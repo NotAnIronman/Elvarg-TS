@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Packet = void 0;
 const PacketType_1 = require("./PacketType");
 const ValueType_1 = require("./ValueType");
-const stringbuilder_1 = require("stringbuilder");
 class Packet {
     constructor(opcode, arg2, arg3) {
         this.offset = 0;
@@ -16,6 +15,14 @@ class Packet {
             this.type = PacketType_1.PacketType.FIXED;
             this.buffer = arg2;
         }
+    }
+    safeSlice(size) {
+        if (this.offset + size > this.buffer.length) {
+            return null;
+        }
+        const slice = this.buffer.subarray(this.offset, this.offset + size);
+        this.offset += size;
+        return slice;
     }
     getOpcode() {
         return this.opcode;
@@ -30,9 +37,10 @@ class Packet {
         return this.buffer.length;
     }
     readByte() {
-        const b = this.buffer.readUInt8(this.offset);
-        this.offset++;
-        return b;
+        const slice = this.safeSlice(1);
+        if (!slice)
+            return 0;
+        return slice.readUInt8(0);
     }
     readByteA() {
         return this.readByte() - 128;
@@ -75,14 +83,16 @@ class Packet {
         return bytes;
     }
     readUnsignedByte() {
-        const b = this.buffer.readUInt8(this.offset);
-        this.offset++;
-        return b;
+        const slice = this.safeSlice(1);
+        if (!slice)
+            return 0;
+        return slice.readUInt8(0);
     }
     readShort() {
-        const val = this.buffer.readInt16BE(this.offset);
-        this.offset += 2;
-        return val;
+        const slice = this.safeSlice(2);
+        if (!slice)
+            return 0;
+        return slice.readInt16BE(0);
     }
     readShortA() {
         let value = ((this.readByte() & 0xFF) << 8) | (this.readByte() - 128 & 0xFF);
@@ -98,9 +108,10 @@ class Packet {
         return value > 32767 ? value - 0x10000 : value;
     }
     readUnsignedShort() {
-        const val = this.buffer.readUInt16BE(this.offset);
-        this.offset += 2;
-        return val;
+        const slice = this.safeSlice(2);
+        if (!slice)
+            return 0;
+        return slice.readUInt16BE(0);
     }
     readUnsignedShortA() {
         let value = 0;
@@ -109,9 +120,10 @@ class Packet {
         return value;
     }
     readInt() {
-        const val = this.buffer.readInt32BE(this.offset);
-        this.offset += 4;
-        return val;
+        const slice = this.safeSlice(4);
+        if (!slice)
+            return 0;
+        return slice.readInt32BE(0);
     }
     readSingleInt() {
         const firstByte = this.readByte(), secondByte = this.readByte(), thirdByte = this.readByte(), fourthByte = this.readByte();
@@ -152,12 +164,15 @@ class Packet {
         return data;
     }
     readString() {
-        let builder = new stringbuilder_1.StringBuilder();
-        let value;
-        while (this.buffer.readUInt8() && (value = this.buffer.readInt8()) != 10) {
-            builder.append(String.fromCharCode(value));
+        let out = "";
+        while (this.offset < this.buffer.length) {
+            const b = this.buffer.readUInt8(this.offset++);
+            if (b === 10) {
+                break;
+            }
+            out += String.fromCharCode(b);
         }
-        return builder.toString();
+        return out;
     }
     readSmart() {
         return this.buffer.readInt8(this.buffer.readInt8()) < 128 ? this.readByte() & 0xFF : (this.readShort() & 0xFFFF) - 32768;

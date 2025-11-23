@@ -265,11 +265,6 @@ export class MovementQueue {
             return false;
         }
 
-        const distance = this.character.getLocation().getDistance(destination);
-        if (distance > 25) {
-            return false;
-        }
-
         return true;
     }
 
@@ -1032,7 +1027,6 @@ class MovementeTaskFunc extends Task {
     }
 
 }
-
 
 
 

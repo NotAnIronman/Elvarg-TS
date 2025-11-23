@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ByteBufUtils = void 0;
-const stringbuilder_1 = require("stringbuilder");
 class ByteBufUtils {
     static getMedium(buffer) {
         const short1 = buffer[0] << 8;
@@ -43,12 +42,14 @@ class ByteBufUtils {
         return `${hostname}:${port}`;
     }
     static readString(buf) {
-        let temp;
-        let builder = new stringbuilder_1.StringBuilder();
-        for (let i = 0; i < buf.length && (temp = buf[i]) !== 10; i++) {
-            builder.append(String.fromCharCode(temp));
+        let out = "";
+        for (let i = 0; i < buf.length; i++) {
+            const temp = buf[i];
+            if (temp === 10)
+                break; // newline terminator
+            out += String.fromCharCode(temp);
         }
-        return builder.toString();
+        return out;
     }
 }
 exports.ByteBufUtils = ByteBufUtils;

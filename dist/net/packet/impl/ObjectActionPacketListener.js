@@ -33,7 +33,6 @@ exports.ObjectActionPacketListener = void 0;
 // import { Graphic } from "../../../game/model/Graphic";
 // import { Animation } from "../../../game/model/Animation";
 // import { Action } from "../../../game/model/Action";
-// class ObjectAction implements Action{
 class ObjectAction {
     constructor(execFunc) {
         this.execFunc = execFunc;
@@ -44,6 +43,11 @@ class ObjectAction {
 }
 // export class ObjectActionPacketListener extends ObjectIdentifiers implements PacketExecutor {
 class ObjectActionPacketListener {
+    // Minimal stub: safely ignore object interactions for now.
+    execute(player, packet) {
+        // No-op until object interaction logic is reintroduced.
+        return;
+    }
 }
 exports.ObjectActionPacketListener = ObjectActionPacketListener;
 //# sourceMappingURL=ObjectActionPacketListener.js.map

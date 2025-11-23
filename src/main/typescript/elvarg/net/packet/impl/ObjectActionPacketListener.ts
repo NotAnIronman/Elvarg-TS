@@ -1,6 +1,7 @@
 // import { Player } from "../../../game/entity/impl/player/Player";
 import { Packet } from "../Packet";
 import { PacketConstants } from "../PacketConstants";
+import { PacketExecutor } from "../PacketExecutor";
 // import { PlayerRights } from "../../../game/model/rights/PlayerRights";
 // import { Server } from "../../../Server";
 // import { RegionManager } from "../../../game/collision/RegionManager";
@@ -34,7 +35,6 @@ import { PacketConstants } from "../PacketConstants";
 // import { Animation } from "../../../game/model/Animation";
 // import { Action } from "../../../game/model/Action";
 
-// class ObjectAction implements Action{
 class ObjectAction {
   constructor(private readonly execFunc: Function) {}
   execute(): void {
@@ -43,7 +43,12 @@ class ObjectAction {
 }
 
 // export class ObjectActionPacketListener extends ObjectIdentifiers implements PacketExecutor {
-export class ObjectActionPacketListener {
+export class ObjectActionPacketListener implements PacketExecutor {
+  // Minimal stub: safely ignore object interactions for now.
+  execute(player: any, packet: Packet) {
+    // No-op until object interaction logic is reintroduced.
+    return;
+  }
   // private static firstClick(player: Player, object: GameObject) {
   //     if (ObjectActionPacketListener.doorHandler(player, object)) {
   //         return;

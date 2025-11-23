@@ -1,7 +1,4 @@
 
-import { StringBuilder } from 'stringbuilder'
-
-
 export class ByteBufUtils {
     public static J_STRING_TERMINATOR: string = '\n';
 
@@ -50,12 +47,13 @@ export class ByteBufUtils {
     }
 
     public static readString(buf: Uint8Array): string {
-        let temp: number;
-        let builder = new StringBuilder();
-        for (let i = 0; i < buf.length && (temp = buf[i]) !== 10; i++) {
-            builder.append(String.fromCharCode(temp));
+        let out = "";
+        for (let i = 0; i < buf.length; i++) {
+            const temp = buf[i];
+            if (temp === 10) break; // newline terminator
+            out += String.fromCharCode(temp);
         }
-        return builder.toString();
+        return out;
     }
 }
 

@@ -35,6 +35,7 @@ import { TradeRequestPacketListener } from "../../net/packet/impl/TradeRequestPa
 import { CreationMenuPacketListener } from "../../net/packet/impl/CreationMenuPacketListener";
 import { TeleportPacketListener } from "../../net/packet/impl/TeleportPacketListener";
 import { ItemContainerActionPacketListener } from "../../net/packet/impl/ItemContainerActionPacketListener";
+import { NOPPacketListener } from "../../net/packet/impl/NOPPacketListener";
 
 export class PacketConstants {
   public static readonly TELEPORT_OPCODE = 183;
@@ -47,6 +48,7 @@ export class PacketConstants {
   public static readonly DROP_ITEM_OPCODE = 87;
   public static readonly FINALIZED_MAP_REGION_OPCODE = 121;
   public static readonly CHANGE_MAP_REGION_OPCODE = 210;
+  public static readonly INTERFACE_TAB_ID_OPCODE = 239;
   public static readonly CLOSE_INTERFACE_OPCODE = 130;
   public static readonly EXAMINE_ITEM_OPCODE = 2;
   public static readonly EXAMINE_NPC_OPCODE = 6;
@@ -61,6 +63,8 @@ export class PacketConstants {
   public static readonly COMMAND_MOVEMENT_OPCODE = 98;
   public static readonly GAME_MOVEMENT_OPCODE = 164;
   public static readonly MINIMAP_MOVEMENT_OPCODE = 248;
+  public static readonly MAP_STATE_OPCODE = 99;
+  public static readonly SOUND_AREA_OPCODE = 209;
   public static readonly PICKUP_ITEM_OPCODE = 236;
   public static readonly SECOND_GROUNDITEM_OPTION_OPCODE = 235;
   public static readonly FIRST_ITEM_CONTAINER_ACTION_OPCODE = 145;
@@ -107,12 +111,12 @@ export class PacketConstants {
   public static readonly ITEM_ON_OBJECT = 192;
   public static readonly ITEM_ON_GROUND_ITEM = 25;
   public static readonly ITEM_ON_PLAYER = 14;
-
   public static PACKETS = new Map<number, any>([
     [PacketConstants.TELEPORT_OPCODE, new TeleportPacketListener()],
     [PacketConstants.SPECIAL_ATTACK_OPCODE, new SpecialAttackPacketListener()],
     [PacketConstants.BUTTON_CLICK_OPCODE, new ButtonClickPacketListener()],
     [PacketConstants.INTERFACE_ACTION_CLICK_OPCODE, new InterfaceActionClickOpcode()],
+    [PacketConstants.SPAWN_TAB_ACTION_OPCODE, new SpawnItemPacketListener()],
     [PacketConstants.REGULAR_CHAT_OPCODE, new ChatPacketListener()],
     [PacketConstants.CLAN_CHAT_OPCODE, new ChatPacketListener()],
     [PacketConstants.DROP_ITEM_OPCODE, new DropItemPacketListener()],
@@ -124,6 +128,7 @@ export class PacketConstants {
     [PacketConstants.CHANGE_APPEARANCE, new ChangeAppearancePacketListener()],
     [PacketConstants.DIALOGUE_OPCODE, new DialoguePacketListener()],
     [PacketConstants.ENTER_AMOUNT_OPCODE, new EnterInputPacketListener()],
+    [PacketConstants.ENTER_SYNTAX_OPCODE, new EnterInputPacketListener()],
     [PacketConstants.EQUIP_ITEM_OPCODE, new EquipPacketListener()],
     [PacketConstants.PLAYER_INACTIVE_OPCODE, new PlayerInactivePacketListener()],
     [PacketConstants.CHAT_SETTINGS_OPCODE, new ChatSettingsPacketListener()],
@@ -131,6 +136,7 @@ export class PacketConstants {
     [PacketConstants.COMMAND_MOVEMENT_OPCODE, new MovementPacketListener()],
     [PacketConstants.GAME_MOVEMENT_OPCODE, new MovementPacketListener()],
     [PacketConstants.MINIMAP_MOVEMENT_OPCODE, new MovementPacketListener()],
+    [PacketConstants.MAP_STATE_OPCODE, new NOPPacketListener()],
     [PacketConstants.PICKUP_ITEM_OPCODE, new PickupItemPacketListener()],
     [PacketConstants.SECOND_GROUNDITEM_OPTION_OPCODE, new SecondGroundItemOptionPacketListener()],
     [PacketConstants.SWITCH_ITEM_SLOT_OPCODE, new SwitchItemSlotPacketListener()],
@@ -139,7 +145,7 @@ export class PacketConstants {
     [PacketConstants.MAGIC_ON_ITEM_OPCODE, new MagicOnItemPacketListener()],
     [PacketConstants.MAGIC_ON_GROUND_ITEM_OPCODE, new MagicOnItemPacketListener()],
     [PacketConstants.BANK_TAB_CREATION_OPCODE, new BankTabCreationPacketListener()],
-    [PacketConstants.SPAWN_TAB_ACTION_OPCODE, new SpawnItemPacketListener()],
+    [PacketConstants.INTERFACE_TAB_ID_OPCODE, new NOPPacketListener()],
     [PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
     [PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
     [PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
@@ -174,9 +180,31 @@ export class PacketConstants {
     [PacketConstants.ADD_IGNORE_OPCODE, new PlayerRelationPacketListener()],
     [PacketConstants.REMOVE_IGNORE_OPCODE, new PlayerRelationPacketListener()],
     [PacketConstants.SEND_PM_OPCODE, new PlayerRelationPacketListener()],
-    [PacketConstants.ENTER_AMOUNT_OPCODE, new EnterInputPacketListener()],
-    [PacketConstants.ENTER_SYNTAX_OPCODE, new EnterInputPacketListener()],
     [PacketConstants.TRADE_REQUEST_OPCODE, new TradeRequestPacketListener()],
-    [PacketConstants.CREATION_MENU_OPCODE, new CreationMenuPacketListener()]
+    [PacketConstants.CREATION_MENU_OPCODE, new CreationMenuPacketListener()],
+    // Stubs for remaining opcodes we see from the client but have no gameplay hooked yet.
+    [3, new NOPPacketListener()], // idle
+    [57, new UseItemPacketListener()], // item on npc (already mapped)
+    [64, new NOPPacketListener()],
+    [65, new NOPPacketListener()],
+    [80, new NOPPacketListener()],
+    [93, new NOPPacketListener()],
+    [94, new NOPPacketListener()],
+    [100, new NOPPacketListener()],
+    [101, new NOPPacketListener()],
+    [115, new NOPPacketListener()],
+    [126, new PlayerRelationPacketListener()], // send pm
+    [139, new TradeRequestPacketListener()],
+    [144, new UseItemPacketListener()],
+    [155, new NPCOptionPacketListener()],
+    [162, new NOPPacketListener()],
+    [174, new NOPPacketListener()],
+    [177, new NOPPacketListener()],
+    [181, new MagicOnItemPacketListener()],
+    [182, new NOPPacketListener()],
+    [200, new NOPPacketListener()],
+    [209, new NOPPacketListener()],
+    [210, new RegionChangePacketListener()],
+    [248, new MovementPacketListener()],
   ]);
 }

@@ -1,6 +1,5 @@
 import { PacketType } from './PacketType';
 import { ValueType } from './ValueType';
-import { StringBuilder } from 'stringbuilder'
 
 export class Packet {
     private offset = 0;
@@ -20,6 +19,14 @@ export class Packet {
     private opcode: number;
     public type: PacketType;
     private buffer: Buffer;
+    private safeSlice(size: number): Buffer | null {
+        if (this.offset + size > this.buffer.length) {
+            return null;
+        }
+        const slice = this.buffer.subarray(this.offset, this.offset + size);
+        this.offset += size;
+        return slice;
+    }
 
     public getOpcode(): number {
         return this.opcode;
@@ -37,9 +44,9 @@ export class Packet {
     }
 
     public readByte(): number {
-        const b = this.buffer.readUInt8(this.offset);
-        this.offset++;
-        return b;
+        const slice = this.safeSlice(1);
+        if (!slice) return 0;
+        return slice.readUInt8(0);
     }
 
     public readByteA(): number {
@@ -91,15 +98,15 @@ export class Packet {
     }
 
     public readUnsignedByte(): number {
-        const b = this.buffer.readUInt8(this.offset);
-        this.offset++;
-        return b;
+        const slice = this.safeSlice(1);
+        if (!slice) return 0;
+        return slice.readUInt8(0);
     }
 
     public readShort(): number {
-        const val = this.buffer.readInt16BE(this.offset);
-        this.offset += 2;
-        return val;
+        const slice = this.safeSlice(2);
+        if (!slice) return 0;
+        return slice.readInt16BE(0);
     }
 
     public readShortA(): number {
@@ -119,9 +126,9 @@ export class Packet {
     }
 
     public readUnsignedShort(): number {
-        const val = this.buffer.readUInt16BE(this.offset);
-        this.offset += 2;
-        return val;
+        const slice = this.safeSlice(2);
+        if (!slice) return 0;
+        return slice.readUInt16BE(0);
     }
 
     public readUnsignedShortA(): number {
@@ -132,9 +139,9 @@ export class Packet {
     }
 
     public readInt(): number {
-        const val = this.buffer.readInt32BE(this.offset);
-        this.offset += 4;
-        return val;
+        const slice = this.safeSlice(4);
+        if (!slice) return 0;
+        return slice.readInt32BE(0);
     }
 
     public readSingleInt(): number {
@@ -181,12 +188,15 @@ export class Packet {
     }
 
     public readString(): string {
-        let builder = new StringBuilder();
-        let value;
-        while (this.buffer.readUInt8() && (value = this.buffer.readInt8()) != 10) {
-            builder.append(String.fromCharCode(value));
+        let out = "";
+        while (this.offset < this.buffer.length) {
+            const b = this.buffer.readUInt8(this.offset++);
+            if (b === 10) {
+                break;
+            }
+            out += String.fromCharCode(b);
         }
-        return builder.toString();
+        return out;
     }
 
     public readSmart(): number {
@@ -205,5 +215,3 @@ export class Packet {
         return this.type;
     }
 }
-
-
