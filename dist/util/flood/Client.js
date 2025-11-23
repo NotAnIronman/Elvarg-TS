@@ -1,55 +1,55 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Client = void 0;
-var Buffer_1 = require("../flood/Buffer");
-var ByteBuffer_1 = require("../flood/ByteBuffer");
-var BufferedConnection_1 = require("../flood/BufferedConnection");
-var IsaacRandom_1 = require("../../net/security/IsaacRandom");
-var NetworkConstants_1 = require("../../net/NetworkConstants");
-var socket_io_client_1 = require("socket.io-client");
+const Buffer_1 = require("../flood/Buffer");
+const ByteBuffer_1 = require("../flood/ByteBuffer");
+const BufferedConnection_1 = require("../flood/BufferedConnection");
+const IsaacRandom_1 = require("../../net/security/IsaacRandom");
+const NetworkConstants_1 = require("../../net/NetworkConstants");
+const socket_io_client_1 = require("socket.io-client");
 // import { GameConstants } from '../../game/GameConstants';
-var LoginResponses_1 = require("../../net/login/LoginResponses");
-var Server_1 = require("../../Server");
-var Client = /** @class */ (function () {
-    function Client(username, password) {
+const LoginResponses_1 = require("../../net/login/LoginResponses");
+const Server_1 = require("../../Server");
+class Client {
+    constructor(username, password) {
         this.pingCounter = 0;
         this.username = username;
         this.password = password;
     }
-    Client.prototype.openSocket = function (port) {
-        var socket = (0, socket_io_client_1.default)("http://localhost:".concat(port));
-        socket.on("connect", function () {
+    openSocket(port) {
+        const socket = (0, socket_io_client_1.default)(`http://localhost:${port}`);
+        socket.on("connect", () => {
             console.log("Conectado ao servidor");
         });
-        socket.on("disconnect", function () {
+        socket.on("disconnect", () => {
             console.log("Desconectado do servidor");
         });
         return socket;
-    };
-    Client.prototype.attemptLogin = function () {
+    }
+    attemptLogin() {
         this.login = Buffer_1.Buffer.create();
         this.incoming = Buffer_1.Buffer.create();
         this.outgoing = ByteBuffer_1.ByteBuffer.create(5000, false, null);
         this.socketStream = new BufferedConnection_1.BufferedConnection(this.openSocket(NetworkConstants_1.NetworkConstants.GAME_PORT));
         this.outgoing.putByte(14); //REQUEST
         this.socketStream.queueBytes(1, this.outgoing.getBuffer());
-        var response = this.socketStream.read();
-    };
-    Client.prototype.attemptLogins = function () {
+        let response = this.socketStream.read();
+    }
+    attemptLogins() {
         this.login = Buffer_1.Buffer.create();
         this.incoming = Buffer_1.Buffer.create();
         this.outgoing = ByteBuffer_1.ByteBuffer.create(5000, false, null);
         this.socketStream = new BufferedConnection_1.BufferedConnection(this.openSocket(NetworkConstants_1.NetworkConstants.GAME_PORT));
         this.outgoing.putByte(14); //REQUEST
         this.socketStream.queueBytes(1, this.outgoing.getBuffer());
-        var response = this.socketStream.read();
+        let response = this.socketStream.read();
         //Our encryption for outgoing messages for this player's session
-        var cipher = null;
+        let cipher = null;
         if (response === 0) {
             this.socketStream.flushInputStream(new Uint8Array(this.incoming.payload), 8);
             this.incoming.currentPosition = 0;
             this.serverSeed = this.incoming.readLong();
-            var seed = [
+            let seed = [
                 Math.floor(Math.random() * 99999999),
                 Math.floor(Math.random() * 99999999),
                 this.serverSeed >> 32,
@@ -72,7 +72,7 @@ var Client = /** @class */ (function () {
             this.login.writeByte(0);
             this.login.writeByteS(this.outgoing.getPosition());
             cipher = new IsaacRandom_1.IsaacRandom(seed);
-            for (var index = 0; index < 4; index++) {
+            for (let index = 0; index < 4; index++) {
                 seed[index] += 50;
             }
             this.encryption = new IsaacRandom_1.IsaacRandom(seed);
@@ -81,22 +81,22 @@ var Client = /** @class */ (function () {
         }
         if (response === LoginResponses_1.LoginResponses.LOGIN_SUCCESSFUL) {
             Server_1.Server.getFlooder().clients.set(this.username, this);
-            var rights = this.socketStream.read();
+            let rights = this.socketStream.read();
             this.loggedIn = true;
             this.outgoing = ByteBuffer_1.ByteBuffer.create(5000, false, cipher);
             this.incoming.currentPosition = 0;
         }
-    };
-    Client.prototype.readPacket = function () {
+    }
+    readPacket() {
         if (this.socketStream == null) {
             return false;
         }
-        var available = this.socketStream.available();
+        let available = this.socketStream.available();
         if (available < 2) {
             return false;
         }
-        var opcode = -1;
-        var packetSize = -1;
+        let opcode = -1;
+        let packetSize = -1;
         if (opcode === -1) {
             this.socketStream.flushInputStream(new Uint8Array(this.incoming.payload), 1);
             opcode = this.incoming.payload[0] & 0xff;
@@ -117,10 +117,10 @@ var Client = /** @class */ (function () {
         switch (opcode) {
         }
         return false;
-    };
-    Client.prototype.process = function () {
+    }
+    process() {
         if (this.loggedIn) {
-            for (var i = 0; i < 5; i++) {
+            for (let i = 0; i < 5; i++) {
                 if (!this.readPacket()) {
                     break;
                 }
@@ -134,8 +134,7 @@ var Client = /** @class */ (function () {
                 this.pingCounter = 0;
             }
         }
-    };
-    return Client;
-}());
+    }
+}
 exports.Client = Client;
 //# sourceMappingURL=Client.js.map

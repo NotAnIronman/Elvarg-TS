@@ -2,13 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PlayerOptionPacketListener = void 0;
 // import { PlayerRights } from '../../../game/model/rights/PlayerRights';
-var PacketConstants_1 = require("../PacketConstants");
-var PlayerOptionPacketListener = /** @class */ (function () {
-    function PlayerOptionPacketListener() {
-    }
+const PacketConstants_1 = require("../PacketConstants");
+class PlayerOptionPacketListener {
     // public static attack(player: Player, packet: Packet) {
-    PlayerOptionPacketListener.attack = function (player, packet) {
-        var index = packet.readLEShort();
+    static attack(player, packet) {
+        let index = packet.readLEShort();
         // if (index > World.getPlayers().capacityReturn() || index < 0)
         //     return;
         // const attacked: Player = World.getPlayers().get(index);
@@ -20,7 +18,7 @@ var PlayerOptionPacketListener = /** @class */ (function () {
         //     player.getPacketSender().sendMessage("AttacKInfo "+attacked.getLocation().toString() + " " + player.getLocation().getDistance(attacked.getLocation()));
         // }
         // player.getCombat().attack(attacked);
-    };
+    }
     /**
      * Manages the first option click on a player option menu.
      *
@@ -28,8 +26,8 @@ var PlayerOptionPacketListener = /** @class */ (function () {
      * @param packet The packet to read values from.
      */
     // public static option1(player: Player, packet: Packet) {
-    PlayerOptionPacketListener.option1 = function (player, packet) {
-        var id = packet.readShort() & 0xffff;
+    static option1(player, packet) {
+        let id = packet.readShort() & 0xffff;
         // if (id < 0 || id > World.getPlayers().capacityReturn())
         //     return;
         // let player2: Player = World.getPlayers().get(id);
@@ -40,7 +38,7 @@ var PlayerOptionPacketListener = /** @class */ (function () {
         //         player.getArea().onPlayerRightClick(player, player2, 1);
         //     }
         // });
-    };
+    }
     /**
      * Manages the second option click on a player option menu.
      *
@@ -48,8 +46,8 @@ var PlayerOptionPacketListener = /** @class */ (function () {
      * @param packet The packet to read values from.
      */
     // public static option2(player: Player, packet: Packet) {
-    PlayerOptionPacketListener.option2 = function (player, packet) {
-        var id = packet.readShort() & 0xffff;
+    static option2(player, packet) {
+        let id = packet.readShort() & 0xffff;
         // if (id < 0 || id > World.getPlayers().capacityReturn())
         //     return;
         // let player2: Player = World.getPlayers().get(id);
@@ -60,10 +58,10 @@ var PlayerOptionPacketListener = /** @class */ (function () {
         //             player.getArea().onPlayerRightClick(player, player2, 2);
         //         }
         // });
-    };
+    }
     // private static option3(player: Player, packet: Packet) {
-    PlayerOptionPacketListener.option3 = function (player, packet) {
-        var id = packet.readLEShortA() & 0xffff;
+    static option3(player, packet) {
+        let id = packet.readLEShortA() & 0xffff;
         // if (id < 0 || id > World.getPlayers().capacityReturn())
         //     return;
         // let player2 = World.getPlayers().get(id);
@@ -74,9 +72,9 @@ var PlayerOptionPacketListener = /** @class */ (function () {
         //             player.getArea().onPlayerRightClick(player, player2, 3);
         //         }
         // });
-    };
+    }
     // execute(player: Player, packet: Packet) {
-    PlayerOptionPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player == null || player.getHitpoints() <= 0) {
             return;
         }
@@ -97,8 +95,7 @@ var PlayerOptionPacketListener = /** @class */ (function () {
                 PlayerOptionPacketListener.option3(player, packet);
                 break;
         }
-    };
-    return PlayerOptionPacketListener;
-}());
+    }
+}
 exports.PlayerOptionPacketListener = PlayerOptionPacketListener;
 //# sourceMappingURL=PlayerOptionPacketListener.js.map

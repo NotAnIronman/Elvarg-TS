@@ -2,18 +2,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MagicOnPlayerPacketListener = void 0;
 // import { CombatSpells } from "../../../game/content/combat/magic/CombatSpells";
-var MagicOnPlayerPacketListener = /** @class */ (function () {
-    function MagicOnPlayerPacketListener() {
-    }
+class MagicOnPlayerPacketListener {
     // execute(player: Player, packet: Packet) {
-    MagicOnPlayerPacketListener.prototype.execute = function (player, packet) {
-        var playerIndex = packet.readShortA();
+    execute(player, packet) {
+        let playerIndex = packet.readShortA();
         if (!player || player.getHitpoints() <= 0) {
             return;
         }
         // if (playerIndex < 0 || playerIndex > World.getPlayers().capacityReturn())
         //     return;
-        var spellId = packet.readLEShort();
+        let spellId = packet.readLEShort();
         if (spellId < 0) {
             return;
         }
@@ -34,8 +32,7 @@ var MagicOnPlayerPacketListener = /** @class */ (function () {
         // player.setPositionToFace(attacked.getLocation());
         // player.getCombat().setCastSpell(spell);
         // player.getCombat().attack(attacked);
-    };
-    return MagicOnPlayerPacketListener;
-}());
+    }
+}
 exports.MagicOnPlayerPacketListener = MagicOnPlayerPacketListener;
 //# sourceMappingURL=MagicOnPlayerPacketListener.js.map

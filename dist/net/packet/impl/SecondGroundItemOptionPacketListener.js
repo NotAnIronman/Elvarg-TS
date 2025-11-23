@@ -5,14 +5,12 @@ exports.SecondGroundItemOptionPacketListener = void 0;
 // import { Firemaking } from '../../../game/content/skill/skillable/impl/Firemaking';
 // import { Location } from '../../../game/model/Location';
 // import { LightableLog } from '../../../game/content/skill/skillable/impl/Firemaking'
-var SecondGroundItemOptionPacketListener = /** @class */ (function () {
-    function SecondGroundItemOptionPacketListener() {
-    }
+class SecondGroundItemOptionPacketListener {
     // execute(player: Player, packet: Packet) {
-    SecondGroundItemOptionPacketListener.prototype.execute = function (player, packet) {
-        var y = packet.readLEShort();
-        var itemId = packet.readShort();
-        var x = packet.readLEShort();
+    execute(player, packet) {
+        const y = packet.readLEShort();
+        const itemId = packet.readShort();
+        const x = packet.readLEShort();
         // const position = new Location(x, y, player.getLocation().getZ());
         if (!player || player.getHitpoints() <= 0) {
             return;
@@ -36,8 +34,7 @@ var SecondGroundItemOptionPacketListener = /** @class */ (function () {
         //         }
         //     }
         // });
-    };
-    return SecondGroundItemOptionPacketListener;
-}());
+    }
+}
 exports.SecondGroundItemOptionPacketListener = SecondGroundItemOptionPacketListener;
 //# sourceMappingURL=SecondGroundItemOptionPacketListener.js.map

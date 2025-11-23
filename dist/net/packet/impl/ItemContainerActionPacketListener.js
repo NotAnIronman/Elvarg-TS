@@ -14,28 +14,25 @@ exports.ItemContainerActionPacketListener = void 0;
 // import { WeaponInterfaces } from "../../../game/content/combat/WeaponInterfaces";
 // import { CombatSpecial } from "../../../game/content/combat/CombatSpecial";
 // import { Autocasting } from "../../../game/content/combat/magic/Autocasting";
-var PacketConstants_1 = require("../PacketConstants");
+const PacketConstants_1 = require("../PacketConstants");
 // import { Item } from "../../../game/model/Item";
 // import { Flag } from "../../../game/model/Flag";
 // import { EnteredAmountAction } from "../../../game/model/EnteredAmountAction";
 // class ItemContainerEnteredAmountAction implements EnteredAmountAction{
-var ItemContainerEnteredAmountAction = /** @class */ (function () {
-    function ItemContainerEnteredAmountAction(execFunc) {
+class ItemContainerEnteredAmountAction {
+    constructor(execFunc) {
         this.execFunc = execFunc;
     }
-    ItemContainerEnteredAmountAction.prototype.execute = function (amount) {
+    execute(amount) {
         this.execFunc();
-    };
-    return ItemContainerEnteredAmountAction;
-}());
-var ItemContainerActionPacketListener = /** @class */ (function () {
-    function ItemContainerActionPacketListener() {
     }
-    ItemContainerActionPacketListener.firstAction = function (player, packet) {
+}
+class ItemContainerActionPacketListener {
+    static firstAction(player, packet) {
         // static firstAction(player: Player, packet: Packet) {
-        var containerId = packet.readInt();
-        var slot = packet.readShortA();
-        var id = packet.readShortA();
+        let containerId = packet.readInt();
+        let slot = packet.readShortA();
+        let id = packet.readShortA();
         // Bank withdrawal..
         // if (containerId >= Bank.CONTAINER_START && containerId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {
         //     Bank.withdraw(player, id, slot, 1, containerId - Bank.CONTAINER_START);
@@ -120,12 +117,12 @@ var ItemContainerActionPacketListener = /** @class */ (function () {
         //         }
         //         break;
         // }
-    };
+    }
     // private static secondAction(player: Player, packet: Packet): void {
-    ItemContainerActionPacketListener.secondAction = function (player, packet) {
-        var interfaceId = packet.readInt();
-        var id = packet.readShortA();
-        var slot = packet.readLEShort();
+    static secondAction(player, packet) {
+        let interfaceId = packet.readInt();
+        let id = packet.readShortA();
+        let slot = packet.readLEShort();
         // Bank withdrawal..
         // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {
         //     Bank.withdraw(player, id, slot, 5, interfaceId - Bank.CONTAINER_START);
@@ -181,12 +178,12 @@ var ItemContainerActionPacketListener = /** @class */ (function () {
         //         player.getPriceChecker().withdraw(id, 5, slot);
         //         break;
         // }
-    };
+    }
     // private static thirdAction(player: Player, packet: Packet) {
-    ItemContainerActionPacketListener.thirdAction = function (player, packet) {
-        var interfaceId = packet.readInt();
-        var id = packet.readShortA();
-        var slot = packet.readShortA();
+    static thirdAction(player, packet) {
+        let interfaceId = packet.readInt();
+        let id = packet.readShortA();
+        let slot = packet.readShortA();
         // Bank withdrawal..
         // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {
         //     Bank.withdraw(player, id, slot, 10, interfaceId - Bank.CONTAINER_START);
@@ -224,12 +221,12 @@ var ItemContainerActionPacketListener = /** @class */ (function () {
         //         player.getPriceChecker().withdraw(id, 10, slot);
         //         break;
         // }
-    };
+    }
     // private static fourthAction(player: Player, packet: Packet) {
-    ItemContainerActionPacketListener.fourthAction = function (player, packet) {
-        var slot = packet.readShortA();
-        var interfaceId = packet.readInt();
-        var id = packet.readShortA();
+    static fourthAction(player, packet) {
+        let slot = packet.readShortA();
+        let interfaceId = packet.readInt();
+        let id = packet.readShortA();
         // Bank withdrawal..
         // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {
         //     Bank.withdraw(player, id, slot, -1, interfaceId - Bank.CONTAINER_START);
@@ -281,12 +278,12 @@ var ItemContainerActionPacketListener = /** @class */ (function () {
         //         player.getPriceChecker().withdraw(id, player.getPriceChecker().getAmount(id), slot);
         //         break;
         // }
-    };
+    }
     // private static fifthAction(player: Player, packet: Packet) {
-    ItemContainerActionPacketListener.fifthAction = function (player, packet) {
-        var interfaceId = packet.readInt();
-        var slot = packet.readLEShort();
-        var id = packet.readLEShort();
+    static fifthAction(player, packet) {
+        let interfaceId = packet.readInt();
+        let slot = packet.readLEShort();
+        let id = packet.readLEShort();
         // Bank withdrawal..
         // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {
         //     player.setEnteredAmountAction(new ItemContainerEnteredAmountAction((amount: number) => {
@@ -362,11 +359,11 @@ var ItemContainerActionPacketListener = /** @class */ (function () {
         //         player.getPacketSender().sendEnterAmountPrompt("How many would you like to withdraw?");
         //         break;
         // }
-    };
+    }
     // private static sixthAction(player: Player, packet: Packet) {
-    ItemContainerActionPacketListener.sixthAction = function (player, packet) { };
+    static sixthAction(player, packet) { }
     // public execute(player: Player, packet: Packet) {
-    ItemContainerActionPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player == null || player.getHitpoints() <= 0) {
             return;
         }
@@ -390,8 +387,7 @@ var ItemContainerActionPacketListener = /** @class */ (function () {
                 ItemContainerActionPacketListener.sixthAction(player, packet);
                 break;
         }
-    };
-    return ItemContainerActionPacketListener;
-}());
+    }
+}
 exports.ItemContainerActionPacketListener = ItemContainerActionPacketListener;
 //# sourceMappingURL=ItemContainerActionPacketListener.js.map

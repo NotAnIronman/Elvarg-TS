@@ -2,11 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SpawnItemPacketListener = void 0;
 // import { EnteredAmountAction } from "../../../game/model/EnteredAmountAction";
-var SpawnItemPacketListener = /** @class */ (function () {
-    function SpawnItemPacketListener() {
-    }
+class SpawnItemPacketListener {
     // static spawn(player: Player, item: number, amount: number, toBank: boolean) {
-    SpawnItemPacketListener.spawn = function (player, item, amount, toBank) {
+    static spawn(player, item, amount, toBank) {
         if (amount < 0) {
             return;
         }
@@ -38,41 +36,39 @@ var SpawnItemPacketListener = /** @class */ (function () {
         }
         player.getPacketSender().sendMessage(
         // `Spawned ${def.getName()} to ${toBank ? "bank" : "inventory"}.`
-        "Spawned to ".concat(toBank ? "bank" : "inventory", "."));
-    };
+        `Spawned to ${toBank ? "bank" : "inventory"}.`);
+    }
     // execute(player: Player, packet: Packet) {
-    SpawnItemPacketListener.prototype.execute = function (player, packet) {
-        var item = packet.readInt();
-        var spawnX = packet.readByte() == 1;
-        var toBank = packet.readByte() == 1;
+    execute(player, packet) {
+        let item = packet.readInt();
+        let spawnX = packet.readByte() == 1;
+        let toBank = packet.readByte() == 1;
         // let def = ItemDefinition.forId(item);
         // if (!def) {
         //     player.getPacketSender().sendMessage("This item is currently unavailable.");
         //     return;
         // }
         if (spawnX) {
-            player.setEnteredAmountAction(new SpawnEntered(function (amount) {
+            player.setEnteredAmountAction(new SpawnEntered((amount) => {
                 SpawnItemPacketListener.spawn(player, item, amount, toBank);
             }));
             player.getPacketSender().sendEnterAmountPrompt(
             //   `How many ${def.getName()} would you like to spawn?`
-            "How many  would you like to spawn?");
+            `How many  would you like to spawn?`);
         }
         else {
             SpawnItemPacketListener.spawn(player, item, 1, toBank);
         }
-    };
-    return SpawnItemPacketListener;
-}());
+    }
+}
 exports.SpawnItemPacketListener = SpawnItemPacketListener;
 // class SpawnEntered implements EnteredAmountAction{
-var SpawnEntered = /** @class */ (function () {
-    function SpawnEntered(execFunc) {
+class SpawnEntered {
+    constructor(execFunc) {
         this.execFunc = execFunc;
     }
-    SpawnEntered.prototype.execute = function (amount) {
+    execute(amount) {
         this.execFunc();
-    };
-    return SpawnEntered;
-}());
+    }
+}
 //# sourceMappingURL=SpawnItemPacketListener.js.map

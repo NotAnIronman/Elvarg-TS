@@ -1,1 +1,1 @@
-{"version":3,"file":"ChannelEventHandler.js","sourceRoot":"","sources":["../../../src/main/typescript/elvarg/net/channel/ChannelEventHandler.ts"],"names":[],"mappings":";;;AAKA;IAGE,6BAAY,IAAmB;QAC7B,IAAI,CAAC,EAAE,GAAG,IAAI,CAAC;IACjB,CAAC;IA0CH,0BAAC;AAAD,CAAC,AA/CD,IA+CC;AA/CY,kDAAmB"}
+{"version":3,"file":"ChannelEventHandler.js","sourceRoot":"","sources":["../../../src/main/typescript/elvarg/net/channel/ChannelEventHandler.ts"],"names":[],"mappings":";;;AAKA,MAAa,mBAAmB;IAG9B,YAAY,IAAmB;QAC7B,IAAI,CAAC,EAAE,GAAG,IAAI,CAAC;IACjB,CAAC;CA0CF;AA/CD,kDA+CC"}

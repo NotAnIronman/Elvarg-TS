@@ -25,16 +25,11 @@ exports.ItemActionPacketListener = void 0;
 // import { BirdNest } from "../../../game/content/skill/skillable/impl/woodcutting/BirdNest";
 // import { BarrowsSet } from "../../../game/model/BarrowsSet";
 // class ItemActionTask extends Task{
-var ItemActionTask = /** @class */ (function () {
-    function ItemActionTask() {
-    }
-    return ItemActionTask;
-}());
-var ItemActionPacketListener = /** @class */ (function () {
-    function ItemActionPacketListener() {
-    }
+class ItemActionTask {
+}
+class ItemActionPacketListener {
     // execute(player: Player, packet: Packet): void {
-    ItemActionPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player == null || player.getHitpoints() <= 0)
             return;
         switch (packet.getOpcode()
@@ -49,12 +44,12 @@ var ItemActionPacketListener = /** @class */ (function () {
         //     break;
         ) {
         }
-    };
+    }
     // private static firstAction(player: Player, packet: Packet) {
-    ItemActionPacketListener.firstAction = function (player, packet) {
-        var interfaceId = packet.readUnsignedShort();
-        var itemId = packet.readShort();
-        var slot = packet.readShort();
+    static firstAction(player, packet) {
+        let interfaceId = packet.readUnsignedShort();
+        let itemId = packet.readShort();
+        let slot = packet.readShort();
         if (slot < 0 || slot > player.getInventory().capacity()) {
             return;
         }
@@ -184,12 +179,12 @@ var ItemActionPacketListener = /** @class */ (function () {
             //   player.getPacketSender().sendMessage(`You've opened your .`);
             // }
         }
-    };
+    }
     // static secondAction(player: Player, packet: Packet) {
-    ItemActionPacketListener.secondAction = function (player, packet) {
-        var interfaceId = packet.readLEShortA();
-        var slot = packet.readLEShort();
-        var itemId = packet.readShortA();
+    static secondAction(player, packet) {
+        let interfaceId = packet.readLEShortA();
+        let slot = packet.readLEShort();
+        let itemId = packet.readShortA();
         if (slot < 0 || slot >= player.getInventory().capacity())
             return;
         if (player.getInventory().getItems()[slot].getId() != itemId)
@@ -220,12 +215,12 @@ var ItemActionPacketListener = /** @class */ (function () {
                                 "You still have " + (40 - player.getRecoilDamage()) + " damage before it breaks. Continue?");*/
                 break;
         }
-    };
+    }
     // public thirdClickAction(player: Player, packet: Packet) {
-    ItemActionPacketListener.prototype.thirdClickAction = function (player, packet) {
-        var itemId = packet.readShortA();
-        var slot = packet.readLEShortA();
-        var interfaceId = packet.readLEShortA();
+    thirdClickAction(player, packet) {
+        let itemId = packet.readShortA();
+        let slot = packet.readLEShortA();
+        let interfaceId = packet.readLEShortA();
         if (slot < 0 || slot >= player.getInventory().capacity())
             return;
         if (player.getInventory().getItems()[slot].getId() != itemId)
@@ -245,8 +240,7 @@ var ItemActionPacketListener = /** @class */ (function () {
                     " Zulrah scales left.");
                 break;
         }
-    };
-    return ItemActionPacketListener;
-}());
+    }
+}
 exports.ItemActionPacketListener = ItemActionPacketListener;
 //# sourceMappingURL=ItemActionPacketListener.js.map

@@ -3,6 +3,7 @@ import { ValueType } from './ValueType';
 import { StringBuilder } from 'stringbuilder'
 
 export class Packet {
+    private offset = 0;
     constructor(opcode: number, buffer: Buffer);
     constructor(opcode: number, type: PacketType, buffer: Buffer);
     constructor(opcode: number, arg2: PacketType | Buffer, arg3?: Buffer) {
@@ -36,11 +37,8 @@ export class Packet {
     }
 
     public readByte(): number {
-        let b: number = 0;
-        try {
-            b = this.buffer.readUInt8();
-        } catch (e) {
-        }
+        const b = this.buffer.readUInt8(this.offset);
+        this.offset++;
         return b;
     }
 
@@ -93,11 +91,15 @@ export class Packet {
     }
 
     public readUnsignedByte(): number {
-        return this.buffer.readUInt8();
+        const b = this.buffer.readUInt8(this.offset);
+        this.offset++;
+        return b;
     }
 
     public readShort(): number {
-        return this.buffer.readUInt8();
+        const val = this.buffer.readInt16BE(this.offset);
+        this.offset += 2;
+        return val;
     }
 
     public readShortA(): number {
@@ -117,7 +119,9 @@ export class Packet {
     }
 
     public readUnsignedShort(): number {
-        return this.buffer.readUInt8();
+        const val = this.buffer.readUInt16BE(this.offset);
+        this.offset += 2;
+        return val;
     }
 
     public readUnsignedShortA(): number {
@@ -128,16 +132,18 @@ export class Packet {
     }
 
     public readInt(): number {
-        return this.buffer.readUInt8();
+        const val = this.buffer.readInt32BE(this.offset);
+        this.offset += 4;
+        return val;
     }
 
     public readSingleInt(): number {
-        let firstByte = this.readByte(), secondByte = this.readByte(), thirdByte = this.readByte(), fourthByte = this.readByte();
+        const firstByte = this.readByte(), secondByte = this.readByte(), thirdByte = this.readByte(), fourthByte = this.readByte();
         return ((thirdByte << 24) & 0xFF) | ((fourthByte << 16) & 0xFF) | ((firstByte << 8) & 0xFF) | (secondByte & 0xFF);
     }
 
     public readDoubleInt(): number {
-        let firstByte = this.readByte() & 0xFF, secondByte = this.readByte() & 0xFF, thirdByte = this.readByte() & 0xFF, fourthByte = this.readByte() & 0xFF;
+        const firstByte = this.readByte() & 0xFF, secondByte = this.readByte() & 0xFF, thirdByte = this.readByte() & 0xFF, fourthByte = this.readByte() & 0xFF;
         return ((secondByte << 24) & 0xFF) | ((firstByte << 16) & 0xFF) | ((fourthByte << 8) & 0xFF) | (thirdByte & 0xFF);
     }
 
@@ -146,7 +152,9 @@ export class Packet {
     }
 
     public readLong(): number {
-        return this.buffer.readUInt8();
+        const high = this.readInt();
+        const low = this.readInt();
+        return high * 0x100000000 + low;
     }
 
     public getBytesReverse(amount: number, type: ValueType): number[] {
@@ -197,6 +205,5 @@ export class Packet {
         return this.type;
     }
 }
-
 
 

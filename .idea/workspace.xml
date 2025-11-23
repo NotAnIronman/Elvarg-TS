@@ -5,38 +5,1041 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="286c1503-b08d-4a5e-bcd8-fae14731a9d8" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/scripts/login-smoke.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameBuilder.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameConstants.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameEngine.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameLogic.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/Sound.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/Sounds.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/Systems.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/World.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/collision/Buffer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/collision/Region.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/collision/RegionManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/DepositBox.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Duelling.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Emotes.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Food.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Gambiling.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/ItemsKeptOnDeath.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Obelisks.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/PetHandler.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/PotionConsumable.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/PrayerHandler.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/QuickPrayers.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Trading.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/clan/BannedMember.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/clan/ClanChat.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/clan/ClanChatManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/clan/ClanChatRank.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/Combat.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/CombatConstants.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/CombatEquipment.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/CombatFactory.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/CombatSpecial.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/CombatType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/FightStyle.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/FightType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/WeaponInterfaces.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/bountyhunter/BountyHunter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/bountyhunter/Emblem.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/bountyhunter/TargetPair.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/bountyhunter/WealthType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/formula/AccuracyFormulasDpsCalc.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/hit/HitDamage.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/hit/HitDamageCache.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/hit/HitMask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/hit/HitQueue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/hit/PendingHit.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/Autocasting.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/CombatAncientSpell.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/CombatEffectSpell.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/CombatNormalSpell.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/CombatSpell.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/CombatSpells.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/EffectSpells.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/PlayerMagicStaff.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/Spell.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/CombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/MagicCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/MeleeCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/RangedCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/BanditCombtMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/CallistoCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/ChaosElementalCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/ChaosFanaticCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/CrazyArchaeologistCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/JadCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/KingBlackDragonMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/RockCrabCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/VenenatisCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/VetionCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/pestcontrol/BrawlerCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/pestcontrol/PestControlPortalCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/pestcontrol/RavagerCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/pestcontrol/ShifterCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/pestcontrol/SpinnerCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/pestcontrol/SplatterCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/npcs/pestcontrol/TorcherCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/AbyssalBludgeonCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/AbyssalDaggerCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/AbyssalTentacleCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/AbyssalWhipCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/ArmadylCrossbowCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/ArmadylGodswordCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/BallistaCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/BandosGodswordCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/BarrelchestAnchorCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DarkBowCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DragonClawCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DragonDaggerCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DragonHalberdCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DragonLongswordCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DragonMaceCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DragonScimitarCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/DragonWarhammerCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/GraniteMaulCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/MagicShortbowCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/SaradominGodswordCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/SaradominSwordCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/method/impl/specials/ZamorakGodswordCombatMethod.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/ranged/RangedData.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/Minigame.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/MinigameHandler.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/Barrows.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/CastleWars.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/FightCaves.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/pestcontrols/PestControl.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/pestcontrols/PestControlBoat.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/pestcontrols/PestControlPortal.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/pestcontrols/PestControlPortalData.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/presets/PredefinedPresets.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/presets/Presetable.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/presets/Presetables.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/quests/Quest.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/quests/QuestHandler.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/quests/impl/CooksAssistant.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/SkillManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/Skillable.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Cooking.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Crafting.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/DefaultSkillable.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Firemaking.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Fishing.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Fletching.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Herblore.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/ItemCreationSkillable.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Mining.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Prayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Runecrafting.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Smithing.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Thieving.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/woodcutting/BirdNest.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/woodcutting/Woodcutting.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/slayer/ActiveSlayerTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/slayer/Slayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/slayer/SlayerMaster.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/slayer/SlayerTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/DefaultSpawnDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/ItemDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/NpcDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/NpcDropDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/NpcSpawnDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/ObjectDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/ObjectSpawnDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/PlayerBotDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/ShopDefinition.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/DefinitionLoader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ItemDefinitionLoader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NPCSpawnDumper.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcDefinitionLoader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcSpawnDefinitionLoader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ObjectSpawnDefinitionLoader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ShopDefinitionLoader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/Entity.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/Mobile.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/MobileList.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGround.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NPCDropGenerator.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NPCInteraction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NPCInteractionSystem.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NPCMovementCoordinator.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NpcAggression.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/AhrimTheBlighted.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Bandit.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Banker.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Barricades.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Callisto.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/ChaosElemental.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/ChaosFanatic.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/CrazyArchaeologist.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/ElderChaosDruid.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/EmblemTrader.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/GodwarsFollower.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/KarilTheTainted.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/KingBlackDragon.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Lanthus.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Perdu.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/RockCrab.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Sheep.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/TztokJad.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Venenatis.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Vetion.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/VetionHellhound.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/pestcontrol/BrawlerNPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/pestcontrol/PestControlPortalNPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/pestcontrol/RavagerNPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/pestcontrol/ShifterNPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/pestcontrol/SpinnerNPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/pestcontrol/SplaaterNPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/pestcontrol/TorcherNPC.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/object/GameObject.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/object/MapObjects.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/object/ObjectManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/object/impl/WebHandler.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/JacksonAttributeConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/Player.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerPersistence.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSaveConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/dynamodb/DynamoDBPlayerPersistence.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/dynamodb/PlayerSaveRecord.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/jsonfile/JSONFilePlayerPersistence.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/PlayerBot.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/BotCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/CommandType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/FightCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/FollowPlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/GoToDuelArena.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/HoldItems.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/LoadPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/commands/PlayCastleWars.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/AttackStyleSwitch.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/CombatAction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/CombatSwitch.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/EnemyDefenseAwareCombatSwitch.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/FighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/DDSPureMFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/DDSPureRFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/F2PMeleeFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/GRangerFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/MidTribridMaxFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/NHPureFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/ObbyMaulerFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/TribridMaxFighterPreset.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/interaction/ChatInteraction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/interaction/CombatInteraction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/interaction/MovementInteraction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/interaction/TradingInteraction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/NPCUpdating.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/PlayerUpdating.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/sync/GameSyncExecutor.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/sync/GameSyncTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Action.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Animation.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/AnimationLoop.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Appearance.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/BarrowsSet.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Boundary.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/BrokenItem.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/ChatMessage.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Direction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/DwarfCannon.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/EffectTimer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/EnteredAmountAction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/EnteredSyntaxAction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/EquipmentType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/FacingDirection.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Flag.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/ForceMovement.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/God.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Graphic.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/GraphicHeight.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Hitmask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Ids.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Item.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/ItemInSlot.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Location.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/MagicSpellbook.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/PlayerInteractingOption.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/PlayerRelations.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/PlayerStatus.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/PolygonalBoundary.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Prayerbook.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Priority.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Projectile.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/RequiredItem.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/SecondsTimer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skill.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skillcape.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/SkullType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/UpdateFlag.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/Area.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/AreaManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/BarrowsArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/DuelArenaArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/FightCavesArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/GodwarsDugeonArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/KingBlackDragonArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/PrivateArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/WildernessArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/castlewars/CastleWarsGameArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/castlewars/CastleWarsLobbyArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/castlewars/CastleWarsSaradominWaitingArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/castlewars/CastleWarsZamorakWaitingArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/pestcontrol/PestControlArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/pestcontrol/PestControlNoviceBoatArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/impl/pestcontrol/PestControlOutpostArea.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/Command.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/CommandManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/GroundItemCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/AnimationCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/AreaDebug.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/AttackRange.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/BanPlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Bank.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/BarrageCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/CWarInterfaceCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ChangePassword.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ChatboxInterfaceCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Claim.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ConfigCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/CopyBank.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/CreationDate.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/DebugCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/DialogueCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Down.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Empty.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ExitClient.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/FloodCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/GFXCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/InfiniteHealth.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/InterfaceCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/IpBanPlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/IpMutePlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ItemSpawn.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Kdr.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/KickPlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ListSizesCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/LockExperience.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/MasterCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/MaxHit.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/MutePlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Noclip.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/OpenThread.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/PNPCCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Players.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/PositionDebug.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ReloadCommands.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ReloadDrops.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ReloadItems.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ReloadNPCDefinitions.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ReloadNPCSpawns.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ReloadPunishments.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ReloadShops.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/ResetCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Runes.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Save.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/SaveAll.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Skull.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/SoundEffectCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/SpawnNPCCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/SpawnObjectCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/SpawnPermanentNPCCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/SpecCommand.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Store.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/TaskDebug.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/TeleTo.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/TeleToMe.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/TeleToPlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/TestGESellInt.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/TimePlayed.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Title.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/UnBanPlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/UnIpMutePlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/UnMutePlayer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/UnlockPrayers.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Up.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/UpdateServer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/Yell.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/ItemContainer.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/StackType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Bank.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Equipment.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Inventory.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/PriceChecker.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/Shop.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/ShopManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/currency/ShopCurrencies.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/currency/ShopCurrency.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/currency/impl/BloodMoneyCurrency.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/currency/impl/CastleWarsTicketCurrency.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/currency/impl/CoinsCurrency.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/currency/impl/ItemCurrency.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/shop/currency/impl/PointsCurrency.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueAction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueExpression.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueOption.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueOptionAction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueOptionsAction.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/DialogueBuilder.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/DialogueChainBuilder.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/DynamicDialogueBuilder.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/impl/BankedDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/impl/EmblemTraderDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/impl/NieveDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/impl/ParduDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/impl/SpellBookDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/builders/impl/TestStaticDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/Dialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/ActionDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/EndDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/ItemStatementDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/NpcDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/OptionDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/OptionsDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/PlayerDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/StatementDialogue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/equipment/BonusManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/menu/CreationMenu.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/MovementQueue.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/path/PathFinder.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/path/RS317PathFinder.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/rights/DonatorRights.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/rights/PlayerRights.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/teleportation/TeleportButton.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/teleportation/TeleportHandler.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/teleportation/TeleportTablets.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/teleportation/TeleportType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/teleportation/Teleportable.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/Task.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/TaskManager.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/TaskType.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/CombatPoisonEffect.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/CountdownTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/ForceMovementTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/GroundItemRespawnTask.ts" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/ItemContainerTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/NPCDeathTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/NPCRespawnTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/PlayerDeath.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/RestoreSpecialAttackTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/ShopRestockTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/TimedObjectReplacementTask.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/TimedObjectSpawnTask.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/novo_elvargserver.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/novo_elvargserver.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Duelling.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Duelling.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Emotes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Emotes.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Food.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Food.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/PrayerHandler.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/PrayerHandler.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/Autocasting.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/magic/Autocasting.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/ranged/RangedData.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/ranged/RangedData.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/pestcontrols/PestControl.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/minigames/impl/pestcontrols/PestControl.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Crafting.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Crafting.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Fletching.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Fletching.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Herblore.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Herblore.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Prayer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Prayer.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Runecrafting.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Runecrafting.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Smithing.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Smithing.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Thieving.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/skillable/impl/Thieving.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Lanthus.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/impl/Lanthus.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/dynamodb/DynamoDBPlayerPersistence.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/dynamodb/DynamoDBPlayerPersistence.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/MidTribridMaxFighterPreset.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/playerbot/fightstyle/impl/MidTribridMaxFighterPreset.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skill.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skill.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skillcape.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skillcape.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/AreaManager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/areas/AreaManager.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/OpenThread.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/commands/impl/OpenThread.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/ItemContainer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/ItemContainer.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Bank.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Bank.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Equipment.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Equipment.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Inventory.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Inventory.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/PriceChecker.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/PriceChecker.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueManager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/DialogueManager.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Function" beforeDir="false" afterPath="$PROJECT_DIR$/Function" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Server.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Server.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Server.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Server.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/ByteBufUtils.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/ByteBufUtils.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/ByteBufUtils.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/ByteBufUtils.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkBuilder.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/NetworkBuilder.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkBuilder.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/NetworkBuilder.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkConstants.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/NetworkConstants.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkConstants.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/NetworkConstants.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerBotSession.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/PlayerBotSession.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerBotSession.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/PlayerBotSession.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerSession.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/PlayerSession.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerSession.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/PlayerSession.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelEventHandler.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/channel/ChannelEventHandler.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelEventHandler.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/channel/ChannelEventHandler.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelFilter.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/channel/ChannelFilter.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelFilter.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/channel/ChannelFilter.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelPipelineHandler.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/channel/ChannelPipelineHandler.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelPipelineHandler.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/channel/ChannelPipelineHandler.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginDecoder.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/LoginDecoder.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginDecoder.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/LoginDecoder.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginEncoder.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/LoginEncoder.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginEncoder.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/LoginEncoder.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketDecoder.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/PacketDecoder.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketDecoder.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/PacketDecoder.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketEncoder.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/PacketEncoder.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketEncoder.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/codec/PacketEncoder.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginDetailsMessage.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/login/LoginDetailsMessage.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginDetailsMessage.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/login/LoginDetailsMessage.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponsePacket.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/login/LoginResponsePacket.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponsePacket.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/login/LoginResponsePacket.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponses.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/login/LoginResponses.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponses.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/login/LoginResponses.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/Packet.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/Packet.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/Packet.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/Packet.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketBuilder.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/PacketBuilder.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketBuilder.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/PacketBuilder.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketConstants.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/PacketConstants.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketConstants.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/PacketConstants.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketSender.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/PacketSender.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketSender.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/PacketSender.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/BankTabCreationPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/BankTabCreationPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/BankTabCreationPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/BankTabCreationPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ButtonClickPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ButtonClickPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ButtonClickPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ButtonClickPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChangeAppearancePacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ChangeAppearancePacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChangeAppearancePacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ChangeAppearancePacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ChatPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ChatPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatSettingsPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ChatSettingsPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatSettingsPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ChatSettingsPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CloseInterfacePacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/CloseInterfacePacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CloseInterfacePacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/CloseInterfacePacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CommandPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/CommandPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CommandPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/CommandPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CreationMenuPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/CreationMenuPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CreationMenuPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/CreationMenuPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DialoguePacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/DialoguePacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DialoguePacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/DialoguePacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DropItemPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/DropItemPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DropItemPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/DropItemPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EnterInputPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/EnterInputPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EnterInputPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/EnterInputPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EquipPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/EquipPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EquipPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/EquipPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineItemPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ExamineItemPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineItemPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ExamineItemPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineNpcPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ExamineNpcPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineNpcPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ExamineNpcPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FinalizedMapRegionChangePacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/FinalizedMapRegionChangePacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FinalizedMapRegionChangePacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/FinalizedMapRegionChangePacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FollowPlayerPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/FollowPlayerPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FollowPlayerPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/FollowPlayerPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/InterfaceActionClickOpcode.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/InterfaceActionClickOpcode.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/InterfaceActionClickOpcode.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/InterfaceActionClickOpcode.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemActionPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ItemActionPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemActionPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ItemActionPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemContainerActionPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ItemContainerActionPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemContainerActionPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ItemContainerActionPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnItemPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnItemPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnItemPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnItemPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnPlayerPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnPlayerPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnPlayerPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnPlayerPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MovementPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/MovementPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MovementPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/MovementPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/NPCOptionPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/NPCOptionPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/NPCOptionPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/NPCOptionPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ObjectActionPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ObjectActionPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ObjectActionPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/ObjectActionPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PickupItemPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PickupItemPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PickupItemPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PickupItemPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerInactivePacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PlayerInactivePacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerInactivePacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PlayerInactivePacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerOptionPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PlayerOptionPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerOptionPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PlayerOptionPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerRelationPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PlayerRelationPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerRelationPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/PlayerRelationPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/RegionChangePacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/RegionChangePacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/RegionChangePacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/RegionChangePacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SecondGroundItemOptionPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SecondGroundItemOptionPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SecondGroundItemOptionPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SecondGroundItemOptionPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpawnItemPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SpawnItemPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpawnItemPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SpawnItemPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpecialAttackPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SpecialAttackPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpecialAttackPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SpecialAttackPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SwitchItemSlotPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SwitchItemSlotPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SwitchItemSlotPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/SwitchItemSlotPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TeleportPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/TeleportPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TeleportPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/TeleportPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TradeRequestPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/TradeRequestPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TradeRequestPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/TradeRequestPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/UseItemPacketListener.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/UseItemPacketListener.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/UseItemPacketListener.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/packet/impl/UseItemPacketListener.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/BCrypt.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/security/BCrypt.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/BCrypt.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/security/BCrypt.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/IsaacRandom.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/security/IsaacRandom.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/IsaacRandom.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/net/security/IsaacRandom.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/BackgroundLoader.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/BackgroundLoader.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/BackgroundLoader.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/BackgroundLoader.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Chance.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/Chance.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Chance.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/Chance.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/CompressionUtil.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/CompressionUtil.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/CompressionUtil.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/CompressionUtil.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/DiscordUtil.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/DiscordUtil.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/DiscordUtil.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/DiscordUtil.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FileUtil.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/FileUtil.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FileUtil.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/FileUtil.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FrameUpdater.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/FrameUpdater.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FrameUpdater.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/FrameUpdater.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ItemIdentifiers.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ItemIdentifiers.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ItemIdentifiers.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ItemIdentifiers.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Misc.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/Misc.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Misc.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/Misc.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/NpcIdentifiers.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/NpcIdentifiers.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/NpcIdentifiers.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/NpcIdentifiers.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ObjectIdentifiers.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ObjectIdentifiers.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ObjectIdentifiers.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ObjectIdentifiers.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PasswordUtil.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/PasswordUtil.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PasswordUtil.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/PasswordUtil.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PlayerPunishment.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/PlayerPunishment.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PlayerPunishment.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/PlayerPunishment.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/RandomGen.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/RandomGen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/RandomGen.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/RandomGen.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShopIdentifiers.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ShopIdentifiers.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShopIdentifiers.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ShopIdentifiers.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShutdownHook.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ShutdownHook.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShutdownHook.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/ShutdownHook.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Stopwatch.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/Stopwatch.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Stopwatch.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/Stopwatch.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/TileUtils.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/TileUtils.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/TileUtils.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/TileUtils.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Buffer.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/Buffer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Buffer.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/Buffer.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/BufferedConnection.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/BufferedConnection.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/BufferedConnection.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/BufferedConnection.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/ByteBuffer.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/ByteBuffer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/ByteBuffer.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/ByteBuffer.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Client.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/Client.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Client.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/Client.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Flooder.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/Flooder.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Flooder.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/flood/Flooder.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/Timer.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/timers/Timer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/Timer.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/timers/Timer.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerKey.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/timers/TimerKey.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerKey.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/timers/TimerKey.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerRepository.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/timers/TimerRepository.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerRepository.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/dist/util/timers/TimerRepository.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/GameBuilder.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/GameConstants.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/GameEngine.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/GameLogic.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/Sound.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/Sounds.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/Systems.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/World.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/collision/Buffer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/collision/Region.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/collision/RegionManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/DepositBox.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/Duelling.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/Emotes.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/Food.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/Gambiling.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/ItemsKeptOnDeath.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/Obelisks.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/PetHandler.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/PotionConsumable.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/PrayerHandler.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/QuickPrayers.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/Trading.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/clan/BannedMember.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/clan/ClanChat.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/clan/ClanChatManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/clan/ClanChatRank.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/Combat.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/CombatConstants.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/CombatEquipment.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/CombatFactory.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/CombatSpecial.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/CombatType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/FightStyle.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/FightType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/WeaponInterfaces.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/bountyhunter/BountyHunter.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/bountyhunter/Emblem.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/bountyhunter/TargetPair.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/bountyhunter/WealthType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/formula/AccuracyFormulasDpsCalc.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/formula/DamageFormulas.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/hit/HitDamage.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/hit/HitDamageCache.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/hit/HitMask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/hit/HitQueue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/hit/PendingHit.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/Autocasting.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/CombatAncientSpell.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/CombatEffectSpell.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/CombatNormalSpell.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/CombatSpell.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/CombatSpells.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/EffectSpells.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/PlayerMagicStaff.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/magic/Spell.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/CombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/MagicCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/MeleeCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/RangedCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/BanditCombtMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/CallistoCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/ChaosElementalCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/ChaosFanaticCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/CrazyArchaeologistCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/JadCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/KingBlackDragonMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/RockCrabCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/VenenatisCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/VetionCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/pestcontrol/BrawlerCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/pestcontrol/PestControlPortalCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/pestcontrol/RavagerCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/pestcontrol/ShifterCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/pestcontrol/SpinnerCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/pestcontrol/SplatterCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/npcs/pestcontrol/TorcherCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/AbyssalBludgeonCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/AbyssalDaggerCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/AbyssalTentacleCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/AbyssalWhipCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/ArmadylCrossbowCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/ArmadylGodswordCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/BallistaCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/BandosGodswordCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/BarrelchestAnchorCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DarkBowCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DragonClawCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DragonDaggerCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DragonHalberdCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DragonLongswordCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DragonMaceCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DragonScimitarCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/DragonWarhammerCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/GraniteMaulCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/MagicShortbowCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/SaradominGodswordCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/SaradominSwordCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/method/impl/specials/ZamorakGodswordCombatMethod.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/combat/ranged/RangedData.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/Minigame.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/MinigameHandler.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/impl/Barrows.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/impl/CastleWars.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/impl/FightCaves.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/impl/pestcontrols/PestControl.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/impl/pestcontrols/PestControlBoat.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/impl/pestcontrols/PestControlPortal.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/minigames/impl/pestcontrols/PestControlPortalData.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/presets/PredefinedPresets.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/presets/Presetable.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/presets/Presetables.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/quests/Quest.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/quests/QuestHandler.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/quests/impl/CooksAssistant.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/SkillManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/Skillable.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Cooking.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Crafting.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/DefaultSkillable.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Firemaking.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Fishing.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Fletching.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Herblore.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/ItemCreationSkillable.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Mining.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Prayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Runecrafting.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Smithing.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/Thieving.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/woodcutting/BirdNest.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/skillable/impl/woodcutting/Woodcutting.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/slayer/ActiveSlayerTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/slayer/Slayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/slayer/SlayerMaster.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/content/skill/slayer/SlayerTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/DefaultSpawnDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/ItemDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/NpcDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/NpcDropDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/NpcSpawnDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/ObjectDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/ObjectSpawnDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/PlayerBotDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/ShopDefinition.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/DefinitionLoader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/impl/ItemDefinitionLoader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/impl/NPCSpawnDumper.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/impl/NpcDefinitionLoader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/impl/NpcDropDefinitionLoader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/impl/NpcSpawnDefinitionLoader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/impl/ObjectSpawnDefinitionLoader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/definition/loader/impl/ShopDefinitionLoader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/Entity.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/Mobile.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/MobileList.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/grounditem/ItemOnGround.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/grounditem/ItemOnGroundManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/NPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/NPCDropGenerator.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/NPCInteraction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/NPCInteractionSystem.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/NPCMovementCoordinator.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/NpcAggression.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/AhrimTheBlighted.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Bandit.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Banker.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Barricades.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Callisto.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/ChaosElemental.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/ChaosFanatic.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/CrazyArchaeologist.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/ElderChaosDruid.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/EmblemTrader.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/GodwarsFollower.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/KarilTheTainted.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/KingBlackDragon.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Lanthus.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Perdu.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/RockCrab.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Sheep.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/TztokJad.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Venenatis.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/Vetion.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/VetionHellhound.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/pestcontrol/BrawlerNPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/pestcontrol/PestControlPortalNPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/pestcontrol/RavagerNPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/pestcontrol/ShifterNPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/pestcontrol/SpinnerNPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/pestcontrol/SplaaterNPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/npc/impl/pestcontrol/TorcherNPC.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/object/GameObject.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/object/MapObjects.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/object/ObjectManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/object/impl/WebHandler.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/JacksonAttributeConverter.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/Player.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/persistence/PlayerPersistence.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/persistence/PlayerSave.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/persistence/PlayerSaveConverter.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/persistence/dynamodb/DynamoDBPlayerPersistence.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/persistence/dynamodb/PlayerSaveRecord.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/player/persistence/jsonfile/JSONFilePlayerPersistence.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/PlayerBot.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/BotCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/CommandType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/FightCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/FollowPlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/GoToDuelArena.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/HoldItems.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/LoadPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/commands/PlayCastleWars.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/AttackStyleSwitch.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/CombatAction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/CombatSwitch.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/EnemyDefenseAwareCombatSwitch.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/FighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/DDSPureMFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/DDSPureRFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/F2PMeleeFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/GRangerFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/MidTribridMaxFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/NHPureFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/ObbyMaulerFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/fightstyle/impl/TribridMaxFighterPreset.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/interaction/ChatInteraction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/interaction/CombatInteraction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/interaction/MovementInteraction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/impl/playerbot/interaction/TradingInteraction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/updating/NPCUpdating.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/updating/PlayerUpdating.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/updating/sync/GameSyncExecutor.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/entity/updating/sync/GameSyncTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Action.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Animation.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/AnimationLoop.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Appearance.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/BarrowsSet.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Boundary.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/BrokenItem.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/ChatMessage.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Direction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/DwarfCannon.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/EffectTimer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/EnteredAmountAction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/EnteredSyntaxAction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/EquipmentType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/FacingDirection.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Flag.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/ForceMovement.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/God.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Graphic.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/GraphicHeight.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Hitmask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Ids.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Item.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/ItemInSlot.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Location.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/MagicSpellbook.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/PlayerInteractingOption.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/PlayerRelations.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/PlayerStatus.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/PolygonalBoundary.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Prayerbook.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Priority.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Projectile.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/RequiredItem.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/SecondsTimer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Skill.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/Skillcape.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/SkullType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/UpdateFlag.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/Area.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/AreaManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/BarrowsArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/DuelArenaArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/FightCavesArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/GodwarsDugeonArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/KingBlackDragonArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/PrivateArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/WildernessArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/castlewars/CastleWarsGameArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/castlewars/CastleWarsLobbyArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/castlewars/CastleWarsSaradominWaitingArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/castlewars/CastleWarsZamorakWaitingArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/pestcontrol/PestControlArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/pestcontrol/PestControlNoviceBoatArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/areas/impl/pestcontrol/PestControlOutpostArea.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/Command.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/CommandManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/GroundItemCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/AnimationCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/AreaDebug.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/AttackRange.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/BanPlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Bank.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/BarrageCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/CWarInterfaceCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ChangePassword.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ChatboxInterfaceCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Claim.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ConfigCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/CopyBank.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/CreationDate.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/DebugCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/DialogueCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Down.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Empty.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ExitClient.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/FloodCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/GFXCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/InfiniteHealth.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/InterfaceCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/IpBanPlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/IpMutePlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ItemSpawn.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Kdr.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/KickPlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ListSizesCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/LockExperience.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/MasterCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/MaxHit.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/MutePlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Noclip.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/OpenThread.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/PNPCCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Players.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/PositionDebug.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ReloadCommands.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ReloadDrops.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ReloadItems.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ReloadNPCDefinitions.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ReloadNPCSpawns.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ReloadPunishments.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ReloadShops.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/ResetCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Runes.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Save.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/SaveAll.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Skull.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/SoundEffectCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/SpawnNPCCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/SpawnObjectCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/SpawnPermanentNPCCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/SpecCommand.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Store.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/TaskDebug.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/TeleTo.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/TeleToMe.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/TeleToPlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/TestGESellInt.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/TimePlayed.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Title.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/UnBanPlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/UnIpMutePlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/UnMutePlayer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/UnlockPrayers.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Up.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/UpdateServer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/commands/impl/Yell.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/ItemContainer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/StackType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/impl/Bank.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/impl/Equipment.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/impl/Inventory.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/impl/PriceChecker.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/Shop.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/ShopManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/currency/ShopCurrencies.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/currency/ShopCurrency.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/currency/impl/BloodMoneyCurrency.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/currency/impl/CastleWarsTicketCurrency.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/currency/impl/CoinsCurrency.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/currency/impl/ItemCurrency.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/container/shop/currency/impl/PointsCurrency.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/DialogueAction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/DialogueExpression.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/DialogueManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/DialogueOption.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/DialogueOptionAction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/DialogueOptionsAction.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/DialogueBuilder.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/DialogueChainBuilder.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/DynamicDialogueBuilder.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/impl/BankedDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/impl/EmblemTraderDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/impl/NieveDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/impl/ParduDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/impl/SpellBookDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/builders/impl/TestStaticDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/Dialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/ActionDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/EndDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/ItemStatementDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/NpcDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/OptionDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/OptionsDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/PlayerDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/dialogues/entries/impl/StatementDialogue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/equipment/BonusManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/menu/CreationMenu.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/movement/MovementQueue.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/movement/path/PathFinder.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/movement/path/RS317PathFinder.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/rights/DonatorRights.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/rights/PlayerRights.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/teleportation/TeleportButton.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/teleportation/TeleportHandler.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/teleportation/TeleportTablets.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/teleportation/TeleportType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/model/teleportation/Teleportable.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/Task.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/TaskManager.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/TaskType.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/CombatPoisonEffect.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/CountdownTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/ForceMovementTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/GroundItemRespawnTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/ItemContainerTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/NPCDeathTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/NPCRespawnTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/PlayerDeath.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/RestoreSpecialAttackTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/ShopRestockTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/TimedObjectReplacementTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/game-seperate/game/task/impl/TimedObjectSpawnTask.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/Server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/Server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkBuilder.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkBuilder.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkConstants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkConstants.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/PlayerSession.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/PlayerSession.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/Packet.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/Packet.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketConstants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketConstants.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketSender.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketSender.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/EquipPacketListener.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/EquipPacketListener.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/security/IsaacRandom.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/security/IsaacRandom.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/util/Misc.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/util/Misc.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/tsconfig.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,19 +1059,31 @@
   <component name="ProblemsViewState">
     <option name="selectedIndex" value="1" />
   </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 8
+}]]></component>
   <component name="ProjectId" id="2OK3qyB9VTWqFCcB0rtpsCY2TtZ" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">
-    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
-    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
-    <property name="nodejs_package_manager_path" value="npm" />
-    <property name="ts.external.directory.path" value="C:\Program Files\JetBrains\WebStorm 2020.3\plugins\JavaScriptLanguage\jsLanguageServicesImpl\external" />
-    <property name="vue.rearranger.settings.migration" value="true" />
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/Users/toby/elvarg-web/elvarg-web-server",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-WS-251.26927.40" />
+      </set>
+    </attachedChunks>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
@@ -80,6 +1095,7 @@
       <updated>1681295642272</updated>
       <workItem from="1681295643536" duration="2965000" />
       <workItem from="1681314057925" duration="4150000" />
+      <workItem from="1763898342136" duration="19000" />
     </task>
     <servers />
   </component>

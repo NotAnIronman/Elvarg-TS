@@ -1,23 +1,22 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Timer = void 0;
-var Timer = /** @class */ (function () {
-    function Timer(Key, Ticks) {
+class Timer {
+    constructor(Key, Ticks) {
         this.Key = Key;
         this.Ticks = Ticks;
     }
-    Timer.prototype.ticks = function () {
+    ticks() {
         return this.Ticks;
-    };
-    Timer.prototype.key = function () {
+    }
+    key() {
         return this.Key;
-    };
-    Timer.prototype.tick = function () {
+    }
+    tick() {
         if (this.Ticks > 0) {
             this.Ticks--;
         }
-    };
-    return Timer;
-}());
+    }
+}
 exports.Timer = Timer;
 //# sourceMappingURL=Timer.js.map

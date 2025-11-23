@@ -22,39 +22,35 @@ exports.UseItemPacketListener = void 0;
 // import { CreationMenuAction } from "../../../game/model/menu/CreationMenu";
 // import { Action } from "../../../game/model/Action";
 // class UseItemCreationMenuAction implements CreationMenuAction{
-var UseItemCreationMenuAction = /** @class */ (function () {
-    function UseItemCreationMenuAction(execFunc) {
+class UseItemCreationMenuAction {
+    constructor(execFunc) {
         this.execFunc = execFunc;
     }
-    UseItemCreationMenuAction.prototype.execute = function (item, amount) {
+    execute(item, amount) {
         this.execFunc();
-    };
-    return UseItemCreationMenuAction;
-}());
+    }
+}
 // class UseItemAction implements Action{
-var UseItemAction = /** @class */ (function () {
-    function UseItemAction(execFunc) {
+class UseItemAction {
+    constructor(execFunc) {
         this.execFunc = execFunc;
     }
-    UseItemAction.prototype.execute = function () {
+    execute() {
         this.execFunc();
-    };
-    return UseItemAction;
-}());
-var UseItemPacketListener = /** @class */ (function () {
-    function UseItemPacketListener() {
     }
+}
+class UseItemPacketListener {
     // private static itemOnItem(player: Player, packet: Packet) {
-    UseItemPacketListener.itemOnItem = function (player, packet) {
-        var usedWithSlot = packet.readUnsignedShort();
-        var itemUsedSlot = packet.readUnsignedShortA();
+    static itemOnItem(player, packet) {
+        let usedWithSlot = packet.readUnsignedShort();
+        let itemUsedSlot = packet.readUnsignedShortA();
         if (usedWithSlot < 0 ||
             itemUsedSlot < 0 ||
             itemUsedSlot >= player.getInventory().capacity() ||
             usedWithSlot >= player.getInventory().capacity())
             return;
-        var used = player.getInventory()[itemUsedSlot];
-        var usedWith = player.getInventory()[usedWithSlot];
+        let used = player.getInventory()[itemUsedSlot];
+        let usedWith = player.getInventory()[usedWithSlot];
         player.getPacketSender().sendInterfaceRemoval();
         player.getSkillManager().stopSkillable();
         //Herblore
@@ -94,12 +90,12 @@ var UseItemPacketListener = /** @class */ (function () {
         //         player.getPacketSender().sendMessage("You cannot load the blowpipe with that!");
         //     }
         // }
-    };
+    }
     // public static itemOnNpc(player: Player, packet: Packet) {
-    UseItemPacketListener.itemOnNpc = function (player, packet) {
-        var id = packet.readShortA();
-        var index = packet.readShortA();
-        var slot = packet.readLEShort();
+    static itemOnNpc(player, packet) {
+        const id = packet.readShortA();
+        const index = packet.readShortA();
+        const slot = packet.readLEShort();
         // if (index < 0 || index > World.getNpcs().capacityReturn()) {
         //     return;
         // }
@@ -110,7 +106,7 @@ var UseItemPacketListener = /** @class */ (function () {
         // if (npc == null) {
         //     return;
         // }
-        var item = player.getInventory().getItems()[slot];
+        let item = player.getInventory().getItems()[slot];
         if (item == null || item.getId() !== id) {
             return;
         }
@@ -125,18 +121,18 @@ var UseItemPacketListener = /** @class */ (function () {
         //             break;
         //     }
         // });
-    };
+    }
     // private static itemOnObject(player: Player, packet: Packet) {
-    UseItemPacketListener.itemOnObject = function (player, packet) {
-        var interfaceType = packet.readShort();
-        var objectId = packet.readShort();
-        var objectY = packet.readLEShortA();
-        var itemSlot = packet.readLEShort();
-        var objectX = packet.readLEShortA();
-        var itemId = packet.readShort();
+    static itemOnObject(player, packet) {
+        let interfaceType = packet.readShort();
+        const objectId = packet.readShort();
+        const objectY = packet.readLEShortA();
+        const itemSlot = packet.readLEShort();
+        const objectX = packet.readLEShortA();
+        const itemId = packet.readShort();
         if (itemSlot < 0 || itemSlot >= player.getInventory().capacity())
             return;
-        var item = player.getInventory().getItems()[itemSlot];
+        const item = player.getInventory().getItems()[itemSlot];
         if (item == null || item.getId() !== itemId)
             return;
         // const position = new Location(objectX, objectY, player.getLocation().getZ());
@@ -198,20 +194,20 @@ var UseItemPacketListener = /** @class */ (function () {
         //         return;
         //     }
         // }));
-    };
-    UseItemPacketListener.itemOnPlayer = function (player, packet) {
+    }
+    static itemOnPlayer(player, packet) {
         // private static itemOnPlayer(player: Player, packet: Packet) {
-        var interfaceId = packet.readUnsignedShortA();
-        var targetIndex = packet.readUnsignedShort();
-        var itemId = packet.readUnsignedShort();
-        var slot = packet.readLEShort();
+        let interfaceId = packet.readUnsignedShortA();
+        let targetIndex = packet.readUnsignedShort();
+        let itemId = packet.readUnsignedShort();
+        let slot = packet.readLEShort();
         // if (slot < 0 || slot >= player.getInventory().capacity() || targetIndex >= World.getPlayers().capacityReturn())
         //     return;
         // let target = World.getPlayers().get(targetIndex);
         // if (target == null) {
         //     return;
         // }
-        var item = player.getInventory().get(slot);
+        let item = player.getInventory().get(slot);
         if (item == null || !player.getInventory().contains(itemId)) {
             return;
         }
@@ -227,15 +223,15 @@ var UseItemPacketListener = /** @class */ (function () {
         //         }
         //     }
         // });
-    };
-    UseItemPacketListener.itemOnGroundItem = function (player, packet) {
+    }
+    static itemOnGroundItem(player, packet) {
         // private static itemOnGroundItem(player: Player, packet: Packet) {
-        var interfaceId = packet.readLEShort();
-        var inventory_item = packet.readShortA();
-        var ground_item_id = packet.readShort();
-        var y = packet.readShortA();
-        var unknown = packet.readLEShortA();
-        var x = packet.readShort();
+        let interfaceId = packet.readLEShort();
+        let inventory_item = packet.readShortA();
+        let ground_item_id = packet.readShort();
+        let y = packet.readShortA();
+        let unknown = packet.readLEShortA();
+        let x = packet.readShort();
         //Verify item..
         if (!player.getInventory().contains(inventory_item)) {
             return;
@@ -259,9 +255,9 @@ var UseItemPacketListener = /** @class */ (function () {
         //             break;
         //     }
         // });
-    };
+    }
     // public execute(player: Player, packet: Packet) {
-    UseItemPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player.getHitpoints() <= 0)
             return;
         switch (packet.getOpcode()
@@ -282,8 +278,7 @@ var UseItemPacketListener = /** @class */ (function () {
         //     break;
         ) {
         }
-    };
-    return UseItemPacketListener;
-}());
+    }
+}
 exports.UseItemPacketListener = UseItemPacketListener;
 //# sourceMappingURL=UseItemPacketListener.js.map

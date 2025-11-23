@@ -1,14 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatSettingsPacketListener = void 0;
-var ChatSettingsPacketListener = /** @class */ (function () {
-    function ChatSettingsPacketListener() {
-    }
+class ChatSettingsPacketListener {
     // execute(player: Player, packet: Packet) {
-    ChatSettingsPacketListener.prototype.execute = function (player, packet) {
-        var publicMode = packet.readByte();
-        var privateMode = packet.readByte();
-        var tradeMode = packet.readByte();
+    execute(player, packet) {
+        let publicMode = packet.readByte();
+        let privateMode = packet.readByte();
+        let tradeMode = packet.readByte();
         // if (privateMode > Object.keys(PrivateChatStatus).length / 2) {
         //     return;
         // }
@@ -16,8 +14,7 @@ var ChatSettingsPacketListener = /** @class */ (function () {
         // if (player.getRelations().getStatus() != privateChatStatus) {
         //     player.getRelations().setStatus(privateChatStatus, true);
         // }
-    };
-    return ChatSettingsPacketListener;
-}());
+    }
+}
 exports.ChatSettingsPacketListener = ChatSettingsPacketListener;
 //# sourceMappingURL=ChatSettingsPacketListener.js.map

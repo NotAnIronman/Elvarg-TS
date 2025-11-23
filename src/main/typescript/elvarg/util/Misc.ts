@@ -2,6 +2,7 @@ import DecimalFormat from "decimal-format";
 // import { Location } from '../game/model/Location';
 // import { Player } from '../game/entity/impl/player/Player';
 import { RandomGen } from "../util/RandomGen";
+import { Location } from "../game/model/Location";
 import { ZonedDateTime } from "js-joda";
 import { fs, readFileSync, existsSync } from "fs-extra";
 import * as path from "path";
@@ -683,9 +684,9 @@ export class Misc {
     return value;
   }
 
-  // public static delta(a: Location, b: Location) {
-  //     return { x: b.x - a.x, y: b.y - a.y };
-  // }
+  public static delta(a: Location, b: Location): Location {
+    return new Location(b.getX() - a.getX(), b.getY() - a.getY(), b.getZ());
+  }
 
   // Picks a random element out of any array type
   public static randomElements<T>(array: T[]) {

@@ -1,14 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BankTabCreationPacketListener = void 0;
-var BankTabCreationPacketListener = /** @class */ (function () {
-    function BankTabCreationPacketListener() {
-    }
+class BankTabCreationPacketListener {
     // execute(player: Player, packet: Packet) {
-    BankTabCreationPacketListener.prototype.execute = function (player, packet) {
-        var interfaceId = packet.readInt();
-        var fromSlot = packet.readShort();
-        var to_tab = packet.readShort();
+    execute(player, packet) {
+        let interfaceId = packet.readInt();
+        let fromSlot = packet.readShort();
+        let to_tab = packet.readShort();
         // let fromBankTab = interfaceId - Bank.CONTAINER_START;
         // if (fromBankTab >= 0 && fromBankTab < Bank.TOTAL_BANK_TABS) {
         //     if (player.getStatus() == PlayerStatus.BANKING && player.getInterfaceId() == 5292) {
@@ -39,8 +37,7 @@ var BankTabCreationPacketListener = /** @class */ (function () {
         //         }
         //     }
         // }
-    };
-    return BankTabCreationPacketListener;
-}());
+    }
+}
 exports.BankTabCreationPacketListener = BankTabCreationPacketListener;
 //# sourceMappingURL=BankTabCreationPacketListener.js.map

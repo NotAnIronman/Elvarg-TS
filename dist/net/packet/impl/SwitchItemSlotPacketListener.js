@@ -3,17 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwitchItemSlotPacketListener = void 0;
 // import { Bank } from "../../../game/model/container/impl/Bank";
 // import { Inventory } from "../../../game/model/container/impl/Inventory";
-var SwitchItemSlotPacketListener = /** @class */ (function () {
-    function SwitchItemSlotPacketListener() {
-    }
+class SwitchItemSlotPacketListener {
     // execute(player: Player, packet: Packet) {
-    SwitchItemSlotPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player.getHitpoints() <= 0)
             return;
-        var interfaceId = packet.readInt();
+        let interfaceId = packet.readInt();
         packet.readByteC();
-        var fromSlot = packet.readLEShortA();
-        var toSlot = packet.readLEShort();
+        let fromSlot = packet.readLEShortA();
+        let toSlot = packet.readLEShort();
         if (player == null || player.getHitpoints() <= 0) {
             return;
         }
@@ -33,8 +31,7 @@ var SwitchItemSlotPacketListener = /** @class */ (function () {
         //     break;
         ) {
         }
-    };
-    return SwitchItemSlotPacketListener;
-}());
+    }
+}
 exports.SwitchItemSlotPacketListener = SwitchItemSlotPacketListener;
 //# sourceMappingURL=SwitchItemSlotPacketListener.js.map

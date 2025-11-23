@@ -1,3 +1,11 @@
+// Provide minimal browser globals for libs that expect window (e.g., phaser).
+(global as any).window = (global as any).window ?? {};
+(global as any).document = (global as any).document ?? { documentElement: {}, createElement: () => ({ canPlayType: () => "", getContext: () => ({ fillRect: () => {}, drawImage: () => {}, getImageData: () => ({ data: [0,0,0,0] }), putImageData: () => {} }) }) };
+if (typeof (global as any).navigator === "undefined") {
+  (global as any).navigator = {};
+}
+(global as any).Image = (global as any).Image ?? function () { return {}; };
+(global as any).HTMLCanvasElement = (global as any).HTMLCanvasElement ?? function () {};
 // import { GameBuilder } from "./game/GameBuilder";
 // import { GameConstants } from "./game/GameConstants";
 import { NetworkBuilder } from "./net/NetworkBuilder";

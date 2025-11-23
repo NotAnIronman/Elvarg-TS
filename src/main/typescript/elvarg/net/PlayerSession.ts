@@ -12,14 +12,17 @@ import { Misc } from "../util/Misc";
 import { NetworkConstants } from "./NetworkConstants";
 // import { PlayerRights } from '../game/model/rights/PlayerRights';
 import { Server, Socket } from "socket.io";
+import { PacketType } from "./packet/PacketType";
+import { IsaacRandom } from "./security/IsaacRandom";
 
 export class PlayerSession {
   private packetsQueue: Packet[] = [];
   private lastPacketOpcodeQueue: number[] = [];
   private channel: Socket;
+  private encryptor?: IsaacRandom;
   // public player: Player;
 
-  constructor(channel: Socket) {
+  constructor(channel: any) {
     this.channel = channel;
     // this.player = new Player(this);
   }
@@ -93,11 +96,39 @@ export class PlayerSession {
   }
 
   public write(builder: PacketBuilder) {
+    const chan: any = this.channel;
+    // ws path
+    if (chan && typeof chan.send === "function") {
+      const packet = builder.toPacket();
+      const opcode = packet.getOpcode();
+      const payload = packet.getBuffer();
+      const encOpcode =
+        this.encryptor != null ? (opcode + this.encryptor.nextInt()) & 0xff : opcode;
+      let header: Buffer;
+      switch (packet.getType()) {
+        case PacketType.VARIABLE:
+          header = Buffer.alloc(2);
+          header.writeUInt8(encOpcode, 0);
+          header.writeUInt8(payload.length, 1);
+          break;
+        case PacketType.VARIABLE_SHORT:
+          header = Buffer.alloc(3);
+          header.writeUInt8(encOpcode, 0);
+          header.writeUInt16BE(payload.length, 1);
+          break;
+        default:
+          header = Buffer.from([encOpcode]);
+      }
+      chan.send(Buffer.concat([header, payload]));
+      return;
+    }
+
+    // socket.io fallback
     if (!this.channel.connected) {
       return;
     }
     try {
-      let packet = builder.toPacket();
+      const packet = builder.toPacket();
       this.channel.emit("packet", packet);
     } catch (ex) {
       console.error(ex);
@@ -105,6 +136,15 @@ export class PlayerSession {
   }
 
   public flush() {
+    const chan: any = this.channel;
+    if (chan && typeof chan.send === "function") {
+      try {
+        chan.close();
+      } catch {
+        // ignore
+      }
+      return;
+    }
     if (!this.channel.connected) {
       return;
     }
@@ -121,5 +161,9 @@ export class PlayerSession {
 
   public getChannel(): Socket {
     return this.channel;
+  }
+
+  public setEncryptor(enc: IsaacRandom) {
+    this.encryptor = enc;
   }
 }

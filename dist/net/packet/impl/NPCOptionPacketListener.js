@@ -2,16 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NPCOptionPacketListener = void 0;
 // import { World } from "../../../game/World";
-var PacketConstants_1 = require("../PacketConstants");
-var NPCOptionPacketListener = /** @class */ (function () {
-    function NPCOptionPacketListener() {
-    }
+const PacketConstants_1 = require("../PacketConstants");
+class NPCOptionPacketListener {
     // execute(player: Player, packet: Packet) {
-    NPCOptionPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player.busy()) {
             return;
         }
-        var index = packet.readLEShortA();
+        let index = packet.readLEShortA();
         // if (index < 0 || index > World.getNpcs().capacityReturn()) {
         //     return;
         // }
@@ -36,7 +34,7 @@ var NPCOptionPacketListener = /** @class */ (function () {
             //     return;
             // }
             if (packet.getOpcode() === PacketConstants_1.PacketConstants.MAGE_NPC_OPCODE) {
-                var spellId = packet.readShortA();
+                let spellId = packet.readShortA();
                 // let spell = CombatSpells.getCombatSpell(spellId);
                 // if (!spell) {
                 //     player.getMovementQueue().reset();
@@ -49,8 +47,7 @@ var NPCOptionPacketListener = /** @class */ (function () {
             return;
         }
         // player.getMovementQueue().walkToEntity(npc, () => this.handleInteraction(player, npc, packet));
-    };
-    return NPCOptionPacketListener;
-}());
+    }
+}
 exports.NPCOptionPacketListener = NPCOptionPacketListener;
 //# sourceMappingURL=NPCOptionPacketListener.js.map

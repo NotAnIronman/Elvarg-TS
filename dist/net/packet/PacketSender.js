@@ -2,11 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PacketSender = void 0;
 // import { Player } from "../../game/entity/impl/player/Player";
-var PacketBuilder_1 = require("./PacketBuilder");
-var ValueType_1 = require("./ValueType");
-var ByteOrder_1 = require("./ByteOrder");
+const PacketBuilder_1 = require("./PacketBuilder");
+const ValueType_1 = require("./ValueType");
+const ByteOrder_1 = require("./ByteOrder");
 // import { CreationMenu } from "../../game/model/menu/CreationMenu";
-var PacketType_1 = require("./PacketType");
+const PacketType_1 = require("./PacketType");
 // import { Skill } from "../../game/model/Skill";
 // import { GameConstants } from "../../game/GameConstants";
 // import { PlayerBot } from "../../game/entity/impl/playerbot/PlayerBot";
@@ -23,50 +23,50 @@ var PacketType_1 = require("./PacketType");
 // import { Mobile } from "../../game/entity/impl/Mobile";
 // import { EffectTimer } from "../../game/model/EffectTimer";
 // import { DonatorRights } from "../../game/model/rights/DonatorRights";
-var PacketSender = /** @class */ (function () {
-    function PacketSender(player) {
+class PacketSender {
+    constructor(player) {
         this.player = player;
     }
-    PacketSender.prototype.sendDetails = function () {
-        var out = new PacketBuilder_1.PacketBuilder(249);
+    sendDetails() {
+        let out = new PacketBuilder_1.PacketBuilder(249);
         out.put(1);
         out.putShort(this.player.getIndex());
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendMapRegion = function () {
+    }
+    sendMapRegion() {
         this.player.setAllowRegionChangePacket(true);
         this.player.setLastKnownRegion(this.player.getLocation().clone());
-        var out = new PacketBuilder_1.PacketBuilder(73);
+        let out = new PacketBuilder_1.PacketBuilder(73);
         out.putShort(this.player.getLocation().getRegionX() + 6, ValueType_1.ValueType.A);
         out.putShort(this.player.getLocation().getRegionY() + 6);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendLogout = function () {
-        var out = new PacketBuilder_1.PacketBuilder(109);
+    }
+    sendLogout() {
+        const out = new PacketBuilder_1.PacketBuilder(109);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendRegionReload = function () {
-        var out = new PacketBuilder_1.PacketBuilder(89);
+    }
+    sendRegionReload() {
+        const out = new PacketBuilder_1.PacketBuilder(89);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendSystemUpdate = function (time) {
-        var out = new PacketBuilder_1.PacketBuilder(114);
-        var byteOrder = ByteOrder_1.ByteOrder.LITTLE;
+    }
+    sendSystemUpdate(time) {
+        const out = new PacketBuilder_1.PacketBuilder(114);
+        const byteOrder = ByteOrder_1.ByteOrder.LITTLE;
         out.putShorts(time, byteOrder);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendTeleportInterface = function (menu) {
+    }
+    sendTeleportInterface(menu) {
         this.player.setTeleportInterfaceOpen(true);
-        var out = new PacketBuilder_1.PacketBuilder(183);
+        const out = new PacketBuilder_1.PacketBuilder(183);
         out.put(menu);
         this.player.getSession().write(out);
         return this;
-    };
+    }
     // sendCreationMenu(menu: CreationMenu): this {
     //     this.player.setCreationMenu(menu);
     //     this.sendString( menu.getTitle(), 31104);
@@ -78,73 +78,62 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendSpecialAttackState = function (active) {
-        var out = new PacketBuilder_1.PacketBuilder(186);
+    sendSpecialAttackState(active) {
+        const out = new PacketBuilder_1.PacketBuilder(186);
         out.put(active ? 1 : 0);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendSoundEffect = function (soundId, loopType, delay, volume) {
-        var out = new PacketBuilder_1.PacketBuilder(174);
+    }
+    sendSoundEffect(soundId, loopType, delay, volume) {
+        const out = new PacketBuilder_1.PacketBuilder(174);
         out.putShort(soundId).put(loopType).putShort(delay).putShort(volume);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendSound = function (soundId, volume, delay) {
-        var out = new PacketBuilder_1.PacketBuilder(175);
+    }
+    sendSound(soundId, volume, delay) {
+        const out = new PacketBuilder_1.PacketBuilder(175);
         out
             .putShort(soundId, ValueType_1.ValueType.A, ByteOrder_1.ByteOrder.LITTLE)
             .put(volume)
             .putShort(delay);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendSong = function (id) {
-        var out = new PacketBuilder_1.PacketBuilder(74);
+    }
+    sendSong(id) {
+        const out = new PacketBuilder_1.PacketBuilder(74);
         out.putShorts(id, ByteOrder_1.ByteOrder.LITTLE);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendAutocastId = function (id) {
-        var out = new PacketBuilder_1.PacketBuilder(38);
+    }
+    sendAutocastId(id) {
+        const out = new PacketBuilder_1.PacketBuilder(38);
         out.putShort(id);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendEnableNoclip = function () {
-        var out = new PacketBuilder_1.PacketBuilder(250);
+    }
+    sendEnableNoclip() {
+        const out = new PacketBuilder_1.PacketBuilder(250);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendURL = function (url) {
-        var out = new PacketBuilder_1.PacketBuilder(251, PacketType_1.PacketType.VARIABLE);
+    }
+    sendURL(url) {
+        const out = new PacketBuilder_1.PacketBuilder(251, PacketType_1.PacketType.VARIABLE);
         out.putString(url);
         this.player.getSession().write(out);
         return this;
-    };
-    // sendMessage(message: string): this {
-    //     if (this.player instanceof PlayerBot) {
-    //         // Bots can't read their own messages, yet ;)
-    //         (this.player as PlayerBot).getChatInteraction().receivedGameMessage(message);
-    //         return this;
-    //     }
-    //     const out = new PacketBuilder(253, PacketType.VARIABLE);
-    //     out.putString(message);
-    //     this.player.getSession().write(out);
-    //     return this;
-    // }
-    PacketSender.prototype.sendSpecialMessage = function (name, type, message) {
-        var out = new PacketBuilder_1.PacketBuilder(252, PacketType_1.PacketType.VARIABLE);
+    }
+    sendSpecialMessage(name, type, message) {
+        const out = new PacketBuilder_1.PacketBuilder(252, PacketType_1.PacketType.VARIABLE);
         out.put(type);
         out.putString(name);
         out.putString(message);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendPoisonType = function (type) {
+    }
+    sendPoisonType(type) {
         this.player.getSession().write(new PacketBuilder_1.PacketBuilder(184).put(type));
         return this;
-    };
+    }
     // sendSkill(skill: Skill): this {
     //     const out = new PacketBuilder(134);
     //     out.put(skill.getButton());
@@ -161,181 +150,181 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendConfig = function (id, state) {
-        var out = new PacketBuilder_1.PacketBuilder(36);
+    sendConfig(id, state) {
+        const out = new PacketBuilder_1.PacketBuilder(36);
         out.putShorts(id, ByteOrder_1.ByteOrder.LITTLE);
         out.put(state);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendToggle = function (id, state) {
-        var out = new PacketBuilder_1.PacketBuilder(87);
+    }
+    sendToggle(id, state) {
+        const out = new PacketBuilder_1.PacketBuilder(87);
         out.putShorts(id, ByteOrder_1.ByteOrder.LITTLE);
         out.putsInt(state, ByteOrder_1.ByteOrder.MIDDLE);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendChatOptions = function (publicChat, privateChat, tradeChat) {
-        var out = new PacketBuilder_1.PacketBuilder(206);
+    }
+    sendChatOptions(publicChat, privateChat, tradeChat) {
+        const out = new PacketBuilder_1.PacketBuilder(206);
         out.put(publicChat).put(privateChat).put(tradeChat);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendRunEnergy = function () {
-        var out = new PacketBuilder_1.PacketBuilder(110);
+    }
+    sendRunEnergy() {
+        const out = new PacketBuilder_1.PacketBuilder(110);
         out.put(this.player.getRunEnergy());
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendQuickPrayersState = function (activated) {
-        var out = new PacketBuilder_1.PacketBuilder(111);
+    }
+    sendQuickPrayersState(activated) {
+        const out = new PacketBuilder_1.PacketBuilder(111);
         out.put(activated ? 1 : 0);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.updateSpecialAttackOrb = function () {
-        var out = new PacketBuilder_1.PacketBuilder(137);
+    }
+    updateSpecialAttackOrb() {
+        const out = new PacketBuilder_1.PacketBuilder(137);
         out.put(this.player.getSpecialPercentage());
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendDungeoneeringTabIcon = function (show) {
-        var out = new PacketBuilder_1.PacketBuilder(103);
+    }
+    sendDungeoneeringTabIcon(show) {
+        const out = new PacketBuilder_1.PacketBuilder(103);
         out.put(show ? 1 : 0);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendHeight = function () {
+    }
+    sendHeight() {
         this.player
             .getSession()
             .write(new PacketBuilder_1.PacketBuilder(86).put(this.player.getLocation().getZ()));
         return this;
-    };
-    PacketSender.prototype.sendIronmanMode = function (ironmanMode) {
-        var out = new PacketBuilder_1.PacketBuilder(112);
+    }
+    sendIronmanMode(ironmanMode) {
+        const out = new PacketBuilder_1.PacketBuilder(112);
         out.put(ironmanMode);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendShowClanChatOptions = function (show) {
-        var out = new PacketBuilder_1.PacketBuilder(115);
+    }
+    sendShowClanChatOptions(show) {
+        const out = new PacketBuilder_1.PacketBuilder(115);
         out.put(show ? 1 : 0); // 0 = no right click options
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendRunStatus = function () {
-        var out = new PacketBuilder_1.PacketBuilder(113);
+    }
+    sendRunStatus() {
+        const out = new PacketBuilder_1.PacketBuilder(113);
         out.put(this.player.isRunningReturn() ? 1 : 0);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendWeight = function (weight) {
-        var out = new PacketBuilder_1.PacketBuilder(240);
+    }
+    sendWeight(weight) {
+        const out = new PacketBuilder_1.PacketBuilder(240);
         out.putShort(weight);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.commandFrame = function (i) {
-        var out = new PacketBuilder_1.PacketBuilder(28);
+    }
+    commandFrame(i) {
+        const out = new PacketBuilder_1.PacketBuilder(28);
         out.put(i);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterface = function (id) {
+    }
+    sendInterface(id) {
         if (this.player.isPlayerBot()) {
             return this;
         }
-        var out = new PacketBuilder_1.PacketBuilder(97);
+        const out = new PacketBuilder_1.PacketBuilder(97);
         out.putShort(id);
         this.player.getSession().write(out);
         this.player.setInterfaceId(id);
         return this;
-    };
-    PacketSender.prototype.sendWalkableInterface = function (interfaceId) {
+    }
+    sendWalkableInterface(interfaceId) {
         this.player.setWalkableInterfaceId(interfaceId);
-        var out = new PacketBuilder_1.PacketBuilder(208);
+        const out = new PacketBuilder_1.PacketBuilder(208);
         out.putInt(interfaceId);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterfaceDisplayState = function (interfaceId, hide) {
-        var out = new PacketBuilder_1.PacketBuilder(171);
+    }
+    sendInterfaceDisplayState(interfaceId, hide) {
+        const out = new PacketBuilder_1.PacketBuilder(171);
         out.put(hide ? 1 : 0);
         out.putInt(interfaceId);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendPlayerHeadOnInterface = function (id) {
-        var out = new PacketBuilder_1.PacketBuilder(185);
+    }
+    sendPlayerHeadOnInterface(id) {
+        const out = new PacketBuilder_1.PacketBuilder(185);
         out.putShort(id, ValueType_1.ValueType.A, ByteOrder_1.ByteOrder.LITTLE);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendNpcHeadOnInterface = function (id, interfaceId) {
-        var out = new PacketBuilder_1.PacketBuilder(75);
+    }
+    sendNpcHeadOnInterface(id, interfaceId) {
+        const out = new PacketBuilder_1.PacketBuilder(75);
         out.putShort(id, ValueType_1.ValueType.A, ByteOrder_1.ByteOrder.LITTLE);
         out.putShort(interfaceId, ValueType_1.ValueType.A, ByteOrder_1.ByteOrder.LITTLE);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendEnterAmountPrompt = function (title) {
-        var out = new PacketBuilder_1.PacketBuilder();
+    }
+    sendEnterAmountPrompt(title) {
+        const out = new PacketBuilder_1.PacketBuilder();
         out.putString(title);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendEnterInputPrompt = function (title) {
-        var out = new PacketBuilder_1.PacketBuilder();
+    }
+    sendEnterInputPrompt(title) {
+        const out = new PacketBuilder_1.PacketBuilder();
         out.putString(title);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterfaceReset = function () {
-        var out = new PacketBuilder_1.PacketBuilder(68);
+    }
+    sendInterfaceReset() {
+        const out = new PacketBuilder_1.PacketBuilder(68);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendExit = function () {
-        var out = new PacketBuilder_1.PacketBuilder(62);
+    }
+    sendExit() {
+        const out = new PacketBuilder_1.PacketBuilder(62);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterfaceComponentMoval = function (x, y, id) {
-        var out = new PacketBuilder_1.PacketBuilder(70);
+    }
+    sendInterfaceComponentMoval(x, y, id) {
+        const out = new PacketBuilder_1.PacketBuilder(70);
         out.putShort(x);
         out.putShort(y);
         out.putShorts(id, ByteOrder_1.ByteOrder.LITTLE);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterfaceAnimation = function (interfaceId, animationId) {
-        var out = new PacketBuilder_1.PacketBuilder(200);
+    }
+    sendInterfaceAnimation(interfaceId, animationId) {
+        const out = new PacketBuilder_1.PacketBuilder(200);
         out.putShort(interfaceId);
         out.putShort(animationId);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterfaceModel = function (interfaceId, itemId, zoom) {
-        var out = new PacketBuilder_1.PacketBuilder(246);
+    }
+    sendInterfaceModel(interfaceId, itemId, zoom) {
+        const out = new PacketBuilder_1.PacketBuilder(246);
         out.putShorts(interfaceId, ByteOrder_1.ByteOrder.LITTLE);
         out.putShort(zoom).putShort(itemId);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendWidgetModel = function (widget, model) {
-        var out = new PacketBuilder_1.PacketBuilder(8);
+    }
+    sendWidgetModel(widget, model) {
+        const out = new PacketBuilder_1.PacketBuilder(8);
         out.putShort(widget);
         out.putShort(model);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendTabInterface = function (tabId, interfaceId) {
-        var out = new PacketBuilder_1.PacketBuilder(71);
+    }
+    sendTabInterface(tabId, interfaceId) {
+        const out = new PacketBuilder_1.PacketBuilder(71);
         out.putShort(interfaceId);
         out.puts(tabId, ValueType_1.ValueType.A);
         this.player.getSession().write(out);
         return this;
-    };
+    }
     // public sendTabs() {
     //     for (let tab = 0; tab < GameConstants.TAB_INTERFACES.length; tab++) {
     //         let interface_ = GameConstants.TAB_INTERFACES[tab];
@@ -346,32 +335,32 @@ var PacketSender = /** @class */ (function () {
     //     }
     //     return this;
     // }
-    PacketSender.prototype.sendTab = function (id) {
-        var out = new PacketBuilder_1.PacketBuilder(106);
+    sendTab(id) {
+        let out = new PacketBuilder_1.PacketBuilder(106);
         out.puts(id, ValueType_1.ValueType.C);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendFlashingSidebar = function (id) {
-        var out = new PacketBuilder_1.PacketBuilder(24);
+    }
+    sendFlashingSidebar(id) {
+        let out = new PacketBuilder_1.PacketBuilder(24);
         out.puts(id, ValueType_1.ValueType.S);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendChatboxInterface = function (id) {
-        var out = new PacketBuilder_1.PacketBuilder(164);
+    }
+    sendChatboxInterface(id) {
+        let out = new PacketBuilder_1.PacketBuilder(164);
         out.putShorts(id, ByteOrder_1.ByteOrder.LITTLE);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendMapState = function (state) {
-        var out = new PacketBuilder_1.PacketBuilder(99);
+    }
+    sendMapState(state) {
+        let out = new PacketBuilder_1.PacketBuilder(99);
         out.put(state);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendCameraAngle = function (x, y, level, speed, angle) {
-        var out = new PacketBuilder_1.PacketBuilder(177);
+    }
+    sendCameraAngle(x, y, level, speed, angle) {
+        let out = new PacketBuilder_1.PacketBuilder(177);
         out.put(x / 64);
         out.put(y / 64);
         out.putShort(level);
@@ -379,18 +368,18 @@ var PacketSender = /** @class */ (function () {
         out.put(angle);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendCameraShake = function (verticalAmount, verticalSpeed, horizontalAmount, horizontalSpeed) {
-        var out = new PacketBuilder_1.PacketBuilder(35);
+    }
+    sendCameraShake(verticalAmount, verticalSpeed, horizontalAmount, horizontalSpeed) {
+        const out = new PacketBuilder_1.PacketBuilder(35);
         out.put(verticalAmount);
         out.put(verticalSpeed);
         out.put(horizontalAmount);
         out.put(horizontalSpeed);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendCameraSpin = function (x, y, z, speed, angle) {
-        var out = new PacketBuilder_1.PacketBuilder(166);
+    }
+    sendCameraSpin(x, y, z, speed, angle) {
+        const out = new PacketBuilder_1.PacketBuilder(166);
         out.put(x / 64);
         out.put(y / 64);
         out.putShort(z);
@@ -398,12 +387,12 @@ var PacketSender = /** @class */ (function () {
         out.put(angle);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendCameraNeutrality = function () {
-        var out = new PacketBuilder_1.PacketBuilder(107);
+    }
+    sendCameraNeutrality() {
+        const out = new PacketBuilder_1.PacketBuilder(107);
         this.player.getSession().write(out);
         return this;
-    };
+    }
     // public sendInterfaceRemoval(): PacketSender {
     //     if (this.player.getStatus() === PlayerStatus.BANKING) {
     //         if (this.player.isSearchingBank()) {
@@ -431,27 +420,27 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(new PacketBuilder(219));
     //     return this;
     // }
-    PacketSender.prototype.sendInterfaceScrollReset = function (interfaceId) {
-        var out = new PacketBuilder_1.PacketBuilder(9);
+    sendInterfaceScrollReset(interfaceId) {
+        let out = new PacketBuilder_1.PacketBuilder(9);
         out.putInt(interfaceId);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendScrollbarHeight = function (interfaceId, scrollMax) {
-        var out = new PacketBuilder_1.PacketBuilder(10);
+    }
+    sendScrollbarHeight(interfaceId, scrollMax) {
+        let out = new PacketBuilder_1.PacketBuilder(10);
         out.putInt(interfaceId);
         out.putShort(scrollMax);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterfaceSet = function (interfaceId, sidebarInterfaceId) {
-        var out = new PacketBuilder_1.PacketBuilder(248);
+    }
+    sendInterfaceSet(interfaceId, sidebarInterfaceId) {
+        let out = new PacketBuilder_1.PacketBuilder(248);
         out.putShort(interfaceId, ValueType_1.ValueType.A);
         out.putShort(sidebarInterfaceId);
         this.player.getSession().write(out);
         this.player.setInterfaceId(interfaceId);
         return this;
-    };
+    }
     // public sendItemContainer(container: Inventory, interfaceId: number) {
     //     let out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
     //     out.putInt(interfaceId);
@@ -482,12 +471,12 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendCurrentBankTab = function (current_tab) {
-        var out = new PacketBuilder_1.PacketBuilder(55);
+    sendCurrentBankTab(current_tab) {
+        let out = new PacketBuilder_1.PacketBuilder(55);
         out.put(current_tab);
         this.player.getSession().write(out);
         return this;
-    };
+    }
     // public sendEffectTimer(delay: number, e: EffectTimer) {
     //     let out = new PacketBuilder(54);
     //     out.putShort(delay);
@@ -513,32 +502,32 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendItemOnInterfaces = function (interfaceId, item, amount) {
-        var out = new PacketBuilder_1.PacketBuilder(53, PacketType_1.PacketType.VARIABLE_SHORT);
+    sendItemOnInterfaces(interfaceId, item, amount) {
+        let out = new PacketBuilder_1.PacketBuilder(53, PacketType_1.PacketType.VARIABLE_SHORT);
         out.putInt(interfaceId);
         out.putShort(1);
         out.putInt(amount);
         out.putShort(item + 1);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendItemOnInterface = function (frame, item, slot, amount) {
-        var out = new PacketBuilder_1.PacketBuilder(34, PacketType_1.PacketType.VARIABLE_SHORT);
+    }
+    sendItemOnInterface(frame, item, slot, amount) {
+        let out = new PacketBuilder_1.PacketBuilder(34, PacketType_1.PacketType.VARIABLE_SHORT);
         out.putShort(frame);
         out.put(slot);
         out.putInt(amount);
         out.putShort(item + 1);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.clearItemOnInterface = function (frame) {
-        var out = new PacketBuilder_1.PacketBuilder(72);
+    }
+    clearItemOnInterface(frame) {
+        const out = new PacketBuilder_1.PacketBuilder(72);
         out.putShort(frame);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendSmithingData = function (id, slot, interfaceId, amount) {
-        var out = new PacketBuilder_1.PacketBuilder(34, PacketType_1.PacketType.VARIABLE_SHORT);
+    }
+    sendSmithingData(id, slot, interfaceId, amount) {
+        const out = new PacketBuilder_1.PacketBuilder(34, PacketType_1.PacketType.VARIABLE_SHORT);
         out.putShort(interfaceId);
         out.put(slot);
         out.putInt(amount);
@@ -546,9 +535,9 @@ var PacketSender = /** @class */ (function () {
         out.put(amount);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInteractionOption = function (option, slot, top) {
-        var out = new PacketBuilder_1.PacketBuilder(104, PacketType_1.PacketType.VARIABLE);
+    }
+    sendInteractionOption(option, slot, top) {
+        const out = new PacketBuilder_1.PacketBuilder(104, PacketType_1.PacketType.VARIABLE);
         out.puts(slot, ValueType_1.ValueType.C);
         out.puts(top ? 1 : 0, ValueType_1.ValueType.A);
         out.putString(option);
@@ -557,50 +546,50 @@ var PacketSender = /** @class */ (function () {
         if (option != null)
             // this.player.setPlayerInteractingOption(interactingOption);
             return this;
-    };
-    PacketSender.prototype.sendString = function (string, id) {
+    }
+    sendString(string, id) {
         if (!this.player.getFrameUpdater().shouldUpdate(string, id)) {
             return this;
         }
-        var out = new PacketBuilder_1.PacketBuilder(126, PacketType_1.PacketType.VARIABLE_SHORT);
+        const out = new PacketBuilder_1.PacketBuilder(126, PacketType_1.PacketType.VARIABLE_SHORT);
         out.putString(string);
         out.putInt(id);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.clearInterfaceText = function (start, end) {
-        for (var i = start; i <= end; i++) {
+    }
+    clearInterfaceText(start, end) {
+        for (let i = start; i <= end; i++) {
             this.player.getFrameUpdater().interfaceTextMap.remove(i);
         }
-        var out = new PacketBuilder_1.PacketBuilder(105);
+        const out = new PacketBuilder_1.PacketBuilder(105);
         out.putInt(start);
         out.putInt(end);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.clearInterfaceItems = function (start, end) {
-        var out = new PacketBuilder_1.PacketBuilder(112);
+    }
+    clearInterfaceItems(start, end) {
+        let out = new PacketBuilder_1.PacketBuilder(112);
         out.putInt(start);
         out.putInt(end);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendRights = function () {
-        var out = new PacketBuilder_1.PacketBuilder(127);
+    }
+    sendRights() {
+        const out = new PacketBuilder_1.PacketBuilder(127);
         out.put(this.player.getRights().getSpriteId());
         // out.put(DonatorRights.getSpriteId(0));
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendPositionalHint = function (position, tilePosition) {
-        var out = new PacketBuilder_1.PacketBuilder(254);
+    }
+    sendPositionalHint(position, tilePosition) {
+        const out = new PacketBuilder_1.PacketBuilder(254);
         out.put(tilePosition);
         // out.putShort(position.getX());
         // out.putShort(position.getY());
         // out.put(position.getZ());
         this.player.getSession().write(out);
         return this;
-    };
+    }
     // public sendEntityHint(mobile: Mobile) {
     //     // let type = mobile instanceof Player ? 10 : 1;
     //     let type =  1;
@@ -611,21 +600,21 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendEntityHintRemoval = function (playerHintRemoval) {
-        var type = playerHintRemoval ? 10 : 1;
-        var out = new PacketBuilder_1.PacketBuilder(254);
+    sendEntityHintRemoval(playerHintRemoval) {
+        let type = playerHintRemoval ? 10 : 1;
+        let out = new PacketBuilder_1.PacketBuilder(254);
         out.put(type).putShort(-1);
         out.putShorts(0, ByteOrder_1.ByteOrder.TRIPLE_INT);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendMultiIcon = function (value) {
-        var out = new PacketBuilder_1.PacketBuilder(61);
+    }
+    sendMultiIcon(value) {
+        let out = new PacketBuilder_1.PacketBuilder(61);
         out.put(value);
         this.player.getSession().write(out);
         this.player.setMultiIcon(value);
         return this;
-    };
+    }
     // public sendPrivateMessage(target: Player, message: Uint8Array, size: number): PacketSender {
     //     const messageArray = Array.from(message);
     //     if (this.player instanceof PlayerBot) {
@@ -641,44 +630,44 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendFriendStatus = function (status) {
-        var out = new PacketBuilder_1.PacketBuilder(221);
+    sendFriendStatus(status) {
+        const out = new PacketBuilder_1.PacketBuilder(221);
         out.put(status);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendFriend = function (name, world) {
+    }
+    sendFriend(name, world) {
         world = world !== 0 ? world + 9 : world;
-        var out = new PacketBuilder_1.PacketBuilder(50);
+        const out = new PacketBuilder_1.PacketBuilder(50);
         out.putLong(name);
         out.put(world);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendDeleteFriend = function (name) {
-        var out = new PacketBuilder_1.PacketBuilder(51);
+    }
+    sendDeleteFriend(name) {
+        const out = new PacketBuilder_1.PacketBuilder(51);
         out.putLong(name);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendAddIgnore = function (name) {
-        var out = new PacketBuilder_1.PacketBuilder(214);
+    }
+    sendAddIgnore(name) {
+        const out = new PacketBuilder_1.PacketBuilder(214);
         out.putLong(name);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendDeleteIgnore = function (name) {
-        var out = new PacketBuilder_1.PacketBuilder(215);
+    }
+    sendDeleteIgnore(name) {
+        const out = new PacketBuilder_1.PacketBuilder(215);
         out.putLong(name);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendTotalExp = function (exp) {
-        var out = new PacketBuilder_1.PacketBuilder(108);
+    }
+    sendTotalExp(exp) {
+        const out = new PacketBuilder_1.PacketBuilder(108);
         out.putLong(exp);
         this.player.getSession().write(out);
         return this;
-    };
+    }
     // public sendGraphic(graphic: Graphic, position: Location): PacketSender {
     //     this.sendPosition(position);
     //     let out = new PacketBuilder(4);
@@ -698,11 +687,11 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendAnimationReset = function () {
-        var out = new PacketBuilder_1.PacketBuilder(1);
+    sendAnimationReset() {
+        let out = new PacketBuilder_1.PacketBuilder(1);
         this.player.getSession().write(out);
         return this;
-    };
+    }
     // public sendGlobalGraphic(graphic: Graphic, position: Location): PacketSender {
     //     this.sendGraphic(graphic, position);
     //     for (let p of this.player.getLocalPlayers()) {
@@ -754,28 +743,28 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.deleteRegionalSpawns = function () {
+    deleteRegionalSpawns() {
         this.player.getSession().write(new PacketBuilder_1.PacketBuilder(178));
         return this;
-    };
-    PacketSender.prototype.sendPosition = function (position) {
-        var other = this.player.getLastKnownRegion();
-        var out = new PacketBuilder_1.PacketBuilder(85);
+    }
+    sendPosition(position) {
+        let other = this.player.getLastKnownRegion();
+        let out = new PacketBuilder_1.PacketBuilder(85);
         // out.puts(position.getY() - 8 * other.getRegionY(), ValueType.C);
         // out.puts(position.getX() - 8 * other.getRegionX(), ValueType.C);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendConsoleMessage = function (message) {
-        var out = new PacketBuilder_1.PacketBuilder(123);
+    }
+    sendConsoleMessage(message) {
+        let out = new PacketBuilder_1.PacketBuilder(123);
         out.putString(message);
         this.player.getSession().write(out);
         return this;
-    };
-    PacketSender.prototype.sendInterfaceSpriteChange = function (childId, firstSprite, secondSprite) {
+    }
+    sendInterfaceSpriteChange(childId, firstSprite, secondSprite) {
         // player.write(new PacketBuilder(140).writeShort(childId).writeByte((firstSprite << 0) + (secondSprite & 0x0)).toPacket());
         return this;
-    };
+    }
     // public getRegionOffset(position: Location): number {
     //     // let x = position.getX() - (position.getRegionX() << 4);
     //     // let y = position.getY() - (position.getRegionY() & 0x7);
@@ -803,17 +792,94 @@ var PacketSender = /** @class */ (function () {
     //     this.player.getSession().write(out);
     //     return this;
     // }
-    PacketSender.prototype.sendHideCombatBox = function () {
+    sendHideCombatBox() {
         this.player.getSession().write(new PacketBuilder_1.PacketBuilder(128));
         return this;
-    };
-    PacketSender.prototype.sendObjectsRemoval = function (chunkX, chunkY, height) {
+    }
+    sendObjectsRemoval(chunkX, chunkY, height) {
         this.player
             .getSession()
             .write(new PacketBuilder_1.PacketBuilder(153).put(chunkX).put(chunkY).put(height));
         return this;
-    };
-    return PacketSender;
-}());
+    }
+    // Basic chat message to client.
+    sendMessage(message) {
+        const out = new PacketBuilder_1.PacketBuilder(253, PacketType_1.PacketType.VARIABLE);
+        out.putString(message ?? "");
+        this.player.getSession().write(out);
+        return this;
+    }
+    // Stubs to satisfy gameplay code; implement client opcodes as needed.
+    sendPrivateMessage(..._args) {
+        return this;
+    }
+    sendInterfaceRemoval() {
+        return this;
+    }
+    sendItemContainer(_containerId, _interfaceId) {
+        return this;
+    }
+    sendItemContainers(..._args) {
+        return this;
+    }
+    sendInterfaceItems(_interfaceId, _items) {
+        return this;
+    }
+    sendEffectTimer(_seconds, _effect) {
+        return this;
+    }
+    sendGraphic(..._args) {
+        return this;
+    }
+    sendGlobalGraphic(..._args) {
+        return this;
+    }
+    sendProjectile(..._args) {
+        return this;
+    }
+    sendEntityHint(_target, _index) {
+        return this;
+    }
+    // Additional stubs for gameplay code.
+    sendTabs() {
+        return this;
+    }
+    sendObject(..._args) {
+        return this;
+    }
+    sendObjectRemoval(..._args) {
+        return this;
+    }
+    sendObjectAnimation(..._args) {
+        return this;
+    }
+    sendCreationMenu(_menu) {
+        return this;
+    }
+    sendItemContainerInterface(_containerId, _interfaceId) {
+        return this;
+    }
+    sendItemOnWidget(_widgetId, _modelZoom, _itemId) {
+        return this;
+    }
+    alterGroundItem(_item) {
+        return this;
+    }
+    deleteGroundItem(_item) {
+        return this;
+    }
+    createGroundItem(_item) {
+        return this;
+    }
+    sendItemOnEquipment(_slot) {
+        return this;
+    }
+    sendSkill(_skill) {
+        return this;
+    }
+    sendExpDrop(_skill, _exp) {
+        return this;
+    }
+}
 exports.PacketSender = PacketSender;
 //# sourceMappingURL=PacketSender.js.map

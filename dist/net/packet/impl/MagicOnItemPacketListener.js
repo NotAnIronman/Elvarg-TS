@@ -1,18 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MagicOnItemPacketListener = void 0;
-var PacketConstants_1 = require("../PacketConstants");
-var MagicOnItemPacketListener = /** @class */ (function () {
-    function MagicOnItemPacketListener() {
-    }
+const PacketConstants_1 = require("../PacketConstants");
+class MagicOnItemPacketListener {
     // public execute(player: Player, packet: Packet) {
-    MagicOnItemPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         switch (packet.getOpcode()) {
             case PacketConstants_1.PacketConstants.MAGIC_ON_ITEM_OPCODE:
-                var slot = packet.readShort();
-                var itemId = packet.readShortA();
-                var childId = packet.readShort();
-                var spellId = packet.readShortA();
+                let slot = packet.readShort();
+                let itemId = packet.readShortA();
+                let childId = packet.readShort();
+                let spellId = packet.readShortA();
                 if (!player.getClickDelay().elapsedTime(1300))
                     return;
                 if (slot < 0 || slot >= player.getInventory().capacity())
@@ -23,7 +21,7 @@ var MagicOnItemPacketListener = /** @class */ (function () {
                 // if (!spell) {
                 //     return;
                 // }
-                var item = player.getInventory().getItems()[slot];
+                let item = player.getInventory().getItems()[slot];
             // switch (spell) {
             //     case EffectSpells.LOW_ALCHEMY:
             //     case EffectSpells.HIGH_ALCHEMY:
@@ -50,8 +48,7 @@ var MagicOnItemPacketListener = /** @class */ (function () {
             //         break;
             // }
         }
-    };
-    return MagicOnItemPacketListener;
-}());
+    }
+}
 exports.MagicOnItemPacketListener = MagicOnItemPacketListener;
 //# sourceMappingURL=MagicOnItemPacketListener.js.map

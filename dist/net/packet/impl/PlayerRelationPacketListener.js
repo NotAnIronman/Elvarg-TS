@@ -1,14 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PlayerRelationPacketListener = void 0;
-var PacketConstants_1 = require("../PacketConstants");
-var PlayerRelationPacketListener = /** @class */ (function () {
-    function PlayerRelationPacketListener() {
-    }
+const PacketConstants_1 = require("../PacketConstants");
+class PlayerRelationPacketListener {
     // execute(player: Player, packet: Packet) {
-    PlayerRelationPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         try {
-            var username = packet.readLong();
+            let username = packet.readLong();
             if (username < 0) {
                 return;
             }
@@ -26,8 +24,8 @@ var PlayerRelationPacketListener = /** @class */ (function () {
                     player.getRelations().deleteIgnore(username);
                     break;
                 case PacketConstants_1.PacketConstants.SEND_PM_OPCODE:
-                    var size = packet.getSize();
-                    var message = packet.readBytes(size);
+                    let size = packet.getSize();
+                    let message = packet.readBytes(size);
                     // let friend = World.getPlayerByName(Misc.formatText(Misc.longToString(username)).replace("_", " "));
                     // if (friend) {
                     //     player.getRelations().message(friend, new Uint8Array(message), size);
@@ -40,8 +38,7 @@ var PlayerRelationPacketListener = /** @class */ (function () {
         catch (e) {
             console.log(e);
         }
-    };
-    return PlayerRelationPacketListener;
-}());
+    }
+}
 exports.PlayerRelationPacketListener = PlayerRelationPacketListener;
 //# sourceMappingURL=PlayerRelationPacketListener.js.map

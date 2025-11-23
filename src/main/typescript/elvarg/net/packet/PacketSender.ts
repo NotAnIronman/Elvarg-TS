@@ -143,19 +143,6 @@ export class PacketSender {
     return this;
   }
 
-  // sendMessage(message: string): this {
-  //     if (this.player instanceof PlayerBot) {
-  //         // Bots can't read their own messages, yet ;)
-  //         (this.player as PlayerBot).getChatInteraction().receivedGameMessage(message);
-  //         return this;
-  //     }
-
-  //     const out = new PacketBuilder(253, PacketType.VARIABLE);
-  //     out.putString(message);
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
   sendSpecialMessage(name: string, type: number, message: string): this {
     const out = new PacketBuilder(252, PacketType.VARIABLE);
     out.put(type);
@@ -728,7 +715,7 @@ export class PacketSender {
     return this;
   }
 
-  public sendPositionalHint(position: Location, tilePosition: number) {
+  public sendPositionalHint(position: any, tilePosition: number) {
     const out = new PacketBuilder(254);
     out.put(tilePosition);
     // out.putShort(position.getX());
@@ -916,7 +903,7 @@ export class PacketSender {
     return this;
   }
 
-  public sendPosition(position: Location) {
+  public sendPosition(position: any) {
     let other = this.player.getLastKnownRegion();
     let out = new PacketBuilder(85);
     // out.puts(position.getY() - 8 * other.getRegionY(), ValueType.C);
@@ -983,6 +970,108 @@ export class PacketSender {
     this.player
       .getSession()
       .write(new PacketBuilder(153).put(chunkX).put(chunkY).put(height));
+    return this;
+  }
+
+  // Basic chat message to client.
+  sendMessage(message: string): this {
+    const out = new PacketBuilder(253, PacketType.VARIABLE);
+    out.putString(message ?? "");
+    this.player.getSession().write(out);
+    return this;
+  }
+
+  // Stubs to satisfy gameplay code; implement client opcodes as needed.
+  sendPrivateMessage(..._args: any[]): this {
+    return this;
+  }
+
+  sendInterfaceRemoval(): this {
+    return this;
+  }
+
+  sendItemContainer(_containerId: number | any, _interfaceId?: number): this {
+    return this;
+  }
+
+  sendItemContainers(..._args: any[]): this {
+    return this;
+  }
+
+  sendInterfaceItems(_interfaceId: number, _items?: any): this {
+    return this;
+  }
+
+  sendEffectTimer(_seconds: number, _effect: any): this {
+    return this;
+  }
+
+  sendGraphic(..._args: any[]): this {
+    return this;
+  }
+
+  sendGlobalGraphic(..._args: any[]): this {
+    return this;
+  }
+
+  sendProjectile(..._args: any[]): this {
+    return this;
+  }
+
+  sendEntityHint(_target?: any, _index?: any): this {
+    return this;
+  }
+
+  // Additional stubs for gameplay code.
+  sendTabs(): this {
+    return this;
+  }
+
+  sendObject(..._args: any[]): this {
+    return this;
+  }
+
+  sendObjectRemoval(..._args: any[]): this {
+    return this;
+  }
+
+  sendObjectAnimation(..._args: any[]): this {
+    return this;
+  }
+
+  sendCreationMenu(_menu: any): this {
+    return this;
+  }
+
+  sendItemContainerInterface(_containerId: number, _interfaceId: number): this {
+    return this;
+  }
+
+  sendItemOnWidget(_widgetId: number, _modelZoom: number, _itemId: number): this {
+    return this;
+  }
+
+  alterGroundItem(_item: any): this {
+    return this;
+  }
+
+  deleteGroundItem(_item: any): this {
+    return this;
+  }
+
+  createGroundItem(_item: any): this {
+    return this;
+  }
+
+  sendItemOnEquipment(_slot: number): this {
+    return this;
+  }
+
+  sendSkill(_skill: any): this {
+    return this;
+  }
+
+  sendExpDrop(_skill: any, _exp: number): this {
     return this;
   }
 }

@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PacketEncoder = void 0;
-var PacketType_1 = require("../packet/PacketType");
-var PacketEncoder = /** @class */ (function () {
-    function PacketEncoder(encoder) {
+const PacketType_1 = require("../packet/PacketType");
+class PacketEncoder {
+    constructor(encoder) {
         this.CLIENTS_PACKET_SIZES = [
             0, 0, 0, 1, 6, 0, 0, 0, 4, 4, //0
             6, 2, -1, 1, 1, -1, 1, 0, 0, 0, // 10
@@ -35,49 +35,49 @@ var PacketEncoder = /** @class */ (function () {
         this.encoder = encoder;
         this.CLIENT_PACKET_SIZES = [];
     }
-    PacketEncoder.prototype.encode = function (packet) {
-        var opcode = (packet.getOpcode() + this.encoder.nextInt()) & 0xff;
-        var type = packet.getType();
-        var size = packet.getSize();
+    encode(packet) {
+        const opcode = (packet.getOpcode() + this.encoder.nextInt()) & 0xff;
+        const type = packet.getType();
+        const size = packet.getSize();
         if (type === PacketType_1.PacketType.FIXED) {
-            var currSize = this.CLIENT_PACKET_SIZES[packet.getOpcode()];
+            const currSize = this.CLIENT_PACKET_SIZES[packet.getOpcode()];
             if (size !== currSize) {
-                console.error("{PacketEncoder} Opcode ".concat(packet.getOpcode(), " has defined size ").concat(currSize, " but is actually ").concat(size, "."));
+                console.error(`{PacketEncoder} Opcode ${packet.getOpcode()} has defined size ${currSize} but is actually ${size}.`);
                 return null;
             }
         }
         else if (type === PacketType_1.PacketType.VARIABLE) {
-            var currSize = this.CLIENT_PACKET_SIZES[packet.getOpcode()];
+            const currSize = this.CLIENT_PACKET_SIZES[packet.getOpcode()];
             if (currSize !== -1) {
-                console.error("{PacketEncoder} Opcode ".concat(packet.getOpcode(), "'s size needs to be -1, it's currently ").concat(currSize, "."));
+                console.error(`{PacketEncoder} Opcode ${packet.getOpcode()}'s size needs to be -1, it's currently ${currSize}.`);
                 return null;
             }
         }
         else if (type === PacketType_1.PacketType.VARIABLE_SHORT) {
-            var currSize = this.CLIENT_PACKET_SIZES[packet.getOpcode()];
+            const currSize = this.CLIENT_PACKET_SIZES[packet.getOpcode()];
             if (currSize !== -2) {
-                console.error("{PacketEncoder} Opcode ".concat(packet.getOpcode(), "'s size needs to be -2, it's currently ").concat(currSize, "."));
+                console.error(`{PacketEncoder} Opcode ${packet.getOpcode()}'s size needs to be -2, it's currently ${currSize}.`);
                 return null;
             }
         }
-        var finalSize = size + 1;
+        let finalSize = size + 1;
         switch (type) {
             case PacketType_1.PacketType.VARIABLE:
                 if (size > 255) {
-                    throw new Error("Tried to send packet length ".concat(size, " in variable-byte packet"));
+                    throw new Error(`Tried to send packet length ${size} in variable-byte packet`);
                 }
                 finalSize++;
                 break;
             case PacketType_1.PacketType.VARIABLE_SHORT:
                 if (size > 65535) {
-                    throw new Error("Tried to send packet length ".concat(size, " in variable-short packet"));
+                    throw new Error(`Tried to send packet length ${size} in variable-short packet`);
                 }
                 finalSize += 2;
                 break;
             default:
                 break;
         }
-        var buffer = Buffer.allocUnsafe(finalSize);
+        const buffer = Buffer.allocUnsafe(finalSize);
         buffer.writeUInt8(opcode);
         switch (type) {
             case PacketType_1.PacketType.VARIABLE:
@@ -92,8 +92,7 @@ var PacketEncoder = /** @class */ (function () {
         // Write packet
         buffer.set(packet.getBuffer(), finalSize - size - 1);
         return buffer;
-    };
-    return PacketEncoder;
-}());
+    }
+}
 exports.PacketEncoder = PacketEncoder;
 //# sourceMappingURL=PacketEncoder.js.map

@@ -10,34 +10,31 @@ exports.DropItemPacketListener = void 0;
 // import { Sounds } from "../../../game/Sounds";
 // import { PetHandler } from '../../../game/content/PetHandler'
 // import { PlayerRights } from "../../../game/model/rights/PlayerRights";
-var DropItemPacketListener = /** @class */ (function () {
-    function DropItemPacketListener() {
-    }
+class DropItemPacketListener {
     // public static destroyItemInterface(player: Player, item: Item) {
-    DropItemPacketListener.destroyItemInterface = function (player, item) {
-        var _a;
+    static destroyItemInterface(player, item) {
         player.setDestroyItem(item.getId());
-        var info = [
+        let info = [
             { "Are you sure you want to discard this item?": "14174" },
             { "Yes.": "14175" },
             { "No.": "14176" },
             { "": "14177" },
             { "This item will vanish once it hits the floor.": "14182" },
             { "You cannot get it back if discarded.": "14183" },
-            (_a = {}, _a[item.getDefinition().getName()] = "14184", _a),
+            { [item.getDefinition().getName()]: "14184" },
         ];
         player
             .getPacketSender()
             .sendItemOnInterfaces(14171, item.getId(), item.getAmount());
-        for (var i = 0; i < info.length; i++)
+        for (let i = 0; i < info.length; i++)
             player.getPacketSender().sendString(info[i][0], parseInt(info[i][1]));
         player.getPacketSender().sendChatboxInterface(14170);
-    };
+    }
     // public execute(player: Player, packet: Packet) {
-    DropItemPacketListener.prototype.execute = function (player, packet) {
-        var id = packet.readUnsignedShortA();
-        var interface_id = packet.readUnsignedShort();
-        var itemSlot = packet.readUnsignedShortA();
+    execute(player, packet) {
+        let id = packet.readUnsignedShortA();
+        let interface_id = packet.readUnsignedShort();
+        let itemSlot = packet.readUnsignedShortA();
         if (player == null || player.getHitpoints() <= 0) {
             return;
         }
@@ -51,7 +48,7 @@ var DropItemPacketListener = /** @class */ (function () {
         if (player.busy()) {
             player.getPacketSender().sendInterfaceRemoval();
         }
-        var item = player.getInventory().getItems()[itemSlot];
+        let item = player.getInventory().getItems()[itemSlot];
         if (item == null)
             return;
         if (item.getId() != id || item.getAmount() <= 0) {
@@ -81,8 +78,7 @@ var DropItemPacketListener = /** @class */ (function () {
         else {
             DropItemPacketListener.destroyItemInterface(player, item);
         }
-    };
-    return DropItemPacketListener;
-}());
+    }
+}
 exports.DropItemPacketListener = DropItemPacketListener;
 //# sourceMappingURL=DropItemPacketListener.js.map

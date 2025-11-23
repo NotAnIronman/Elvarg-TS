@@ -2,9 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ButtonClickPacketListener = void 0;
 // import { Dueling } from '../../../game/content/Duelling';
-var ButtonClickPacketListener = /** @class */ (function () {
-    function ButtonClickPacketListener() {
-    }
+class ButtonClickPacketListener {
     // public static handlers(player: Player, button: number): boolean {
     //   if (PrayerHandler.togglePrayer(player, button)) {
     //     return true;
@@ -54,8 +52,8 @@ var ButtonClickPacketListener = /** @class */ (function () {
     //   return false;
     // }
     // execute(player: Player, packet: Packet): void {
-    ButtonClickPacketListener.prototype.execute = function (player, packet) {
-        var button = packet.readInt();
+    execute(player, packet) {
+        let button = packet.readInt();
         if (player.getHitpoints() <= 0 || player.isTeleporting) {
             return;
         }
@@ -156,7 +154,7 @@ var ButtonClickPacketListener = /** @class */ (function () {
                 player.setAutoRetaliate(!player.autoRetaliateReturn());
                 break;
             case ButtonClickPacketListener.DESTROY_ITEM:
-                var item = player.getDestroyItem();
+                let item = player.getDestroyItem();
                 player.getPacketSender().sendInterfaceRemoval();
                 if (item != -1) {
                     player
@@ -213,56 +211,55 @@ var ButtonClickPacketListener = /** @class */ (function () {
                 // player.getPacketSender().sendMessage("Player "+player.getUsername()+", click button: "+button);
                 break;
         }
-    };
-    ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_FIVE = 2494;
-    ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_FIVE = 2495;
-    ButtonClickPacketListener.THIRD_DIALOGUE_OPTION_OF_FIVE = 2496;
-    ButtonClickPacketListener.FOURTH_DIALOGUE_OPTION_OF_FIVE = 2497;
-    ButtonClickPacketListener.FIFTH_DIALOGUE_OPTION_OF_FIVE = 2498;
-    ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_FOUR = 2482;
-    ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_FOUR = 2483;
-    ButtonClickPacketListener.THIRD_DIALOGUE_OPTION_OF_FOUR = 2484;
-    ButtonClickPacketListener.FOURTH_DIALOGUE_OPTION_OF_FOUR = 2485;
-    ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_THREE = 2471;
-    ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_THREE = 2472;
-    ButtonClickPacketListener.THIRD_DIALOGUE_OPTION_OF_THREE = 2473;
-    ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_TWO = 2461;
-    ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_TWO = 2462;
-    ButtonClickPacketListener.LOGOUT = 2458;
-    ButtonClickPacketListener.TOGGLE_RUN_ENERGY_ORB = 1050;
-    ButtonClickPacketListener.TOGGLE_RUN_ENERGY_SETTINGS = 42507;
-    ButtonClickPacketListener.OPEN_EQUIPMENT_SCREEN = 27653;
-    ButtonClickPacketListener.OPEN_PRICE_CHECKER = 27651;
-    ButtonClickPacketListener.OPEN_ITEMS_KEPT_ON_DEATH_SCREEN = 27654;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_328 = 24115;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_425 = 24041;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_3796 = 24033;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_776 = 24048;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_1698 = 24017;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_1764 = 24010;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_2276 = 22845;
-    ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_5570 = 24025;
-    ButtonClickPacketListener.DESTROY_ITEM = 14175;
-    ButtonClickPacketListener.CANCEL_DESTROY_ITEM = 14176;
-    ButtonClickPacketListener.PRICE_CHECKER_WITHDRAW_ALL = 18255;
-    ButtonClickPacketListener.PRICE_CHECKER_DEPOSIT_ALL = 18252;
-    ButtonClickPacketListener.TOGGLE_EXP_LOCK = 476;
-    ButtonClickPacketListener.OPEN_WORLD_MAP = 156;
-    // Trade buttons
-    ButtonClickPacketListener.TRADE_ACCEPT_BUTTON_1 = 3420;
-    ButtonClickPacketListener.TRADE_ACCEPT_BUTTON_2 = 3546;
-    // Duel buttons
-    ButtonClickPacketListener.DUEL_ACCEPT_BUTTON_1 = 6674;
-    ButtonClickPacketListener.DUEL_ACCEPT_BUTTON_2 = 6520;
-    // Close buttons
-    ButtonClickPacketListener.CLOSE_BUTTON_1 = 18247;
-    ButtonClickPacketListener.CLOSE_BUTTON_2 = 38117;
-    // Presets
-    ButtonClickPacketListener.OPEN_PRESETS = 31015;
-    // Settings tab
-    ButtonClickPacketListener.OPEN_ADVANCED_OPTIONS = 42524;
-    ButtonClickPacketListener.OPEN_KEY_BINDINGS = 42552;
-    return ButtonClickPacketListener;
-}());
+    }
+}
 exports.ButtonClickPacketListener = ButtonClickPacketListener;
+ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_FIVE = 2494;
+ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_FIVE = 2495;
+ButtonClickPacketListener.THIRD_DIALOGUE_OPTION_OF_FIVE = 2496;
+ButtonClickPacketListener.FOURTH_DIALOGUE_OPTION_OF_FIVE = 2497;
+ButtonClickPacketListener.FIFTH_DIALOGUE_OPTION_OF_FIVE = 2498;
+ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_FOUR = 2482;
+ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_FOUR = 2483;
+ButtonClickPacketListener.THIRD_DIALOGUE_OPTION_OF_FOUR = 2484;
+ButtonClickPacketListener.FOURTH_DIALOGUE_OPTION_OF_FOUR = 2485;
+ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_THREE = 2471;
+ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_THREE = 2472;
+ButtonClickPacketListener.THIRD_DIALOGUE_OPTION_OF_THREE = 2473;
+ButtonClickPacketListener.FIRST_DIALOGUE_OPTION_OF_TWO = 2461;
+ButtonClickPacketListener.SECOND_DIALOGUE_OPTION_OF_TWO = 2462;
+ButtonClickPacketListener.LOGOUT = 2458;
+ButtonClickPacketListener.TOGGLE_RUN_ENERGY_ORB = 1050;
+ButtonClickPacketListener.TOGGLE_RUN_ENERGY_SETTINGS = 42507;
+ButtonClickPacketListener.OPEN_EQUIPMENT_SCREEN = 27653;
+ButtonClickPacketListener.OPEN_PRICE_CHECKER = 27651;
+ButtonClickPacketListener.OPEN_ITEMS_KEPT_ON_DEATH_SCREEN = 27654;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_328 = 24115;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_425 = 24041;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_3796 = 24033;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_776 = 24048;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_1698 = 24017;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_1764 = 24010;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_2276 = 22845;
+ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_5570 = 24025;
+ButtonClickPacketListener.DESTROY_ITEM = 14175;
+ButtonClickPacketListener.CANCEL_DESTROY_ITEM = 14176;
+ButtonClickPacketListener.PRICE_CHECKER_WITHDRAW_ALL = 18255;
+ButtonClickPacketListener.PRICE_CHECKER_DEPOSIT_ALL = 18252;
+ButtonClickPacketListener.TOGGLE_EXP_LOCK = 476;
+ButtonClickPacketListener.OPEN_WORLD_MAP = 156;
+// Trade buttons
+ButtonClickPacketListener.TRADE_ACCEPT_BUTTON_1 = 3420;
+ButtonClickPacketListener.TRADE_ACCEPT_BUTTON_2 = 3546;
+// Duel buttons
+ButtonClickPacketListener.DUEL_ACCEPT_BUTTON_1 = 6674;
+ButtonClickPacketListener.DUEL_ACCEPT_BUTTON_2 = 6520;
+// Close buttons
+ButtonClickPacketListener.CLOSE_BUTTON_1 = 18247;
+ButtonClickPacketListener.CLOSE_BUTTON_2 = 38117;
+// Presets
+ButtonClickPacketListener.OPEN_PRESETS = 31015;
+// Settings tab
+ButtonClickPacketListener.OPEN_ADVANCED_OPTIONS = 42524;
+ButtonClickPacketListener.OPEN_KEY_BINDINGS = 42552;
 //# sourceMappingURL=ButtonClickPacketListener.js.map

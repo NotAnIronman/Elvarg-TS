@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginDetailsMessage = void 0;
-var LoginDetailsMessage = /** @class */ (function () {
-    function LoginDetailsMessage(username, password, host, encryptor, decryptor) {
+class LoginDetailsMessage {
+    constructor(username, password, host, encryptor, decryptor) {
         this.isDiscord = false;
         this.username = username;
         this.password = password;
@@ -10,28 +10,27 @@ var LoginDetailsMessage = /** @class */ (function () {
         this.encryptor = encryptor;
         this.decryptor = decryptor;
     }
-    LoginDetailsMessage.prototype.getUsername = function () {
+    getUsername() {
         return this.username;
-    };
-    LoginDetailsMessage.prototype.getPassword = function () {
+    }
+    getPassword() {
         return this.password;
-    };
-    LoginDetailsMessage.prototype.getHost = function () {
+    }
+    getHost() {
         return this.host;
-    };
-    LoginDetailsMessage.prototype.getEncryptor = function () {
+    }
+    getEncryptor() {
         return this.encryptor;
-    };
-    LoginDetailsMessage.prototype.getDecryptor = function () {
+    }
+    getDecryptor() {
         return this.decryptor;
-    };
-    LoginDetailsMessage.prototype.getIsDiscord = function () {
+    }
+    getIsDiscord() {
         return this.isDiscord;
-    };
-    LoginDetailsMessage.prototype.setDiscord = function (discord) {
+    }
+    setDiscord(discord) {
         this.isDiscord = discord;
-    };
-    return LoginDetailsMessage;
-}());
+    }
+}
 exports.LoginDetailsMessage = LoginDetailsMessage;
 //# sourceMappingURL=LoginDetailsMessage.js.map

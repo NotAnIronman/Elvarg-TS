@@ -4,15 +4,13 @@ exports.TeleportPacketListener = void 0;
 // import { TeleportHandler } from "../../../game/model/teleportation/TeleportHandler";
 // import { PlayerRights } from "../../../game/model/rights/PlayerRights";
 // import { Teleportable } from "../../../game/model/teleportation/Teleportable";
-var TeleportPacketListener = /** @class */ (function () {
-    function TeleportPacketListener() {
-    }
+class TeleportPacketListener {
     // execute(player: Player, packet: Packet) {
-    TeleportPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player.getHitpoints() <= 0)
             return;
-        var type = packet.readByte();
-        var index = packet.readByte();
+        let type = packet.readByte();
+        let index = packet.readByte();
         if (!player.isTeleportInterfaceOpen()) {
             player.getPacketSender().sendInterfaceRemoval();
             return;
@@ -31,8 +29,7 @@ var TeleportPacketListener = /** @class */ (function () {
         //       break;
         //     }
         //   }
-    };
-    return TeleportPacketListener;
-}());
+    }
+}
 exports.TeleportPacketListener = TeleportPacketListener;
 //# sourceMappingURL=TeleportPacketListener.js.map

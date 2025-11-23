@@ -37,6 +37,11 @@ export class EquipPacketListener implements PacketExecutor {
   // 	EquipPacketListener.equip(player, itemInSlot.getId(), itemInSlot.getSlot(), Inventory.INTERFACE_ID);
   // }
 
+  // Placeholder to satisfy callers during porting.
+  public static equipFromInventory(_player: any, _itemInSlot: any) {
+    return;
+  }
+
   // public static equip(player: Player, id, slot: number, interfaceId: number): void{
 
   // 	// Validate player..

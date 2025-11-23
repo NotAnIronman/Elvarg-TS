@@ -2,28 +2,26 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EnterInputPacketListener = void 0;
 // import { Player } from "../../../game/entity/impl/player/Player";
-var ByteBufUtils_1 = require("../../../net/ByteBufUtils");
-var PacketConstants_1 = require("../../../net/packet/PacketConstants");
-var EnterInputPacketListener = /** @class */ (function () {
-    function EnterInputPacketListener() {
-    }
+const ByteBufUtils_1 = require("../../../net/ByteBufUtils");
+const PacketConstants_1 = require("../../../net/packet/PacketConstants");
+class EnterInputPacketListener {
     // execute(player: Player, packet: Packet) {
-    EnterInputPacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         if (player == null || player.getHitpoints() <= 0) {
             return;
         }
         switch (packet.getOpcode()) {
             case PacketConstants_1.PacketConstants.ENTER_SYNTAX_OPCODE:
-                var name_1 = ByteBufUtils_1.ByteBufUtils.readString(packet.getBuffer());
-                if (name_1 == null)
+                let name = ByteBufUtils_1.ByteBufUtils.readString(packet.getBuffer());
+                if (name == null)
                     return;
                 if (player.getEnteredSyntaxAction() != null) {
-                    player.getEnteredSyntaxAction().execute(name_1);
+                    player.getEnteredSyntaxAction().execute(name);
                     player.setEnteredSyntaxAction(null);
                 }
                 break;
             case PacketConstants_1.PacketConstants.ENTER_AMOUNT_OPCODE:
-                var amount = packet.readInt();
+                let amount = packet.readInt();
                 if (amount <= 0)
                     return;
                 if (player.getEnteredAmountAction() != null) {
@@ -32,8 +30,7 @@ var EnterInputPacketListener = /** @class */ (function () {
                 }
                 break;
         }
-    };
-    return EnterInputPacketListener;
-}());
+    }
+}
 exports.EnterInputPacketListener = EnterInputPacketListener;
 //# sourceMappingURL=EnterInputPacketListener.js.map

@@ -34,20 +34,16 @@ exports.ObjectActionPacketListener = void 0;
 // import { Animation } from "../../../game/model/Animation";
 // import { Action } from "../../../game/model/Action";
 // class ObjectAction implements Action{
-var ObjectAction = /** @class */ (function () {
-    function ObjectAction(execFunc) {
+class ObjectAction {
+    constructor(execFunc) {
         this.execFunc = execFunc;
     }
-    ObjectAction.prototype.execute = function () {
+    execute() {
         this.execFunc();
-    };
-    return ObjectAction;
-}());
-// export class ObjectActionPacketListener extends ObjectIdentifiers implements PacketExecutor {
-var ObjectActionPacketListener = /** @class */ (function () {
-    function ObjectActionPacketListener() {
     }
-    return ObjectActionPacketListener;
-}());
+}
+// export class ObjectActionPacketListener extends ObjectIdentifiers implements PacketExecutor {
+class ObjectActionPacketListener {
+}
 exports.ObjectActionPacketListener = ObjectActionPacketListener;
 //# sourceMappingURL=ObjectActionPacketListener.js.map

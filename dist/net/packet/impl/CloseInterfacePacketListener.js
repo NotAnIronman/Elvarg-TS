@@ -1,14 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CloseInterfacePacketListener = void 0;
-var CloseInterfacePacketListener = /** @class */ (function () {
-    function CloseInterfacePacketListener() {
-    }
+class CloseInterfacePacketListener {
     // execute(player: Player, packet: Packet) {
-    CloseInterfacePacketListener.prototype.execute = function (player, packet) {
+    execute(player, packet) {
         player.getPacketSender().sendInterfaceRemoval();
-    };
-    return CloseInterfacePacketListener;
-}());
+    }
+}
 exports.CloseInterfacePacketListener = CloseInterfacePacketListener;
 //# sourceMappingURL=CloseInterfacePacketListener.js.map

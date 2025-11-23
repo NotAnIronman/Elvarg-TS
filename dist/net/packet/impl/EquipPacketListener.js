@@ -5,25 +5,29 @@ exports.EquipPacketListener = void 0;
 // import { GameConstants } from "../../../game/GameConstants";
 // import { Flag } from "../../../game/model/Flag";
 // import { BonusManager } from "../../../game/model/equipment/BonusManager";
-var EquipPacketListener = /** @class */ (function () {
-    function EquipPacketListener() {
-    }
+class EquipPacketListener {
     // public static resetWeapon(player: Player, deactivateSpecialAttack: boolean) {
-    EquipPacketListener.resetWeapon = function (player, deactivateSpecialAttack) {
+    static resetWeapon(player, deactivateSpecialAttack) {
         if (deactivateSpecialAttack) {
             player.setSpecialActivated(false);
         }
         player.getPacketSender().sendSpecialAttackState(false);
         // WeaponInterfaces.assign(player);
-    };
+    }
     // execute(player: Player, packet: Packet) {
-    EquipPacketListener.prototype.execute = function (player, packet) {
-        var id = packet.readShort();
-        var slot = packet.readShortA();
-        var interfaceId = packet.readShortA();
+    execute(player, packet) {
+        let id = packet.readShort();
+        let slot = packet.readShortA();
+        let interfaceId = packet.readShortA();
         // EquipPacketListener.equip(player, id, slot, interfaceId);
-    };
-    return EquipPacketListener;
-}());
+    }
+    // public static equipFromInventory(player: Player, itemInSlot: ItemInSlot) {
+    // 	EquipPacketListener.equip(player, itemInSlot.getId(), itemInSlot.getSlot(), Inventory.INTERFACE_ID);
+    // }
+    // Placeholder to satisfy callers during porting.
+    static equipFromInventory(_player, _itemInSlot) {
+        return;
+    }
+}
 exports.EquipPacketListener = EquipPacketListener;
 //# sourceMappingURL=EquipPacketListener.js.map

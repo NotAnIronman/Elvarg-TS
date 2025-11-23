@@ -1,13 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InterfaceActionClickOpcode = void 0;
-var InterfaceActionClickOpcode = /** @class */ (function () {
-    function InterfaceActionClickOpcode() {
-    }
+class InterfaceActionClickOpcode {
     // execute(player: Player, packet: Packet) {
-    InterfaceActionClickOpcode.prototype.execute = function (player, packet) {
-        var interfaceId = packet.readInt();
-        var action = packet.readByte();
+    execute(player, packet) {
+        let interfaceId = packet.readInt();
+        let action = packet.readByte();
         if (player == null ||
             player.getHitpoints() <= 0 ||
             player.isTeleportingReturn()) {
@@ -25,8 +23,7 @@ var InterfaceActionClickOpcode = /** @class */ (function () {
         // if (TeleportHandler.handleButton(player, interfaceId, action)) {
         //     return;
         // }
-    };
-    return InterfaceActionClickOpcode;
-}());
+    }
+}
 exports.InterfaceActionClickOpcode = InterfaceActionClickOpcode;
 //# sourceMappingURL=InterfaceActionClickOpcode.js.map

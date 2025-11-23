@@ -1,50 +1,46 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BackgroundLoader = void 0;
-var double_ended_queue_1 = require("double-ended-queue");
-var timeunit_1 = require("timeunit");
-var BackgroundLoaderThread = /** @class */ (function () {
-    function BackgroundLoaderThread(runnable) {
-        this.worker = new Worker(URL.createObjectURL(new Blob(["(".concat(runnable.run.toString(), ")()")], { type: 'text/javascript' })));
+const double_ended_queue_1 = require("double-ended-queue");
+const timeunit_1 = require("timeunit");
+class BackgroundLoaderThread {
+    constructor(runnable) {
+        this.worker = new Worker(URL.createObjectURL(new Blob([`(${runnable.run.toString()})()`], { type: 'text/javascript' })));
     }
-    BackgroundLoaderThread.prototype.start = function () {
+    start() {
         // Não faz nada, o worker já está rodando
-    };
-    BackgroundLoaderThread.prototype.setName = function (name) {
-        // Não faz nada, não temos acesso ao nome do worker
-    };
-    BackgroundLoaderThread.prototype.setDaemon = function (daemon) {
-        // Não faz nada, não podemos mudar a natureza do worker
-    };
-    return BackgroundLoaderThread;
-}());
-var BackgroundLoaderThreadFactory = /** @class */ (function () {
-    function BackgroundLoaderThreadFactory() {
     }
-    BackgroundLoaderThreadFactory.prototype.createThread = function (runnable) {
+    setName(name) {
+        // Não faz nada, não temos acesso ao nome do worker
+    }
+    setDaemon(daemon) {
+        // Não faz nada, não podemos mudar a natureza do worker
+    }
+}
+class BackgroundLoaderThreadFactory {
+    createThread(runnable) {
         return new BackgroundLoaderThread(runnable);
-    };
-    return BackgroundLoaderThreadFactory;
-}());
-var BackgroundLoaderExecutorService = /** @class */ (function () {
-    function BackgroundLoaderExecutorService() {
+    }
+}
+class BackgroundLoaderExecutorService {
+    constructor() {
         this.terminated = false;
         this.threadFactory = new BackgroundLoaderThreadFactory();
     }
-    BackgroundLoaderExecutorService.prototype.submit = function (runnable) {
-        var thread = this.threadFactory.createThread(runnable);
+    submit(runnable) {
+        const thread = this.threadFactory.createThread(runnable);
         thread.start();
-    };
-    BackgroundLoaderExecutorService.prototype.isTerminated = function () {
+    }
+    isTerminated() {
         return this.terminated;
-    };
-    BackgroundLoaderExecutorService.prototype.shutdown = function () {
+    }
+    shutdown() {
         this.terminated = true;
-    };
-    BackgroundLoaderExecutorService.prototype.awaitTermination = function (timeout, unit) {
-        var millis = unit.toMillis(timeout);
-        var remaining = millis;
-        var terminated = true;
+    }
+    awaitTermination(timeout, unit) {
+        const millis = unit.toMillis(timeout);
+        let remaining = millis;
+        let terminated = true;
         while (remaining > 0) {
             try {
                 this.awaitTermination(remaining, timeunit_1.TimeUnit.MILLISECONDS);
@@ -57,29 +53,28 @@ var BackgroundLoaderExecutorService = /** @class */ (function () {
             }
         }
         return terminated;
-    };
-    BackgroundLoaderExecutorService.prototype.execute = function (runnable) {
+    }
+    execute(runnable) {
         this.submit(runnable);
-    };
-    return BackgroundLoaderExecutorService;
-}());
-var BackgroundLoader = /** @class */ (function () {
-    function BackgroundLoader() {
+    }
+}
+class BackgroundLoader {
+    constructor() {
         this.service = new BackgroundLoaderExecutorService();
         this.tasks = new double_ended_queue_1.ArrayDeque();
         this.isShutdown = false;
     }
-    BackgroundLoader.prototype.init = function (backgroundTasks) {
+    init(backgroundTasks) {
         if (this.isShutdown || this.service.isTerminated()) {
             throw new Error("This background loader has been shutdown!");
         }
         this.tasks.addAll(backgroundTasks);
-        var t;
+        let t;
         while ((t = this.tasks.poll()) != null) {
             this.service.execute(t);
         }
-    };
-    BackgroundLoader.prototype.awaitCompletion = function () {
+    }
+    awaitCompletion() {
         if (this.isShutdown) {
             throw new Error("This background loader has been shutdown!");
         }
@@ -87,16 +82,15 @@ var BackgroundLoader = /** @class */ (function () {
             this.service.awaitTermination(1, timeunit_1.TimeUnit.HOURS);
         }
         catch (e) {
-            console.log("The background service loader was interrupted. ".concat(e));
+            console.log(`The background service loader was interrupted. ${e}`);
             return false;
         }
         this.isShutdown = true;
         return true;
-    };
-    BackgroundLoader.prototype.stop = function () {
+    }
+    stop() {
         this.service.shutdown();
-    };
-    return BackgroundLoader;
-}());
+    }
+}
 exports.BackgroundLoader = BackgroundLoader;
 //# sourceMappingURL=BackgroundLoader.js.map

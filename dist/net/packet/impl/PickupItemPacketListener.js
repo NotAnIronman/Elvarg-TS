@@ -7,14 +7,12 @@ exports.PickupItemPacketListener = void 0;
 // import { Sounds } from "../../../game/Sounds";
 // import { Location } from "../../../game/model/Location";
 // import { ItemOnGround } from "../../../game/entity/impl/grounditem/ItemOnGround";
-var PickupItemPacketListener = /** @class */ (function () {
-    function PickupItemPacketListener() {
-    }
+class PickupItemPacketListener {
     // execute(player: Player, packet: Packet) {
-    PickupItemPacketListener.prototype.execute = function (player, packet) {
-        var y = packet.readLEShort();
-        var itemId = packet.readShort();
-        var x = packet.readLEShort();
+    execute(player, packet) {
+        const y = packet.readLEShort();
+        const itemId = packet.readShort();
+        const x = packet.readLEShort();
         // const position = new Location(x, y, player.getLocation().getZ());
         // if (player.getRights() == PlayerRights.DEVELOPER) {
         //     player.getPacketSender().sendMessage("Pick up item: " + itemId + ". " + position.toString());
@@ -24,8 +22,7 @@ var PickupItemPacketListener = /** @class */ (function () {
             return;
         }
         // player.getMovementQueue().walkToGroundItem(position, () => this.takeItem(player, itemId, position));
-    };
-    return PickupItemPacketListener;
-}());
+    }
+}
 exports.PickupItemPacketListener = PickupItemPacketListener;
 //# sourceMappingURL=PickupItemPacketListener.js.map

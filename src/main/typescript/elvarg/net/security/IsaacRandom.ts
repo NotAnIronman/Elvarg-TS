@@ -3,14 +3,17 @@ export class IsaacRandom {
     private static readonly LOG_SIZE: number = 8;
     private static readonly SIZE: number = 1 << IsaacRandom.LOG_SIZE;
     private static MASK: number = IsaacRandom.SIZE - 1 << 2;
-    private readonly results: number[] = new Array(IsaacRandom.SIZE);
-    private readonly state: number[] = new Array(IsaacRandom.SIZE);
+    private readonly results: number[] = new Array(IsaacRandom.SIZE).fill(0);
+    private readonly state: number[] = new Array(IsaacRandom.SIZE).fill(0);
     private count: number = IsaacRandom.SIZE;
     private accumulator: number;
     private last: number;
     private counter: number;
 
     public constructor(seed: number[]) {
+        this.accumulator = 0;
+        this.last = 0;
+        this.counter = 0;
         let length = Math.min(seed.length, this.results.length);
         this.results.splice(0, length, ...seed);
         this.init();
