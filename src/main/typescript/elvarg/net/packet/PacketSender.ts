@@ -904,10 +904,16 @@ export class PacketSender {
   }
 
   public sendPosition(position: any) {
-    let other = this.player.getLastKnownRegion();
+    if (!position || typeof position.getX !== "function" || typeof position.getY !== "function") {
+      return this;
+    }
+    let other = this.player.getLastKnownRegion?.() ?? this.player.getLocation?.();
+    if (!other) {
+      return this;
+    }
     let out = new PacketBuilder(85);
-    // out.puts(position.getY() - 8 * other.getRegionY(), ValueType.C);
-    // out.puts(position.getX() - 8 * other.getRegionX(), ValueType.C);
+    out.puts(position.getY() - 8 * other.getRegionY(), ValueType.C);
+    out.puts(position.getX() - 8 * other.getRegionX(), ValueType.C);
     this.player.getSession().write(out);
     return this;
   }
@@ -990,15 +996,64 @@ export class PacketSender {
     return this;
   }
 
-  sendItemContainer(_containerId: number | any, _interfaceId?: number): this {
+  sendItemContainer(containerOrInterfaceId: number | any, interfaceId?: number): this {
+    if (typeof containerOrInterfaceId === "number") {
+      return this;
+    }
+    const container = containerOrInterfaceId;
+    if (
+      !container ||
+      typeof container.getItems !== "function" ||
+      typeof container.capacity !== "function" ||
+      !Number.isInteger(interfaceId)
+    ) {
+      return this;
+    }
+
+    const items = container.getItems();
+    const capacity = container.capacity();
+    const includeZeroAmount = container?.constructor?.name === "Bank";
+
+    const out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
+    out.putInt(interfaceId);
+    out.putShort(capacity);
+
+    for (let slot = 0; slot < capacity; slot++) {
+      const item = items?.[slot];
+      const id = item?.getId?.() ?? -1;
+      const amount = item?.getAmount?.() ?? 0;
+      if (id <= 0 || (amount <= 0 && !includeZeroAmount)) {
+        out.putInt(-1);
+        continue;
+      }
+      out.putInt(amount);
+      out.putShort(id + 1);
+    }
+
+    this.player.getSession().write(out);
     return this;
   }
 
-  sendItemContainers(..._args: any[]): this {
-    return this;
+  sendItemContainers(container: any, interfaceId: number): this {
+    return this.sendItemContainer(container, interfaceId);
   }
 
-  sendInterfaceItems(_interfaceId: number, _items?: any): this {
+  sendInterfaceItems(interfaceId: number, items?: any): this {
+    const resolvedItems = Array.isArray(items) ? items : [];
+    const out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
+    out.putInt(interfaceId);
+    out.putShort(resolvedItems.length);
+    for (const item of resolvedItems) {
+      const id = item?.getId?.() ?? item?.id ?? -1;
+      const amount = item?.getAmount?.() ?? item?.amount ?? 0;
+      if (id <= 0 || amount <= 0) {
+        out.putInt(-1);
+        continue;
+      }
+      out.putInt(amount);
+      out.putShort(id + 1);
+    }
+    this.player.getSession().write(out);
     return this;
   }
 
@@ -1027,11 +1082,43 @@ export class PacketSender {
     return this;
   }
 
-  sendObject(..._args: any[]): this {
+  sendObject(object: any): this {
+    if (
+      !object ||
+      typeof object.getLocation !== "function" ||
+      typeof object.getId !== "function" ||
+      typeof object.getType !== "function" ||
+      typeof object.getFace !== "function"
+    ) {
+      return this;
+    }
+
+    const location = object.getLocation();
+    this.sendPosition(location);
+    const out = new PacketBuilder(151);
+    out.puts(location.getZ(), ValueType.A);
+    out.putShorts(object.getId(), ByteOrder.LITTLE);
+    out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.S);
+    this.player.getSession().write(out);
     return this;
   }
 
-  sendObjectRemoval(..._args: any[]): this {
+  sendObjectRemoval(object: any): this {
+    if (
+      !object ||
+      typeof object.getLocation !== "function" ||
+      typeof object.getType !== "function" ||
+      typeof object.getFace !== "function"
+    ) {
+      return this;
+    }
+
+    const location = object.getLocation();
+    this.sendPosition(location);
+    const out = new PacketBuilder(101);
+    out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.C);
+    out.put(location.getZ());
+    this.player.getSession().write(out);
     return this;
   }
 
@@ -1067,11 +1154,32 @@ export class PacketSender {
     return this;
   }
 
-  sendSkill(_skill: any): this {
+  sendSkill(skill: any): this {
+    if (!skill || typeof skill.getIndex !== "function") {
+      return this;
+    }
+    const skillManager = this.player?.getSkillManager?.();
+    if (!skillManager) {
+      return this;
+    }
+
+    const out = new PacketBuilder(134);
+    out.put(skill.getIndex());
+    out.putInt(skillManager.getCurrentLevel(skill));
+    out.putInt(skillManager.getMaxLevel(skill));
+    out.putInt(skillManager.getExperience(skill));
+    this.player.getSession().write(out);
     return this;
   }
 
-  sendExpDrop(_skill: any, _exp: number): this {
+  sendExpDrop(skill: any, exp: number): this {
+    if (!skill || typeof skill.getIndex !== "function") {
+      return this;
+    }
+    const out = new PacketBuilder(116);
+    out.put(skill.getIndex());
+    out.putInt(exp);
+    this.player.getSession().write(out);
     return this;
   }
 }

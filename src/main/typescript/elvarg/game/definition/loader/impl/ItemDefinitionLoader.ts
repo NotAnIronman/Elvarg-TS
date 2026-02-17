@@ -7,9 +7,13 @@ export class ItemDefinitionLoader extends DefinitionLoader {
     load() {
         ItemDefinition.definitions.clear();
         const content = fs.readFileSync(this.file(), "utf8");
-        const defs: ItemDefinition[] = JSON.parse(content);
-        for (const def of defs) {
-            ItemDefinition.definitions.set((def as any).id ?? (def as any).getId?.(), def as any);
+        const defs: any[] = JSON.parse(content);
+        for (const rawDef of defs) {
+            // Hydrate plain JSON into ItemDefinition instances so method-based
+            // accessors (e.g. isStackable()) are always available.
+            const def = Object.assign(new ItemDefinition(), rawDef);
+            const id = (rawDef as any).id ?? (def as any).getId?.();
+            ItemDefinition.definitions.set(id, def);
         }
     }
 

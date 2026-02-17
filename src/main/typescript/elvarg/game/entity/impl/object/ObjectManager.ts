@@ -7,6 +7,14 @@ import { MapObjects } from "./MapObjects";
 
 export class ObjectManager {
 
+    private static sameObjectIdentity(a: GameObject, b: GameObject): boolean {
+        return a.getId() === b.getId()
+            && a.getType() === b.getType()
+            && a.getFace() === b.getFace()
+            && a.getPrivateArea() === b.getPrivateArea()
+            && a.getLocation().equals(b.getLocation());
+    }
+
     public static onRegionChange(player: Player) {
         World.getObjects().forEach((o) => ObjectManager.perform(o, OperationType.SPAWN));
         World.getRemovedObjects().forEach((o) => player.getPacketSender().sendObjectRemoval(o));
@@ -14,15 +22,27 @@ export class ObjectManager {
 
     public static register(object: GameObject, playerUpdate: boolean) {
         // Check for matching object on this tile.
-        World.getObjects().forEach((o, index) => {
+        for (let index = World.getObjects().length - 1; index >= 0; index--) {
+            const o = World.getObjects()[index];
             if (o.getLocation().equals(object.getLocation()) && object.getPrivateArea() == o.getPrivateArea()) {
                 World.getObjects().splice(index, 1);
             }
-        });
+        }
 
-        let matchingObjects = World.getRemovedObjects().filter(o => o.getType() == object.getType() && o.getLocation().equals(object.getLocation()));
-        matchingObjects.forEach(RegionManager.removeObjectClipping);
-        matchingObjects.forEach(o => World.getRemovedObjects().splice(World.getRemovedObjects().indexOf(o), 1));
+        for (let index = World.getRemovedObjects().length - 1; index >= 0; index--) {
+            const removed = World.getRemovedObjects()[index];
+            if (removed.getType() !== object.getType()) {
+                continue;
+            }
+            if (!removed.getLocation().equals(object.getLocation())) {
+                continue;
+            }
+            if (removed.getPrivateArea() !== object.getPrivateArea()) {
+                continue;
+            }
+            RegionManager.removeObjectClipping(removed);
+            World.getRemovedObjects().splice(index, 1);
+        }
 
         World.getObjects().push(object);
         if (playerUpdate) {
@@ -30,10 +50,24 @@ export class ObjectManager {
         }
     }
     public static deregister(object: GameObject, playerUpdate: boolean) {
-        World.getObjects().filter(o => o.equals(object));
-        ObjectManager.perform(object, OperationType.DESPAWN);
+        for (let index = World.getObjects().length - 1; index >= 0; index--) {
+            const existing = World.getObjects()[index];
+            if (!ObjectManager.sameObjectIdentity(existing, object)) {
+                continue;
+            }
+            World.getObjects().splice(index, 1);
+        }
 
-        World.getRemovedObjects().push(object);
+        if (playerUpdate) {
+            ObjectManager.perform(object, OperationType.DESPAWN);
+        }
+
+        const alreadyMarkedRemoved = World.getRemovedObjects().some((removed) =>
+            ObjectManager.sameObjectIdentity(removed, object)
+        );
+        if (!alreadyMarkedRemoved) {
+            World.getRemovedObjects().push(object);
+        }
     }
 
     /**

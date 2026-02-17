@@ -10,6 +10,7 @@ const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/ri
 const { BotPlayerSession } = require("../../src/main/typescript/elvarg/net/BotPlayerSession");
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
+const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const {
   ActionNode,
   BotController,
@@ -25,7 +26,7 @@ const BOT_WALK_RADIUS = 6;
 const BOT_DECISION_TICKS = 1;
 const BOT_BASE_COOLDOWN_MS = 1200;
 const BOT_JITTER_MS = 300;
-const WILDERNESS_DITCH_OBJECT_ID = 23271;
+const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
 const DITCH_ATTEMPT_COOLDOWN_MS = 1200;
 const DITCH_TRANSITION_TIMEOUT_MS = 15000;
 const DITCH_POST_CROSS_RETRY_DELAY_MS = 0;

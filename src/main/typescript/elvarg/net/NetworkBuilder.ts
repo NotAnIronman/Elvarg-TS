@@ -19,6 +19,7 @@ import { World } from "../game/World";
 import { PluginManager } from "../plugins/PluginManager";
 import { GameConstants } from "../game/GameConstants";
 import { DonatorRights } from "../game/model/rights/DonatorRights";
+import { Skill } from "../game/model/Skill";
 
 // Copied from Java PacketDecoder.PACKET_SIZES (index = opcode).
 const PACKET_SIZES: number[] = [
@@ -366,6 +367,7 @@ class LoginSession {
       playerSave.applyToPlayer(gamePlayer);
       this.log("persistence_loaded", {
         username: gamePlayer.getUsername(),
+        rightsId: gamePlayer.getRights()?.getId?.() ?? null,
       });
       return true;
     } catch (err) {
@@ -588,13 +590,27 @@ class LoginSession {
     // Clear interfaces (219) similar to Java's sendInterfaceRemoval on login
     this.sendPacket(219, Buffer.alloc(0), PacketType.FIXED, "interface_removal");
 
-    // Inventory/equipment containers (53) with empty slots to avoid client desync.
-    this.sendItemContainer(3214, 28); // inventory
-    this.sendItemContainer(1688, 14); // equipment
+    // Send persisted container contents immediately on login.
+    // If we send empty containers here, the client can visually override loaded state
+    // and make persistence appear broken until a later refresh packet arrives.
+    const inventoryItems = this.gamePlayer?.getInventory?.()?.getItems?.();
+    const equipmentItems = this.gamePlayer?.getEquipment?.()?.getItems?.();
+    this.sendItemContainer(3214, 28, inventoryItems); // inventory
+    this.sendItemContainer(1688, 14, equipmentItems); // equipment
 
-    // Total experience (108) - send zeroed long for now
-    const totalExp = Buffer.alloc(8);
-    this.sendPacket(108, totalExp, PacketType.FIXED, "total_exp");
+    // Send skill states on login so client stat widgets initialize from server state.
+    // Without this, the client can show 0/0 until some later gameplay update mutates a skill.
+    const packetSender = this.gamePlayer?.getPacketSender?.();
+    const skillManager = this.gamePlayer?.getSkillManager?.();
+    if (packetSender && skillManager) {
+      for (const skill of Skill.values()) {
+        packetSender.sendSkill(skill);
+      }
+      packetSender.sendTotalExp(skillManager.getTotalExp());
+    } else {
+      const totalExp = Buffer.alloc(8);
+      this.sendPacket(108, totalExp, PacketType.FIXED, "total_exp");
+    }
 
     // Welcome message (253)
     const msg = Buffer.from(`Welcome to RSPS.APP.\n`, "ascii");
@@ -765,12 +781,22 @@ class LoginSession {
     this.sendPacket(36, buf, PacketType.FIXED, `config_${id}`);
   }
 
-  private sendItemContainer(interfaceId: number, capacity: number) {
+  private sendItemContainer(interfaceId: number, capacity: number, items?: any[]) {
     const entries: Buffer[] = [];
     for (let i = 0; i < capacity; i++) {
-      const entry = Buffer.alloc(4);
-      entry.writeInt32BE(-1, 0);
-      entries.push(entry);
+      const item = items?.[i];
+      const id = item?.getId?.() ?? -1;
+      const amount = item?.getAmount?.() ?? 0;
+      if (id > 0 && amount > 0) {
+        const entry = Buffer.alloc(6);
+        entry.writeInt32BE(amount, 0);
+        entry.writeUInt16BE((id + 1) & 0xffff, 4);
+        entries.push(entry);
+        continue;
+      }
+      const empty = Buffer.alloc(4);
+      empty.writeInt32BE(-1, 0);
+      entries.push(empty);
     }
     const header = Buffer.alloc(6);
     header.writeInt32BE(interfaceId, 0);

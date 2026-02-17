@@ -2,8 +2,9 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { ForceMovementTask } = require("../../src/main/typescript/elvarg/game/task/impl/ForceMovementTask");
 const { ForceMovement } = require("../../src/main/typescript/elvarg/game/model/ForceMovement");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
+const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
-const WILDERNESS_DITCH_OBJECT_ID = 23271;
+const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
 
 function tryCrossWildernessDitch(player, ditchY, sourceY) {
   if (!player || player.getForceMovement() != null) {

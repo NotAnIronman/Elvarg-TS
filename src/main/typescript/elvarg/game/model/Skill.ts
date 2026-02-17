@@ -1,6 +1,11 @@
 import { Misc } from '../../util/Misc';
 
 export class Skill {
+    // Must be initialized before any static Skill instances are constructed.
+    // If declared after ATTACK/DEFENCE/etc, indices become NaN and all skill
+    // lookups/packets collapse to zero.
+    private static nextIndex = 0;
+
     public static ATTACK = new Skill(6247, 8654);
     public static DEFENCE = new Skill(6253, 8660);
     public static STRENGTH = new Skill(6206, 8657);
@@ -24,8 +29,6 @@ export class Skill {
     public static RUNECRAFTING = new Skill(4267, 8672);
     public static CONSTRUCTION = new Skill(7267, 18801);
     public static HUNTER = new Skill(8267, 18829);
-
-    private static nextIndex = 0;
 
     private static readonly VALUES: Skill[] = [
         Skill.ATTACK,
@@ -92,6 +95,9 @@ export class Skill {
     constructor(chatboxInterface: number, button: number) {
         this.chatboxInterface = chatboxInterface;
         this.button = button;
+        if (!Number.isInteger(Skill.nextIndex)) {
+            Skill.nextIndex = 0;
+        }
         this.index = Skill.nextIndex++;
     }
 

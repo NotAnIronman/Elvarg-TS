@@ -181,20 +181,28 @@ class JsonPlayerPersistence extends PlayerPersistence {
   }
 
   hydrateRights(raw) {
+    const numericId = this.toNumber(raw, Number.NaN);
+    if (!Number.isNaN(numericId)) {
+      return PlayerRights.fromId(numericId);
+    }
     const id = this.toNumber(raw?.id, Number.NaN);
     if (!Number.isNaN(id)) {
       return PlayerRights.fromId(id);
     }
-    const spriteId = this.toNumber(raw?.spriteId ?? raw, -1);
+    const spriteId = this.toNumber(raw?.spriteId, -1);
     return PlayerRights.fromSpriteId(spriteId);
   }
 
   hydrateDonatorRights(raw) {
+    const numericId = this.toNumber(raw, Number.NaN);
+    if (!Number.isNaN(numericId)) {
+      return DonatorRights.fromId(numericId);
+    }
     const id = this.toNumber(raw?.id, Number.NaN);
     if (!Number.isNaN(id)) {
       return DonatorRights.fromId(id);
     }
-    const spriteId = this.toNumber(raw?.spriteId ?? raw, -1);
+    const spriteId = this.toNumber(raw?.spriteId, -1);
     return DonatorRights.fromSpriteId(spriteId);
   }
 

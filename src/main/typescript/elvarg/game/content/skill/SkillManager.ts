@@ -249,7 +249,7 @@ export class SkillManager {
 
     public updateSkill(skill: Skill) {
         const maxLevel = this.getMaxLevel(skill);
-        const currentLevel = this.getMaxLevel(skill);
+        const currentLevel = this.getCurrentLevel(skill);
 
         // Update prayer tab if it's the prayer skill.
         if (skill === Skill.PRAYER) {
@@ -402,7 +402,9 @@ export class SkillManager {
     }
 
     setCurrentLevels(skill: Skill, level: number, refresh = true) {
-        this.skills.maxLevel[skill.getIndex()] = level;
+        // Java parity: this method updates the temporary/current level only.
+        // Max/real level is managed through setMaxLevels/setMaxLevel.
+        this.skills.level[skill.getIndex()] = level < 0 ? 0 : level;
 
         if (refresh) {
             this.updateSkill(skill);

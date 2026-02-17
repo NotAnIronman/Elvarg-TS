@@ -13,16 +13,24 @@ export class CommandPacketListener implements PacketExecutor {
     if (player.getHitpoints() <= 0) {
       return;
     }
-    const command = packet.readString().trim();
-    if (!command.length) {
+    const rawCommand = packet.readString();
+    const sanitizedCommand = rawCommand.replace(/\u0000/g, " ").trim();
+    if (!sanitizedCommand.length) {
       return;
     }
-    const parts = command.split(/\s+/);
-    const baseCommand = parts[0].toLowerCase();
+    const parts = sanitizedCommand.split(/\s+/);
+    // Accept payload variants like "::item 1351", "/item 1351", and tokens with trailing punctuation.
+    const baseToken = parts[0].replace(/^[:/]+/, "");
+    const baseMatch = baseToken.match(/^[a-z0-9_]+/i);
+    if (!baseMatch) {
+      return;
+    }
+    const baseCommand = baseMatch[0].toLowerCase();
+    parts[0] = baseCommand;
 
     const pluginHandled = PluginManager.emitCommand({
       player,
-      raw: command,
+      raw: sanitizedCommand,
       base: baseCommand,
       parts,
       handled: false,
@@ -30,6 +38,13 @@ export class CommandPacketListener implements PacketExecutor {
     if (pluginHandled) {
       return;
     }
+    console.warn("[command] unhandled_command", {
+      username: player?.getUsername?.() ?? "unknown",
+      raw: rawCommand,
+      sanitized: sanitizedCommand,
+      base: baseCommand,
+      parts,
+    });
 
     // let c: Command | undefined = CommandManager.commands.get(parts[0]);
     // if (c) {

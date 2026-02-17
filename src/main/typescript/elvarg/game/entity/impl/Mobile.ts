@@ -189,11 +189,16 @@ export abstract class Mobile extends Entity {
     }
 
     performAnimation(animation: Animation) {
+        if (animation == null) {
+            return;
+        }
         if (this.animation != null && animation != null) {
             if (this.animation.getPriority() > animation.getPriority()) {
                 return;
             }
         }
+        this.animation = animation;
+        this.getUpdateFlag().flag(Flag.ANIMATION);
     }
 
     performGraphic(graphic: Graphic) {

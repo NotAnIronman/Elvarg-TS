@@ -11,7 +11,6 @@ const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/N
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
-const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
 const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
@@ -548,15 +547,20 @@ module.exports = {
     api.registerCommand("attackrange", attackRangeFn);
 
     api.registerCommand("item", ({ player, parts }) => {
-      if (!requireRights(player, ownerOrDev)) {
+      if (!requireRights(player, adminOrAbove)) {
         return true;
       }
       const id = parseIntArg(parts[1]);
       const amount = parts.length > 2 ? parseIntArg(parts[2]) : 1;
-      if (id === null || amount === null) {
+      if (id === null || amount === null || id < 0 || amount <= 0) {
+        player.getPacketSender().sendMessage("Usage: ::item id [amount]");
         return true;
       }
-      player.getInventory().addItem(new Item(id, amount));
+      const cappedAmount = Math.min(amount, Number.MAX_SAFE_INTEGER);
+      player.getInventory().adds(id, cappedAmount);
+      player
+        .getPacketSender()
+        .sendMessage(`Spawned item ${id} x${cappedAmount}.`);
       return true;
     });
 
