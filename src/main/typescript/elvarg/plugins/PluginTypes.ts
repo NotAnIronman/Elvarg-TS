@@ -20,6 +20,12 @@ export interface PluginPlayerDisconnectEvent {
   source: string;
 }
 
+export interface PluginRegionLoadedEvent {
+  regionId: number;
+  absX: number;
+  absY: number;
+}
+
 export interface PluginPathBlockedEvent {
   entity: any;
   isPlayer: boolean;
@@ -32,6 +38,11 @@ export interface PluginPathBlockedEvent {
   yLength: number;
   direction: number;
   blockingMask: number;
+}
+
+export interface PluginPlayerPathBlockedEvent extends PluginPathBlockedEvent {
+  isPlayer: true;
+  username: string;
 }
 
 export interface PluginObjectInteractionEvent {
@@ -56,7 +67,9 @@ export interface PluginApi {
   onPacketReceived(handler: (event: PluginPacketEvent) => void): void;
   onPlayerLogin(handler: (event: PluginPlayerLoginEvent) => void): void;
   onPlayerDisconnect(handler: (event: PluginPlayerDisconnectEvent) => void): void;
+  onRegionLoaded(handler: (event: PluginRegionLoadedEvent) => void): void;
   onPathBlocked(handler: (event: PluginPathBlockedEvent) => void): void;
+  onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
   onCommand(handler: (event: PluginCommandEvent) => void): void;
   registerCommand(

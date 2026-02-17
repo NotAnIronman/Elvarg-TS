@@ -12,6 +12,7 @@ import { Region } from './Region'
 import pako from 'pako';
 import * as zlib from "zlib";
 import * as path from "path";
+import { PluginManager } from "../../plugins/PluginManager";
 
 
 
@@ -58,14 +59,16 @@ export class RegionManager {
         return this.regions.get(regionId);
     }
 
+    public static regionIdForTile(x: number, y: number): number {
+        return ((x >> 6) << 8) + (y >> 6);
+    }
+
     public static getRegion(x: number, y: number): Region | undefined {
         if (RegionManager.regions.size === 0) {
             return undefined;
         }
         RegionManager.loadMapFiles(x, y);
-        let regionX = x >> 3;
-        let regionY = y >> 3;
-        let regionId = ((regionX >> 3) << 8) + (regionY >> 3);
+        let regionId = RegionManager.regionIdForTile(x, y);
         return RegionManager.getRegionid(regionId);
     }
     private static addClippingForVariableObject(x: number, y: number, height: number, type: number, direction: number, tall: boolean, privateArea: PrivateArea) {
@@ -702,9 +705,7 @@ export class RegionManager {
 
     public static loadMapFiles(x: number, y: number) {
         try {
-            const regionX = x >> 3;
-            const regionY = y >> 3;
-            const regionId = ((regionX >> 3) << 8) + (regionY >> 3);
+            const regionId = RegionManager.regionIdForTile(x, y);
             const r: Region = RegionManager.getRegionid(regionId);
 
             if (r == null || r == undefined || !r) {
@@ -801,10 +802,15 @@ export class RegionManager {
                 }
             }
             r.setLoaded(true);
+            PluginManager.emitRegionLoaded({
+                regionId,
+                absX,
+                absY,
+            });
             RegionManager.loadingRegions.delete(regionId);
         } catch (e) {
             console.error(e);
-            RegionManager.loadingRegions.delete((((x >> 3) >> 3) << 8) + ((y >> 3) >> 3));
+            RegionManager.loadingRegions.delete(RegionManager.regionIdForTile(x, y));
         }
     }
 }

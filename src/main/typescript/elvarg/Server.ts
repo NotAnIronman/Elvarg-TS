@@ -15,14 +15,16 @@ import { NetworkBuilder } from "./net/NetworkBuilder";
 import { NetworkConstants } from "./net/NetworkConstants";
 import { PluginManager } from "./plugins/PluginManager";
 import { Flooder } from "./util/flood/Flooder";
-// import Logger from "logger";
-var logger = require("logger");
 
 export class Server {
   private static flooder: Flooder = new Flooder();
   public static PRODUCTION = false;
   private static DEBUG_LOGGING = false;
-  private static logger = logger.createLogger(Server.constructor.name);
+  private static logger = {
+    info: (...args: any[]) => console.info(...args),
+    warn: (...args: any[]) => console.warn(...args),
+    error: (...args: any[]) => console.error(...args),
+  };
   private static updating = false;
   private static logFile = path.join(process.cwd(), "logs", "server.log");
   private static consolePatched = false;
@@ -94,7 +96,7 @@ export class Server {
       return;
     }
 
-    logger.info(logMessage);
+    Server.logger.info(logMessage);
   }
 
   public static getLogger() {

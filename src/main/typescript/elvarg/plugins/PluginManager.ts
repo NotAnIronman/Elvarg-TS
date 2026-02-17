@@ -7,10 +7,12 @@ import {
   PluginModule,
   PluginObjectInteractionEvent,
   PluginPathBlockedEvent,
+  PluginPlayerPathBlockedEvent,
   PluginPacketEvent,
   PluginCommandEvent,
   PluginPlayerDisconnectEvent,
   PluginPlayerLoginEvent,
+  PluginRegionLoadedEvent,
 } from "./PluginTypes";
 
 type PluginHook<T> = {
@@ -30,6 +32,7 @@ export class PluginManager {
   private static packetHooks: PluginHook<PluginPacketEvent>[] = [];
   private static loginHooks: PluginHook<PluginPlayerLoginEvent>[] = [];
   private static disconnectHooks: PluginHook<PluginPlayerDisconnectEvent>[] = [];
+  private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
   private static commandHooks: PluginHook<PluginCommandEvent>[] = [];
@@ -120,6 +123,19 @@ export class PluginManager {
       } catch (err) {
         console.error(
           `[plugins] disconnect hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+  }
+
+  public static emitRegionLoaded(event: PluginRegionLoadedEvent): void {
+    for (const hook of PluginManager.regionLoadedHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] region_loaded hook failed (${hook.pluginName})`,
           err
         );
       }
@@ -248,11 +264,31 @@ export class PluginManager {
         }
         PluginManager.disconnectHooks.push({ pluginName, handler });
       },
+      onRegionLoaded: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.regionLoadedHooks.push({ pluginName, handler });
+      },
       onPathBlocked: (handler) => {
         if (typeof handler !== "function") {
           return;
         }
         PluginManager.pathBlockedHooks.push({ pluginName, handler });
+      },
+      onPlayerPathBlocked: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.pathBlockedHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.isPlayer || !event.entity || !event.username) {
+              return;
+            }
+            handler(event as PluginPlayerPathBlockedEvent);
+          },
+        });
       },
       onObjectInteraction: (handler) => {
         if (typeof handler !== "function") {

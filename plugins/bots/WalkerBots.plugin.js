@@ -1,9 +1,7 @@
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
-const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { PathFinder } = require("../../src/main/typescript/elvarg/game/model/movement/path/PathFinder");
-const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
@@ -20,8 +18,9 @@ const {
   SelectorNode,
   SequenceNode,
 } = require("../../src/main/typescript/elvarg/game/bot/BehaviorTree");
+const { createTraversalAssist } = require("./lib/TraversalAssist");
 
-const BOT_COUNT = 200;
+const BOT_COUNT = 50;
 const BOT_WALK_RADIUS = 6;
 const BOT_DECISION_TICKS = 1;
 const BOT_BASE_COOLDOWN_MS = 1200;
@@ -31,12 +30,11 @@ const DITCH_ATTEMPT_COOLDOWN_MS = 1200;
 const DITCH_TRANSITION_TIMEOUT_MS = 15000;
 const DITCH_POST_CROSS_RETRY_DELAY_MS = 0;
 const ENDPOINT_LINGER_MS = 500;
-const CROSS_DITCH_TARGET_CHANCE = 0.45;
-const CROSS_DITCH_X_RADIUS = 2;
 const BLOCKED_RETARGET_MIN_DELAY_MS = 120;
 const BLOCKED_RETARGET_MAX_DELAY_MS = 320;
-const BOT_SPAWN_GRID_SPACING = 2;
-const BOT_SPAWN_GRID_COLUMNS = Math.ceil(Math.sqrt(BOT_COUNT));
+const BOT_SPAWN_RADIUS = 14;
+const BOT_SPAWN_MIN_DISTANCE = 2;
+const BOT_SPAWN_MAX_ATTEMPTS = 80;
 const MANUAL_CONTROL_PACKET_OPCODES = new Set([
   PacketConstants.COMMAND_MOVEMENT_OPCODE,
   PacketConstants.GAME_MOVEMENT_OPCODE,
@@ -47,19 +45,51 @@ const MANUAL_CONTROL_PACKET_OPCODES = new Set([
   PacketConstants.OBJECT_FOURTH_CLICK_OPCODE,
   PacketConstants.OBJECT_FIFTH_CLICK_OPCODE,
 ]);
-function createSpawnOffsets(count, columns, spacing) {
+function createSpawnOffsets(
+  count,
+  radius,
+  minDistance,
+  maxAttemptsPerBot = BOT_SPAWN_MAX_ATTEMPTS
+) {
   const offsets = [];
-  const rows = Math.ceil(count / columns);
-  const startX = -Math.floor((columns - 1) / 2) * spacing;
-  const startY = -Math.floor((rows - 1) / 2) * spacing;
+  const minDistanceSq = minDistance * minDistance;
+  const radiusSq = radius * radius;
+  const maxAttempts = Math.max(count * maxAttemptsPerBot, count * 10);
 
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < columns; col++) {
-      offsets.push([startX + col * spacing, startY + row * spacing]);
-      if (offsets.length >= count) {
-        return offsets;
+  let attempts = 0;
+  while (offsets.length < count && attempts < maxAttempts) {
+    attempts++;
+
+    const dx = Math.floor(Math.random() * (radius * 2 + 1)) - radius;
+    const dy = Math.floor(Math.random() * (radius * 2 + 1)) - radius;
+    if (dx * dx + dy * dy > radiusSq) {
+      continue;
+    }
+
+    let tooClose = false;
+    for (const [ox, oy] of offsets) {
+      const deltaX = ox - dx;
+      const deltaY = oy - dy;
+      if (deltaX * deltaX + deltaY * deltaY < minDistanceSq) {
+        tooClose = true;
+        break;
       }
     }
+    if (tooClose) {
+      continue;
+    }
+
+    offsets.push([dx, dy]);
+  }
+
+  // Fallback fill guarantees all bots spawn even if density constraints are tight.
+  while (offsets.length < count) {
+    const dx = Math.floor(Math.random() * (radius * 2 + 1)) - radius;
+    const dy = Math.floor(Math.random() * (radius * 2 + 1)) - radius;
+    if (dx * dx + dy * dy > radiusSq) {
+      continue;
+    }
+    offsets.push([dx, dy]);
   }
 
   return offsets;
@@ -67,9 +97,10 @@ function createSpawnOffsets(count, columns, spacing) {
 
 const BOT_SPAWN_OFFSETS = createSpawnOffsets(
   BOT_COUNT,
-  BOT_SPAWN_GRID_COLUMNS,
-  BOT_SPAWN_GRID_SPACING
+  BOT_SPAWN_RADIUS,
+  BOT_SPAWN_MIN_DISTANCE
 );
+let traversalAssist = null;
 
 function resetMovementState(player) {
   if (!player) {
@@ -100,112 +131,67 @@ function isAtTarget(player, target) {
   );
 }
 
-function calculateStrictWalkRoute(player, targetX, targetY) {
-  // Bot ditch traversal depends on `path_blocked` events. The default walk route
-  // uses basic fallback and can stop near the target instead of reporting blocked.
-  PathFinder.calculateRoute(player, 0, targetX, targetY, 0, 0, 0, 0, false);
-}
-
-function randomRoamTarget(home) {
-  return {
-    x: home.x + randomInRange(-BOT_WALK_RADIUS, BOT_WALK_RADIUS),
-    y: home.y + randomInRange(-BOT_WALK_RADIUS, BOT_WALK_RADIUS),
-    z: home.z,
-  };
-}
-
-function findNearbyDitchObject(player, searchRadius = 10) {
-  if (!player) {
-    return null;
-  }
-  const loc = player.getLocation();
-  const z = loc.getZ();
-  const baseX = loc.getX();
-  const baseY = loc.getY();
-
-  let closest = null;
-  let closestDistance = Number.MAX_SAFE_INTEGER;
-  for (let x = baseX - searchRadius; x <= baseX + searchRadius; x++) {
-    for (let y = baseY - searchRadius; y <= baseY + searchRadius; y++) {
-      const object = MapObjects.get(
-        WILDERNESS_DITCH_OBJECT_ID,
-        new Location(x, y, z),
-        player.getPrivateArea()
-      );
-      if (!object) {
-        continue;
-      }
-      const dx = baseX - x;
-      const dy = baseY - y;
-      const distanceSquared = dx * dx + dy * dy;
-      if (distanceSquared < closestDistance) {
-        closestDistance = distanceSquared;
-        closest = object;
-      }
-    }
-  }
-  return closest;
-}
-
-function chooseCrossDitchTarget(player) {
-  const ditchObject = findNearbyDitchObject(player);
-  if (!ditchObject) {
-    return null;
-  }
-  const current = player.getLocation();
-  const ditchLoc = ditchObject.getLocation();
-  const ditchY = ditchLoc.getY();
-  const currentY = current.getY();
-  const movingNorth = currentY <= ditchY;
-  const yOffset = randomInRange(2, BOT_WALK_RADIUS);
-  const targetY = movingNorth ? ditchY + yOffset : ditchY - yOffset;
-  const targetX = ditchLoc.getX() + randomInRange(-CROSS_DITCH_X_RADIUS, CROSS_DITCH_X_RADIUS);
-  return { x: targetX, y: targetY, z: current.getZ() };
-}
-
-function isDitchLineTarget(player, target) {
-  if (!player || !target) {
-    return false;
-  }
-  const ditchObject = findNearbyDitchObject(player);
-  if (!ditchObject) {
-    return false;
-  }
-  return target.y === ditchObject.getLocation().getY();
-}
-
 function chooseNextTarget(player, state) {
   if (!player || !state?.home) {
     return null;
   }
-  const current = player.getLocation();
 
-  // Periodically force a target to the opposite side of the nearest ditch so
-  // blocked-route ditch traversal stays exercised during normal roaming.
-  if (Math.random() < CROSS_DITCH_TARGET_CHANCE) {
-    const crossDitch = chooseCrossDitchTarget(player);
-    if (crossDitch) {
-      return crossDitch;
-    }
-  }
+  const homeX = state.home.x;
+  const homeY = state.home.y;
+  const homeZ = state.home.z ?? player.getLocation().getZ();
+  const currentX = player.getLocation().getX();
+  const currentY = player.getLocation().getY();
+  const previousTarget = state.target;
+  const radiusSq = BOT_WALK_RADIUS * BOT_WALK_RADIUS;
+  const maxAttempts = 24;
 
-  for (let attempts = 0; attempts < 8; attempts++) {
-    const candidate = randomRoamTarget(state.home);
-    const sameAsCurrent =
-      candidate.x === current.getX() &&
-      candidate.y === current.getY() &&
-      candidate.z === current.getZ();
-    if (sameAsCurrent) {
+  // Keep roaming local to each bot's home tile; ditch crossing remains organic
+  // and is only triggered by path-blocked handling when a route is obstructed.
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const dx = randomInRange(-BOT_WALK_RADIUS, BOT_WALK_RADIUS);
+    const dy = randomInRange(-BOT_WALK_RADIUS, BOT_WALK_RADIUS);
+    if (dx * dx + dy * dy > radiusSq) {
       continue;
     }
-    // Avoid choosing the ditch tile itself; it's often clipped and leads to
-    // bots repeatedly re-pathing to an impossible destination.
-    if (isDitchLineTarget(player, candidate)) {
+
+    const targetX = homeX + dx;
+    const targetY = homeY + dy;
+    if (targetX === currentX && targetY === currentY) {
       continue;
     }
-    return candidate;
+    if (
+      previousTarget &&
+      targetX === previousTarget.x &&
+      targetY === previousTarget.y &&
+      attempt < maxAttempts - 1
+    ) {
+      continue;
+    }
+    return { x: targetX, y: targetY, z: homeZ };
   }
+
+  const fallbackTargets = [
+    [homeX + BOT_WALK_RADIUS, homeY],
+    [homeX - BOT_WALK_RADIUS, homeY],
+    [homeX, homeY + BOT_WALK_RADIUS],
+    [homeX, homeY - BOT_WALK_RADIUS],
+    [homeX, homeY],
+  ];
+
+  for (const [targetX, targetY] of fallbackTargets) {
+    if (targetX === currentX && targetY === currentY) {
+      continue;
+    }
+    return { x: targetX, y: targetY, z: homeZ };
+  }
+
   return null;
+}
+
+function calculateStrictWalkRoute(player, targetX, targetY) {
+  // Bot ditch traversal depends on `path_blocked` events. The default walk route
+  // uses basic fallback and can stop near the target instead of reporting blocked.
+  PathFinder.calculateRoute(player, 0, targetX, targetY, 0, 0, 0, 0, false);
 }
 
 function retargetAfterBlocked(player, state, api, reason, event) {
@@ -371,40 +357,15 @@ function spawnLocationForIndex(base, index) {
 }
 
 function findDitchOnRoute(player, from, to) {
-  if (!player || !from || !to) {
+  if (!player || !from || !to || !traversalAssist) {
     return null;
   }
-
-  const z = from.z ?? player.getLocation().getZ();
-  const minX = Math.min(from.x, to.x) - 1;
-  const maxX = Math.max(from.x, to.x) + 1;
-  const minY = Math.min(from.y, to.y) - 1;
-  const maxY = Math.max(from.y, to.y) + 1;
-
-  let closest = null;
-  let closestDistance = Number.MAX_SAFE_INTEGER;
-  for (let x = minX; x <= maxX; x++) {
-    for (let y = minY; y <= maxY; y++) {
-      const object = MapObjects.get(
-        WILDERNESS_DITCH_OBJECT_ID,
-        new Location(x, y, z),
-        player.getPrivateArea()
-      );
-      if (!object) {
-        continue;
-      }
-
-      const dx = player.getLocation().getX() - x;
-      const dy = player.getLocation().getY() - y;
-      const distanceSquared = dx * dx + dy * dy;
-      if (distanceSquared < closestDistance) {
-        closestDistance = distanceSquared;
-        closest = object;
-      }
-    }
-  }
-
-  return closest;
+  return traversalAssist.findObjectOnRoute(
+    player,
+    from,
+    to,
+    WILDERNESS_DITCH_OBJECT_ID
+  );
 }
 
 function isDitchBetween(fromY, targetY, ditchY) {
@@ -606,6 +567,9 @@ class BotBehaviorTask extends Task {
 module.exports = {
   name: "WalkerBots",
   register(api) {
+    traversalAssist = createTraversalAssist(api, {
+      objectIds: [WILDERNESS_DITCH_OBJECT_ID],
+    });
     const spawn = GameConstants.DEFAULT_LOCATION.clone();
     const botStatesByName = new Map();
     const botmeUsernames = new Set();
@@ -802,11 +766,7 @@ module.exports = {
       TaskManager.submit(new BotBehaviorTask(entries, api));
     }
 
-    api.onPathBlocked((event) => {
-      if (!event || !event.isPlayer || !event.entity || !event.username) {
-        return;
-      }
-
+    api.onPlayerPathBlocked((event) => {
       const state = botStatesByName.get(event.username);
       if (!state || state.awaitingDitchTransition) {
         return;
