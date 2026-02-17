@@ -13,7 +13,6 @@ import { PlayerUpdating } from './entity/updating/PlayerUpdating';
 import { GameSyncExecutor } from './entity/updating/sync/GameSyncExecutor';
 import { Graphic } from './model/Graphic';
 import { Location } from './model/Location';
-import { Players } from './model/commands/impl/Players';
 import { TaskManager } from './task/TaskManager';
 import { GameConstants } from '../game/GameConstants'
 import { Misc } from '../util/Misc';

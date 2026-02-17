@@ -27,7 +27,7 @@ class SkillEntered implements EnteredAmountAction {
 
 }
 export class SkillManager {
-    public static readonly AMOUNT_OF_SKILLS: number = Object.keys(Skill).length;
+    public static readonly AMOUNT_OF_SKILLS: number = Skill.values().length;
     public static readonly MAX_EXPERIENCE: number = 1000000000;
     public static readonly EXPERIENCE_FOR_99: number = 13034431;
     public static readonly EXP_ARRAY: number[] = [0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833, 2107,
@@ -53,8 +53,9 @@ export class SkillManager {
             this.skills.level[i] = this.skills.maxLevel[i] = 1;
             this.skills.experience[i] = 0;
         }
-        this.skills.level[Skill.HITPOINTS.getButton()] = this.skills.maxLevel[Skill.HITPOINTS.getButton()] = 10;
-        this.skills.experience[Skill.HITPOINTS.getButton()] = 1184;
+        // Skill arrays use ordinal-style indices, never skill tab button ids.
+        this.skills.level[Skill.HITPOINTS.getIndex()] = this.skills.maxLevel[Skill.HITPOINTS.getIndex()] = 10;
+        this.skills.experience[Skill.HITPOINTS.getIndex()] = 1184;
     }
 
     static getExperienceForLevel(level: number): number {
@@ -121,27 +122,27 @@ export class SkillManager {
             return this;
 
         // If we already have max exp, don't add any more.
-        if (this.skills.experience[skill.getButton()] >= SkillManager.MAX_EXPERIENCE)
+        if (this.skills.experience[skill.getIndex()] >= SkillManager.MAX_EXPERIENCE)
             return this;
 
         // The skill's level before any experience is added
-        const startingLevel = this.skills.maxLevel[skill.getButton()];
+        const startingLevel = this.skills.maxLevel[skill.getIndex()];
 
         // Add experience to the selected skill..
-        this.skills.experience[skill.getName()] = this.skills.experience[skill.getName()] + experience > SkillManager.MAX_EXPERIENCE
+        this.skills.experience[skill.getIndex()] = this.skills.experience[skill.getIndex()] + experience > SkillManager.MAX_EXPERIENCE
             ? SkillManager.MAX_EXPERIENCE
-            : this.skills.experience[skill.getName()] + experience;
+            : this.skills.experience[skill.getIndex()] + experience;
 
         // Get the skill's new level after experience has been added..
-        let newLevel = SkillManager.getLevelForExperience(this.skills.experience[skill.getName()]);
+        let newLevel = SkillManager.getLevelForExperience(this.skills.experience[skill.getIndex()]);
 
         // Handle level up..
         if (newLevel > startingLevel) {
             let level = newLevel - startingLevel;
             let skillName = skill.toString().toLowerCase().charAt(0).toUpperCase() + skill.toString().toLowerCase().slice(1);
-            this.skills.maxLevel[skill.getButton()] += level;
+            this.skills.maxLevel[skill.getIndex()] += level;
             this.stopSkillable(); // Stop skilling on level up like osrs
-            this.setCurrentLevels(skill, this.skills.maxLevel[skill.getButton()]);
+            this.setCurrentLevels(skill, this.skills.maxLevel[skill.getIndex()]);
             this.player.getPacketSender().sendInterfaceRemoval();
             this.player.getPacketSender().sendString("Congratulations! You have achieved a " + skillName + " level!", 4268);
             this.player.getPacketSender().sendString("Well done. You are now level " + newLevel + ".", 4269);
@@ -149,7 +150,7 @@ export class SkillManager {
             this.player.getPacketSender().sendChatboxInterface(skill.getChatboxInterface());
             this.player.performGraphic(SkillManager.LEVEL_UP_GRAPHIC);
             this.player.getPacketSender().sendMessage("You've just advanced " + skillName + " level! You have reached level " + newLevel);
-            if (this.skills.maxLevel[skill.getButton()] == SkillManager.getMaxAchievingLevel(skill)) {
+            if (this.skills.maxLevel[skill.getIndex()] == SkillManager.getMaxAchievingLevel(skill)) {
                 this.player.getPacketSender().sendMessage("Well done! You've achieved the highest possible level in this skill!");
                 World.sendMessage("<shad=15536940>News: " + this.player.getUsername()
                     + " has just achieved the highest possible level in " + skillName + "!");
@@ -210,7 +211,7 @@ export class SkillManager {
                     continue;
                 }
                 if (item.getDefinition().getRequirements() != null) {
-                    if (item.getDefinition().getRequirements()[skill.getButton()] > level) {
+                    if (item.getDefinition().getRequirements()[skill.getIndex()] > level) {
                         this.player.getPacketSender().sendMessage(
                             "Please unequip your " + item.getDefinition().getName() + " before doing that.");
                         return;
@@ -277,13 +278,13 @@ export class SkillManager {
      * @return The average of the player's combat skills.
      */
     public getCombatLevel(): number {
-        const attack = this.skills.maxLevel[Skill.ATTACK.getButton()];
-        const defence = this.skills.maxLevel[Skill.DEFENCE.getButton()];
-        const strength = this.skills.maxLevel[Skill.STRENGTH.getButton()];
-        const hp = this.skills.maxLevel[Skill.HITPOINTS.getButton()];
-        const prayer = this.skills.maxLevel[Skill.PRAYER.getButton()];
-        const ranged = this.skills.maxLevel[Skill.RANGED.getButton()];
-        const magic = this.skills.maxLevel[Skill.MAGIC.getButton()];
+        const attack = this.skills.maxLevel[Skill.ATTACK.getIndex()];
+        const defence = this.skills.maxLevel[Skill.DEFENCE.getIndex()];
+        const strength = this.skills.maxLevel[Skill.STRENGTH.getIndex()];
+        const hp = this.skills.maxLevel[Skill.HITPOINTS.getIndex()];
+        const prayer = this.skills.maxLevel[Skill.PRAYER.getIndex()];
+        const ranged = this.skills.maxLevel[Skill.RANGED.getIndex()];
+        const magic = this.skills.maxLevel[Skill.MAGIC.getIndex()];
         let combatLevel = 3;
         combatLevel = (defence + hp + Math.floor(prayer / 2)) * 0.2535 + 1;
         const melee = (attack + strength) * 0.325;
@@ -308,7 +309,7 @@ export class SkillManager {
     public getTotalLevel(): number {
         let total = 0;
         for (const skill of Skill.values()) {
-            total += this.skills.maxLevel[skill.getButton()];
+            total += this.skills.maxLevel[skill.getIndex()];
         }
         return total;
     }
@@ -333,7 +334,7 @@ export class SkillManager {
      * @return The skill's level.
      */
     public getCurrentLevel(skill: Skill): number {
-        return this.skills.level[skill.getButton()];
+        return this.skills.level[skill.getIndex()];
     }
 
     /**
@@ -343,7 +344,7 @@ export class SkillManager {
      * @return The skill's maximum level.
      */
     public getMaxLevel(skill: Skill): number {
-        return this.skills.maxLevel[skill.getButton()];
+        return this.skills.maxLevel[skill.getIndex()];
     }
 
     /**
@@ -363,7 +364,7 @@ export class SkillManager {
      * @return The experience in said skill.
      */
     public getExperience(skill: Skill): number {
-        return this.skills.experience[skill.getButton()];
+        return this.skills.experience[skill.getIndex()];
     }
 
     /**
@@ -375,7 +376,7 @@ export class SkillManager {
      * @return The Skills instance.
      */
     public setCurrentLevel(skill: Skill, level: number, refresh: boolean): SkillManager {
-        this.skills.level[skill.getButton()] = level < 0 ? 0 : level;
+        this.skills.level[skill.getIndex()] = level < 0 ? 0 : level;
         if (refresh) {
             this.updateSkill(skill);
         }
@@ -384,7 +385,7 @@ export class SkillManager {
 
 
     setMaxLevels(skill: Skill, level: number, refresh = true) {
-        this.skills.maxLevel[skill.getButton()] = level;
+        this.skills.maxLevel[skill.getIndex()] = level;
 
         if (refresh) {
             this.updateSkill(skill);
@@ -393,7 +394,7 @@ export class SkillManager {
     }
 
     setExperiences(skill: Skill, experience: number, refresh = true) {
-        this.skills.experience[skill.getButton()] = experience < 0 ? 0 : experience;
+        this.skills.experience[skill.getIndex()] = experience < 0 ? 0 : experience;
         if (refresh) {
             this.updateSkill(skill);
         }
@@ -401,7 +402,7 @@ export class SkillManager {
     }
 
     setCurrentLevels(skill: Skill, level: number, refresh = true) {
-        this.skills.maxLevel[skill.getButton()] = level;
+        this.skills.maxLevel[skill.getIndex()] = level;
 
         if (refresh) {
             this.updateSkill(skill);

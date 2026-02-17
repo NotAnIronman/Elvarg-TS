@@ -42,4 +42,14 @@ export class PlayerRights {
             default: return PlayerRights.NONE;
         }
     }
+
+    /**
+     * Returns true for admin-capable rights (administrator/owner/developer).
+     * Accepts either a Player instance or a PlayerRights instance.
+     */
+    public static hasAdminRights(playerOrRights: any): boolean {
+        const rights = playerOrRights?.getRights?.() ?? playerOrRights;
+        const rightsId = rights?.getId?.();
+        return Number.isInteger(rightsId) && rightsId >= PlayerRights.ADMINISTRATOR.getId();
+    }
 }

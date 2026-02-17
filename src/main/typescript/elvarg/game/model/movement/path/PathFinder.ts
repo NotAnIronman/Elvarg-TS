@@ -3,7 +3,7 @@ import { Server } from "../../../../Server";
 import { RegionManager } from "../../../collision/RegionManager";
 import { Location } from "../../Location";
 import { PrivateArea } from "../../areas/impl/PrivateArea";
-import { AttackRange } from '../../../model/commands/impl/AttackRange'
+import { Graphic } from "../../Graphic";
 import { PlayerRights } from "../../rights/PlayerRights";
 import { GameConstants } from "../../../GameConstants";
 import { CombatConstants } from "../../../content/combat/CombatConstants";
@@ -12,6 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 export class PathFinder {
+    private static readonly ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
     private static LOG_DIR = path.join(process.cwd(), "logs");
     private static LOG_FILE = path.join(PathFinder.LOG_DIR, "movement.log");
     private static LOG_READY = false;
@@ -160,10 +161,10 @@ export class PathFinder {
             // Fetch the circumference of the closest attackable tiles to the target
             const possibleTiles = PathFinder.getTilesForDistance(targetLocation, distance);
 
-            if (GameConstants.DEBUG_ATTACK_DISTANCE && attacker.getAsPlayer() && attacker.getAsPlayer().rights === PlayerRights.DEVELOPER) {
-                // If we're debugging attack range
-                possibleTiles.forEach(t => attacker.getAsPlayer().packetSender.sendGraphic(AttackRange.PURPLE_GLOW, t));
-            }
+                if (GameConstants.DEBUG_ATTACK_DISTANCE && attacker.getAsPlayer() && attacker.getAsPlayer().rights === PlayerRights.DEVELOPER) {
+                    // If we're debugging attack range
+                    possibleTiles.forEach(t => attacker.getAsPlayer().packetSender.sendGraphic(PathFinder.ATTACK_RANGE_DEBUG_GRAPHIC, t));
+                }
 
             tile = possibleTiles
                 // Filter out any tiles which are clipped

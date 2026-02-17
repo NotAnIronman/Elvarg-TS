@@ -79,7 +79,7 @@
   "scripts": {
     "build": "tsc --build",
     "start": "node ./dist/Server.js",
-    "dev": "nodemon ./src/main/typescript/elvarg/Server.ts",
+    "dev": "nodemon --ext ts,json,js ./src/main/typescript/elvarg/Server.ts",
     "test:login": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/login-smoke.ts",
     "test:protocol": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/login-protocol-harness.ts"
   },

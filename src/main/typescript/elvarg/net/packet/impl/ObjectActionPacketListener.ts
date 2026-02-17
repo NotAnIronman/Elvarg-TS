@@ -28,6 +28,7 @@ export class ObjectActionPacketListener implements PacketExecutor {
       parsed.y,
       player.getLocation().getZ()
     );
+    const sourceLocation = player.getLocation().clone();
     const object = MapObjects.getPrivateArea(player, parsed.id, objectLocation);
     if (!object) {
       return;
@@ -35,6 +36,8 @@ export class ObjectActionPacketListener implements PacketExecutor {
 
     player.getMovementQueue().walkToObject(object, {
       execute: () => {
+        player.getMovementQueue().reset();
+        player.getMovementQueue().walkToReset();
         player.setPositionToFace(object.getLocation());
 
         const pluginHandled = PluginManager.emitObjectInteraction({
@@ -46,6 +49,11 @@ export class ObjectActionPacketListener implements PacketExecutor {
             x: object.getLocation().getX(),
             y: object.getLocation().getY(),
             z: object.getLocation().getZ(),
+          },
+          sourceLocation: {
+            x: sourceLocation.getX(),
+            y: sourceLocation.getY(),
+            z: sourceLocation.getZ(),
           },
           handled: false,
         });

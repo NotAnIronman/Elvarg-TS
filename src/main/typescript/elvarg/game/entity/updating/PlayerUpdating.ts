@@ -12,16 +12,134 @@ import { ByteOrder } from '../../../net/packet/ByteOrder'
 import { Skill } from '../../model/Skill'
 import { Misc } from '../../../util/Misc'
 import { DonatorRights } from '../../model/rights/DonatorRights'
+import * as fs from "fs";
+import * as path from "path";
 
 export class PlayerUpdating {
     private static MAX_NEW_PLAYERS_PER_CYCLE = 25;
+    private static readonly DEBUG_ENABLED =
+        (process.env.PLAYER_UPDATE_DEBUG ?? "1") === "1";
+    private static readonly DEBUG_RECEIVER_FILTER = (
+        process.env.PLAYER_UPDATE_DEBUG_RECEIVER ?? "happysham31"
+    )
+        .trim()
+        .toLowerCase();
+    private static readonly DEBUG_TARGET_FILTER = (
+        process.env.PLAYER_UPDATE_DEBUG_TARGET ?? "walkerbot1"
+    )
+        .trim()
+        .toLowerCase();
+    private static readonly DEBUG_LOG_DIR = path.join(process.cwd(), "logs");
+    private static readonly DEBUG_LOG_FILE = path.join(
+        PlayerUpdating.DEBUG_LOG_DIR,
+        "player_update_bits.log"
+    );
+    private static debugReady = false;
+    private static updateSequence = 0;
+
+    private static nextUpdateId(): number {
+        PlayerUpdating.updateSequence += 1;
+        return PlayerUpdating.updateSequence;
+    }
+
+    private static playerName(player: Player | null | undefined): string {
+        if (!player) {
+            return "unknown";
+        }
+        return player.getUsername?.() ?? `index:${player.getIndex?.() ?? "?"}`;
+    }
+
+    private static locationOf(player: Player | null | undefined): {
+        x: number;
+        y: number;
+        z: number;
+    } | null {
+        if (!player) {
+            return null;
+        }
+        const loc = player.getLocation?.();
+        if (!loc) {
+            return null;
+        }
+        return { x: loc.getX(), y: loc.getY(), z: loc.getZ() };
+    }
+
+    private static shouldDebugReceiver(receiver: Player): boolean {
+        if (!PlayerUpdating.DEBUG_ENABLED) {
+            return false;
+        }
+        if (!PlayerUpdating.DEBUG_RECEIVER_FILTER) {
+            return false;
+        }
+        if (!PlayerUpdating.DEBUG_RECEIVER_FILTER) {
+            return true;
+        }
+        const receiverName = PlayerUpdating.playerName(receiver).toLowerCase();
+        return receiverName.includes(PlayerUpdating.DEBUG_RECEIVER_FILTER);
+    }
+
+    private static shouldDebugPair(receiver: Player, target: Player): boolean {
+        if (!PlayerUpdating.DEBUG_ENABLED) {
+            return false;
+        }
+        if (receiver === target) {
+            return false;
+        }
+        if (PlayerUpdating.DEBUG_RECEIVER_FILTER) {
+            const receiverName = PlayerUpdating.playerName(receiver).toLowerCase();
+            if (!receiverName.includes(PlayerUpdating.DEBUG_RECEIVER_FILTER)) {
+                return false;
+            }
+        }
+        if (!PlayerUpdating.DEBUG_TARGET_FILTER) {
+            return true;
+        }
+        const targetName = PlayerUpdating.playerName(target).toLowerCase();
+        return targetName.includes(PlayerUpdating.DEBUG_TARGET_FILTER);
+    }
+
+    private static encodeByteS(value: number): number {
+        return (128 - value) & 0xff;
+    }
+
+    private static encodeShortLittleA(value: number): number[] {
+        return [((value + 128) & 0xff), ((value >> 8) & 0xff)];
+    }
+
+    private static encodeShortBigA(value: number): number[] {
+        return [((value >> 8) & 0xff), ((value + 128) & 0xff)];
+    }
+
+    private static debugLog(
+        kind: string,
+        payload: Record<string, unknown>
+    ): void {
+        if (!PlayerUpdating.DEBUG_ENABLED) {
+            return;
+        }
+        try {
+            if (!PlayerUpdating.debugReady) {
+                fs.mkdirSync(PlayerUpdating.DEBUG_LOG_DIR, { recursive: true });
+                PlayerUpdating.debugReady = true;
+            }
+            const line = `${new Date().toISOString()} [player_update_debug] ${kind} ${JSON.stringify(
+                payload
+            )}\n`;
+            fs.appendFileSync(PlayerUpdating.DEBUG_LOG_FILE, line, {
+                encoding: "utf8",
+            });
+        } catch (err) {
+            console.warn("[PlayerUpdating] failed to write debug log", err);
+        }
+    }
 
     public static update(player: Player) {
+        const updateId = this.nextUpdateId();
         const update = new PacketBuilder();
         const packet = new PacketBuilder(81, PacketType.VARIABLE_SHORT);
         packet.initializeAccess(AccessType.BIT);
-        this.updateMovement(player, packet);
-        this.appendUpdates(player, update, player, false, true);
+        this.updateMovement(player, packet, updateId);
+        this.appendUpdates(player, update, player, false, true, updateId);
         const localPlayers = player.getLocalPlayers();
         packet.putBits(8, localPlayers.length);
         const retainedLocalPlayers: Player[] = [];
@@ -30,9 +148,9 @@ export class PlayerUpdating {
                 && localPlayer.getLocation().isViewableFrom(player.getLocation())
                 && !localPlayer.isNeedsPlacement()
                 && localPlayer.getPrivateArea() === player.getPrivateArea()) {
-                this.updateOtherPlayerMovement(packet, localPlayer);
+                this.updateOtherPlayerMovement(player, packet, localPlayer, updateId);
                 if (localPlayer.getUpdateFlag().isUpdateRequired()) {
-                    this.appendUpdates(player, update, localPlayer, false, false);
+                    this.appendUpdates(player, update, localPlayer, false, false, updateId);
                 }
                 retainedLocalPlayers.push(localPlayer);
             } else {
@@ -55,7 +173,7 @@ export class PlayerUpdating {
             }
             player.getLocalPlayers().push(otherPlayer);
             this.addPlayer(player, otherPlayer, packet);
-            this.appendUpdates(player, update, otherPlayer, true, false);
+            this.appendUpdates(player, update, otherPlayer, true, false, updateId);
             playersAdded++;
         }
 
@@ -66,6 +184,20 @@ export class PlayerUpdating {
             packet.putBytes(updateBuffer);
         } else {
             packet.initializeAccess(AccessType.BYTE);
+        }
+        if (this.shouldDebugReceiver(player)) {
+            const packetBuffer = packet.getBuffer();
+            this.debugLog("packet81", {
+                updateId,
+                receiver: this.playerName(player),
+                receiverLocation: this.locationOf(player),
+                localPlayers: localPlayers.length,
+                updateBlockBytes: updateBuffer.length,
+                packetBytes: packetBuffer.length,
+                packetPreviewHex: packetBuffer
+                    .subarray(0, Math.min(packetBuffer.length, 64))
+                    .toString("hex"),
+            });
         }
         player.getSession().write(packet);
     }
@@ -78,8 +210,12 @@ export class PlayerUpdating {
         builder.putBits(5, yDiff);
         builder.putBits(5, xDiff);
     }
-    private static updateMovement(player: Player, builder: PacketBuilder) {
+    private static updateMovement(player: Player, builder: PacketBuilder, updateId: number) {
         if (player.isNeedsPlacement()) {
+            // IMPORTANT: do not clear placement/reset flags inside this method.
+            // This packet writes the local player first, then encodes other local players
+            // in the same cycle. Clearing early can make observers miss placement for the
+            // same tick and keep a stale position after forced movement (ditch regression).
             builder.putBits(1, 1);
             builder.putBits(2, 3);
             builder.putBits(2, player.getLocation().getZ());
@@ -87,29 +223,78 @@ export class PlayerUpdating {
             builder.putBits(1, player.getUpdateFlag().isUpdateRequired() ? 1 : 0);
             builder.putBits(7, player.getLocation().getLocalY(player.getLastKnownRegion()));
             builder.putBits(7, player.getLocation().getLocalX(player.getLastKnownRegion()));
-            player.setNeedsPlacement(false);
-            player.setResetMovementQueue(false);
+            if (this.shouldDebugReceiver(player)) {
+                this.debugLog("self_movement", {
+                    updateId,
+                    receiver: this.playerName(player),
+                    movementType: "placement",
+                    updateRequired: player.getUpdateFlag().isUpdateRequired(),
+                    location: this.locationOf(player),
+                });
+            }
         } else if (player.getWalkingDirection().getId() == -1) {
             if (player.getUpdateFlag().isUpdateRequired()) {
                 builder.putBits(1, 1);
                 builder.putBits(2, 0);
+                if (this.shouldDebugReceiver(player)) {
+                    this.debugLog("self_movement", {
+                        updateId,
+                        receiver: this.playerName(player),
+                        movementType: "none_with_update",
+                        location: this.locationOf(player),
+                    });
+                }
             } else {
                 builder.putBits(1, 0);
+                if (this.shouldDebugReceiver(player)) {
+                    this.debugLog("self_movement", {
+                        updateId,
+                        receiver: this.playerName(player),
+                        movementType: "none_no_update",
+                        location: this.locationOf(player),
+                    });
+                }
             }
         } else if (player.getRunningDirection().getId() == -1) {
             builder.putBits(1, 1);
             builder.putBits(2, 1);
             builder.putBits(3, player.getWalkingDirection().getId());
             builder.putBits(1, player.getUpdateFlag().isUpdateRequired() ? 1 : 0);
+            if (this.shouldDebugReceiver(player)) {
+                this.debugLog("self_movement", {
+                    updateId,
+                    receiver: this.playerName(player),
+                    movementType: "walk",
+                    walkDirection: player.getWalkingDirection().getId(),
+                    updateRequired: player.getUpdateFlag().isUpdateRequired(),
+                    location: this.locationOf(player),
+                });
+            }
         } else {
             builder.putBits(1, 1);
             builder.putBits(2, 2);
             builder.putBits(3, player.getWalkingDirection().getId());
             builder.putBits(3, player.getRunningDirection().getId());
             builder.putBits(1, player.getUpdateFlag().isUpdateRequired() ? 1 : 0);
+            if (this.shouldDebugReceiver(player)) {
+                this.debugLog("self_movement", {
+                    updateId,
+                    receiver: this.playerName(player),
+                    movementType: "run",
+                    walkDirection: player.getWalkingDirection().getId(),
+                    runDirection: player.getRunningDirection().getId(),
+                    updateRequired: player.getUpdateFlag().isUpdateRequired(),
+                    location: this.locationOf(player),
+                });
+            }
         }
     }
-    private static updateOtherPlayerMovement(builder: PacketBuilder, target: Player) {
+    private static updateOtherPlayerMovement(
+        receiver: Player,
+        builder: PacketBuilder,
+        target: Player,
+        updateId: number
+    ) {
         // TODO: Teleport
         /*if (target.isNeedsPlacement()) {
             builder.putBits(1, target.getUpdateFlag().isUpdateRequired() ? 1 : 0);
@@ -118,6 +303,25 @@ export class PlayerUpdating {
             builder.putBits(7, target.getPosition().getLocalX(target.getLastKnownRegion()));
             return;
         }*/
+        if (this.shouldDebugPair(receiver, target) && target.isNeedsPlacement()) {
+            this.debugLog("other_movement", {
+                updateId,
+                receiver: this.playerName(receiver),
+                target: this.playerName(target),
+                movementType: "placement_not_serialized",
+                targetNeedsPlacement: target.isNeedsPlacement(),
+                targetResetMovementQueue: target.isResetMovementQueue(),
+                targetUpdateRequired: target.getUpdateFlag().isUpdateRequired(),
+                targetLocation: this.locationOf(target),
+                targetLastKnownRegion: target.getLastKnownRegion()
+                    ? {
+                          x: target.getLastKnownRegion().getX(),
+                          y: target.getLastKnownRegion().getY(),
+                          z: target.getLastKnownRegion().getZ(),
+                      }
+                    : null,
+            });
+        }
 
         /*
          * Check which type of movement took place.
@@ -136,11 +340,31 @@ export class PlayerUpdating {
                  * Signify that there was no movement.
                  */
                 builder.putBits(2, 0);
+                if (this.shouldDebugPair(receiver, target)) {
+                    this.debugLog("other_movement", {
+                        updateId,
+                        receiver: this.playerName(receiver),
+                        target: this.playerName(target),
+                        movementType: "none_with_update",
+                        targetForceMovement: target.getForceMovement() != null,
+                        targetLocation: this.locationOf(target),
+                    });
+                }
             } else {
                 /*
                  * Signify that nothing changed.
                  */
                 builder.putBits(1, 0);
+                if (this.shouldDebugPair(receiver, target)) {
+                    this.debugLog("other_movement", {
+                        updateId,
+                        receiver: this.playerName(receiver),
+                        target: this.playerName(target),
+                        movementType: "none_no_update",
+                        targetForceMovement: target.getForceMovement() != null,
+                        targetLocation: this.locationOf(target),
+                    });
+                }
             }
         } else if (target.getRunningDirection().getId() == -1) {
             /*
@@ -162,6 +386,18 @@ export class PlayerUpdating {
              * Write a flag indicating if a block update happened.
              */
             builder.putBits(1, target.getUpdateFlag().isUpdateRequired() ? 1 : 0);
+            if (this.shouldDebugPair(receiver, target)) {
+                this.debugLog("other_movement", {
+                    updateId,
+                    receiver: this.playerName(receiver),
+                    target: this.playerName(target),
+                    movementType: "walk",
+                    walkDirection: target.getWalkingDirection().getId(),
+                    targetUpdateRequired: target.getUpdateFlag().isUpdateRequired(),
+                    targetForceMovement: target.getForceMovement() != null,
+                    targetLocation: this.locationOf(target),
+                });
+            }
         } else {
             /*
              * The player ran. Signify that an update happened.
@@ -181,9 +417,29 @@ export class PlayerUpdating {
 
             // Write a flag indicating if a block update happened.
             builder.putBits(1, target.updateFlag.isUpdateRequired() ? 1 : 0);
+            if (this.shouldDebugPair(receiver, target)) {
+                this.debugLog("other_movement", {
+                    updateId,
+                    receiver: this.playerName(receiver),
+                    target: this.playerName(target),
+                    movementType: "run",
+                    walkDirection: target.walkingDirection.id,
+                    runDirection: target.runningDirection.id,
+                    targetUpdateRequired: target.updateFlag.isUpdateRequired(),
+                    targetForceMovement: target.getForceMovement() != null,
+                    targetLocation: this.locationOf(target),
+                });
+            }
         }
     }
-    private static appendUpdates(player: Player, builder: PacketBuilder, target: Player, updateAppearance: boolean, noChat: boolean) {
+    private static appendUpdates(
+        player: Player,
+        builder: PacketBuilder,
+        target: Player,
+        updateAppearance: boolean,
+        noChat: boolean,
+        updateId: number
+    ) {
         if (!target.updateFlag.isUpdateRequired() && !updateAppearance) {
             return;
         }
@@ -233,8 +489,18 @@ export class PlayerUpdating {
         } else {
             builder.put(mask);
         }
+        if (this.shouldDebugPair(player, target)) {
+            this.debugLog("append_mask", {
+                updateId,
+                receiver: this.playerName(player),
+                target: this.playerName(target),
+                mask,
+                targetUpdateRequired: target.updateFlag.isUpdateRequired(),
+                targetForceMovement: target.forceMovement != null,
+            });
+        }
         if (flag.flagged(Flag.FORCED_MOVEMENT) && target.forceMovement != null) {
-            this.updateForcedMovement(player, builder, target);
+            this.updateForcedMovement(player, builder, target, updateId);
         }
         if (flag.flagged(Flag.GRAPHIC) && target.graphic != null) {
             this.updateGraphics(builder, target);
@@ -284,7 +550,12 @@ export class PlayerUpdating {
     private static updateForcedChat(builder: PacketBuilder, target: Player) {
         builder.putString(target.forcedChat);
     }
-    private static updateForcedMovement(player: Player, builder: PacketBuilder, target: Player) {
+    private static updateForcedMovement(
+        player: Player,
+        builder: PacketBuilder,
+        target: Player,
+        updateId: number
+    ) {
         const startX = target.forceMovement.start.getLocalX(player.lastKnownRegion);
         const startY = target.forceMovement.start.getLocalY(player.lastKnownRegion);
         const endX = target.forceMovement.end.getX();
@@ -298,6 +569,40 @@ export class PlayerUpdating {
         builder.putShort(target.forceMovement.reverseSpeed, ValueType.A, ByteOrder.BIG);
         builder.putShort(target.forceMovement.animation, ValueType.A, ByteOrder.LITTLE);
         builder.puts(target.forceMovement.direction, ValueType.S);
+        if (this.shouldDebugPair(player, target)) {
+            const forcedBytes = [
+                this.encodeByteS(startX),
+                this.encodeByteS(startY),
+                this.encodeByteS(startX + endX),
+                this.encodeByteS(startY + endY),
+                ...this.encodeShortLittleA(target.forceMovement.speed),
+                ...this.encodeShortBigA(target.forceMovement.reverseSpeed),
+                ...this.encodeShortLittleA(target.forceMovement.animation),
+                this.encodeByteS(target.forceMovement.direction),
+            ];
+            this.debugLog("forced_movement", {
+                updateId,
+                receiver: this.playerName(player),
+                target: this.playerName(target),
+                receiverLocation: this.locationOf(player),
+                targetLocation: this.locationOf(target),
+                receiverLastKnownRegion: player.lastKnownRegion
+                    ? {
+                          x: player.lastKnownRegion.getX(),
+                          y: player.lastKnownRegion.getY(),
+                          z: player.lastKnownRegion.getZ(),
+                      }
+                    : null,
+                startLocal: { x: startX, y: startY },
+                endDelta: { x: endX, y: endY },
+                endLocal: { x: startX + endX, y: startY + endY },
+                speed: target.forceMovement.speed,
+                reverseSpeed: target.forceMovement.reverseSpeed,
+                animation: target.forceMovement.animation,
+                direction: target.forceMovement.direction,
+                encodedBytes: forcedBytes,
+            });
+        }
     }
     private static updateAnimation(builder: PacketBuilder, target: Player) {
         builder.putShorts(target.animation.id, ByteOrder.LITTLE);

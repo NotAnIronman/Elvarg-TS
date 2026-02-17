@@ -23,10 +23,13 @@ export class ForceMovementTask extends Task {
     public execute() {
         let x = this.start.getX() + this.end.getX();
         let y = this.start.getY() + this.end.getY();
-        (this.player as any).moveTo(new (Location as any)(x, y, (this.player.getLocation() as any).getZ()));
+        // Use moveTo() so completion emits placement/reset semantics that match
+        // vanilla protocol expectations for both self and observers.
+        // Direct setLocation() caused client/server position drift after ditch crosses.
+        this.player.moveTo(
+            new (Location as any)(x, y, (this.player.getLocation() as any).getZ())
+        );
         this.player.setForceMovement(null);
         this.stop();
     }
 }
-
-

@@ -25,6 +25,8 @@ export class Skill {
     public static CONSTRUCTION = new Skill(7267, 18801);
     public static HUNTER = new Skill(8267, 18829);
 
+    private static nextIndex = 0;
+
     private static readonly VALUES: Skill[] = [
         Skill.ATTACK,
         Skill.DEFENCE,
@@ -61,8 +63,9 @@ export class Skill {
         Skill.MAGIC
     ]);
 
-    // TODO - Populate skill map
-    private static readonly skillMap: Map<number, Skill> = new Map<number, Skill>();
+    private static readonly skillMap: Map<number, Skill> = new Map<number, Skill>(
+        Skill.VALUES.map((skill) => [skill.button, skill] as [number, Skill])
+    );
 
     /**
      * The {@link Skill}'s chatbox interface
@@ -75,6 +78,10 @@ export class Skill {
      * interface.
      */
     private readonly button: number;
+    /**
+     * Stable index used for skill arrays (equivalent to Java enum ordinal).
+     */
+    private readonly index: number;
 
     /**
      * Constructor
@@ -85,6 +92,7 @@ export class Skill {
     constructor(chatboxInterface: number, button: number) {
         this.chatboxInterface = chatboxInterface;
         this.button = button;
+        this.index = Skill.nextIndex++;
     }
 
     /**
@@ -93,7 +101,7 @@ export class Skill {
      * @param button The button id.
      * @return The skill with the matching button.
      */
-    public static forButton(button: number): Skill {
+    public static forButton(button: number): Skill | undefined {
         return Skill.skillMap.get(button);
     }
 
@@ -120,6 +128,14 @@ export class Skill {
     */
     public getButton(): number {
         return this.button;
+    }
+
+    /**
+     * Gets the array index for this skill.
+     * Use this for level/maxLevel/experience arrays, not button ids.
+     */
+    public getIndex(): number {
+        return this.index;
     }
     /**
 
