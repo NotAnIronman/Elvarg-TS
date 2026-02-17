@@ -4,7 +4,238 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="286c1503-b08d-4a5e-bcd8-fae14731a9d8" name="Default Changelist" comment="Login working, player updating, chat, npcs, compilation &amp; runtime errors fixed" />
+    <list default="true" id="286c1503-b08d-4a5e-bcd8-fae14731a9d8" name="Default Changelist" comment="Click to move (teleport), region loading">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Function" beforeDir="false" afterPath="$PROJECT_DIR$/Function" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Server.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Server.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/ByteBufUtils.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/ByteBufUtils.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkBuilder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkBuilder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkConstants.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/NetworkConstants.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerBotSession.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerBotSession.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerSession.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/PlayerSession.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/SessionState.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/SessionState.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelEventHandler.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelEventHandler.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelFilter.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelFilter.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelPipelineHandler.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/channel/ChannelPipelineHandler.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginDecoder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginDecoder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginEncoder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/LoginEncoder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketDecoder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketDecoder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketEncoder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/codec/PacketEncoder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginDetailsMessage.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginDetailsMessage.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponsePacket.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponsePacket.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponses.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/login/LoginResponses.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/ByteOrder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/ByteOrder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/Packet.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/Packet.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketBuilder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketBuilder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketConstants.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketConstants.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketExecutor.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketExecutor.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketSender.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketSender.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketType.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/PacketType.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/ValueType.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/ValueType.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/BankTabCreationPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/BankTabCreationPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ButtonClickPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ButtonClickPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChangeAppearancePacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChangeAppearancePacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatSettingsPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ChatSettingsPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CloseInterfacePacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CloseInterfacePacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CommandPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CommandPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CreationMenuPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/CreationMenuPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DialoguePacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DialoguePacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DropItemPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/DropItemPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EnterInputPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EnterInputPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EquipPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/EquipPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineItemPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineItemPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineNpcPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ExamineNpcPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FinalizedMapRegionChangePacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FinalizedMapRegionChangePacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FollowPlayerPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/FollowPlayerPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/InterfaceActionClickOpcode.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/InterfaceActionClickOpcode.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemActionPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemActionPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemContainerActionPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ItemContainerActionPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnItemPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnItemPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnPlayerPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MagicOnPlayerPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MovementPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/MovementPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/NPCOptionPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/NPCOptionPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ObjectActionPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/ObjectActionPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PickupItemPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PickupItemPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerInactivePacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerInactivePacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerOptionPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerOptionPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerRelationPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/PlayerRelationPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/RegionChangePacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/RegionChangePacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SecondGroundItemOptionPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SecondGroundItemOptionPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpawnItemPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpawnItemPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpecialAttackPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SpecialAttackPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SwitchItemSlotPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/SwitchItemSlotPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TeleportPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TeleportPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TradeRequestPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/TradeRequestPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/UseItemPacketListener.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/packet/impl/UseItemPacketListener.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/BCrypt.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/BCrypt.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/IsaacRandom.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/net/security/IsaacRandom.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/BackgroundLoader.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/BackgroundLoader.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Chance.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Chance.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/CompressionUtil.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/CompressionUtil.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/DiscordUtil.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/DiscordUtil.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FileUtil.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FileUtil.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FrameUpdater.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/FrameUpdater.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ItemIdentifiers.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ItemIdentifiers.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Misc.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Misc.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/NpcIdentifiers.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/NpcIdentifiers.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ObjectIdentifiers.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ObjectIdentifiers.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PasswordUtil.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PasswordUtil.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PlayerPunishment.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/PlayerPunishment.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/RandomGen.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/RandomGen.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShopIdentifiers.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShopIdentifiers.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShutdownHook.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/ShutdownHook.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Stopwatch.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/Stopwatch.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/TileUtils.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/TileUtils.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Buffer.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Buffer.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/BufferedConnection.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/BufferedConnection.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/ByteBuffer.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/ByteBuffer.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Client.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Client.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Flooder.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/flood/Flooder.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/Timer.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/Timer.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerKey.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerKey.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerRepository.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/util/timers/TimerRepository.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/Server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/Server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameConstants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameConstants.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameEngine.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameEngine.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/Systems.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/Systems.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/World.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/World.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/collision/Region.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/collision/Region.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/collision/RegionManager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/collision/RegionManager.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/QuickPrayers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/QuickPrayers.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/FightType.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/combat/FightType.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/SkillManager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/skill/SkillManager.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/ObjectDefinition.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/ObjectDefinition.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ItemDefinitionLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ItemDefinitionLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcDefinitionLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcDefinitionLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcSpawnDefinitionLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/NpcSpawnDefinitionLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ObjectSpawnDefinitionLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ObjectSpawnDefinitionLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ShopDefinitionLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/definition/loader/impl/ShopDefinitionLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/Entity.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/Entity.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/Mobile.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/Mobile.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/MobileList.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/MobileList.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NPCMovementCoordinator.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/npc/NPCMovementCoordinator.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/Player.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/Player.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/dynamodb/DynamoDBPlayerPersistence.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/dynamodb/DynamoDBPlayerPersistence.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/jsonfile/JSONFilePlayerPersistence.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/jsonfile/JSONFilePlayerPersistence.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/NPCUpdating.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/NPCUpdating.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/PlayerUpdating.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/PlayerUpdating.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/sync/GameSyncExecutor.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/sync/GameSyncExecutor.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/sync/GameSyncTask.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/updating/sync/GameSyncTask.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/PlayerRelations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/PlayerRelations.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/SecondsTimer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/SecondsTimer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skill.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/Skill.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/MovementQueue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/MovementQueue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/path/PathFinder.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/path/PathFinder.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/CombatPoisonEffect.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/CombatPoisonEffect.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkBuilder.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkBuilder.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkConstants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/NetworkConstants.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/PlayerSession.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/PlayerSession.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketBuilder.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketBuilder.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketSender.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketSender.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/CommandPacketListener.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/CommandPacketListener.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/MovementPacketListener.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/MovementPacketListener.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/RegionChangePacketListener.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/RegionChangePacketListener.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/util/BackgroundLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/util/BackgroundLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/util/DiscordUtil.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/util/DiscordUtil.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/util/FileUtil.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/util/FileUtil.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/util/Misc.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/util/Misc.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/util/PlayerPunishment.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/util/PlayerPunishment.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/util/timers/TimerRepository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/util/timers/TimerRepository.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -23,25 +254,31 @@
   <component name="ProblemsViewState">
     <option name="selectedIndex" value="1" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 8
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
   <component name="ProjectId" id="2OK3qyB9VTWqFCcB0rtpsCY2TtZ" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "/Users/toby/elvarg-web/elvarg-web-server",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/toby/elvarg-web/elvarg-web-server&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/Applications/WebStorm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -60,6 +297,9 @@
       <workItem from="1681295643536" duration="2965000" />
       <workItem from="1681314057925" duration="4150000" />
       <workItem from="1763898342136" duration="84000" />
+      <workItem from="1763913911306" duration="3614000" />
+      <workItem from="1771315519919" duration="470000" />
+      <workItem from="1771321631099" duration="549000" />
     </task>
     <task id="LOCAL-00001" summary="Login working, player updating, chat, npcs, compilation &amp; runtime errors fixed">
       <option name="closed" value="true" />
@@ -69,7 +309,15 @@
       <option name="project" value="LOCAL" />
       <updated>1763898420977</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Click to move (teleport), region loading">
+      <option name="closed" value="true" />
+      <created>1763913970687</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1763913970687</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -88,6 +336,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Login working, player updating, chat, npcs, compilation &amp; runtime errors fixed" />
-    <option name="LAST_COMMIT_MESSAGE" value="Login working, player updating, chat, npcs, compilation &amp; runtime errors fixed" />
+    <MESSAGE value="Click to move (teleport), region loading" />
+    <option name="LAST_COMMIT_MESSAGE" value="Click to move (teleport), region loading" />
   </component>
 </project>

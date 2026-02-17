@@ -25,6 +25,32 @@ export class Skill {
     public static CONSTRUCTION = new Skill(7267, 18801);
     public static HUNTER = new Skill(8267, 18829);
 
+    private static readonly VALUES: Skill[] = [
+        Skill.ATTACK,
+        Skill.DEFENCE,
+        Skill.STRENGTH,
+        Skill.HITPOINTS,
+        Skill.RANGED,
+        Skill.PRAYER,
+        Skill.MAGIC,
+        Skill.COOKING,
+        Skill.WOODCUTTING,
+        Skill.FLETCHING,
+        Skill.FISHING,
+        Skill.FIREMAKING,
+        Skill.CRAFTING,
+        Skill.SMITHING,
+        Skill.MINING,
+        Skill.HERBLORE,
+        Skill.AGILITY,
+        Skill.THIEVING,
+        Skill.SLAYER,
+        Skill.FARMING,
+        Skill.RUNECRAFTING,
+        Skill.CONSTRUCTION,
+        Skill.HUNTER,
+    ];
+
     private static readonly ALLOWED_TO_SET_LEVELS: ReadonlySet<Skill> = new Set([
         Skill.ATTACK,
         Skill.DEFENCE,
@@ -71,6 +97,10 @@ export class Skill {
         return Skill.skillMap.get(button);
     }
 
+    public static values(): Skill[] {
+        return Skill.VALUES;
+    }
+
     public canSetLevel() {
         return Skill.ALLOWED_TO_SET_LEVELS.has(this);
     }
@@ -100,4 +130,3 @@ export class Skill {
         return Misc.FORMATTER.format(this.toString().toLowerCase());
     }
 }
-

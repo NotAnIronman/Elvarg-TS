@@ -1,5 +1,5 @@
-import { ThreadPoolExecutor } from 'async';
 import { GameSyncTask } from './GameSyncTask';
+import { World } from '../../../World';
 
 export class GameSyncExecutor {
 
@@ -32,13 +32,21 @@ export class GameSyncExecutor {
    * @param syncTask the synchronization task to execute.
    */
   public sync(syncTask: GameSyncTask): void {
-    if (this.service == null || this.phaser == null || !syncTask.isConcurrent()) {
+    const runInline = () => {
       for (let index = 1; index < syncTask.getCapacity(); index++) {
         if (!syncTask.checkIndex(index)) {
           continue;
         }
+        const entity = syncTask.isPlayers() ? World.getPlayers().get(index) : World.getNpcs().get(index);
+        if (!entity) {
+          continue;
+        }
         syncTask.execute(index);
       }
+    };
+
+    if (this.service == null || this.phaser == null || !syncTask.isConcurrent()) {
+      runInline();
       return;
     }
 
@@ -50,7 +58,10 @@ export class GameSyncExecutor {
       const finalIndex = index;
       this.service.execute(() => {
         try {
-          syncTask.execute(finalIndex);
+          const entity = syncTask.isPlayers() ? World.getPlayers().get(finalIndex) : World.getNpcs().get(finalIndex);
+          if (entity) {
+            syncTask.execute(finalIndex);
+          }
         } finally {
           this.phaser.arriveAndDeregister();
         }
@@ -71,10 +82,13 @@ export class GameSyncExecutor {
     if (nThreads <= 1) {
       return null;
     }
-    const executor = new ThreadPoolExecutor(nThreads, nThreads, 0, "GameSyncThread");
-    executor.on("rejected", (task: any) => {
-      console.warn(`Task ${task} has been rejected from the GameSyncExecutor`);
-    });
-    return executor;
+    return {
+      execute(task: () => void) {
+        setImmediate(task);
+      },
+      on(_event: string, _handler: (task: any) => void) {
+        // no-op compatibility hook
+      },
+    };
   }
 }

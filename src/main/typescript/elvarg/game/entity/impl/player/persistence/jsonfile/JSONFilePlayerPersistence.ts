@@ -34,13 +34,14 @@ export class JSONFilePlayerPersistence {
     public save(player: Player): void {
         const save: PlayerSave = PlayerSave.fromPlayer(player);
     
+        if (!player) {
+            return;
+        }
         const filePath: string = path.join(JSONFilePlayerPersistence.PATH, player.getUsername() + '.json');
         this.setupDirectory(filePath);
     
-        const builder = new GsonBuilder().setPrettyPrinting().create();
-    
         try {
-          fs.writeFileSync(filePath, builder.toJson(save));
+          fs.writeFileSync(filePath, JSON.stringify(save, null, 2), "utf8");
         } catch (e) {
           throw new Error(e);
         }

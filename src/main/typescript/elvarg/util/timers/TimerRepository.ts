@@ -7,8 +7,11 @@ export class TimerRepository {
     private timer = new Map<TimerKey, Timer>();
 
     public has(key: TimerKey): boolean {
-        let timer = this.timer.get(key);
-        return timer !== null && timer.ticks() > 0;
+        const timer = this.timer.get(key);
+        if (!timer) {
+            return false;
+        }
+        return timer.ticks() > 0;
     }
 
     public register(timer: Timer) {
@@ -21,13 +24,13 @@ export class TimerRepository {
 
 
     public left(key: TimerKey): number {
-        let timer = this.timer.get(key);
-        return timer.ticks();
+        const timer = this.timer.get(key);
+        return timer ? timer.ticks() : 0;
     }
 
     public willEndIn(key: TimerKey, ticks: number): boolean {
-        let timer = this.timer.get(key);
-        if (timer === null) {
+        const timer = this.timer.get(key);
+        if (!timer) {
             return true;
         }
         return timer.ticks() <= ticks;
@@ -35,8 +38,8 @@ export class TimerRepository {
 
 
     public getTicks(key: TimerKey): number {
-        let timer = this.timer.get(key);
-        if (timer === null) {
+        const timer = this.timer.get(key);
+        if (!timer) {
             return 0;
         }
         return timer.ticks();
@@ -47,10 +50,12 @@ export class TimerRepository {
     }
 
     public extendOrRegister(key: TimerKey, ticks: number) {
-        this.timer.set(key, this.timer.get(key) === null || this.timer.get(key).ticks() < ticks ? new Timer(key, ticks) : this.timer.get(key));
+        const existing = this.timer.get(key);
+        this.timer.set(key, !existing || existing.ticks() < ticks ? new Timer(key, ticks) : existing);
     }
     public addOrSet(key: TimerKey, ticks: number) {
-        this.timer.set(key, this.timer.get(key) ? new Timer(key, this.timer.get(key).ticks() + ticks) : new Timer(key, ticks));
+        const existing = this.timer.get(key);
+        this.timer.set(key, existing ? new Timer(key, existing.ticks() + ticks) : new Timer(key, ticks));
     }
 
     public cancel(name: TimerKey) {

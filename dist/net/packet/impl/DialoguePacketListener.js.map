@@ -1,1 +1,0 @@
-{"version":3,"file":"DialoguePacketListener.js","sourceRoot":"","sources":["../../../../src/main/typescript/elvarg/net/packet/impl/DialoguePacketListener.ts"],"names":[],"mappings":";;;AAIA,MAAa,sBAAsB;IACjC,4CAA4C;IAC5C,OAAO,CAAC,MAAW,EAAE,MAAc;QACjC,MAAM,CAAC,kBAAkB,EAAE,CAAC,OAAO,EAAE,CAAC;IACxC,CAAC;CACF;AALD,wDAKC"}

@@ -6,10 +6,12 @@ import { MapObjects } from '../entity/impl/object/MapObjects'
 import { Direction } from '../model/Direction'
 import { Location } from '../model/Location'
 import { PrivateArea } from '../model/areas/impl/PrivateArea'
-import { fs } from "fs-extra"
+import * as fs from "fs";
 import { Buffer } from './Buffer'
 import { Region } from './Region'
 import pako from 'pako';
+import * as zlib from "zlib";
+import * as path from "path";
 
 
 
@@ -30,16 +32,18 @@ export class RegionManager {
     public static OCEAN_TILE = 2097152;
 
     public static regions: Map<number, Region> = new Map<number, Region>();
+    private static loadingRegions: Set<number> = new Set<number>();
 
     public static init(): void {
         // Load object definitions..
         ObjectDefinition.init();
         // Load regions..
-        let map_index = new fs(GameConstants.CLIPPING_DIRECTORY + "map_index");
-        if (!map_index.exists()) {
-            throw new Error("map_index was not found!");
+        const mapIndexPath = GameConstants.CLIPPING_DIRECTORY + "map_index";
+        if (!fs.existsSync(mapIndexPath)) {
+            console.warn("RegionManager: map_index not found; skipping region load (no clipping).");
+            return;
         }
-        let data = fs.readAllBytes(map_index.toPath());
+        let data = fs.readFileSync(mapIndexPath);
         let stream = new Buffer(data);
         let size = stream.readUShort();
         for (let i = 0; i < size; i++) {
@@ -55,10 +59,13 @@ export class RegionManager {
     }
 
     public static getRegion(x: number, y: number): Region | undefined {
+        if (RegionManager.regions.size === 0) {
+            return undefined;
+        }
         RegionManager.loadMapFiles(x, y);
         let regionX = x >> 3;
         let regionY = y >> 3;
-        let regionId = ((regionX / 8) << 8) + (regionY / 8);
+        let regionId = ((regionX >> 3) << 8) + (regionY >> 3);
         return RegionManager.getRegionid(regionId);
     }
     private static addClippingForVariableObject(x: number, y: number, height: number, type: number, direction: number, tall: boolean, privateArea: PrivateArea) {
@@ -287,7 +294,7 @@ export class RegionManager {
     }
 
     public static addObject(objectId: number, x: number, y: number, height: number, type: number, direction: number) {
-        const position = new Location(x, y);
+        const position = new Location(x, y, height);
 
         if (height === 0) {
             if (x >= 3092 && x <= 3094 && (y === 3513 || y === 3514 || y === 3507 || y === 3506)) {
@@ -336,16 +343,16 @@ export class RegionManager {
         }
 
         if (type === 22) {
-            if (def.hasActions() && ObjectDefinition.solid) {
+            if (def.hasActions() && def.isSolid()) {
                 RegionManager.addClipping(x, y, height, 0x200000, object.getPrivateArea());
             }
         } else if (type >= 9) {
-            if (ObjectDefinition.solid) {
-                RegionManager.addClippingForSolidObject(x, y, height, xLength, yLength, ObjectDefinition.impenetrable, object.getPrivateArea());
+            if (def.isSolid()) {
+                RegionManager.addClippingForSolidObject(x, y, height, xLength, yLength, def.isImpenetrable(), object.getPrivateArea());
             }
         } else if (type >= 0 && type <= 3) {
-            if (ObjectDefinition.solid) {
-                RegionManager.addClippingForVariableObject(x, y, height, type, direction, ObjectDefinition.impenetrable, object.getPrivateArea());
+            if (def.isSolid()) {
+                RegionManager.addClippingForVariableObject(x, y, height, type, direction, def.isImpenetrable(), object.getPrivateArea());
             }
         }
     }
@@ -376,26 +383,26 @@ export class RegionManager {
         }
 
         if (type === 22) {
-            if (def.hasActions() && ObjectDefinition.solid) {
+            if (def.hasActions() && def.isSolid()) {
                 this.removeClipping(x, y, height, 0x200000, object.getPrivateArea());
             }
         } else if (type >= 9) {
-            if (ObjectDefinition.solid) {
-                this.removeClippingForSolidObject(x, y, height, xLength, yLength, ObjectDefinition.solid, object.getPrivateArea());
+            if (def.isSolid()) {
+                this.removeClippingForSolidObject(x, y, height, xLength, yLength, def.isSolid(), object.getPrivateArea());
             }
         } else if (type >= 0 && type <= 3) {
-            if (ObjectDefinition.solid) {
-                RegionManager.removeClippingForVariableObject(x, y, height, type, direction, ObjectDefinition.solid, object.getPrivateArea());
+            if (def.isSolid()) {
+                RegionManager.removeClippingForVariableObject(x, y, height, type, direction, def.isSolid(), object.getPrivateArea());
             }
         }
     }
 
-    public static addClipping(x: number, y: number, height: number, shift: number, privateArea: PrivateArea) {
+    public static addClipping(x: number, y: number, height: number, shift: number, privateArea: PrivateArea, region?: Region) {
         if (privateArea) {
             privateArea.setClip(new Location(x, y), shift);
             return;
         }
-        const r = RegionManager.getRegion(x, y);
+        const r = region ?? RegionManager.getRegion(x, y);
         if (r) {
             r.addClip(x, y, height, shift);
         }
@@ -697,34 +704,27 @@ export class RegionManager {
         try {
             const regionX = x >> 3;
             const regionY = y >> 3;
-            const regionId = ((regionX / 8) << 8) + (regionY / 8);
+            const regionId = ((regionX >> 3) << 8) + (regionY >> 3);
             const r: Region = RegionManager.getRegionid(regionId);
 
             if (r == null || r == undefined || !r) {
-                if (!r) {
-                    return;
-                }
-                if (r.isLoaded) {
-                    return;
-                }
-
-                r.setLoaded = (loaded: boolean) => {
-                    true;
-                }
-
+                return;
             }
+            if (RegionManager.loadingRegions.has(regionId) || r.isLoaded()) {
+                return;
+            }
+            RegionManager.loadingRegions.add(regionId);
 
 
             // Attempt to create streams..
-            const oFileData = pako.gunzip(
-                pako.readFile(GameConstants.CLIPPING_DIRECTORY + "maps/" + r.getTerrainFile() + ".dat")
-            );
-            const gFileData = pako.gunzip(
-                pako.readFile(GameConstants.CLIPPING_DIRECTORY + "maps/" + r.getTerrainFile() + ".dat")
-            );
+            const terrainPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${r.getTerrainFile()}.dat`);
+            const objectPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${r.getObjectFile()}.dat`);
+            const gFileData = fs.existsSync(terrainPath) ? zlib.gunzipSync(fs.readFileSync(terrainPath)) : null;
+            const oFileData = fs.existsSync(objectPath) ? zlib.gunzipSync(fs.readFileSync(objectPath)) : null;
 
             // Don't allow ground file to be invalid..
             if (!gFileData) {
+                RegionManager.loadingRegions.delete(regionId);
                 return;
             }
 
@@ -763,7 +763,7 @@ export class RegionManager {
                                 height--;
                             }
                             if (height >= 0 && height <= 3) {
-                                RegionManager.addClipping(absX + i2, absY + i3, height, 0x200000, null);
+                                RegionManager.addClipping(absX + i2, absY + i3, height, 0x200000, null, r);
                             }
                         }
                     }
@@ -800,8 +800,11 @@ export class RegionManager {
                     }
                 }
             }
+            r.setLoaded(true);
+            RegionManager.loadingRegions.delete(regionId);
         } catch (e) {
             console.error(e);
+            RegionManager.loadingRegions.delete((((x >> 3) >> 3) << 8) + ((y >> 3) >> 3));
         }
     }
 }

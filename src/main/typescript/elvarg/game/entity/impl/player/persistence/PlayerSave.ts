@@ -590,9 +590,12 @@ export class PlayerSave {
         }
     }
     static fromPlayer(player: Player): PlayerSave {
+        if (!player) {
+            return new PlayerSave();
+        }
         let playerSave = new PlayerSave();
 
-        playerSave.passwordHashWithSalt = player.getPasswordHashWithSalt().trim();
+        playerSave.passwordHashWithSalt = (player.getPasswordHashWithSalt() || "").trim();
         playerSave.isDiscordLogin = player.isDiscordLoginReturn();
         playerSave.cachedDiscordAccessToken = player.getCachedDiscordAccessToken();
         playerSave.title = player.getLoyaltyTitle();

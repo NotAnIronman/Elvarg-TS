@@ -176,7 +176,7 @@ export class PestControlArea extends PrivateArea {
                 return false;
             }
 
-            const open = ObjectDefinition.interactions?.some(d => d?.includes("Open"));
+            const open = defs.getInteractions()?.some(d => d?.includes("Open"));
 
             const westernGate = oX == 2643;
             const southernGate = oY == 2585;

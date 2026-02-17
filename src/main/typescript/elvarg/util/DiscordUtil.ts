@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-
 export class DiscordUtil {
     static DiscordConstants = {
         CLIENT_ID: "1010001099815669811",
@@ -56,7 +54,7 @@ export class DiscordUtil {
 
         let ret = new DiscordInfo();
         ret.username = userInfo.username + "_" + userInfo.discriminator;
-        ret.password = uuidv4();
+        ret.password = crypto.randomUUID();
         ret.token = token;
 
         return ret;

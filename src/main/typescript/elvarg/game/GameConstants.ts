@@ -1,5 +1,5 @@
 import { PlayerBotDefinition } from "./definition/PlayerBotDefinition";
-import { JSONFilePlayerPersistence } from "./entity/impl/player/persistence/jsonfile/JSONFilePlayerPersistence";
+import { NullPlayerPersistence } from "./entity/impl/player/persistence/NullPlayerPersistence";
 import { PlayerPersistence } from "./entity/impl/player/persistence/PlayerPersistence";
 import { Location } from "./model/Location"
 import { PlayerRights } from "./model/rights/PlayerRights"
@@ -10,8 +10,10 @@ export class GameConstants {
     public static readonly CLIENT_UID: number = 8784521;
     public static readonly DEFINITIONS_DIRECTORY: string = "./data/definitions/";
     public static readonly CLIPPING_DIRECTORY: string = "./data/clipping/";
-    public static readonly PLAYER_PERSISTENCE = new JSONFilePlayerPersistence();
+    public static PLAYER_PERSISTENCE: PlayerPersistence = new NullPlayerPersistence();
     public static readonly CONCURRENCY: boolean = false;
+    // Tick rate for the main game loop in milliseconds.
+    // Java server runs at ~600ms per cycle; mirror that here.
     public static readonly GAME_ENGINE_PROCESSING_CYCLE_RATE: number = 600;
     public static readonly QUEUED_LOOP_THRESHOLD: number = 45;
     public static readonly DEFAULT_LOCATION = new Location(3089, 3524);
@@ -65,4 +67,11 @@ export class GameConstants {
 
     public static readonly PLAYER_BOT_PASSWORD: string = "wirfunerpro4n!1";
     public static readonly PLAYER_BOT_OVERRIDE: number[] = [PlayerRights.MODERATOR.getSpriteId(), PlayerRights.ADMINISTRATOR.getSpriteId(), PlayerRights.DEVELOPER.getSpriteId(), PlayerRights.OWNER.getSpriteId()];
+
+    public static setPlayerPersistence(playerPersistence: PlayerPersistence): void {
+        if (!playerPersistence) {
+            return;
+        }
+        this.PLAYER_PERSISTENCE = playerPersistence;
+    }
 }

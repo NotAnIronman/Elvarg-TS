@@ -17,7 +17,6 @@ import { Players } from './model/commands/impl/Players';
 import { TaskManager } from './task/TaskManager';
 import { GameConstants } from '../game/GameConstants'
 import { Misc } from '../util/Misc';
-import { produce } from 'immer';
 import { List } from 'list'
 import { TreeMap } from 'treemap'
 import { Task } from './task/Task';
@@ -46,7 +45,7 @@ export class World {
     /**
      * The collection of removed {@link GameObject}s..
      */
-    private static removedObjects: GameObject[];
+    private static removedObjects: GameObject[] = [];
 
     /**
      * The collection of {@link Players}s waiting to be added to the game.
@@ -89,7 +88,26 @@ export class World {
     }
 
     public static getPlayerByName(username: string): Player | undefined {
-        return this.players.search(p => p !== null && p.getUsername() === Misc.formatText(username));
+        return this.players.search(p => p && p.getUsername && p.getUsername() === Misc.formatText(username));
+    }
+
+    public static isPlayerSessionConnected(player: Player): boolean {
+        if (!player) {
+            return false;
+        }
+        const channel: any = player.getSession?.()?.getChannel?.();
+        if (!channel) {
+            return false;
+        }
+        if (typeof channel.readyState === "number") {
+            // ws WebSocket: 1 = OPEN
+            return channel.readyState === 1;
+        }
+        if (typeof channel.connected === "boolean") {
+            // socket.io Socket
+            return channel.connected;
+        }
+        return true;
     }
 
     /**
@@ -201,7 +219,11 @@ export class World {
     }
 
     public savePlayers() {
-        World.players.forEach(GameConstants.PLAYER_PERSISTENCE.save);
+        World.players.forEach((p) => {
+            if (p) {
+                GameConstants.PLAYER_PERSISTENCE.save(p);
+            }
+        });
     }
 
     public static process() {
@@ -228,17 +250,24 @@ export class World {
         }
 
         // Deregister queued players.
+        // If a player's transport is already closed, force removal immediately.
         let amount = 0;
-        World.removePlayerQueue.forEach((player, index) => {
-            if (!player || amount >= GameConstants.QUEUED_LOOP_THRESHOLD) {
-                return;
+        for (let index = World.removePlayerQueue.length - 1; index >= 0; index--) {
+            if (amount >= GameConstants.QUEUED_LOOP_THRESHOLD) {
+                break;
             }
-            if (player.canLogout() || player.forcedLogoutTimer.finished() || Server.isUpdating()) {
+            const player = World.removePlayerQueue[index];
+            if (!player) {
+                World.removePlayerQueue.splice(index, 1);
+                continue;
+            }
+            const disconnected = !World.isPlayerSessionConnected(player);
+            if (disconnected || player.canLogout() || player.forcedLogoutTimer.finished() || Server.isUpdating()) {
                 World.players.remove(player);
                 World.removePlayerQueue.splice(index, 1);
             }
             amount++;
-        });
+        }
         // Add pending Npcs..
         for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
             let npc = World.addNPCQueue.shift();
@@ -255,61 +284,53 @@ export class World {
             World.npcs.remove(npc);
         }
 
-        // Handle synchronization tasks.
-        World.executor.sync(new GameTask(true, (index: number) => {
-            let player = World.players.get(index);
+        // Sequential processing to avoid null-slot crashes during bring-up.
+        World.players.forEach((player) => {
             try {
                 player.process();
             } catch (e) {
                 console.error(e);
                 player.requestLogout();
             }
-        }, false));
+        });
 
-        World.executor.sync(new GameTask(false, (index: number) => {
-            let npc = World.npcs.get(index);
+        World.npcs.forEach((npc) => {
             try {
                 npc.process();
             } catch (e) {
                 console.error(e);
             }
-        }, false));
+        });
 
-        World.executor.sync(new GameTask(true, (index: number) => {
-            let player = World.players.get(index);
+        // Enable player movement updates only. (NPC updating remains disabled for now.)
+        World.players.forEach((player) => {
             try {
                 PlayerUpdating.update(player);
                 NPCUpdating.update(player);
             } catch (e) {
-                console.error(e);
+                console.error("[World] Player/NPC updating failure", e);
                 player.requestLogout();
             }
-        }));
+        });
 
-        World.executor.sync(new GameTask(true, (index: number) => {
-            let player = World.players.get(index);
-            produce(player, draft => {
-                try {
-                    draft.resetUpdating();
-                    draft.setCachedUpdateBlock(null);
-                    draft.getSession().flush();
-                } catch (e) {
-                    console.log(e);
-                    draft.requestLogout();
-                }
-            });
-        }));
+        World.players.forEach((player) => {
+            try {
+                player.resetUpdating();
+                player.setCachedUpdateBlock(null);
+                player.getSession().flush();
+            } catch (e) {
+                console.log(e);
+                player.requestLogout();
+            }
+        });
 
-        World.executor.sync(new GameTask(false, (index: number) => {
-            let npc = World.npcs.get(index);
-            produce(npc, draft => {
-                try {
-                    draft.resetUpdating();
-                } catch (e) {
-                    console.log(e);
-                }
-            });
-        }));
+        World.npcs.forEach((npc) => {
+            try {
+                npc.resetUpdating();
+            } catch (e) {
+                console.log(e);
+            }
+        });
     }
 
 }

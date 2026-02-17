@@ -7,8 +7,28 @@ import { AttackRange } from '../../../model/commands/impl/AttackRange'
 import { PlayerRights } from "../../rights/PlayerRights";
 import { GameConstants } from "../../../GameConstants";
 import { CombatConstants } from "../../../content/combat/CombatConstants";
+import { PluginManager } from "../../../../plugins/PluginManager";
+import * as fs from "fs";
+import * as path from "path";
 
 export class PathFinder {
+    private static LOG_DIR = path.join(process.cwd(), "logs");
+    private static LOG_FILE = path.join(PathFinder.LOG_DIR, "movement.log");
+    private static LOG_READY = false;
+
+    private static log(line: string) {
+        const msg = `${new Date().toISOString()} [pathfinder] ${line}`;
+        console.log(msg);
+        try {
+            if (!PathFinder.LOG_READY) {
+                fs.mkdirSync(PathFinder.LOG_DIR, { recursive: true });
+                PathFinder.LOG_READY = true;
+            }
+            fs.appendFileSync(PathFinder.LOG_FILE, msg + "\n", { encoding: "utf8" });
+        } catch (e) {
+            // Ignore file logging errors.
+        }
+    }
     static WEST = 0x1280108;
     static EAST = 0x1280180;
     static SOUTH = 0x1280102;
@@ -77,6 +97,11 @@ export class PathFinder {
     }
 
     static calculateWalkRoute(player: Mobile, destX: number, destY: number) {
+        if (player.isPlayer()) {
+            PathFinder.log(
+                `calculateWalkRoute entity=player:${player.getAsPlayer().getUsername()} from=${player.getLocation().getX()},${player.getLocation().getY()},${player.getLocation().getZ()} to=${destX},${destY}`
+            );
+        }
         PathFinder.calculateRoute(player, 0, destX, destY, 0, 0, 0, 0, true);
     }
 
@@ -176,6 +201,9 @@ export class PathFinder {
     }
 
     public static calculateRoute(entity: Mobile, size: number, destX: number, destY: number, xLength: number, yLength: number, direction: number, blockingMask: number, basicPather: boolean): number {
+        PathFinder.log(
+            `calculateRoute entity=${entity.isPlayer() ? "player:" + entity.getAsPlayer().getUsername() : "npc"} dest=${destX},${destY} size=${size} basic=${basicPather}`
+        );
 
         /** RS Protocol **/
         const byte0 = 104;
@@ -207,16 +235,14 @@ export class PathFinder {
             }
         }
 
-        /** Required for based on client **/
-        let localX = entity.getLocation().getRegionX();
-        let localY = entity.getLocation().getRegionY();
-        /** Stored LocalX/Y into another temp list **/
+        // Calculate local coordinates relative to the player's current region.
+        let localX = entity.getLocation().getX() - (entity.getLocation().getRegionX() << 3);
+        let localY = entity.getLocation().getY() - (entity.getLocation().getRegionY() << 3);
+        let destinationX = destX - (entity.getLocation().getRegionX() << 3);
+        let destinationY = destY - (entity.getLocation().getRegionY() << 3);
+
         let baseX = localX;
         let baseY = localY;
-        /** DestinationX for LocalX **/
-        let destinationX = destX - (entity.getLocation().getRegionX() << 3);
-        /** DestinationY for LocalY **/
-        let destinationY = destY - (entity.getLocation().getRegionY() << 3);
         /** RS Protocol **/
         directions[localX][localY] = 99;
         distanceValues[localX][localY] = 0;
@@ -248,7 +274,6 @@ export class PathFinder {
             if (baseX == destinationX && baseY == destinationY) {
                 entity.getMovementQueue().setRoute(true);
                 entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                console.log("Already at destination, breaking loop");
                 break;
             }
 
@@ -268,6 +293,23 @@ export class PathFinder {
             }
             if (size < 10 && PathFinder.largeRoutePath(entity, destinationX, destinationY, baseY, size - 1, direction, baseX)) {
                 Server.logDebug("Using larger Size Pathing..");
+                entity.getMovementQueue().setRoute(true);
+                break;
+            }
+            if (
+                xLength > 0 &&
+                yLength > 0 &&
+                PathFinder.sizeRoutePath(
+                    entity,
+                    destinationY,
+                    destinationX,
+                    baseX,
+                    xLength,
+                    blockingMask,
+                    yLength,
+                    baseY
+                )
+            ) {
                 entity.getMovementQueue().setRoute(true);
                 break;
             }
@@ -370,7 +412,29 @@ export class PathFinder {
             }
             if (!entity.getMovementQueue().hasRoute()) {
                 Server.logDebug("error.. no path found... path probably not reachable.");
-                return -1;
+                PathFinder.log(`no path found to ${destX},${destY}`);
+                PluginManager.emitPathBlocked({
+                    entity,
+                    isPlayer: entity.isPlayer(),
+                    username: entity.isPlayer() ? (entity.getAsPlayer()?.getUsername() ?? null) : null,
+                    from: {
+                        x: entity.getLocation().getX(),
+                        y: entity.getLocation().getY(),
+                        z: height,
+                    },
+                    to: {
+                        x: destX,
+                        y: destY,
+                        z: height,
+                    },
+                    basicPather,
+                    requestedSize: size,
+                    xLength,
+                    yLength,
+                    direction,
+                    blockingMask,
+                });
+                return 0;
             }
         }
 
@@ -399,14 +463,16 @@ export class PathFinder {
 
             if (queueIndex > 25)
                 queueIndex = 25;
-            queueIndex = 25;
         }
         while (queueIndex-- > 0) {
-            let absX = entity.getLocation().getRegionX() * 8 + routeStepsX[queueIndex];
-            let absY = entity.getLocation().getRegionY() * 8 + routeStepsY[queueIndex];
+            let absX = (entity.getLocation().getRegionX() << 3) + routeStepsX[queueIndex];
+            let absY = (entity.getLocation().getRegionY() << 3) + routeStepsY[queueIndex];
             entity.getMovementQueue().addSteps(new Location(absX, absY, height));
             steps++;
         }
+        PathFinder.log(
+            `route built entity=${entity.isPlayer() ? "player:" + entity.getAsPlayer().getUsername() : "npc"} steps=${steps} dest=${destX},${destY}`
+        );
         return steps;
     }
 

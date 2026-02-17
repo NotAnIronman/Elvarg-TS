@@ -1,5 +1,6 @@
 import { Misc } from "./Misc";
-import { fs } from 'fs-extra';
+import * as fs from "fs";
+import * as path from "path";
 
 export class PlayerPunishment {
     private static readonly BAN_DIRECTORY = "./data/saves/";
@@ -11,21 +12,29 @@ export class PlayerPunishment {
     public static AccountsMuted: string[] = [];
 
     public static init() {
-        // In case we're reloading bans, reset lists first.
-        this.IPSBanned = [];
-        this.IPSMuted = [];
-        this.AccountsBanned = [];
-        this.AccountsMuted = [];
+        // Ensure directories exist.
+        fs.mkdirSync(path.dirname(PlayerPunishment.BAN_DIRECTORY + "placeholder"), { recursive: true });
+        fs.mkdirSync(path.dirname(PlayerPunishment.MUTE_DIRECTORY + "placeholder"), { recursive: true });
 
-        this.initializeList(this.BAN_DIRECTORY, "IPBans", this.IPSBanned);
-        this.initializeList(this.BAN_DIRECTORY, "Bans", this.AccountsBanned);
-        this.initializeList(this.MUTE_DIRECTORY, "IPMutes", this.IPSMuted);
-        this.initializeList(this.MUTE_DIRECTORY, "Mutes", this.AccountsMuted);
+        // In case we're reloading bans, reset lists first.
+        PlayerPunishment.IPSBanned = [];
+        PlayerPunishment.IPSMuted = [];
+        PlayerPunishment.AccountsBanned = [];
+        PlayerPunishment.AccountsMuted = [];
+
+        PlayerPunishment.initializeList(PlayerPunishment.BAN_DIRECTORY, "IPBans", PlayerPunishment.IPSBanned);
+        PlayerPunishment.initializeList(PlayerPunishment.BAN_DIRECTORY, "Bans", PlayerPunishment.AccountsBanned);
+        PlayerPunishment.initializeList(PlayerPunishment.MUTE_DIRECTORY, "IPMutes", PlayerPunishment.IPSMuted);
+        PlayerPunishment.initializeList(PlayerPunishment.MUTE_DIRECTORY, "Mutes", PlayerPunishment.AccountsMuted);
     }
 
     public static initializeList(directory: string, file: string, list: string[]) {
         try {
-            const data = fs.readFileSync(`${directory}${file}.txt`, 'utf8');
+            const fullPath = `${directory}${file}.txt`;
+            if (!fs.existsSync(fullPath)) {
+                return;
+            }
+            const data = fs.readFileSync(fullPath, 'utf8');
             list.push(...data.split('\n'));
         } catch (e) {
             console.error(e);

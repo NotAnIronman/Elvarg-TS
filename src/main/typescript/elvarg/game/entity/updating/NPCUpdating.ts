@@ -22,6 +22,11 @@ import { ByteOrder } from '../../../net/packet/ByteOrder';
 
 export class NPCUpdating {
     public static update(player: Player): void {
+        // Disable NPC updates for bring-up to avoid client T2s until the format
+        // matches the reference server.
+        player.getSession()?.write(new PacketBuilder(65, PacketType.VARIABLE_SHORT).writePutBytes("\x00"));
+        return;
+
         let update = new PacketBuilder();
         let packet = new PacketBuilder(65, PacketType.VARIABLE_SHORT);
         packet.initializeAccess(AccessType.BIT);
@@ -265,4 +270,3 @@ export class NPCUpdating {
         builder.putShort(npc.getDefinition().getHitpoints());
     }
 }
-

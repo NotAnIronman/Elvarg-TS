@@ -5,7 +5,7 @@ export class SecondsTimer {
     private running: boolean;
     private startTime: any;
     private endTime: any;
-    private stopwhatch: Stopwatch
+    private stopwhatch: Stopwatch = new Stopwatch();
 
     constructor() {
         this.seconds = 0;
@@ -18,6 +18,8 @@ export class SecondsTimer {
         //Reset and then start the stopwatch.
         this.stopwhatch.reset();
         this.stopwhatch.start();
+        this.startTime = performance.now();
+        this.running = true;
     }
 
     stop(): void {
@@ -50,7 +52,10 @@ export class SecondsTimer {
     }
 
     secondsElapsed(): number {
-        return this.endTime - this.startTime;
+        if (!this.running) {
+            return 0;
+        }
+        return Math.floor((performance.now() - this.startTime) / 1000);
     }
 
     toString(): string {

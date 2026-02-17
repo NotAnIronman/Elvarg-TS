@@ -1,17 +1,16 @@
 import { GameConstants } from "../../../GameConstants";
 import { ItemDefinition } from "../../ItemDefinition";
 import { DefinitionLoader } from "../DefinitionLoader";
-import fs from "fs-extra";
+import * as fs from "fs";
 
 export class ItemDefinitionLoader extends DefinitionLoader {
     load() {
         ItemDefinition.definitions.clear();
-        const reader = fs(this.file());
-        const defs: ItemDefinition[] = JSON.parse(reader.readAsText());
+        const content = fs.readFileSync(this.file(), "utf8");
+        const defs: ItemDefinition[] = JSON.parse(content);
         for (const def of defs) {
-            ItemDefinition.definitions.set(def.getId(), def);
+            ItemDefinition.definitions.set((def as any).id ?? (def as any).getId?.(), def as any);
         }
-        reader.close();
     }
 
     file(): string {

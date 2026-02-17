@@ -21,8 +21,9 @@ export class PacketBuilder {
         0xfffffff, 0x1fffffff, 0x3fffffff, 0x7fffffff, -1];
     private opcode: number;
     private type: PacketType;
-    private bitPosition: number;
-    private buffers = Buffer.alloc(10);
+    private bitPosition: number = 0;
+    private buffers = Buffer.alloc(4096);
+    private offset = 0;
 
     constructor(opcodeOrType?: number | PacketType, type?: PacketType) {
         if (typeof opcodeOrType === 'number') {
@@ -34,14 +35,15 @@ export class PacketBuilder {
         }
     }
 
-    public writeBuffer(buffer: string): PacketBuilder {
-        this.buffers.write(buffer);
+    public writeBuffer(buffer: string | Buffer): PacketBuilder {
+        const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+        buf.copy(this.buffers, this.offset);
+        this.offset += buf.length;
         return this;
     }
 
     public writePutBytes(buffer: string): PacketBuilder {
-        this.buffers.write(buffer);
-        return this;
+        return this.writeBuffer(buffer);
     }
 
     public putBytesReverse(data: Uint8Array): PacketBuilder {
@@ -51,17 +53,13 @@ export class PacketBuilder {
         return this;
     }
 
-    public writeByteArray(bytes: string): PacketBuilder {
-        this.buffers.write(bytes);
-        return this;
+    public writeByteArray(bytes: string | Buffer): PacketBuilder {
+        return this.writeBuffer(bytes);
     }
 
 
     public writePutBits(numBits: number, value: number): PacketBuilder {
-        if (!this.buffers.buffer) {
-            throw new Error("The ByteBuf implementation must support array() for bit usage.");
-        }
-        let buffer = this.buffers.buffer;
+        const buffer = this.buffers;
 
         let bytePos = this.bitPosition >> 3;
         let bitOffset = 8 - (this.bitPosition & 7);
@@ -90,10 +88,10 @@ export class PacketBuilder {
     public initializesAccess(type: AccessType) {
         switch (type) {
             case AccessType.BIT:
-                this.bitPosition = this.buffers.length * 8;
+                this.bitPosition = this.offset * 8;
                 break;
             case AccessType.BYTE:
-                this.buffers.writeUInt32BE((this.bitPosition + 7) / 8);
+                this.offset = Math.floor((this.bitPosition + 7) / 8);
                 break;
         }
         return this;
@@ -172,42 +170,39 @@ export class PacketBuilder {
     }
 
     public putsBytes(from: string): PacketBuilder {
-        this.buffers.write(from);
+        this.writeBuffer(from);
         return this;
     }
 
     public writeByteArrays(bytes: string, offset: number, length: number): PacketBuilder {
-        this.buffers.write(bytes, offset, length);
+        Buffer.from(bytes).copy(this.buffers, this.offset + offset, 0, length);
+        this.offset += length;
         return this;
     }
 
     public writeBytesArray(bytes: string): PacketBuilder {
-        this.buffers.write(bytes);
+        this.writeBuffer(bytes);
         return this;
     }
 
     public putBits(numBits: number, value: number): PacketBuilder {
-        if (!this.buffers.buffer) {
-            throw new Error("The ByteBuf implementation must support array() for bit usage.");
-        }
-        let buffer = this.buffers.buffer;
+        const buffer = this.buffers;
 
         let bytePos: number = this.bitPosition >> 3;
         let bitOffset: number = 8 - (this.bitPosition & 7);
         this.bitPosition += numBits;
 
         for (; numBits > bitOffset; bitOffset = 8) {
-            buffer[bytePos] &= PacketBuilder.BIT_MASK[bitOffset];
+            buffer[bytePos] &= ~PacketBuilder.BIT_MASK[bitOffset];
             buffer[bytePos++] |= (value >> (numBits - bitOffset)) & PacketBuilder.BIT_MASK[bitOffset];
             numBits -= bitOffset;
         }
 
         if (numBits === bitOffset) {
-            buffer[bytePos] &= PacketBuilder.BIT_MASK[bitOffset];
+            buffer[bytePos] &= ~PacketBuilder.BIT_MASK[bitOffset];
             buffer[bytePos] |= value & PacketBuilder.BIT_MASK[bitOffset];
         } else {
             buffer[bytePos] &= ~(PacketBuilder.BIT_MASK[numBits] << (bitOffset - numBits));
-            buffer[bytePos] |= (value & PacketBuilder.BIT_MASK[numBits] << (bitOffset - numBits));
             buffer[bytePos] |= (value & PacketBuilder.BIT_MASK[numBits]) << (bitOffset - numBits);
         }
         return this;
@@ -216,10 +211,10 @@ export class PacketBuilder {
     public initializeAccess(type: AccessType) {
         switch (type) {
             case AccessType.BIT:
-                this.bitPosition = this.buffers.length * 8;
+                this.bitPosition = this.offset * 8;
                 break;
             case AccessType.BYTE:
-                this.buffers.writeUInt32BE((this.bitPosition + 7) / 8);
+                this.offset = Math.floor((this.bitPosition + 7) / 8);
                 break;
         }
         return this;
@@ -244,7 +239,8 @@ export class PacketBuilder {
             case ValueType.STANDARD:
                 break;
         }
-        this.buffers.writeUInt8(value as any);
+        // Mask to byte range to mirror the Java client/server behaviour.
+        this.buffers.writeUInt8(value & 0xff, this.offset++);
         return this;
     }
 
@@ -326,17 +322,28 @@ export class PacketBuilder {
         return this;
     }
 
-    public putsLong(value: number, type: ValueType = ValueType.STANDARD, order: ByteOrder = ByteOrder.BIG) {
+    private toUnsignedLong(value: number | bigint): bigint {
+        if (typeof value === "bigint") {
+            return BigInt.asUintN(64, value);
+        }
+        if (!Number.isFinite(value)) {
+            return 0n;
+        }
+        return BigInt.asUintN(64, BigInt(Math.trunc(value)));
+    }
+
+    public putsLong(value: number | bigint, type: ValueType = ValueType.STANDARD, order: ByteOrder = ByteOrder.BIG) {
+        return this.putLong(value, type, order);
+    }
+
+    public putLong(value: number | bigint, type: ValueType = ValueType.STANDARD, order: ByteOrder = ByteOrder.BIG): PacketBuilder {
+        const longValue = this.toUnsignedLong(value);
         switch (order) {
             case ByteOrder.BIG:
-                this.put((value >> 56) as number);
-                this.put((value >> 48) as number);
-                this.put((value >> 40) as number);
-                this.put((value >> 32) as number);
-                this.put((value >> 24) as number);
-                this.put((value >> 16) as number);
-                this.put((value >> 8) as number);
-                this.puts(value as number, type);
+                for (let shift = 56n; shift >= 8n; shift -= 8n) {
+                    this.put(Number((longValue >> shift) & 0xffn));
+                }
+                this.puts(Number(longValue & 0xffn), type);
                 break;
             case ByteOrder.MIDDLE:
                 throw new Error("Middle-endian long is not implemented!");
@@ -345,46 +352,10 @@ export class PacketBuilder {
             case ByteOrder.TRIPLE_INT:
                 throw new Error("triple-int long is not implemented!");
             case ByteOrder.LITTLE:
-                this.puts(value as number, type);
-                this.put((value >> 8) as number);
-                this.put((value >> 16) as number);
-                this.put((value >> 24) as number);
-                this.put((value >> 32) as number);
-                this.put((value >> 40) as number);
-                this.put((value >> 48) as number);
-                this.put((value >> 56) as number);
-                break;
-        }
-        return this;
-    }
-
-    public putLong(value: number, type: ValueType = ValueType.STANDARD, order: ByteOrder = ByteOrder.BIG): PacketBuilder {
-        switch (order) {
-            case ByteOrder.BIG:
-                this.put((value >> 56) as number);
-                this.put((value >> 48) as number);
-                this.put((value >> 40) as number);
-                this.put((value >> 32) as number);
-                this.put((value >> 24) as number);
-                this.put((value >> 16) as number);
-                this.put((value >> 8) as number);
-                this.puts((value) as number, type);
-                break;
-            case ByteOrder.MIDDLE:
-                throw new Error("Middle-endian long " + "is not implemented!");
-            case ByteOrder.INVERSE_MIDDLE:
-                throw new Error("Inverse-middle-endian long is not implemented!");
-            case ByteOrder.TRIPLE_INT:
-                throw new Error("triple-int long is not implemented!");
-            case ByteOrder.LITTLE:
-                this.puts((value) as number, type);
-                this.put((value >> 8) as number);
-                this.put((value >> 16) as number);
-                this.put((value >> 24) as number);
-                this.put((value >> 32) as number);
-                this.put((value >> 40) as number);
-                this.put((value >> 48) as number);
-                this.put((value >> 56) as number);
+                this.puts(Number(longValue & 0xffn), type);
+                for (let shift = 8n; shift <= 56n; shift += 8n) {
+                    this.put(Number((longValue >> shift) & 0xffn));
+                }
                 break;
         }
         return this;
@@ -430,10 +401,8 @@ export class PacketBuilder {
         return this.buffer;
     }
 
-    private _buffer: Buffer = Buffer.from('my string', 'utf-8');
-
     public getBuffer(): Buffer {
-        return this._buffer;
+        return this.buffers.slice(0, this.offset);
     }
 
     /**
@@ -442,7 +411,7 @@ export class PacketBuilder {
      * @return
      */
     public toPacket() {
-        return new Packet(this.opcode, this.type, this.buffers);
+        return new Packet(this.opcode, this.type, this.getBuffer());
     }
 
     public getType(): PacketType {

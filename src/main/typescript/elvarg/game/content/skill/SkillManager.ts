@@ -307,8 +307,8 @@ export class SkillManager {
 
     public getTotalLevel(): number {
         let total = 0;
-        for (const skill of Object.values(Skill)) {
-            total += this.skills.maxLevel[skill];
+        for (const skill of Skill.values()) {
+            total += this.skills.maxLevel[skill.getButton()];
         }
         return total;
     }
@@ -320,7 +320,7 @@ export class SkillManager {
      */
     public getTotalExp(): number {
         let xp = 0;
-        for (const skill of Object.values(Skill)) {
+        for (const skill of Skill.values()) {
             xp += this.player.getSkillManager().getExperience(skill);
         }
         return xp;

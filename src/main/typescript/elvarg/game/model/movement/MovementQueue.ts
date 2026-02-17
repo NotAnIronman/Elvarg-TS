@@ -20,9 +20,28 @@ import { NpcIdentifiers } from "../../../util/NpcIdentifiers";
 import { RandomGen } from "../../../util/RandomGen";
 import { TimerKey } from "../../../util/timers/TimerKey";
 import { Action } from "../Action";
+import * as fs from "fs";
+import * as path from "path";
 export class MovementQueue {
 
     private static RANDOM: RandomGen = new RandomGen();
+    private static LOG_DIR = path.join(process.cwd(), "logs");
+    private static LOG_FILE = path.join(MovementQueue.LOG_DIR, "movement.log");
+    private static LOG_READY = false;
+
+    private static log(line: string) {
+        const msg = `${new Date().toISOString()} ${line}`;
+        console.log(msg);
+        try {
+            if (!MovementQueue.LOG_READY) {
+                fs.mkdirSync(MovementQueue.LOG_DIR, { recursive: true });
+                MovementQueue.LOG_READY = true;
+            }
+            fs.appendFileSync(MovementQueue.LOG_FILE, msg + "\n", { encoding: "utf8" });
+        } catch (e) {
+            // Ignore file logging errors to avoid cascading issues.
+        }
+    }
 
     /**
      * NPC interactions can begin when the player is within this radius of the NPC.
@@ -179,8 +198,11 @@ export class MovementQueue {
         const deltaX = x - last.position.getX();
         const deltaY = y - last.position.getY();
         const direction = Direction.fromDeltas(deltaX, deltaY);
-        if (direction != Direction.NONE)
-            this.points.push(new Point(new Location(x, y), direction));
+        if (direction != Direction.NONE) {
+            const z = heightLevel ?? this.character.getLocation().getZ() ?? 0;
+            this.points.push(new Point(new Location(x, y, z), direction));
+        }
+        MovementQueue.log(`[movement.addStep] ${this.ownerLabel()} step=${x},${y},${heightLevel} dir=${direction} queueSize=${this.points.length}`);
     }
 
     /**
@@ -196,6 +218,7 @@ export class MovementQueue {
         const last = this.getLast();
         const x = step.getX();
         const y = step.getY();
+        const z = step.getZ() ?? this.character.getLocation().getZ() ?? 0;
         let deltaX = x - last.position.getX();
         let deltaY = y - last.position.getY();
         const max = Math.max(Math.abs(deltaX), Math.abs(deltaY));
@@ -208,7 +231,7 @@ export class MovementQueue {
                 deltaY++;
             else if (deltaY > 0)
                 deltaY--;
-            this.addStep(x - deltaX, y - deltaY, step.getZ());
+            this.addStep(x - deltaX, y - deltaY, z);
         }
     }
 
@@ -286,13 +309,22 @@ export class MovementQueue {
     }
 
     public process() {
+        const ownerLabel = this.ownerLabel();
+
         if (!this.getMobility().canMove()) {
+            if (this.points.length > 0) {
+                MovementQueue.log(`[movement.process] ${ownerLabel} blocked; clearing ${this.points.length} queued steps`);
+            }
             this.reset();
             return;
         }
 
         if (this.character.getCombatFollowing() != null) {
             this.processCombatFollowing();
+        }
+
+        if (this.points.length > 0) {
+            MovementQueue.log(`[movement.process] ${ownerLabel} processing ${this.points.length} steps; run=${this.isRunToggled()}`);
         }
 
         let walkPoint: Point = null;
@@ -316,6 +348,7 @@ export class MovementQueue {
                 this.character.setWalkingDirection(walkPoint.direction);
                 moved = true;
             } else {
+                MovementQueue.log(`[movement.process] ${ownerLabel} blocked walking to ${next.toString()} (reset queue of ${this.points.length})`);
                 this.reset();
                 return;
             }
@@ -331,6 +364,7 @@ export class MovementQueue {
                 this.character.setRunningDirection(runPoint.direction);
                 moved = true;
             } else {
+                MovementQueue.log(`[movement.process] ${ownerLabel} blocked running to ${next.toString()} (reset queue of ${this.points.length})`);
                 this.reset();
                 return;
             }
@@ -345,6 +379,16 @@ export class MovementQueue {
         }
 
         this.isMoving = moved;
+
+        if (!moved && this.points.length > 0) {
+            MovementQueue.log(`[movement.process] ${ownerLabel} did not move; remaining steps ${this.points.length} (walk=${walkPoint?.direction} run=${runPoint?.direction})`);
+        }
+    }
+
+    private ownerLabel(): string {
+        return this.character.isPlayer()
+            ? `player:${this.character.getAsPlayer().getUsername()}`
+            : `npc:${(this.character as any).getId ? (this.character as any).getId() : "unknown"}`;
     }
 
     public canWalkTo(next: Location) {
@@ -364,6 +408,10 @@ export class MovementQueue {
 
     public handleRegionChange() {
         const player = (this.character as Player);
+        // Make sure lastKnownRegion is always populated to avoid null access during early ticks.
+        if (!this.character.getLastKnownRegion()) {
+            this.character.setLastKnownRegion(this.character.getLocation().clone());
+        }
         const diffX = this.character.getLocation().getX() - this.character.getLastKnownRegion().getRegionX() * 8;
         const diffY = this.character.getLocation().getY() - this.character.getLastKnownRegion().getRegionY() * 8;
         let regionChanged = false;
@@ -378,6 +426,7 @@ export class MovementQueue {
         if (regionChanged || player.getRegionHeight() != player.getLocation().getZ()) {
             player.getPacketSender().sendMapRegion();
             player.setRegionHeight(player.getLocation().getZ());
+            this.character.setLastKnownRegion(player.getLocation().clone());
         }
     }
 
@@ -822,13 +871,13 @@ export class MovementQueue {
             let xLength, yLength;
             let def = ObjectDefinition.forId(id);
             if (direction == 0 || direction == 2) {
-                yLength = ObjectDefinition.objectSizeX;
-                xLength = ObjectDefinition.objectSizeY;
+                yLength = def.getSizeX();
+                xLength = def.getSizeY();
             } else {
-                yLength = ObjectDefinition.objectSizeY;
-                xLength = ObjectDefinition.objectSizeX;
+                yLength = def.getSizeY();
+                xLength = def.getSizeX();
             }
-            let blockingMask = ObjectDefinition.blockingMask;
+            let blockingMask = def.getBlockingMask();
 
             if (direction != 0) {
                 blockingMask = (blockingMask << direction & 0xf) + (blockingMask >> 4 - direction);
@@ -841,15 +890,18 @@ export class MovementQueue {
         const finalDestinationX = this.player.getMovementQueue().pathX;
 
         const finalDestinationY = this.player.getMovementQueue().pathY;
+        MovementQueue.log(
+            `[walkToObject] ${this.ownerLabel()} obj=${id}@${objectX},${objectY},${this.player.getLocation().getZ()} type=${type} face=${direction} route=${this.player.getMovementQueue().hasRoute()} path=${finalDestinationX},${finalDestinationY} queuedSteps=${this.points.length}`
+        );
 
         //System.err.println("RequestedX=" + objectX + " requestedY=" + objectY + " givenX=" + finalDestinationX + " givenY=" + finalDestinationY);
 
         let finalObjectY = objectY;
 
         this.player.setPositionToFace(new Location(objectX, objectY));
-        TaskManager.submit(new MovementeTaskFunc(this.player.getIndex(), () => {
         let walkStage = 0;
-        if (walkStage != 0) {
+        TaskManager.submit(new MovementeTaskFunc(this.player.getIndex(), () => {
+            if (walkStage != 0) {
 
                 if (objectX == this.player.getLocation().getX() && finalObjectY == this.player.getLocation().getY()) {
                     if (direction == 0)
@@ -868,10 +920,10 @@ export class MovementQueue {
                     if (action !== null) {
                         action.execute();
                     }
-                    stop();
+                    TaskManager.cancelTasks(this.player.getIndex());
                     return;
                 }
-                stop();
+                TaskManager.cancelTasks(this.player.getIndex());
                 return;
             }
             if (this.points.length) {
@@ -881,6 +933,9 @@ export class MovementQueue {
             if (!this.player.getMovementQueue().hasRoute() || this.player.getLocation().getX() !== finalDestinationX || this.player.getLocation().getY() !== finalDestinationY) {
                 walkStage = -1;
                 /** When no destination is set = no possible route to requested tiles **/
+                MovementQueue.log(
+                    `[walkToObject] ${this.ownerLabel()} failed route=${this.player.getMovementQueue().hasRoute()} current=${this.player.getLocation().getX()},${this.player.getLocation().getY()} expected=${finalDestinationX},${finalDestinationY}`
+                );
                 this.player.getPacketSender().sendMessage("You can't reach that!");
                 return;
             }
@@ -1027,7 +1082,3 @@ class MovementeTaskFunc extends Task {
     }
 
 }
-
-
-
-

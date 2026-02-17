@@ -1,9 +1,4 @@
-import { ExecutorService } from 'executor-service'
-import { Collection } from 'lodash'
-import { ArrayDeque } from 'double-ended-queue'
 import { TimeUnit } from 'timeunit'
-
-
 
 interface Runnable {
   run(): void;
@@ -24,25 +19,16 @@ interface ExecutorService {
 }
 
 class BackgroundLoaderThread implements Thread {
-  private readonly worker: Worker;
-
-  constructor(runnable: Runnable) {
-    this.worker = new Worker(URL.createObjectURL(
-      new Blob([`(${runnable.run.toString()})()`], { type: 'text/javascript' })
-    ));
-  }
+  constructor(private readonly runnable: Runnable) {}
 
   start() {
-    // Não faz nada, o worker já está rodando
+    // Run synchronously in Node; no worker support needed for these small tasks.
+    this.runnable.run();
   }
 
-  setName(name: string) {
-    // Não faz nada, não temos acesso ao nome do worker
-  }
+  setName(name: string) {}
 
-  setDaemon(daemon: boolean) {
-    // Não faz nada, não podemos mudar a natureza do worker
-  }
+  setDaemon(daemon: boolean) {}
 }
 
 class BackgroundLoaderThreadFactory implements ThreadFactory {
@@ -101,16 +87,19 @@ export class BackgroundLoader {
 
   private service = new BackgroundLoaderExecutorService();
 
-  private tasks = new ArrayDeque<Worker>();
+  private tasks: Runnable[] = [];
   private isShutdown = false;
 
-  init(backgroundTasks: Collection<Worker>) {
+  init(backgroundTasks: Iterable<() => void>) {
     if (this.isShutdown || this.service.isTerminated()) {
       throw new Error("This background loader has been shutdown!");
     }
-    this.tasks.addAll(backgroundTasks);
+    for (const fn of backgroundTasks) {
+      this.tasks.push({ run: fn });
+    }
     let t: Runnable;
-    while ((t = this.tasks.poll()) != null) {
+    while ((t = this.tasks.shift()!) != null) {
+      if (!t) break;
       this.service.execute(t);
     }
   }
@@ -119,12 +108,7 @@ export class BackgroundLoader {
     if (this.isShutdown) {
       throw new Error("This background loader has been shutdown!");
     }
-    try {
-      this.service.awaitTermination(1, TimeUnit.HOURS);
-    } catch (e) {
-      console.log(`The background service loader was interrupted. ${e}`);
-      return false;
-    }
+    // All tasks run synchronously, so we're effectively done already.
     this.isShutdown = true;
     return true;
   }

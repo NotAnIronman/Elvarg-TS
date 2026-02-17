@@ -69,6 +69,7 @@ import { SkullType } from "../../../model/SkullType";
 import { EffectTimer } from "../../../model/EffectTimer";
 import { PetHandler } from "../../../content/PetHandler";
 import { Task } from "../../../task/Task";
+import { World } from "../../../World";
 
 export class Player extends Mobile {
     getSize(): number {
@@ -116,8 +117,8 @@ export class Player extends Mobile {
     public username: string;
     private passwordHashWithSalt: string;
     private hostAddress: string;
-    private isDiscordLogin
-    private cachedDiscordAccessToken: string;
+    private isDiscordLogin: boolean = false;
+    private cachedDiscordAccessToken: string = "";
     public longUsername: number;
     private session: PlayerSession;
     private playerInteractingOption: PlayerInteractingOption;
@@ -261,7 +262,7 @@ export class Player extends Mobile {
         PrayerHandler.deactivatePrayers(this);
         this.getEquipment().refreshItems();
         this.getInventory().refreshItems();
-        for (let skill of Object.values(Skill))
+        for (let skill of Skill.values())
             this.getSkillManager().setCurrentLevels(skill, this.getSkillManager().getMaxLevel(skill));
         this.setRunEnergy(100);
         this.getPacketSender().sendRunEnergy();
@@ -394,6 +395,9 @@ export class Player extends Mobile {
 
         // Process walking queue..
         this.getMovementQueue().process();
+        if (this.getMovementQueue().isMovings()) {
+            this.updateFlag.flag(Flag.APPEARANCE);
+        }
 
         // Process combat
         this.getCombat().process();
@@ -442,7 +446,7 @@ export class Player extends Mobile {
         // Decrease boosted stats Increase lowered stats
         if (this.getHitpoints() > 0) {
             if (this.increaseStats.finished() || this.decreaseStats.secondsElapsed() >= (PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60)) {
-                for (let skill of Object.values(Skill)) {
+                for (let skill of Skill.values()) {
                     let current = this.getSkillManager().getCurrentLevel(skill);
                     let max = this.getSkillManager().getMaxLevel(skill);
 
@@ -518,6 +522,9 @@ export class Player extends Mobile {
     the player to the remove characters queue.
     */
     requestLogout() {
+        if (!World.getRemovePlayerQueue().includes(this)) {
+            World.getRemovePlayerQueue().push(this);
+        }
         this.getPacketSender().sendLogout();
     }
 
@@ -555,99 +562,12 @@ export class Player extends Mobile {
         // Attempt to register the player..
         console.log("[World] Registering player - [username, host] : [" + this.getUsername() + ", " + this.getHostAddress() + "]");
 
+        // Minimal bring-up until the opcode stream is fully aligned.
         this.setNeedsPlacement(true);
-        this.getPacketSender().sendMapRegion().sendDetails(); // Map region, player index and player rights
-        this.getPacketSender().sendTabs(); // Client sideicons
-        this.getPacketSender().sendMessage("Welcome to " + GameConstants.NAME + ".");
-        if (this.isDiscordLogin()) {
-            this.getPacketSender().sendMessage(":discordtoken:" + this.getCachedDiscordAccessToken());
-        }
-
-        let totalExp = 0;
-        let skill: Skill;
-        for (const skill of Object.values(Skill)) {
-            this.getSkillManager().updateSkill(skill);
-            totalExp += this.getSkillManager().getExperience(skill);
-        }
-        this.getPacketSender().sendTotalExp(totalExp);
-
-        // Send friends and ignored players lists...
-        this.getRelations().setPrivateMessageId(1).onLogin(this).updateLists(true);
-
-        // Reset prayer configs...
-        PrayerHandler.resetAll(this);
-        this.getPacketSender().sendConfig(709, PrayerHandler.canUse(this, PrayerData.PRESERVE, false) ? 1 : 0);
-        this.getPacketSender().sendConfig(711, PrayerHandler.canUse(this, PrayerData.RIGOUR, false) ? 1 : 0);
-        this.getPacketSender().sendConfig(713, PrayerHandler.canUse(this, PrayerData.AUGURY, false) ? 1 : 0);
-
-        // Refresh item containers..
-        this.getInventory().refreshItems();
-        this.getEquipment().refreshItems();
-
-        // Interaction options on right click...
-        this.getPacketSender().sendInteractionOption("Follow", 3, false);
-        this.getPacketSender().sendInteractionOption("Trade With", 4, false);
-
-        // Sending run energy attributes...
-        this.getPacketSender().sendRunStatus();
-        this.getPacketSender().sendRunEnergy();
-
-        // Sending player's rights..
-        this.getPacketSender().sendRights();
-
-        // Close all interfaces, just in case...
-        this.getPacketSender().sendInterfaceRemoval();
-
-        // Update weapon data and interfaces..
-        WeaponInterfaces.assign(this);
-        // Update weapon interface configs
-        this.getPacketSender().sendConfig(FightType.getParentId(), FightType.getChildId())
-            .sendConfig(172, this.autoRetaliateReturn() ? 1 : 0).updateSpecialAttackOrb();
-
-        // Reset autocasting
-        Autocasting.setAutocast(this, null);
-
-        // Send pvp stats..
-        this.getPacketSender().sendString("@or1@Killstreak: " + this.getKillstreak(), 52029)
-            .sendString("@or1@Kills: " + this.getTotalKills(), 52030).sendString("@or1@Deaths: " + this.getDeaths(), 52031)
-            .sendString("@or1@K/D Ratio: " + this.getKillDeathRatio(), 52033)
-            .sendString("@or1@Donated: " + this.getAmountDonated(), 52034);
-
-        // Join clanchat
-        ClanChatManager.onLogin(this);
-
-        // Handle timers and run tasks
-        if (this.isPoisoned()) {
-            this.getPacketSender().sendPoisonType(1);
-            TaskManager.submit(new CombatPoisonEffect(this));
-        }
-        if (this.getSpecialPercentage() < 100) {
-            TaskManager.submit(new RestoreSpecialAttackTask(this));
-        }
-
-        if (!this.getVengeanceTimer().finished()) {
-            this.getPacketSender().sendEffectTimer(this.getVengeanceTimer().secondsRemaining(), EffectTimer.VENGEANCE);
-        }
-        if (!this.getCombat().getFireImmunityTimer().finished()) {
-            this.getPacketSender().sendEffectTimer(this.getCombat().getFireImmunityTimer().secondsRemaining(),
-                EffectTimer.ANTIFIRE);
-        }
-        if (!this.getCombat().getTeleblockTimer().finished()) {
-            this.getPacketSender().sendEffectTimer(this.getCombat().getTeleblockTimer().secondsRemaining(),
-                EffectTimer.TELE_BLOCK);
-        }
-
-        this.decreaseStats.start(60);
-        this.increaseStats.start(60);
-
+        this.getMovementQueue().reset();
         this.getUpdateFlag().flag(Flag.APPEARANCE);
-
-        if (this.newPlayer) {
-            let presetIndex = Misc.randomInclusive(0, Presetables.GLOBAL_PRESETS.length - 1);
-            Presetables.load(this, Presetables.GLOBAL_PRESETS[presetIndex]);
-        }
-
-        // PlayerBot spawning skipped in this runtime.
+        this.setResetMovementQueue(true);
+        this.getCombat().reset();
     }
 
 
@@ -730,7 +650,7 @@ export class Player extends Mobile {
 	}
 
     public getPasswordHashWithSalt(): string {
-        return this.passwordHashWithSalt;
+        return this.passwordHashWithSalt || "";
     }
 
     public setPasswordHashWithSalt(passwordHashWithSalt: string): Player {
@@ -1249,13 +1169,10 @@ export class Player extends Mobile {
     }
 
     public getKillDeathRatio(): string {
-        let kc = 0;
-        if (this.deaths == 0) {
-            kc = this.totalKills / 1;
-        } else {
-            kc = (this.totalKills / this.deaths);
-        }
-        return Misc.FORMATTER.format(kc);
+        const deaths = this.deaths || 0;
+        const kills = this.totalKills || 0;
+        const ratio = deaths === 0 ? kills : kills / deaths;
+        return isFinite(ratio) ? Misc.FORMATTER.format(ratio) : "0";
     }
 
     public getRecentKills(): string[] {

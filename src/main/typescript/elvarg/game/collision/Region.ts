@@ -5,13 +5,18 @@ export class Region {
     private regionId: number;
     private terrainFile: number;
     private objectFile: number;
-    public clips: number[][][] = new Array(4).fill([]);
+    public clips: number[][][] = Region.createClipGrid();
     private loaded: boolean;
 
     constructor(regionId: number, terrainFile: number, objectFile: number) {
         this.regionId = regionId;
         this.terrainFile = terrainFile;
         this.objectFile = objectFile;
+    }
+    private static createClipGrid(): number[][][] {
+        return Array.from({ length: 4 }, () =>
+            Array.from({ length: 64 }, () => new Array(64).fill(0))
+        );
     }
     public getRegionId(): number {
         return this.regionId;
@@ -30,10 +35,13 @@ export class Region {
         let regionAbsY = (this.regionId & 0xff) * 64;
         if (height < 0 || height >= 4)
             height = 0;
-        if (!this.clips[height]) {
-            this.clips[height] = new Array(64).fill(new Array(64).fill(0));
+        if (!this.clips[height] || this.clips[height].length !== 64) {
+            this.clips[height] = Array.from({ length: 64 }, () => new Array(64).fill(0));
         }
-        return this.clips[height][x - regionAbsX][y - regionAbsY];
+        if (!this.clips[height][x - regionAbsX]) {
+            this.clips[height][x - regionAbsX] = new Array(64).fill(0);
+        }
+        return this.clips[height][x - regionAbsX][y - regionAbsY] || 0;
     }
 
     public addClip(x: number, y: number, height: number, shift: number): void {
@@ -41,8 +49,11 @@ export class Region {
         let regionAbsY = (this.regionId & 0xff) * 64;
         if (height < 0 || height >= 4)
             height = 0;
-        if (!this.clips[height]) {
-            this.clips[height] = new Array(64).fill(new Array(64).fill(0));
+        if (!this.clips[height] || this.clips[height].length !== 64) {
+            this.clips[height] = Array.from({ length: 64 }, () => new Array(64).fill(0));
+        }
+        if (!this.clips[height][x - regionAbsX]) {
+            this.clips[height][x - regionAbsX] = new Array(64).fill(0);
         }
         this.clips[height][x - regionAbsX][y - regionAbsY] |= shift;
     }
@@ -51,8 +62,11 @@ export class Region {
         let regionAbsY: number = (this.regionId & 0xff) * 64;
         if (height < 0 || height >= 4)
             height = 0;
-        if (!this.clips[height]) {
-            this.clips[height] = new Array(64).fill(new Array(64).fill(0));
+        if (!this.clips[height] || this.clips[height].length !== 64) {
+            this.clips[height] = Array.from({ length: 64 }, () => new Array(64).fill(0));
+        }
+        if (!this.clips[height][x - regionAbsX]) {
+            this.clips[height][x - regionAbsX] = new Array(64).fill(0);
         }
         this.clips[height][x - regionAbsX][y - regionAbsY] &= ~shift;
     }

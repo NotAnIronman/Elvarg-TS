@@ -9,7 +9,7 @@ export class ObjectDefinition extends ObjectIdentifiers {
     static lowMemory: boolean;
     static stream: Buffer;
     static streamIndices: number[];
-    static cacheIndex: number;
+    static cacheIndex: number = 0;
     static cache: ObjectDefinition[];
     static totalObjects: number;
     static obstructsGround: boolean;
@@ -52,6 +52,14 @@ export class ObjectDefinition extends ObjectIdentifiers {
     static originalModelTexture: number[];
     static modifiedModelTexture: number[];
     clipType: number = 2;
+    private cachedObjectSizeX: number = 1;
+    private cachedObjectSizeY: number = 1;
+    private cachedSolid: boolean = true;
+    private cachedImpenetrable: boolean = true;
+    private cachedBlockingMask: number = 0;
+    private cachedIsInteractive: boolean = false;
+    private cachedObstructsGround: boolean = false;
+    private cachedInteractions: string[] | null = null;
 
     constructor() {
         super();
@@ -69,24 +77,33 @@ export class ObjectDefinition extends ObjectIdentifiers {
         writer.close();
     }
     isClippedDecoration(): boolean {
-        return ObjectDefinition.isInteractive || this.clipType == 1 || ObjectDefinition.obstructsGround;
+        return this.hasActions() || this.clipType == 1 || this.cachedObstructsGround;
+    }
+
+    private static normalizeId(id: number): number {
+        if (id === 25913) {
+            return 15552;
+        }
+        if (id === 25916 || id === 25926) {
+            return 15553;
+        }
+        if (id === 25917) {
+            return 15554;
+        }
+        return id;
     }
 
     static forId(id: number): ObjectDefinition {
-        if (id > ObjectDefinition.streamIndices.length)
+        if (id >= ObjectDefinition.streamIndices.length) {
             id = ObjectDefinition.streamIndices.length - 1;
-        for (let index = 0; index < 20; index++)
-            if (ObjectDefinition.cache[index].id == id)
+        }
+        id = ObjectDefinition.normalizeId(id);
+        for (let index = 0; index < 20; index++) {
+            if (ObjectDefinition.cache[index].id == id) {
+                ObjectDefinition.cache[index].restoreCachedState();
                 return ObjectDefinition.cache[index];
-
-        if (id == 25913)
-            id = 15552;
-
-        if (id == 25916 || id == 25926)
-            id = 15553;
-
-        if (id == 25917)
-            id = 15554;
+            }
+        }
 
         ObjectDefinition.cacheIndex = (ObjectDefinition.cacheIndex + 1) % 20;
         let objectDef = ObjectDefinition.cache[ObjectDefinition.cacheIndex];
@@ -154,9 +171,11 @@ export class ObjectDefinition extends ObjectIdentifiers {
         switch (id) {
             case 10638:
                 ObjectDefinition.isInteractive = true;
+                objectDef.cacheState();
                 return objectDef;
         }
 
+        objectDef.cacheState();
         return objectDef;
     }
 
@@ -164,6 +183,12 @@ export class ObjectDefinition extends ObjectIdentifiers {
         try {
             let dat = FileUtil.readFile(GameConstants.CLIPPING_DIRECTORY + "loc.dat");
             let idx = FileUtil.readFile(GameConstants.CLIPPING_DIRECTORY + "loc.idx");
+            if (!dat || !idx) {
+                console.warn("ObjectDefinition: loc.dat/loc.idx not found, using empty definitions (clipping may be inaccurate).");
+                ObjectDefinition.streamIndices = [0];
+                ObjectDefinition.cache = Array.from({ length: 20 }, () => new ObjectDefinition());
+                return;
+            }
 
             ObjectDefinition.stream = new Buffer(dat);
             let idxBuffer525 = new Buffer(idx);
@@ -180,9 +205,18 @@ export class ObjectDefinition extends ObjectIdentifiers {
             for (let k = 0; k < 20; k++) {
                 ObjectDefinition.cache[k] = new ObjectDefinition();
             }
+            ObjectDefinition.cacheIndex = 0;
 
         } catch (e) {
             console.log(e);
+        }
+
+        // Safety fallback to avoid undefined cache/indices.
+        if (!ObjectDefinition.streamIndices || ObjectDefinition.streamIndices.length === 0) {
+            ObjectDefinition.streamIndices = [0];
+        }
+        if (!ObjectDefinition.cache || ObjectDefinition.cache.length === 0) {
+            ObjectDefinition.cache = Array.from({ length: 20 }, () => new ObjectDefinition());
         }
     }
 
@@ -400,6 +434,7 @@ export class ObjectDefinition extends ObjectIdentifiers {
             }
         }
 
+        const name = this.name;
         if (name !== null && this.name !== "null") {
             ObjectDefinition.isInteractive = ObjectDefinition.modelIds !== null && (ObjectDefinition.modelTypes === null || ObjectDefinition.modelTypes[0] === 10);
             if (ObjectDefinition.interactions !== null)
@@ -421,15 +456,31 @@ export class ObjectDefinition extends ObjectIdentifiers {
     }
 
     public getSizeX(): number {
-        return ObjectDefinition.objectSizeX;
+        return this.cachedObjectSizeX;
     }
 
     public getSizeY(): number {
-        return ObjectDefinition.objectSizeY;
+        return this.cachedObjectSizeY;
     }
 
     public hasActions(): boolean {
-        return ObjectDefinition.isInteractive;
+        return this.cachedIsInteractive;
+    }
+
+    public isSolid(): boolean {
+        return this.cachedSolid;
+    }
+
+    public isImpenetrable(): boolean {
+        return this.cachedImpenetrable;
+    }
+
+    public getBlockingMask(): number {
+        return this.cachedBlockingMask;
+    }
+
+    public getInteractions(): string[] | null {
+        return this.cachedInteractions;
     }
 
     public getSize(): number {
@@ -445,5 +496,27 @@ export class ObjectDefinition extends ObjectIdentifiers {
         }
 
         return (this.getSizeX() + this.getSizeY()) - 1;
+    }
+
+    private cacheState(): void {
+        this.cachedObjectSizeX = ObjectDefinition.objectSizeX;
+        this.cachedObjectSizeY = ObjectDefinition.objectSizeY;
+        this.cachedSolid = ObjectDefinition.solid;
+        this.cachedImpenetrable = ObjectDefinition.impenetrable;
+        this.cachedBlockingMask = ObjectDefinition.blockingMask;
+        this.cachedIsInteractive = ObjectDefinition.isInteractive;
+        this.cachedObstructsGround = ObjectDefinition.obstructsGround;
+        this.cachedInteractions = ObjectDefinition.interactions ? [...ObjectDefinition.interactions] : null;
+    }
+
+    private restoreCachedState(): void {
+        ObjectDefinition.objectSizeX = this.cachedObjectSizeX;
+        ObjectDefinition.objectSizeY = this.cachedObjectSizeY;
+        ObjectDefinition.solid = this.cachedSolid;
+        ObjectDefinition.impenetrable = this.cachedImpenetrable;
+        ObjectDefinition.blockingMask = this.cachedBlockingMask;
+        ObjectDefinition.isInteractive = this.cachedIsInteractive;
+        ObjectDefinition.obstructsGround = this.cachedObstructsGround;
+        ObjectDefinition.interactions = this.cachedInteractions ? [...this.cachedInteractions] : null;
     }
 }

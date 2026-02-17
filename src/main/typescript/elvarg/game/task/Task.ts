@@ -19,7 +19,34 @@ export abstract class Task {
         delay?: number | boolean,
         arg2?: boolean | TaskType | any,
         arg3?: boolean
-    ) {}
+    ) {
+        let resolvedDelay = 1;
+        let resolvedImmediate = false;
+        let resolvedKey: any = Task.DEFAULT_KEY;
+        let resolvedType = TaskType.DEFAULT;
+
+        if (typeof delay === "boolean") {
+            resolvedImmediate = delay;
+        } else if (typeof delay === "number") {
+            resolvedDelay = delay;
+
+            if (typeof arg2 === "boolean") {
+                resolvedImmediate = arg2;
+            } else if (arg2 !== undefined && arg2 !== null) {
+                resolvedKey = arg2;
+            }
+
+            if (typeof arg3 === "boolean") {
+                resolvedImmediate = arg3;
+            }
+        }
+
+        this.delay = Math.max(0, resolvedDelay);
+        this.countdown = this.delay;
+        this.immediate = resolvedImmediate;
+        this.type = resolvedType;
+        this.bind((resolvedKey ?? Task.DEFAULT_KEY) as object);
+    }
 
     private bind(key: object): void {
         this.key = key;

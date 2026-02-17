@@ -3,17 +3,23 @@ import { GameConstants } from '../../../GameConstants';
 import { ObjectSpawnDefinition } from '../../ObjectSpawnDefinition';
 import { GameObject } from '../../../entity/impl/object/GameObject';
 import { ObjectManager } from '../../../entity/impl/object/ObjectManager';
-import fs from "fs-extra";
+import * as fs from "fs";
+import { Location } from '../../../model/Location';
 
 export class ObjectSpawnDefinitionLoader extends DefinitionLoader {
     load() {
-        let def: ObjectSpawnDefinition
-        const reader = new fs(this.file());
-        const defs: ObjectSpawnDefinition[] = JSON.parse(reader.readAsText());
-        for (def of defs) {
-            ObjectManager.register(new GameObject(def.getId(), def.getPosition(), def.getType(), def.getFace(), null), true);
+        const filePath = this.file();
+        const content = fs.readFileSync(filePath, "utf8");
+        const defs: Array<{ id: number; position: { x: number; y: number; z: number }; type?: number; face?: number }> = JSON.parse(content);
+        for (const def of defs) {
+            const spawn = new ObjectSpawnDefinition(def.id, new Location(def.position.x, def.position.y, def.position.z));
+            const type = def.type ?? spawn.getType();
+            const face = def.face ?? spawn.getFace();
+            ObjectManager.register(
+                new GameObject(def.id, spawn.getPosition(), type, face, null),
+                true
+            );
         }
-        reader.close();
     }
 
     file(): string {

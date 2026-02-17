@@ -104,6 +104,14 @@ export class PlayerSession {
       const payload = packet.getBuffer();
       const encOpcode =
         this.encryptor != null ? (opcode + this.encryptor.nextInt()) & 0xff : opcode;
+      // Log outgoing packets to help diagnose client desyncs.
+      try {
+        console.log(
+          `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length}`
+        );
+      } catch {
+        // best-effort logging; never throw here
+      }
       let header: Buffer;
       switch (packet.getType()) {
         case PacketType.VARIABLE:
@@ -138,17 +146,17 @@ export class PlayerSession {
   public flush() {
     const chan: any = this.channel;
     if (chan && typeof chan.send === "function") {
-      try {
-        chan.close();
-      } catch {
-        // ignore
-      }
+      // WebSocket path does not need explicit flush; keep connection open.
       return;
     }
     if (!this.channel.connected) {
       return;
     }
-    this.channel.disconnect();
+    try {
+      this.channel.disconnect();
+    } catch {
+      // best effort
+    }
   }
 
   // public getPlayer(): Player {

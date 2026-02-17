@@ -1,7 +1,6 @@
 export class NetworkConstants {
-    public static readonly GAME_PORT: number = 49595;
-    //43595
-    //49595
+    // Default port; enable the TS server on 49598 unless overridden by PORT
+    public static readonly GAME_PORT: number = parseInt(process.env.PORT || "49598", 10) || 0;
     public static readonly LOGIN_REQUEST_OPCODE: number = 14;
     public static readonly NEW_CONNECTION_OPCODE: number = 16;
     public static readonly RECONNECTION_OPCODE: number = 18;

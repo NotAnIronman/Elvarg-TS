@@ -1,5 +1,3 @@
-import * as schedule from 'node-schedule';
-
 import { ClanChatManager } from './content/clan/ClanChatManager';
 import { GameConstants } from './GameConstants';
 import { World } from '../game/World';
@@ -11,14 +9,15 @@ import { World } from '../game/World';
  * @author Professor Oak
  */
 export class GameEngine  {
-    private scheduler: schedule.Job;
+    private scheduler: NodeJS.Timeout;
     
     constructor() {
         // ...
     }
     
     public init() {
-        this.scheduler = schedule.scheduleJob(`*/${GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE} * * * * *`, this.run.bind(this));
+        // Tick the game engine at the configured interval (milliseconds).
+        this.scheduler = setInterval(this.run.bind(this), GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE);
     }
     
     public async run() {

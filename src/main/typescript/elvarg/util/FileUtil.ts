@@ -1,8 +1,4 @@
-import { fs } from 'fs-extra';
-import { createGunzip } from 'zlib';
-import { promisify } from 'util';
-import { gunzip } from 'zlib';
-import { createReadStream } from 'fs'
+import * as fs from 'fs';
 import * as zlib from 'zlib';
 
 
@@ -18,11 +14,11 @@ export class FileUtil {
     }
 
     public static async getGZBuffer(file: string): Promise<Buffer> {
-        const stats = await fs.stat(file);
+        const stats = await fs.promises.stat(file);
         if (!stats.isFile()) {
             return null;
         }
-        const buffer = fs.readFile(file);
+        const buffer = await fs.promises.readFile(file);
         const gzipInputBuffer = Buffer.alloc(999999);
         let bufferlength = 0;
         const gzip = zlib.createGunzip();

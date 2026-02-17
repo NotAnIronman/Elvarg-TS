@@ -7,7 +7,6 @@ export abstract class GameSyncTask {
     constructor(players: boolean, concurrent?: boolean) {
         this.players = players;
         this.concurrent = concurrent;
-        this.players = true
     }
 
 
@@ -27,5 +26,9 @@ export abstract class GameSyncTask {
 
     public isConcurrent(): boolean {
         return this.concurrent;
+    }
+
+    public isPlayers(): boolean {
+        return this.players;
     }
 }

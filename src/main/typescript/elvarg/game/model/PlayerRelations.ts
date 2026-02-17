@@ -44,33 +44,7 @@ export class PlayerRelations {
     }
 
     updateLists(online: boolean) {
-        if (this.status == PrivateChatStatus.OFF) {
-            online = false;
-        }
-        this.player.getPacketSender().sendFriendStatus(2);
-        for (const players of World.getPlayers()) {
-            if (!players) {
-                continue;
-            }
-            let temporaryOnlineStatus = online;
-            if (players.getRelations().friendList.includes(this.player.getLongUsername())) {
-                if (this.status === PrivateChatStatus.FRIENDS_ONLY && !this.friendList.includes(players.getLongUsername())
-                    || this.status === PrivateChatStatus.OFF || this.ignoreList.includes(players.getLongUsername())) {
-                    temporaryOnlineStatus = false;
-                }
-                players.getPacketSender().sendFriend(this.player.getLongUsername(), temporaryOnlineStatus ? 1 : 0);
-            }
-            let tempOn = true;
-            if (this.player.getRelations().friendList.includes(players.getLongUsername())) {
-                if (players.getRelations().status === PrivateChatStatus.FRIENDS_ONLY
-                    && !players.getRelations().getFriendList().includes(this.player.getLongUsername())
-                    || players.getRelations().status === PrivateChatStatus.OFF
-                    || players.getRelations().getIgnoreList().includes(this.player.getLongUsername())) {
-                    tempOn = false;
-                }
-                this.player.getPacketSender().sendFriend(players.getLongUsername(), tempOn ? 1 : 0);
-            }
-        }
+        // Temporarily disabled to reduce packet noise while aligning the protocol.
         return this;
     }
 
@@ -81,13 +55,17 @@ export class PlayerRelations {
 
     sendFriends() {
         for (const l of this.friendList) {
-            this.player.getPacketSender().sendFriend(l, 0);
+            if (l) {
+                this.player.getPacketSender().sendFriend(l, 0);
+            }
         }
     }
 
     public sendIgnores(): void {
         for (const l of this.ignoreList) {
-            this.player.getPacketSender().sendAddIgnore(l);
+            if (l) {
+                this.player.getPacketSender().sendAddIgnore(l);
+            }
         }
     }
 

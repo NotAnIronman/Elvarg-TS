@@ -12,7 +12,13 @@ import { Packet } from "./packet/Packet";
 import { PlayerSession } from "./PlayerSession";
 import { Appearance as GameAppearance } from "../game/model/Appearance";
 import { PACKET_GUIDE } from "./PacketGuide";
+import { PacketLogger } from "./PacketLogger";
 import { NOPPacketListener } from "./packet/impl/NOPPacketListener";
+import { Flag } from "../game/model/Flag";
+import { World } from "../game/World";
+import { PluginManager } from "../plugins/PluginManager";
+import { GameConstants } from "../game/GameConstants";
+import { DonatorRights } from "../game/model/rights/DonatorRights";
 
 // Copied from Java PacketDecoder.PACKET_SIZES (index = opcode).
 const PACKET_SIZES: number[] = [
@@ -93,6 +99,7 @@ class LoginSession {
   private player: PlayerState | null = null;
   private gamePlayer: Player | null = null;
   private recvBuffer: Buffer = Buffer.alloc(0);
+  private disconnectedCleanupDone = false;
 
   constructor(private socket: WebSocket) {
     this.log("connection_open", {
@@ -110,9 +117,11 @@ class LoginSession {
     });
     socket.on("error", (err) => {
       this.log("socket_error", { err: err?.message ?? err });
+      this.cleanupDisconnected("socket_error");
       this.socket.close();
     });
     socket.on("close", (code, reason) => {
+      this.cleanupDisconnected("socket_close");
       const stack = new Error().stack;
       this.log("connection_closed", {
         code,
@@ -300,16 +309,103 @@ class LoginSession {
     gamePlayer.setUsername(username);
     gamePlayer.setLongUsername(Misc.stringToLong(username));
     gamePlayer.setHostAddress((this.socket as any)?._socket?.remoteAddress ?? "");
+    const loadedPlayerSave = this.loadPersistedPlayer(gamePlayer, password);
+    if (!loadedPlayerSave) {
+      gamePlayer.setPasswordHashWithSalt(password);
+    }
+    this.syncStateFromGamePlayer(player, gamePlayer);
     gamePlayer.setLastKnownRegion(new Location(player.location.x, player.location.y, player.location.plane));
     gamePlayer.setRegionHeight(player.location.plane);
     this.gamePlayer = gamePlayer;
+    gamePlayer.getUpdateFlag().flag(Flag.APPEARANCE);
+    World.getAddPlayerQueue().push(gamePlayer);
+    World.getPlayers().forEach((existing) => {
+      if (existing && existing !== gamePlayer) {
+        existing.getUpdateFlag().flag(Flag.APPEARANCE);
+      }
+    });
 
     // Plain login response
-    this.socket.send(Buffer.from([LoginResponses.LOGIN_SUCCESSFUL, 0]));
+    this.socket.send(
+      Buffer.from([
+        LoginResponses.LOGIN_SUCCESSFUL,
+        this.gamePlayer.getRights().getId() & 0xff,
+      ])
+    );
     // Encrypted initial packets
     this.sendInitialPackets(player);
     this.sendInitialNpcs(player);
+    PluginManager.emitPlayerLogin({
+      player: gamePlayer,
+      username: gamePlayer.getUsername(),
+    });
     this.stage = "ESTABLISHED";
+  }
+
+  private loadPersistedPlayer(gamePlayer: Player, loginPassword: string): boolean {
+    const persistence = GameConstants.PLAYER_PERSISTENCE;
+    if (!persistence) {
+      return false;
+    }
+    let playerSave = null as any;
+    try {
+      playerSave = persistence.load(gamePlayer.getUsername());
+    } catch (err) {
+      this.log("persistence_load_failed", {
+        username: gamePlayer.getUsername(),
+        err: (err as Error)?.message ?? String(err),
+      });
+      return false;
+    }
+
+    if (!playerSave) {
+      return false;
+    }
+
+    try {
+      playerSave.applyToPlayer(gamePlayer);
+      this.log("persistence_loaded", {
+        username: gamePlayer.getUsername(),
+      });
+      return true;
+    } catch (err) {
+      this.log("persistence_apply_failed", {
+        username: gamePlayer.getUsername(),
+        err: (err as Error)?.message ?? String(err),
+      });
+      gamePlayer.setPasswordHashWithSalt(loginPassword);
+      return false;
+    }
+  }
+
+  private syncStateFromGamePlayer(player: PlayerState, gamePlayer: Player): void {
+    const location = gamePlayer.getLocation();
+    player.location = {
+      x: location.getX(),
+      y: location.getY(),
+      plane: location.getZ(),
+    };
+
+    const look = gamePlayer.getAppearance().getLook();
+    player.appearance = this.normalizeAppearance(
+      look[GameAppearance.GENDER] ?? 0,
+      [
+        look[GameAppearance.HEAD] ?? DEFAULT_LOOKS[0],
+        look[GameAppearance.BEARD] ?? DEFAULT_LOOKS[1],
+        look[GameAppearance.CHEST] ?? DEFAULT_LOOKS[2],
+        look[GameAppearance.ARMS] ?? DEFAULT_LOOKS[3],
+        look[GameAppearance.HANDS] ?? DEFAULT_LOOKS[4],
+        look[GameAppearance.LEGS] ?? DEFAULT_LOOKS[5],
+        look[GameAppearance.FEET] ?? DEFAULT_LOOKS[6],
+      ],
+      [
+        look[GameAppearance.HAIR_COLOUR] ?? DEFAULT_COLORS[0],
+        look[GameAppearance.TORSO_COLOUR] ?? DEFAULT_COLORS[1],
+        look[GameAppearance.LEG_COLOUR] ?? DEFAULT_COLORS[2],
+        look[GameAppearance.FEET_COLOUR] ?? DEFAULT_COLORS[3],
+        look[GameAppearance.SKIN_COLOUR] ?? DEFAULT_COLORS[4],
+      ]
+    );
   }
 
   private parseLoginPayload(
@@ -402,6 +498,15 @@ class LoginSession {
       label: label ?? guide?.name,
       payloadLength: payload.length,
       payloadHex: payload.toString("hex"),
+    });
+    PacketLogger.logOutgoing({
+      direction: "OUT",
+      opcode,
+      stage: this.stage,
+      label: label ?? guide?.name,
+      player: this.player?.username,
+      payloadLength: payload.length,
+      payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
     });
     try {
       this.socket.send(this.encodePacket(opcode, payload, type));
@@ -496,13 +601,21 @@ class LoginSession {
     this.sendPacket(253, msg, PacketType.VARIABLE, "welcome_msg");
 
     // Rights (127)
-    this.sendPacket(127, Buffer.from([0, 0]), PacketType.FIXED, "rights");
+    this.sendPacket(
+      127,
+      Buffer.from([
+        this.gamePlayer?.getRights()?.getId?.() ?? 0,
+        DonatorRights.getId(this.gamePlayer?.getDonatorRights?.()),
+      ]),
+      PacketType.FIXED,
+      "rights"
+    );
 
     // Interaction options (104)
     const writeInteraction = (option: string, slot: number, top: boolean) => {
       const slotC = (-slot) & 0xff; // ValueType.C
       const topA = ((top ? 1 : 0) + 128) & 0xff; // ValueType.A
-      return Buffer.from([slotC, topA, ...Buffer.from(option + "\0", "ascii")]);
+      return Buffer.from([slotC, topA, ...Buffer.from(option + "\n", "ascii")]);
     };
     const follow = writeInteraction("Follow", 3, false);
     const trade = writeInteraction("Trade With", 4, false);
@@ -626,90 +739,15 @@ class LoginSession {
     putShort(824); // run
 
     // Name as long
-    putLong(BigInt(Misc.stringToLong(username)));
+    putLong(Misc.stringToLongBigInt(username));
     // Combat level
     putByte(3);
-    // Rights
-    putByte(0);
+    // Rights (PLAYER_RIGHTS ordinal)
+    putByte(this.gamePlayer?.getRights()?.getId?.() ?? 0);
     // Loyalty title (empty string, terminator only)
     putByte(0);
 
     return Buffer.from(bytes);
-  }
-
-  private handleMovement(opcode: number, payload: Buffer) {
-    if (!this.player) {
-      this.log("movement_no_player");
-      return;
-    }
-    if (payload.length < 5) {
-      this.log("movement_payload_too_short", { opcode, payloadLength: payload.length, payloadHex: payload.toString("hex") });
-      return;
-    }
-    let x = payload.readUInt16BE(0);
-    let y = payload.readUInt16BE(2);
-    let plane = payload.readUInt8(4);
-    this.log("movement_received", { opcode, x, y, plane, payloadHex: payload.toString("hex") });
-
-    const dest = new Location(x, y, plane);
-    const oldRegionX = this.player.location.x >> 3;
-    const oldRegionY = this.player.location.y >> 3;
-
-    // Validate destination and move there. We skip pathfinding complexity and place the player
-    // directly to keep basic click-to-move responsive in this lightweight server.
-    if (this.gamePlayer) {
-      const mq = this.gamePlayer.getMovementQueue();
-      if (!mq.checkDestination(dest)) {
-        this.log("movement_invalid_destination", { x, y, plane });
-        return;
-      }
-      // Close interfaces (except floating world map)
-      this.gamePlayer.getPacketSender().sendInterfaceRemoval();
-      mq.reset();
-      mq.walkToReset();
-      this.gamePlayer.moveTo(dest);
-      x = dest.getX();
-      y = dest.getY();
-      plane = dest.getZ();
-      this.log("movement_applied", { x, y, plane });
-    }
-
-    const regionX = x >> 3;
-    const regionY = y >> 3;
-    // Local coords relative to region base ((regionX - 6) << 3), matching client expectations.
-    const localX = x - ((regionX - 6) << 3);
-    const localY = y - ((regionY - 6) << 3);
-
-    // Update stored state
-    this.player.location = { x, y, plane };
-
-    // Refresh map region only when we crossed a region boundary.
-    if (regionX !== oldRegionX || regionY !== oldRegionY) {
-      const mapPayload = Buffer.alloc(4);
-    mapPayload.writeUInt8(((regionX >> 8) & 0xff) >>> 0, 0);
-    mapPayload.writeUInt8((((regionX & 0xff) + 128) & 0xff) >>> 0, 1);
-    mapPayload.writeUInt8(((regionY >> 8) & 0xff) >>> 0, 2);
-    mapPayload.writeUInt8((regionY & 0xff) >>> 0, 3);
-      this.sendPacket(73, mapPayload, PacketType.FIXED, "map_region_move");
-      if (this.gamePlayer) {
-        // Update region base for subsequent locals.
-        this.gamePlayer.setLastKnownRegion(new Location(x, y, plane));
-      }
-    }
-
-    if (this.gamePlayer) {
-      this.gamePlayer.setNeedsPlacement(true);
-    }
-
-    const updateBuf = this.buildPlayerUpdate(
-      localX,
-      localY,
-      plane,
-      this.player.username,
-      this.player.appearance,
-      "teleport"
-    );
-    this.sendPacket(81, updateBuf, PacketType.VARIABLE_SHORT, "player_update_move");
   }
 
   private startKeepAlive() {
@@ -770,6 +808,44 @@ class LoginSession {
     this.log("login_response", { response, reason, stage: this.stage });
     this.socket.send(Buffer.from([response]));
     if (closeAfter) this.socket.close();
+  }
+
+  private cleanupDisconnected(source: string) {
+    if (this.disconnectedCleanupDone) {
+      return;
+    }
+    this.disconnectedCleanupDone = true;
+
+    const player = this.gamePlayer;
+    if (!player) {
+      return;
+    }
+
+    const addQueue = World.getAddPlayerQueue();
+    const addIndex = addQueue.indexOf(player);
+    if (addIndex !== -1) {
+      addQueue.splice(addIndex, 1);
+    }
+
+    const removeQueue = World.getRemovePlayerQueue();
+    let queuedForRemoval = false;
+    if (!removeQueue.includes(player)) {
+      removeQueue.push(player);
+      queuedForRemoval = true;
+    }
+
+    this.log("disconnect_cleanup", {
+      source,
+      username: player.getUsername(),
+      wasInAddQueue: addIndex !== -1,
+      queuedForRemoval,
+      registered: player.isRegistered(),
+    });
+    PluginManager.emitPlayerDisconnect({
+      player,
+      username: player.getUsername(),
+      source,
+    });
   }
 
   private log(event: string, data?: Record<string, unknown>) {
@@ -835,6 +911,7 @@ class LoginSession {
       const encOpcode = data.readUInt8(offset++);
       const rand = this.decryptor.nextInt() & 0xff;
       const opcode = (encOpcode - rand) & 0xff;
+      let headerSize = 1;
       let size = PACKET_SIZES[opcode];
       if (size === undefined) {
         this.log("packet_unknown_size", { opcode, encOpcode, rand });
@@ -846,6 +923,7 @@ class LoginSession {
           break;
         }
         size = data.readUInt8(offset++);
+        headerSize = 2;
       } else if (size === -2) {
         if (data.length - offset < 2) {
           offset--;
@@ -853,19 +931,11 @@ class LoginSession {
         }
         size = data.readUInt16BE(offset);
         offset += 2;
-      }
-      // Override movement packet sizes to match client encoding (5 bytes for 98/164, 6 for 248).
-      if (
-        opcode === PacketConstants.COMMAND_MOVEMENT_OPCODE ||
-        opcode === PacketConstants.GAME_MOVEMENT_OPCODE
-      ) {
-        size = 5;
-      } else if (opcode === PacketConstants.MINIMAP_MOVEMENT_OPCODE) {
-        size = 6;
+        headerSize = 3;
       }
       if (data.length - offset < size) {
         // Not enough data yet; rewind and wait for the rest.
-        offset -= size === -1 ? 2 : size === -2 ? 3 : 1;
+        offset -= headerSize;
         break;
       }
 
@@ -880,21 +950,33 @@ class LoginSession {
         payloadLength: payload.length,
         payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
       });
+      PacketLogger.logIncoming({
+        direction: "IN",
+        opcode,
+        stage: this.stage,
+        label: PACKET_GUIDE[opcode]?.name,
+        player: this.player?.username,
+        encOpcode,
+        rand,
+        payloadLength: payload.length,
+        payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
+      });
       if (payload.length === 0) {
         this.log("packet_empty_payload", { opcode });
       }
 
-      // Handle movement first.
-      if (
-        opcode === PacketConstants.COMMAND_MOVEMENT_OPCODE ||
-        opcode === PacketConstants.GAME_MOVEMENT_OPCODE ||
-        opcode === PacketConstants.MINIMAP_MOVEMENT_OPCODE
-      ) {
-        this.handleMovement(opcode, payload);
-        continue;
-      }
+      const hookPacket = new Packet(opcode, payload);
+      PluginManager.emitPacketReceived({
+        opcode,
+        packet: hookPacket,
+        player: this.gamePlayer,
+        stage: this.stage,
+      });
 
-      const exec = PacketConstants.PACKETS.get(opcode) ?? new NOPPacketListener();
+      const exec =
+        PluginManager.getPacketListener(opcode) ??
+        PacketConstants.PACKETS.get(opcode) ??
+        new NOPPacketListener();
       if (exec && this.gamePlayer) {
         if (typeof (exec as any).execute !== "function") {
           this.log("packet_listener_missing_execute", { opcode, listener: exec.constructor?.name });

@@ -3,7 +3,119 @@ import { Skill } from "../model/Skill";
 import { PrayerHandler } from "./PrayerHandler";
 import { PrayerData } from "./PrayerHandler";
 
-export class QuickPrayers extends PrayerHandler {
+export class QuickPrayers {
+    private static get PRAYER_HANDLER() {
+        return PrayerHandler;
+    }
+    public static get THICK_SKIN() {
+        return QuickPrayers.PRAYER_HANDLER.THICK_SKIN;
+    }
+    public static get ROCK_SKIN() {
+        return QuickPrayers.PRAYER_HANDLER.ROCK_SKIN;
+    }
+    public static get STEEL_SKIN() {
+        return QuickPrayers.PRAYER_HANDLER.STEEL_SKIN;
+    }
+    public static get BURST_OF_STRENGTH() {
+        return QuickPrayers.PRAYER_HANDLER.BURST_OF_STRENGTH;
+    }
+    public static get SUPERHUMAN_STRENGTH() {
+        return QuickPrayers.PRAYER_HANDLER.SUPERHUMAN_STRENGTH;
+    }
+    public static get ULTIMATE_STRENGTH() {
+        return QuickPrayers.PRAYER_HANDLER.ULTIMATE_STRENGTH;
+    }
+    public static get CLARITY_OF_THOUGHT() {
+        return QuickPrayers.PRAYER_HANDLER.CLARITY_OF_THOUGHT;
+    }
+    public static get IMPROVED_REFLEXES() {
+        return QuickPrayers.PRAYER_HANDLER.IMPROVED_REFLEXES;
+    }
+    public static get INCREDIBLE_REFLEXES() {
+        return QuickPrayers.PRAYER_HANDLER.INCREDIBLE_REFLEXES;
+    }
+    public static get SHARP_EYE() {
+        return QuickPrayers.PRAYER_HANDLER.SHARP_EYE;
+    }
+    public static get HAWK_EYE() {
+        return QuickPrayers.PRAYER_HANDLER.HAWK_EYE;
+    }
+    public static get EAGLE_EYE() {
+        return QuickPrayers.PRAYER_HANDLER.EAGLE_EYE;
+    }
+    public static get MYSTIC_WILL() {
+        return QuickPrayers.PRAYER_HANDLER.MYSTIC_WILL;
+    }
+    public static get MYSTIC_LORE() {
+        return QuickPrayers.PRAYER_HANDLER.MYSTIC_LORE;
+    }
+    public static get MYSTIC_MIGHT() {
+        return QuickPrayers.PRAYER_HANDLER.MYSTIC_MIGHT;
+    }
+    public static get CHIVALRY() {
+        return QuickPrayers.PRAYER_HANDLER.CHIVALRY;
+    }
+    public static get PIETY() {
+        return QuickPrayers.PRAYER_HANDLER.PIETY;
+    }
+    public static get RIGOUR() {
+        return QuickPrayers.PRAYER_HANDLER.RIGOUR;
+    }
+    public static get AUGURY() {
+        return QuickPrayers.PRAYER_HANDLER.AUGURY;
+    }
+    public static get PROTECT_FROM_MAGIC() {
+        return QuickPrayers.PRAYER_HANDLER.PROTECT_FROM_MAGIC;
+    }
+    public static get PROTECT_FROM_MISSILES() {
+        return QuickPrayers.PRAYER_HANDLER.PROTECT_FROM_MISSILES;
+    }
+    public static get PROTECT_FROM_MELEE() {
+        return QuickPrayers.PRAYER_HANDLER.PROTECT_FROM_MELEE;
+    }
+    public static get RETRIBUTION() {
+        return QuickPrayers.PRAYER_HANDLER.RETRIBUTION;
+    }
+    public static get REDEMPTION() {
+        return QuickPrayers.PRAYER_HANDLER.REDEMPTION;
+    }
+    public static get SMITE() {
+        return QuickPrayers.PRAYER_HANDLER.SMITE;
+    }
+    public static get DEFENCE_PRAYERS() {
+        return QuickPrayers.PRAYER_HANDLER.DEFENCE_PRAYERS;
+    }
+    public static get STRENGTH_PRAYERS() {
+        return QuickPrayers.PRAYER_HANDLER.STRENGTH_PRAYERS;
+    }
+    public static get ATTACK_PRAYERS() {
+        return QuickPrayers.PRAYER_HANDLER.ATTACK_PRAYERS;
+    }
+    public static get RANGED_PRAYERS() {
+        return QuickPrayers.PRAYER_HANDLER.RANGED_PRAYERS;
+    }
+    public static get MAGIC_PRAYERS() {
+        return QuickPrayers.PRAYER_HANDLER.MAGIC_PRAYERS;
+    }
+    public static get OVERHEAD_PRAYERS() {
+        return QuickPrayers.PRAYER_HANDLER.OVERHEAD_PRAYERS;
+    }
+
+    public static canUse(player: Player, prayer: PrayerData, msg: boolean): boolean {
+        return PrayerHandler.canUse(player, prayer, msg);
+    }
+
+    public static isActivated(player: Player, prayerId: number): boolean {
+        return PrayerHandler.isActivated(player, prayerId);
+    }
+
+    public static activatePrayerPrayerId(player: Player, prayerId: number): void {
+        PrayerHandler.activatePrayerPrayerId(player, prayerId);
+    }
+
+    public static deactivatePrayer(player: Player, prayerId: number): void {
+        PrayerHandler.deactivatePrayer(player, prayerId);
+    }
     private static readonly TOGGLE_QUICK_PRAYERS = 1500;
     private static readonly SETUP_BUTTON = 1506;
     private static readonly CONFIRM_BUTTON = 17232;
@@ -16,7 +128,6 @@ export class QuickPrayers extends PrayerHandler {
     private enabled: boolean;
 
     constructor(player: Player) {
-        super();
         this.player = player;
     }
 

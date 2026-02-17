@@ -8,7 +8,6 @@ import { fs, readFileSync, existsSync } from "fs-extra";
 import * as path from "path";
 import { resolve } from "path";
 import * as zlib from "zlib";
-import moment from "moment";
 type TimeUnit = "seconds" | "minutes";
 
 export class Misc {
@@ -665,9 +664,13 @@ export class Misc {
     timeAmount: number,
     timeUnit: TimeUnit
   ): number => {
-    const duration = moment.duration(Date.now() - start, "milliseconds");
-    const timeUnitDuration = moment.duration(timeAmount, timeUnit);
-    const remaining = timeUnitDuration.subtract(duration).as(timeUnit);
+    const unitToMs: Record<TimeUnit, number> = {
+      seconds: 1000,
+      minutes: 60 * 1000,
+    };
+    const elapsedMs = Date.now() - start;
+    const totalMs = timeAmount * unitToMs[timeUnit];
+    const remaining = (totalMs - elapsedMs) / unitToMs[timeUnit];
     return Math.max(remaining, 1);
   };
 
@@ -761,6 +764,25 @@ export class Misc {
     }
     while (l % 37 === 0 && l !== 0) {
       l /= 37;
+    }
+    return l;
+  }
+
+  public static stringToLongBigInt(string: string): bigint {
+    let l = 0n;
+    for (let i = 0; i < string.length && i < 12; i++) {
+      const c = string.charAt(i);
+      l *= 37n;
+      if (c >= "A" && c <= "Z") {
+        l += BigInt(1 + c.charCodeAt(0) - 65);
+      } else if (c >= "a" && c <= "z") {
+        l += BigInt(1 + c.charCodeAt(0) - 97);
+      } else if (c >= "0" && c <= "9") {
+        l += BigInt(27 + c.charCodeAt(0) - 48);
+      }
+    }
+    while (l !== 0n && l % 37n === 0n) {
+      l /= 37n;
     }
     return l;
   }

@@ -80,6 +80,8 @@ export abstract class Mobile extends Entity {
 
     constructor(position: Location) {
         super(position);
+        // Ensure we always have a baseline region; movement/updates rely on this.
+        this.lastKnownRegion = position.clone();
     }
 
     public abstract onAdd(): void;

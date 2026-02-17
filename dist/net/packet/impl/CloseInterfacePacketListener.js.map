@@ -1,1 +1,0 @@
-{"version":3,"file":"CloseInterfacePacketListener.js","sourceRoot":"","sources":["../../../../src/main/typescript/elvarg/net/packet/impl/CloseInterfacePacketListener.ts"],"names":[],"mappings":";;;AAIA,MAAa,4BAA4B;IACvC,4CAA4C;IAC5C,OAAO,CAAC,MAAW,EAAE,MAAc;QACjC,MAAM,CAAC,eAAe,EAAE,CAAC,oBAAoB,EAAE,CAAC;IAClD,CAAC;CACF;AALD,oEAKC"}

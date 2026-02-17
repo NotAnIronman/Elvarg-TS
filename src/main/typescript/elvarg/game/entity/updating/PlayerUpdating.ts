@@ -10,6 +10,8 @@ import { Appearance } from '../../model/Appearance'
 import { Flag } from '../../model/Flag'
 import { ByteOrder } from '../../../net/packet/ByteOrder'
 import { Skill } from '../../model/Skill'
+import { Misc } from '../../../util/Misc'
+import { DonatorRights } from '../../model/rights/DonatorRights'
 
 export class PlayerUpdating {
     private static MAX_NEW_PLAYERS_PER_CYCLE = 25;
@@ -20,22 +22,27 @@ export class PlayerUpdating {
         packet.initializeAccess(AccessType.BIT);
         this.updateMovement(player, packet);
         this.appendUpdates(player, update, player, false, true);
-        packet.putBits(8, player.getLocalPlayers().length);
-        for (const playerIterator of player.getLocalPlayers()) {
-            if (World.getPlayers().get(playerIterator.getIndex()) != null
-                && playerIterator.getLocation().isViewableFrom(player.getLocation())
-                && !playerIterator.isNeedsPlacement()
-                && playerIterator.getPrivateArea() === player.getPrivateArea()) {
-                    this.updateOtherPlayerMovement(packet, playerIterator);
-                if (playerIterator.getUpdateFlag().isUpdateRequired()) {
-                    this.appendUpdates(player, update, playerIterator, false, false);
+        const localPlayers = player.getLocalPlayers();
+        packet.putBits(8, localPlayers.length);
+        const retainedLocalPlayers: Player[] = [];
+        for (const localPlayer of localPlayers) {
+            if (World.getPlayers().get(localPlayer.getIndex()) != null
+                && localPlayer.getLocation().isViewableFrom(player.getLocation())
+                && !localPlayer.isNeedsPlacement()
+                && localPlayer.getPrivateArea() === player.getPrivateArea()) {
+                this.updateOtherPlayerMovement(packet, localPlayer);
+                if (localPlayer.getUpdateFlag().isUpdateRequired()) {
+                    this.appendUpdates(player, update, localPlayer, false, false);
                 }
+                retainedLocalPlayers.push(localPlayer);
             } else {
-                playerIterator.onRemove();
+                // Player left local-view; remove from local list only (do not global-logout).
                 packet.putBits(1, 1);
                 packet.putBits(2, 3);
             }
         }
+        localPlayers.length = 0;
+        localPlayers.push(...retainedLocalPlayers);
         let playersAdded = 0;
 
         for (const otherPlayer of World.getPlayers()) {
@@ -52,10 +59,11 @@ export class PlayerUpdating {
             playersAdded++;
         }
 
-        if (update.buffer().length > 0) {
+        const updateBuffer = update.getBuffer();
+        if (updateBuffer.length > 0) {
             packet.putBits(11, 2047);
             packet.initializeAccess(AccessType.BYTE);
-            packet.putBytes(update.getBuffer());
+            packet.putBytes(updateBuffer);
         } else {
             packet.initializeAccess(AccessType.BYTE);
         }
@@ -79,6 +87,8 @@ export class PlayerUpdating {
             builder.putBits(1, player.getUpdateFlag().isUpdateRequired() ? 1 : 0);
             builder.putBits(7, player.getLocation().getLocalY(player.getLastKnownRegion()));
             builder.putBits(7, player.getLocation().getLocalX(player.getLastKnownRegion()));
+            player.setNeedsPlacement(false);
+            player.setResetMovementQueue(false);
         } else if (player.getWalkingDirection().getId() == -1) {
             if (player.getUpdateFlag().isUpdateRequired()) {
                 builder.putBits(1, 1);
@@ -260,8 +270,8 @@ export class PlayerUpdating {
         const message = target.currentChatMessage;
         const bytes = message.text;
         builder.putShorts(((message.colour & 0xff) << 8) | (message.effects & 0xff), ByteOrder.LITTLE);
-        builder.put(target.getRights().getSpriteId());
-        builder.put(target.getRights().getSpriteId());
+        builder.put(target.getRights().getId());
+        builder.put(DonatorRights.getId(target.getDonatorRights()));
         builder.puts(bytes.length, ValueType.C);
         for (let ptr = bytes.length - 1; ptr >= 0; ptr--) {
             builder.put(bytes[ptr]);
@@ -441,9 +451,9 @@ export class PlayerUpdating {
             properties.putShort(wep.getRunAnim());
         }
 
-        properties.putLong(target.getLongUsername());
+        properties.putLong(Misc.stringToLongBigInt(target.getUsername()));
         properties.put(target.getSkillManager().getCombatLevel());
-        properties.put(target.getRights().getSpriteId());
+        properties.put(target.getRights().getId());
         properties.putString(target.getLoyaltyTitle());
 
         out.puts(properties.getBuffer().length, ValueType.C);

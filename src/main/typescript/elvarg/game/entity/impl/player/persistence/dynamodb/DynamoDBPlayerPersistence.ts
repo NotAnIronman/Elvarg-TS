@@ -5,8 +5,6 @@ import { PlayerSave } from "../PlayerSave";
 import * as AWS from "aws-sdk";
 import { DynamoDbEnhancedClient, DynamoDbTable } from 'dynamodb-enhanced'
 import { PlayerSaveRecord } from "./PlayerSaveRecord";
-import { Schema } from '@aws/dynamodb-data-marshaller';
-import { Table } from 'tableschema';
 
 
 

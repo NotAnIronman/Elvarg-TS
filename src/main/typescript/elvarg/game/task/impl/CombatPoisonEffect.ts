@@ -65,8 +65,8 @@ export enum PoisonType {
 }
 
 export class CombatPoisonData {
-  private static damage: number
-  public static types: number[]
+  private static damage: number = 0;
+  public static types: number[] = [];
   private static tipos = new Map<number, PoisonType>();
 
   public static getDemage(): number {
@@ -74,6 +74,9 @@ export class CombatPoisonData {
   }
 
   static init() {
+    if (!CombatPoisonData.types) {
+      CombatPoisonData.types = [];
+    }
     CombatPoisonData.types.push(ItemIdentifiers.BRONZE_DART_P_, PoisonType.VERY_WEAK);
     CombatPoisonData.types.push(ItemIdentifiers.IRON_DART_P_, PoisonType.VERY_WEAK);
     CombatPoisonData.types.push(ItemIdentifiers.STEEL_DART_P_, PoisonType.VERY_WEAK);
@@ -285,7 +288,6 @@ export class CombatPoisonData {
     return CombatPoisonData.types[item.getId()];
   }
 }
-
 
 
 

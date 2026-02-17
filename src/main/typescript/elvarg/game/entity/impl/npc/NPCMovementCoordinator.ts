@@ -154,7 +154,8 @@ export class NPCMovementCoordinator {
             if (this.npc.getLocation().getY() - y < spawnY - 1)
                 return null;
         }
-        return new Location(x, y);
+        // Return an absolute tile, not a relative offset (the queue expects world coords).
+        return new Location(this.npc.getLocation().getX() + x, this.npc.getLocation().getY() + y);
     }
 
     public getCoordinateState(): CoordinateState {

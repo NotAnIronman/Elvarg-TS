@@ -14,7 +14,8 @@ import { PacketType } from "./PacketType";
 // import { ItemOnGround } from "../../game/entity/impl/grounditem/ItemOnGround";
 // import { Graphic } from "../../game/model/Graphic";
 // import { Inventory } from "../../game/model/container/impl/Inventory";
-// import { Location } from "../../game/model/Location";
+import { Location } from "../../game/model/Location";
+import { DonatorRights } from "../../game/model/rights/DonatorRights";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
 // import { Mobile } from "../../game/entity/impl/Mobile";
@@ -41,6 +42,7 @@ export class PacketSender {
 
   public sendMapRegion(): PacketSender {
     this.player.setAllowRegionChangePacket(true);
+    // Track the last known region using the player's actual position, matching the Java server.
     this.player.setLastKnownRegion(this.player.getLocation().clone());
     let out = new PacketBuilder(73);
     out.putShort(this.player.getLocation().getRegionX() + 6, ValueType.A);
@@ -709,8 +711,8 @@ export class PacketSender {
 
   public sendRights() {
     const out = new PacketBuilder(127);
-    out.put(this.player.getRights().getSpriteId());
-    // out.put(DonatorRights.getSpriteId(0));
+    out.put(this.player.getRights().getId());
+    out.put(DonatorRights.getId(this.player.getDonatorRights()));
     this.player.getSession().write(out);
     return this;
   }
@@ -746,10 +748,8 @@ export class PacketSender {
   }
 
   public sendMultiIcon(value: number): PacketSender {
-    let out = new PacketBuilder(61);
-    out.put(value);
-    this.player.getSession().write(out);
-    this.player.setMultiIcon(value);
+    // Temporarily disabled to avoid extra packets that the client isn't expecting
+    // during bring-up.
     return this;
   }
 

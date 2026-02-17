@@ -26,7 +26,7 @@ export class Location {
     constructor(x: number, y: number, z?: number) {
         this.x = x;
         this.y = y;
-        this.z = z;
+        this.z = z ?? 0;
     }
 
     /**
