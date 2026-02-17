@@ -2,7 +2,7 @@
 import { CombatEquipment } from '../CombatEquipment';
 import { CombatFactory } from '../CombatFactory';
 import { Mobile } from '../../../entity/impl/Mobile';
-import { Player } from '../../../entity/impl/player/Player';
+import type { Player } from '../../../entity/impl/player/Player';
 import { Graphic } from '../../../model/Graphic';
 import { GraphicHeight } from '../../../model/GraphicHeight';
 import { Skill } from '../../../model/Skill';

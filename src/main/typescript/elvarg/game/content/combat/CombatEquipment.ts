@@ -1,4 +1,4 @@
-import { Player } from "../../entity/impl/player/Player";
+import type { Player } from "../../entity/impl/player/Player";
 // Avoid importing Equipment to dodge bootstrap cycles; use slot ids directly.
 const HEAD_SLOT = 0;
 const CAPE_SLOT = 1;

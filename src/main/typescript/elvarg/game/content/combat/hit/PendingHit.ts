@@ -3,7 +3,7 @@ import { HitDamage } from "./HitDamage";
 import { CombatType } from "../CombatType";
 import { CombatMethod } from "../method/CombatMethod";
 import { Mobile } from "../../../entity/impl/Mobile";
-import { Player } from "../../../entity/impl/player/Player";
+import type { Player } from "../../../entity/impl/player/Player";
 import { AccuracyFormulasDpsCalc } from "../formula/AccuracyFormulasDpsCalc";
 import { HitMask } from "./HitMask";
 export class PendingHit {

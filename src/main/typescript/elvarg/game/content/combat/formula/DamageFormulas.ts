@@ -6,11 +6,14 @@ import { CombatFactory } from "../CombatFactory";
 import { CombatType } from "../CombatType";
 import { FightStyle } from "../FightStyle";
 import { Mobile } from "../../../entity/impl/Mobile";
-import { Player } from "../../../entity/impl/player/Player";
-import { NPC } from "../../../entity/impl/npc/NPC";
+import type { Player } from "../../../entity/impl/player/Player";
+import type { NPC } from "../../../entity/impl/npc/NPC";
 import { Equipment } from "../../../model/container/impl/Equipment";
 import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
 import { FightType } from "../FightType";
+
+const getPlayerCtor = () =>
+    require("../../../entity/impl/player/Player").Player as typeof import("../../../entity/impl/player/Player").Player;
 
 export class DamageFormulas {
     private static effectiveStrengthLevel(player: Player): number {
@@ -66,7 +69,7 @@ export class DamageFormulas {
             }
 
             if (player.isSpecialActivated()) {
-                maxHit *= Player.getCombatSpecial().getStrengthMultiplier();
+                maxHit *= getPlayerCtor().getCombatSpecial().getStrengthMultiplier();
             }
         } else {
             maxHit = entity.getAsNpc().getCurrentDefinition().getMaxHit();
@@ -144,8 +147,8 @@ export class DamageFormulas {
         maxHit += 320;
         maxHit /= 640;
 
-        if (player.isSpecialActivated() && Player.getCombatSpecial().getCombatMethod().type() == CombatType.RANGED) {
-            maxHit *= Player.getCombatSpecial().getStrengthMultiplier();
+        if (player.isSpecialActivated() && getPlayerCtor().getCombatSpecial().getCombatMethod().type() == CombatType.RANGED) {
+            maxHit *= getPlayerCtor().getCombatSpecial().getStrengthMultiplier();
         }
 
         return Math.floor(maxHit);

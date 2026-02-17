@@ -2,9 +2,7 @@
 import { Packet } from "../Packet";
 import { PacketExecutor } from "../PacketExecutor";
 // import { ItemOnGroundManager } from '../../../game/entity/impl/grounditem/ItemOnGroundManager';
-// import { Firemaking } from '../../../game/content/skill/skillable/impl/Firemaking';
 // import { Location } from '../../../game/model/Location';
-// import { LightableLog } from '../../../game/content/skill/skillable/impl/Firemaking'
 
 export class SecondGroundItemOptionPacketListener implements PacketExecutor {
   // execute(player: Player, packet: Packet) {

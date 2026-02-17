@@ -1,5 +1,5 @@
 import { Equipment } from "../../model/container/impl/Equipment";
-import { Player } from "../../entity/impl/player/Player";
+import type { Player } from "../../entity/impl/player/Player";
 import { FightType } from "../combat/FightType"
 import { CombatSpecial } from "./CombatSpecial";
 import { FightStyle } from "./FightStyle";

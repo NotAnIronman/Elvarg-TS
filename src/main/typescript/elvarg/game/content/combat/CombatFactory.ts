@@ -15,9 +15,9 @@ import { MeleeCombatMethod } from "./method/impl/MeleeCombatMethod";
 import { RangedCombatMethod } from "./method/impl/RangedCombatMethod";
 import { RangedData, RangedWeapon, RangedWeaponType } from "./ranged/RangedData";
 import { Mobile } from "../../entity/impl/Mobile";
-import { NPC } from "../../entity/impl/npc/NPC";
+import type { NPC } from "../../entity/impl/npc/NPC";
 import { CoordinateState, NPCMovementCoordinator } from "../../entity/impl/npc/NPCMovementCoordinator";
-import { Player } from "../../entity/impl/player/Player";
+import type { Player } from "../../entity/impl/player/Player";
 import { Animation } from "../../model/Animation";
 import { EffectTimer } from "../../model/EffectTimer"
 import { Flag } from "../../model/Flag";
@@ -48,6 +48,8 @@ import { DuelRule } from "../Duelling";
 import { PoisonType } from "../../task/impl/CombatPoisonEffect";
 import { CombatConstants } from "./CombatConstants";
 
+const getPlayerCtor = () =>
+    require("../../entity/impl/player/Player").Player as typeof import("../../entity/impl/player/Player").Player;
 
 export class CombatFactory {
     private static readonly RANDOM = new RandomGen();
@@ -82,9 +84,9 @@ export class CombatFactory {
             }
 
             // Check special attacks..
-            if (Player.getCombatSpecial() != null) {
+            if (getPlayerCtor().getCombatSpecial() != null) {
                 if (p.isSpecialActivated()) {
-                    return Player.getCombatSpecial().getCombatMethod();
+                    return getPlayerCtor().getCombatSpecial().getCombatMethod();
                 }
             }
 
@@ -126,7 +128,7 @@ export class CombatFactory {
                 // Check if player is using dark bow and set damage to minimum 8, maxmimum 48 if
                 // that's the case...
                 if (player.isSpecialActivated()
-                    && Player.getCombatSpecial() == CombatSpecial.DARK_BOW) {
+                    && getPlayerCtor().getCombatSpecial() == CombatSpecial.DARK_BOW) {
                     if (damage < 8) {
                         damage = 8;
                     } else if (damage > 48) {
@@ -398,10 +400,10 @@ export class CombatFactory {
             let p: Player = attacker.getAsPlayer();
 
             // Check if we're using a special attack..
-            if (p.isSpecialActivated() && Player.getCombatSpecial() != null) {
+            if (p.isSpecialActivated() && getPlayerCtor().getCombatSpecial() != null) {
                 // Check if we have enough special attack percentage.
                 // If not, reset special attack.
-                if (p.getSpecialPercentage() < Player.getCombatSpecial().getDrainAmount()) {
+                if (p.getSpecialPercentage() < getPlayerCtor().getCombatSpecial().getDrainAmount()) {
                     return CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY;
                 }
             }

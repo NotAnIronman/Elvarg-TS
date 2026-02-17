@@ -18,7 +18,6 @@ import { Packet } from "../Packet";
 // import { Location } from "../../../game/model/Location";
 // import { MapObjects } from "../../../game/entity/impl/object/MapObjects";
 // import { Cooking, Cookable } from "../../../game/content/skill/skillable/impl/Cooking";
-// import { Firemaking, LightableLog } from "../../../game/content/skill/skillable/impl/Firemaking";
 // import { CreationMenuAction } from "../../../game/model/menu/CreationMenu";
 // import { Action } from "../../../game/model/Action";
 

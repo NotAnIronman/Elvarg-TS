@@ -10,7 +10,10 @@ import { BonusManager } from "../../../model/equipment/BonusManager";
 import { Skill } from "../../../model/Skill";
 import { CombatEquipment } from "../../combat/CombatEquipment";
 import { FightType } from '../FightType';
-import { Player } from '../../../entity/impl/player/Player';
+import type { Player } from '../../../entity/impl/player/Player';
+
+const getPlayerCtor = () =>
+    require("../../../entity/impl/player/Player").Player as typeof import("../../../entity/impl/player/Player").Player;
 
 export class AccuracyFormulasDpsCalc {
     static randomFloat() {
@@ -95,7 +98,7 @@ export class AccuracyFormulasDpsCalc {
 
         // Special attack
         if (player.isSpecialActivated()) {
-            att *= Player.getCombatSpecial().getAccuracyMultiplier()
+            att *= getPlayerCtor().getCombatSpecial().getAccuracyMultiplier()
         }
 
         return att;

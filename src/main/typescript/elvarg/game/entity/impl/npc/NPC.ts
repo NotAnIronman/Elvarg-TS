@@ -8,7 +8,7 @@ import { CombatMethod } from "../../../content/combat/method/CombatMethod";
 import { NpcDefinition } from "../../../definition/NpcDefinition";
 import { CoordinateState, NPCMovementCoordinator } from "./NPCMovementCoordinator";
 import { Barricades } from "./impl/Barricades";
-import { Player } from "../player/Player";
+import type { Player } from "../player/Player";
 import { FacingDirection } from "../../../model/FacingDirection";
 import { Ids } from "../../../model/Ids";
 import { Location } from "../../../model/Location";

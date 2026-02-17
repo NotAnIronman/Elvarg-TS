@@ -4,8 +4,8 @@ import { Combat } from "../../content/combat/Combat";
 import { CombatType } from "../../content/combat/CombatType";
 import { HitDamage } from "../../content/combat/hit/HitDamage";
 import { PendingHit } from "../../content/combat/hit/PendingHit";
-import { NPC } from "./npc/NPC";
-import { Player } from "./player/Player";
+import type { NPC } from "./npc/NPC";
+import type { Player } from "./player/Player";
 import { Animation } from "../../model/Animation";
 import { Direction } from "../../model/Direction";
 import { Flag } from "../../model/Flag";
@@ -20,6 +20,11 @@ import { TimerRepository } from "../../../util/timers/TimerRepository";
 import { RegionManager } from "../../collision/RegionManager";
 import { Misc } from "../../../util/Misc";
 import { Boundary } from "../../model/Boundary";
+
+const getPlayerCtor = () =>
+  require("./player/Player").Player as typeof import("./player/Player").Player;
+const getNpcCtor = () =>
+  require("./npc/NPC").NPC as typeof import("./npc/NPC").NPC;
 
 class MobileTask extends Task {
     constructor(ticks: number, private readonly execFunc: Function) {
@@ -102,7 +107,7 @@ export abstract class Mobile extends Entity {
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
-        if (this instanceof Player) {
+        if (this.isPlayer()) {
             this.getMovementQueue().handleRegionChange();
         }
         return this;
@@ -130,7 +135,7 @@ export abstract class Mobile extends Entity {
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
-        if (this instanceof Player) {
+        if (this.isPlayer()) {
             this.movementQueue.handleRegionChange();
         }
 
@@ -154,7 +159,7 @@ export abstract class Mobile extends Entity {
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
-        if (this instanceof Player) {
+        if (this.isPlayer()) {
             this.getMovementQueue().handleRegionChange();
         }
         return this;
@@ -577,7 +582,8 @@ export abstract class Mobile extends Entity {
     }
 
     isPlayer(): boolean {
-        return (this instanceof Player);
+        const PlayerCtor = getPlayerCtor();
+        return typeof PlayerCtor === "function" && this instanceof PlayerCtor;
     }
 
     isPlayerBot(): boolean {
@@ -585,7 +591,8 @@ export abstract class Mobile extends Entity {
     }
 
     isNpc(): boolean {
-        return (this instanceof NPC);
+        const NpcCtor = getNpcCtor();
+        return typeof NpcCtor === "function" && this instanceof NpcCtor;
     }
 
     getAsPlayer(): Player | null {

@@ -1,7 +1,7 @@
 // WeaponInterfaces import removed to avoid circular bootstrap.
 const WeaponInterfaces: any = {};
 import { Mobile } from "../../entity/impl/Mobile";
-import { Player } from "../../entity/impl/player/Player";
+import type { Player } from "../../entity/impl/player/Player";
 import { CombatFactory } from "./CombatFactory";
 import { BonusManager } from "../../model/equipment/BonusManager";
 import { CombatMethod } from "./method/CombatMethod";
@@ -10,6 +10,9 @@ import { TaskManager } from "../../task/TaskManager";
 import { RestoreSpecialAttackTask } from '../../task/impl/RestoreSpecialAttackTask'
 import { Equipment } from "../../model/container/impl/Equipment";
 import { DuelRule } from "../Duelling";
+
+const getPlayerCtor = () =>
+    require("../../entity/impl/player/Player").Player as typeof import("../../entity/impl/player/Player").Player;
 
 class DummyCombatMethod extends CombatMethod {
     start(): void {}
@@ -225,7 +228,12 @@ export class CombatSpecial {
 
 
     public static checkSpecial(player: Player, special: CombatSpecial): boolean {
-        return (Player.getCombatSpecial() != null && Player.getCombatSpecial() == special && player.isSpecialActivated() && player.getSpecialPercentage() >= special.getDrainAmount());
+        return (
+            getPlayerCtor().getCombatSpecial() != null &&
+            getPlayerCtor().getCombatSpecial() == special &&
+            player.isSpecialActivated() &&
+            player.getSpecialPercentage() >= special.getDrainAmount()
+        );
     }
 
     public static drain(character: Mobile, amount: number) {
@@ -283,7 +291,7 @@ export class CombatSpecial {
     }
 
     public static activate(player: Player) {
-        if (Player.getCombatSpecial() == null) {
+        if (getPlayerCtor().getCombatSpecial() == null) {
             return;
         }
 
@@ -295,12 +303,12 @@ export class CombatSpecial {
             player.setSpecialActivated(false);
             CombatSpecial.updateBar(player);
         } else {
-            const spec = Player.getCombatSpecial();
+            const spec = getPlayerCtor().getCombatSpecial();
             player.setSpecialActivated(true);
             CombatSpecial.updateBar(player);
 
             if (spec == CombatSpecial.GRANITE_MAUL) {
-                if (player.getSpecialPercentage() < Player.getCombatSpecial().getDrainAmount()) {
+                if (player.getSpecialPercentage() < getPlayerCtor().getCombatSpecial().getDrainAmount()) {
                     player.getPacketSender().sendMessage("You do not have enough special attack energy left!");
                     player.setSpecialActivated(false);
                     CombatSpecial.updateBar(player);

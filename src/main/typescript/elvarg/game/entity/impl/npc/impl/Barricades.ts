@@ -2,7 +2,6 @@ import { Sound } from "../../../../Sound";
 import { Sounds } from "../../../../Sounds";
 import { World } from "../../../../World";
 import { RegionManager } from "../../../../collision/RegionManager";
-import { Firemaking } from "../../../../content/skill/skillable/impl/Firemaking"
 import { NPC } from "../NPC";
 import { Player } from "../../player/Player";
 import { Animation } from "../../../../model/Animation"
@@ -29,6 +28,7 @@ export class Barricades {
     public static readonly NPC_ID_BURNING: number = 5723;
     public static readonly ITEM_ID: number = 4053;
     public static readonly FIREMAKING_EXPERIENCE: number = 10;
+    private static readonly LIGHT_FIRE_ANIMATION = new Animation(733);
 
     private static barricades: Location[] = [];
     private static getBlackListedTiles(player: Player, requestedTile: Location): boolean {
@@ -71,7 +71,7 @@ export class Barricades {
             return;
         }
 
-        player.performAnimation(Firemaking.LIGHT_FIRE);
+        player.performAnimation(Barricades.LIGHT_FIRE_ANIMATION);
         Sounds.sendSound(player, Sound.FIRE_FIRST_ATTEMPT);
 
         TaskManager.submit(new BarricadesTask(player, ()=>{npc.setNpcTransformationId(this.NPC_ID_BURNING);

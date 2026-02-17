@@ -12,7 +12,6 @@ import { Skillable } from "./skillable/Skillable";
 import { WeaponInterfaces } from "../combat/WeaponInterfaces";
 import { BonusManager } from "../../model/equipment/BonusManager";
 import { BountyHunter } from "../combat/bountyhunter/BountyHunter";
-import { Woodcutting } from '../../../game/content/skill/skillable/impl/woodcutting/Woodcutting'
 import { Mining, Rock } from '../../content/skill/skillable/impl/Mining'
 import { GameObject } from "../../entity/impl/object/GameObject";
 import { EnteredAmountAction } from "../../model/EnteredAmountAction";
