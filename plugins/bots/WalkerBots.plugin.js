@@ -740,10 +740,7 @@ module.exports = {
       }
     });
 
-    api.onPacketReceived(({ opcode, player, stage }) => {
-      if (!player || stage !== "ESTABLISHED") {
-        return;
-      }
+    api.onEstablishedPacket(({ opcode, player }) => {
       if (!MANUAL_CONTROL_PACKET_OPCODES.has(opcode)) {
         return;
       }

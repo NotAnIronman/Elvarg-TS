@@ -23,7 +23,10 @@ export class ItemOnGround {
         this.position = position;
         this.item = item;
         this.goesGlobal = goesGlobal;
+        this.tick = 0;
+        this.pendingRemoval = false;
         this.respawnTimer = respawnTimer;
+        this.oldAmount = item?.getAmount?.() ?? 0;
         this.privateArea = privateArea;
     }
 

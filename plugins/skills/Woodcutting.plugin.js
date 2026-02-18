@@ -6,12 +6,16 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const TREE_STUMP_OBJECT_ID = ObjectIds.TREE_STUMP_3;
 const CHOP_ANIMATION_INTERVAL_TICKS = 4;
+const CHOP_SOUND_INTERVAL_TICKS = 2;
 const MULTI_TREE_DEPLETION_ROLL_MAX = 15;
 const MULTI_TREE_DEPLETION_THRESHOLD = 2;
+let woodcuttingTick = 0;
 
 const AXES = [
   { id: ItemIds.BRONZE_AXE, requiredLevel: 1, speed: 0.03, animationId: 879 },
@@ -326,10 +330,12 @@ function startWoodcutting(player, treeObject, tree, activeSessions) {
     location,
     privateArea: treeObject.getPrivateArea(),
     cyclesUntilReward: calculateCyclesRequired(player, tree, axe),
-    nextAnimationTick: 0,
+    nextAnimationTick: woodcuttingTick + CHOP_ANIMATION_INTERVAL_TICKS,
+    nextSoundTick: woodcuttingTick + CHOP_SOUND_INTERVAL_TICKS,
   });
 
   player.getPacketSender().sendMessage("You swing your axe at the tree..");
+  Sounds.sendSound(player, Sound.WOODCUTTING_CHOP);
   player.performAnimation(new Animation(axe.animationId));
   return true;
 }
@@ -405,7 +411,13 @@ function processWoodcuttingTick(activeSessions, currentTick) {
       continue;
     }
 
+    if (currentTick >= state.nextSoundTick) {
+      Sounds.sendSound(player, Sound.WOODCUTTING_CHOP);
+      state.nextSoundTick = currentTick + CHOP_SOUND_INTERVAL_TICKS;
+    }
+
     if (currentTick >= state.nextAnimationTick) {
+      Sounds.sendSound(player, Sound.WOODCUTTING_CHOP);
       player.performAnimation(new Animation(state.axe.animationId));
       state.nextAnimationTick = currentTick + CHOP_ANIMATION_INTERVAL_TICKS;
     }
@@ -442,6 +454,7 @@ class WoodcuttingTask extends Task {
 
   execute() {
     this.currentTick++;
+    woodcuttingTick = this.currentTick;
     processWoodcuttingTick(this.activeSessions, this.currentTick);
   }
 }

@@ -65,6 +65,7 @@ export interface PluginCommandEvent {
 
 export interface PluginApi {
   onPacketReceived(handler: (event: PluginPacketEvent) => void): void;
+  onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
   onPlayerLogin(handler: (event: PluginPlayerLoginEvent) => void): void;
   onPlayerDisconnect(handler: (event: PluginPlayerDisconnectEvent) => void): void;
   onRegionLoaded(handler: (event: PluginRegionLoadedEvent) => void): void;
@@ -86,6 +87,7 @@ export interface PluginApi {
     handler: (event: PluginObjectInteractionEvent) => void | boolean
   ): void;
   registerPacketListener(opcode: number, listener: PacketExecutor): void;
+  registerAlivePacketListener(opcode: number, listener: PacketExecutor): void;
   setPlayerPersistence(persistence: PlayerPersistence): void;
   log(message: string, extra?: Record<string, unknown>): void;
 }

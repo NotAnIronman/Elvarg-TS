@@ -8,6 +8,7 @@ const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/imp
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
+const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const SESSION_MODE = Object.freeze({
@@ -102,14 +103,9 @@ class FireExpireTask extends Task {
   }
 
   execute() {
-    const existingFire = MapObjects.get(
-      this.fireObject.getId(),
-      this.fireObject.getLocation(),
-      this.fireObject.getPrivateArea()
-    );
-    if (existingFire) {
-      ObjectManager.deregister(existingFire, true);
-    }
+    // Always despawn the exact runtime fire instance we spawned for this task.
+    // Relying on a map lookup here can miss in edge-cases and leave stale fires.
+    ObjectManager.deregister(this.fireObject, true);
 
     if (
       this.ownerPlayer &&
@@ -570,6 +566,21 @@ module.exports = {
   register(api) {
     const activeSessions = new Map();
 
+    // If plugins are hot-reloaded in the same process, ensure no runtime fires linger.
+    // Static map fires are not stored in World.getObjects(), so this only clears
+    // previously spawned temporary firemaking objects.
+    const staleFires = World.getObjects().filter(
+      (object) => object?.getId?.() === FIRE_OBJECT_ID
+    );
+    for (const object of staleFires) {
+      if (object?.getId?.() === FIRE_OBJECT_ID) {
+        ObjectManager.deregister(object, true);
+      }
+    }
+    if (staleFires.length > 0) {
+      api.log("startup_cleanup", { removedStaleFires: staleFires.length });
+    }
+
     TaskManager.submit(new FiremakingTask(activeSessions));
 
     api.onPlayerDisconnect(({ player }) => {
@@ -579,29 +590,20 @@ module.exports = {
       stopFiremaking(activeSessions, player, false);
     });
 
-    api.registerPacketListener(OPCODE_ITEM_ON_ITEM, {
+    api.registerAlivePacketListener(OPCODE_ITEM_ON_ITEM, {
       execute(player, packet) {
-        if (!player || player.getHitpoints() <= 0) {
-          return;
-        }
         handleItemOnItem(player, packet, activeSessions);
       },
     });
 
-    api.registerPacketListener(OPCODE_ITEM_ON_GROUND_ITEM, {
+    api.registerAlivePacketListener(OPCODE_ITEM_ON_GROUND_ITEM, {
       execute(player, packet) {
-        if (!player || player.getHitpoints() <= 0) {
-          return;
-        }
         handleItemOnGroundItem(player, packet, activeSessions);
       },
     });
 
-    api.registerPacketListener(OPCODE_ITEM_ON_OBJECT, {
+    api.registerAlivePacketListener(OPCODE_ITEM_ON_OBJECT, {
       execute(player, packet) {
-        if (!player || player.getHitpoints() <= 0) {
-          return;
-        }
         handleItemOnObject(player, packet, activeSessions);
       },
     });

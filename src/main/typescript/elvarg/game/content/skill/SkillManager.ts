@@ -37,7 +37,8 @@ export class SkillManager {
         1096278, 1210421, 1336443, 1475581, 1629200, 1798808, 1986068, 2192818, 2421087, 2673114, 2951373, 3258594,
         3597792, 3972294, 4385776, 4842295, 5346332, 5902831, , 7195629, 7944614, 8771558, 9684577, 10692629,
         11805606, 13034431];
-    public static readonly LEVEL_UP_GRAPHIC: Graphic = new Graphic(199);
+    // Explicit 0 delay so the client renders the level-up fireworks immediately.
+    public static readonly LEVEL_UP_GRAPHIC: Graphic = new Graphic(199, 0);
 
     /**
      * The player associated with this Skills instance.

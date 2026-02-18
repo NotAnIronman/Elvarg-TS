@@ -227,13 +227,25 @@ export class World {
 
     public static process() {
         // Process all active {@link Task}s..
-        TaskManager.process();
+        try {
+            TaskManager.process();
+        } catch (e) {
+            console.error("[World] TaskManager.process failure", e);
+        }
 
         // Process all minigames
-        MinigameHandler.process();
+        try {
+            MinigameHandler.process();
+        } catch (e) {
+            console.error("[World] MinigameHandler.process failure", e);
+        }
 
         // Process all ground items..
-        ItemOnGroundManager.process();
+        try {
+            ItemOnGroundManager.process();
+        } catch (e) {
+            console.error("[World] ItemOnGroundManager.process failure", e);
+        }
 
         // Add pending players..
         for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {

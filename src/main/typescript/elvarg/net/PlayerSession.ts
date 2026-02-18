@@ -99,35 +99,44 @@ export class PlayerSession {
     const chan: any = this.channel;
     // ws path
     if (chan && typeof chan.send === "function") {
-      const packet = builder.toPacket();
-      const opcode = packet.getOpcode();
-      const payload = packet.getBuffer();
-      const encOpcode =
-        this.encryptor != null ? (opcode + this.encryptor.nextInt()) & 0xff : opcode;
-      // Log outgoing packets to help diagnose client desyncs.
+      // ws.OPEN = 1; skip sends for closed/closing sockets to avoid hard crashes.
+      if (typeof chan.readyState === "number" && chan.readyState !== 1) {
+        return;
+      }
       try {
-        console.log(
-          `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length}`
-        );
-      } catch {
-        // best-effort logging; never throw here
+        const packet = builder.toPacket();
+        const opcode = packet.getOpcode();
+        const payload = packet.getBuffer();
+        const encOpcode =
+          this.encryptor != null ? (opcode + this.encryptor.nextInt()) & 0xff : opcode;
+        // Log outgoing packets to help diagnose client desyncs.
+        try {
+          console.log(
+            `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length}`
+          );
+        } catch {
+          // best-effort logging; never throw here
+        }
+        let header: Buffer;
+        switch (packet.getType()) {
+          case PacketType.VARIABLE:
+            header = Buffer.alloc(2);
+            header.writeUInt8(encOpcode, 0);
+            header.writeUInt8(payload.length, 1);
+            break;
+          case PacketType.VARIABLE_SHORT:
+            header = Buffer.alloc(3);
+            header.writeUInt8(encOpcode, 0);
+            header.writeUInt16BE(payload.length, 1);
+            break;
+          default:
+            header = Buffer.from([encOpcode]);
+        }
+        chan.send(Buffer.concat([header, payload]));
+      } catch (err) {
+        // Ground-item/global updates can target stale sessions; never let this crash the server loop.
+        console.error("[PlayerSession.write] websocket send failed", err);
       }
-      let header: Buffer;
-      switch (packet.getType()) {
-        case PacketType.VARIABLE:
-          header = Buffer.alloc(2);
-          header.writeUInt8(encOpcode, 0);
-          header.writeUInt8(payload.length, 1);
-          break;
-        case PacketType.VARIABLE_SHORT:
-          header = Buffer.alloc(3);
-          header.writeUInt8(encOpcode, 0);
-          header.writeUInt16BE(payload.length, 1);
-          break;
-        default:
-          header = Buffer.from([encOpcode]);
-      }
-      chan.send(Buffer.concat([header, payload]));
       return;
     }
 

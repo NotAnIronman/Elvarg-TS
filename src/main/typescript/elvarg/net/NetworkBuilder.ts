@@ -20,6 +20,8 @@ import { PluginManager } from "../plugins/PluginManager";
 import { GameConstants } from "../game/GameConstants";
 import { DonatorRights } from "../game/model/rights/DonatorRights";
 import { Skill } from "../game/model/Skill";
+import { ItemOnGroundManager } from "../game/entity/impl/grounditem/ItemOnGroundManager";
+import { ObjectManager } from "../game/entity/impl/object/ObjectManager";
 
 // Copied from Java PacketDecoder.PACKET_SIZES (index = opcode).
 const PACKET_SIZES: number[] = [
@@ -539,6 +541,15 @@ class LoginSession {
     mapPayload.writeUInt8(((regionY >> 8) & 0xff) >>> 0, 2);
     mapPayload.writeUInt8((regionY & 0xff) >>> 0, 3);
     this.sendPacket(73, mapPayload, PacketType.FIXED, "map_region");
+
+    // Force a clean regional sync on login.
+    // The web client can otherwise keep stale spawned-object state from a prior
+    // session until the next explicit region-change handshake occurs.
+    if (this.gamePlayer) {
+      this.gamePlayer.getPacketSender().deleteRegionalSpawns();
+      ItemOnGroundManager.onRegionChange(this.gamePlayer);
+      ObjectManager.onRegionChange(this.gamePlayer);
+    }
 
     const updateBuf = this.buildPlayerUpdate(
       localX,

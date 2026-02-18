@@ -19,6 +19,16 @@ import { PacketConstants } from "../PacketConstants";
 // import { Flag } from "../../../game/model/Flag";
 // import { EnteredAmountAction } from "../../../game/model/EnteredAmountAction";
 
+const getInventoryCtor = () =>
+  require("../../../game/model/container/impl/Inventory")
+    .Inventory as typeof import("../../../game/model/container/impl/Inventory").Inventory;
+const getEquipPacketListener = () =>
+  require("./EquipPacketListener")
+    .EquipPacketListener as typeof import("./EquipPacketListener").EquipPacketListener;
+const getItemActionPacketListener = () =>
+  require("./ItemActionPacketListener")
+    .ItemActionPacketListener as typeof import("./ItemActionPacketListener").ItemActionPacketListener;
+
 // class ItemContainerEnteredAmountAction implements EnteredAmountAction{
 class ItemContainerEnteredAmountAction {
   constructor(private readonly execFunc: Function) {}
@@ -30,9 +40,33 @@ class ItemContainerEnteredAmountAction {
 export class ItemContainerActionPacketListener {
   static firstAction(player: any, packet: Packet) {
     // static firstAction(player: Player, packet: Packet) {
+    const payload = packet.getBuffer();
     let containerId = packet.readInt();
     let slot = packet.readShortA();
     let id = packet.readShortA();
+
+    // Some clients emit inventory first-clicks on container opcode 145 instead
+    // of opcode 122. Route it through the same first-action handler so left-click
+    // behavior stays consistent across client builds.
+    //
+    // IMPORTANT: do not trust raw (slot,id) decode blindly for inventory clicks.
+    // The web client can vary short layout/order for this opcode, so we resolve
+    // against live inventory contents before dispatching.
+    const Inventory = getInventoryCtor();
+    if (containerId === Inventory.INTERFACE_ID) {
+      const resolved =
+        getItemActionPacketListener().resolveSlotAndItemFromContainerFirstActionPayload(
+          player,
+          payload
+        );
+      if (!resolved) {
+        return;
+      }
+      slot = resolved.slot;
+      id = resolved.itemId;
+      getItemActionPacketListener().handleFirstAction(player, containerId, id, slot);
+      return;
+    }
 
     // Bank withdrawal..
     // if (containerId >= Bank.CONTAINER_START && containerId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {
@@ -132,8 +166,29 @@ export class ItemContainerActionPacketListener {
   // private static secondAction(player: Player, packet: Packet): void {
   private static secondAction(player: any, packet: Packet): void {
     let interfaceId = packet.readInt();
-    let id = packet.readShortA();
+    let id = packet.readLEShortA();
     let slot = packet.readLEShort();
+
+    // Some clients can emit inventory "Wield/Wear" through container option 2
+    // instead of the dedicated equip opcode. Keep this tolerant.
+    const Inventory = getInventoryCtor();
+    if (interfaceId === Inventory.INTERFACE_ID) {
+      if (slot < 0 || slot >= player.getInventory().capacity()) {
+        return;
+      }
+      const item = player.getInventory().getItems()[slot];
+      if (!item || item.getId() !== id) {
+        return;
+      }
+      const equipSlot = item
+        ?.getDefinition?.()
+        ?.getEquipmentType?.()
+        ?.getSlot?.();
+      if (Number.isInteger(equipSlot) && equipSlot >= 0) {
+        getEquipPacketListener().equip(player, id, slot, interfaceId);
+      }
+      return;
+    }
 
     // Bank withdrawal..
     // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {

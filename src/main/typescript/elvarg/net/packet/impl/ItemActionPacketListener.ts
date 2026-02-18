@@ -35,31 +35,167 @@ class ItemActionTask {
   // }
 }
 
-export class ItemActionPacketListener implements PacketExecutor {
-  // execute(player: Player, packet: Packet): void {
-  execute(player: any, packet: Packet): void {
-    if (player == null || player.getHitpoints() <= 0) return;
-    switch (
-      packet.getOpcode()
-      // case PacketConstants.SECOND_ITEM_ACTION_OPCODE:
-      //     ItemActionPacketListener.secondAction(player, packet);
-      //     break;
-      // case PacketConstants.FIRST_ITEM_ACTION_OPCODE:
-      //     ItemActionPacketListener.firstAction(player, packet);
-      //     break;
-      // case PacketConstants.THIRD_ITEM_ACTION_OPCODE:
-      //     this.thirdClickAction(player, packet);
-      //     break;
-    ) {
-    }
-  }
-  // private static firstAction(player: Player, packet: Packet) {
-  private static firstAction(player: any, packet: Packet) {
-    let interfaceId = packet.readUnsignedShort();
-    let itemId = packet.readShort();
-    let slot = packet.readShort();
+const getInventoryCtor = () =>
+  require("../../../game/model/container/impl/Inventory")
+    .Inventory as typeof import("../../../game/model/container/impl/Inventory").Inventory;
+const getEquipPacketListener = () =>
+  require("./EquipPacketListener")
+    .EquipPacketListener as typeof import("./EquipPacketListener").EquipPacketListener;
 
-    if (slot < 0 || slot > player.getInventory().capacity()) {
+export class ItemActionPacketListener implements PacketExecutor {
+  /**
+   * Decode 16-bit short values in all layouts we have seen across client builds.
+   * We keep this logic centralized so inventory click decoding is deterministic.
+   */
+  private static readShortVariants(
+    payload: Buffer,
+    offset: number
+  ): number[] {
+    const readShortA = (): number => {
+      const value =
+        ((payload[offset] & 0xff) << 8) | ((payload[offset + 1] - 128) & 0xff);
+      return value > 32767 ? value - 0x10000 : value;
+    };
+
+    const readLEShortA = (): number => {
+      const value =
+        ((payload[offset] - 128) & 0xff) | ((payload[offset + 1] & 0xff) << 8);
+      return value > 32767 ? value - 0x10000 : value;
+    };
+
+    const variants = [
+      payload.readInt16BE(offset), // Java/default
+      payload.readInt16LE(offset),
+      readShortA(),
+      readLEShortA(),
+    ];
+
+    return [...new Set(variants)];
+  }
+
+  private static matchInventorySlotAndItem(
+    player: any,
+    candidates: Array<{ slot: number; itemId: number }>
+  ): { slot: number; itemId: number } | null {
+    const inventory = player?.getInventory?.();
+    const items = inventory?.getItems?.();
+    const capacity = inventory?.capacity?.();
+    if (!items || !Number.isInteger(capacity) || capacity <= 0) {
+      return null;
+    }
+
+    for (const candidate of candidates) {
+      const slot = candidate.slot;
+      const itemId = candidate.itemId < 0 ? candidate.itemId + 0x10000 : candidate.itemId;
+      if (!Number.isInteger(slot) || slot < 0 || slot >= capacity) {
+        continue;
+      }
+      if (items[slot]?.getId?.() === candidate.itemId || items[slot]?.getId?.() === itemId) {
+        return { slot, itemId };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * IMPORTANT: inventory first-click packets can arrive with field order/endianness
+   * differences depending on the web client build. We try known layouts and only
+   * accept a decode that matches the authoritative server inventory state.
+   */
+  private static resolveSlotAndItemFromPayload(
+    player: any,
+    payload: Buffer,
+    firstOffset: number,
+    secondOffset: number,
+    primaryLayout: "item_slot" | "slot_item"
+  ): { slot: number; itemId: number } | null {
+    if (!Buffer.isBuffer(payload) || payload.length < secondOffset + 2) {
+      return null;
+    }
+
+    const firstVariants = ItemActionPacketListener.readShortVariants(payload, firstOffset);
+    const secondVariants = ItemActionPacketListener.readShortVariants(payload, secondOffset);
+    const candidates: Array<{ slot: number; itemId: number }> = [];
+    const seen = new Set<string>();
+
+    const pushCandidate = (slot: number, itemId: number): void => {
+      const key = `${slot}:${itemId}`;
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      candidates.push({ slot, itemId });
+    };
+
+    const pushFromValues = (first: number, second: number): void => {
+      if (primaryLayout === "item_slot") {
+        // Java/default opcode 122 layout: interfaceId, itemId, slot
+        pushCandidate(second, first);
+        // Alternate layout: interfaceId, slot, itemId
+        pushCandidate(first, second);
+        return;
+      }
+
+      // Java/default opcode 145 layout: interfaceId, slot, itemId
+      pushCandidate(first, second);
+      // Alternate layout: interfaceId, itemId, slot
+      pushCandidate(second, first);
+    };
+
+    // Prefer the Java/default decode first to keep behavior stable.
+    pushFromValues(payload.readInt16BE(firstOffset), payload.readInt16BE(secondOffset));
+
+    for (const first of firstVariants) {
+      for (const second of secondVariants) {
+        pushFromValues(first, second);
+      }
+    }
+
+    return ItemActionPacketListener.matchInventorySlotAndItem(player, candidates);
+  }
+
+  public static resolveSlotAndItemFromItemFirstActionPayload(
+    player: any,
+    payload: Buffer
+  ): { slot: number; itemId: number } | null {
+    return ItemActionPacketListener.resolveSlotAndItemFromPayload(
+      player,
+      payload,
+      2,
+      4,
+      "item_slot"
+    );
+  }
+
+  public static resolveSlotAndItemFromContainerFirstActionPayload(
+    player: any,
+    payload: Buffer
+  ): { slot: number; itemId: number } | null {
+    return ItemActionPacketListener.resolveSlotAndItemFromPayload(
+      player,
+      payload,
+      4,
+      6,
+      "slot_item"
+    );
+  }
+
+  /**
+   * Handles inventory first-click semantics once interface/id/slot are decoded.
+   * Some client builds route inventory clicks through different opcodes, so this
+   * method is shared by both ItemAction and ItemContainer listeners.
+   */
+  public static handleFirstAction(
+    player: any,
+    interfaceId: number,
+    itemId: number,
+    slot: number
+  ): void {
+    if (!player) {
+      return;
+    }
+    if (slot < 0 || slot >= player.getInventory().capacity()) {
       return;
     }
     if (player.getInventory().getItems()[slot].getId() != itemId) {
@@ -70,7 +206,22 @@ export class ItemActionPacketListener implements PacketExecutor {
       return;
     }
 
+    // Match Java: clear modal/overlay interface context before item action.
     player.getPacketSender().sendInterfaceRemoval();
+
+    // Left-click inventory action for wieldables should behave like clicking "Wield/Wear".
+    const Inventory = getInventoryCtor();
+    if (interfaceId === Inventory.INTERFACE_ID) {
+      const item = player.getInventory().getItems()[slot];
+      const equipSlot = item
+        ?.getDefinition?.()
+        ?.getEquipmentType?.()
+        ?.getSlot?.();
+      if (Number.isInteger(equipSlot) && equipSlot >= 0) {
+        getEquipPacketListener().equip(player, itemId, slot, interfaceId);
+        return;
+      }
+    }
 
     // Herblore
     // if (Herblore.cleanHerb(player, itemId)) {
@@ -202,6 +353,44 @@ export class ItemActionPacketListener implements PacketExecutor {
       //   player.getPacketSender().sendMessage(`You've opened your .`);
       // }
     }
+  }
+
+  // execute(player: Player, packet: Packet): void {
+  execute(player: any, packet: Packet): void {
+    if (player == null || player.getHitpoints() <= 0) return;
+    switch (packet.getOpcode()) {
+      case 122: // FIRST_ITEM_ACTION_OPCODE
+        ItemActionPacketListener.firstAction(player, packet);
+        break;
+      case 75: // SECOND_ITEM_ACTION_OPCODE
+        ItemActionPacketListener.secondAction(player, packet);
+        break;
+      case 16: // THIRD_ITEM_ACTION_OPCODE
+        this.thirdClickAction(player, packet);
+        break;
+      default:
+        break;
+    }
+  }
+  // private static firstAction(player: Player, packet: Packet) {
+  private static firstAction(player: any, packet: Packet) {
+    const payload = packet.getBuffer();
+    if (!Buffer.isBuffer(payload) || payload.length < 6) {
+      return;
+    }
+
+    const interfaceId = payload.readUInt16BE(0);
+    const resolved =
+      ItemActionPacketListener.resolveSlotAndItemFromItemFirstActionPayload(
+        player,
+        payload
+      );
+    if (!resolved) {
+      return;
+    }
+    const { itemId, slot } = resolved;
+
+    ItemActionPacketListener.handleFirstAction(player, interfaceId, itemId, slot);
   }
 
   // static secondAction(player: Player, packet: Packet) {

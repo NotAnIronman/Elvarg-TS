@@ -728,12 +728,13 @@ export class MovementQueue {
 
         PathFinder.calculateWalkRoute(this.player, destX, destY);
 
-        TaskManager.submit(new MovementTask(this.player.getIndex(), () => {
-            let stage = 0;
+        let stage = 0;
+        TaskManager.submit(new MovementTask(this.player.getIndex(), (task: MovementTask) => {
             if (stage !== 0) {
                 this.player.getMovementQueue().reset();
                 TaskManager.cancelTasks(this.player);
                 this.player.getPacketSender().sendMessage("You can't reach that!");
+                task.stop();
                 return;
             }
 
@@ -752,7 +753,7 @@ export class MovementQueue {
             }
 
             this.player.getMovementQueue().reset();
-            stop();
+            task.stop();
         }));
     }
 
@@ -799,10 +800,10 @@ export class MovementQueue {
         let finalDestinationX = this.player.getMovementQueue().pathX;
         let finalDestinationY = this.player.getMovementQueue().pathY;
 
-        TaskManager.submit(new MovementTask(this.player.getIndex(), () => {
-            let currentX = entity.getLocation().getX();
-            let currentY = entity.getLocation().getY();
-            let reachStage = 0;
+        let currentX = entity.getLocation().getX();
+        let currentY = entity.getLocation().getY();
+        let reachStage = 0;
+        TaskManager.submit(new MovementTask(this.player.getIndex(), (task: MovementTask) => {
             this.player.setMobileInteraction(entity);
             if (currentX != entity.getLocation().getX() || currentY != entity.getLocation().getY()) {
                 this.reset();
@@ -814,17 +815,18 @@ export class MovementQueue {
             if (runnable && this.player.getMovementQueue().isWithinEntityInteractionDistance(entity.getLocation())) {
                 // Executes the runnable and stops the task. However, It will still path to the destination.
                 runnable();
+                task.stop();
                 return;
             }
 
             if (reachStage !== 0) {
                 if (reachStage === 1) {
                     this.player.getMovementQueue().reset();
-                    stop();
+                    task.stop();
                     return;
                 }
                 this.player.getMovementQueue().reset();
-                stop();
+                task.stop();
                 this.player.getPacketSender().sendMessage("I can't reach that!");
                 return;
             }
@@ -1064,11 +1066,11 @@ class Point {
 
 
 class MovementTask extends Task {
-    constructor(n1: number, private readonly execFunc: Function) {
+    constructor(n1: number, private readonly execFunc: (task: MovementTask) => void) {
         super(0, n1, true);
     }
     execute(): void {
-        this.execFunc();
+        this.execFunc(this);
     }
 
 }

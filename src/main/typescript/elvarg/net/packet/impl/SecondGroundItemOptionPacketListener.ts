@@ -17,7 +17,7 @@ export class SecondGroundItemOptionPacketListener implements PacketExecutor {
 
     player.getSkillManager().stopSkillable();
 
-    if (!player.getLastItemPickup().elapsed()) return;
+    if (!player.getLastItemPickup().elapsedTime(300)) return;
     if (player.busy()) return;
 
     if (

@@ -16,8 +16,33 @@ export class ObjectManager {
     }
 
     public static onRegionChange(player: Player) {
-        World.getObjects().forEach((o) => ObjectManager.perform(o, OperationType.SPAWN));
-        World.getRemovedObjects().forEach((o) => player.getPacketSender().sendObjectRemoval(o));
+        // Region sync should only target the requesting player.
+        // Broadcasting every object spawn globally here causes redundant updates.
+        for (const object of World.getObjects()) {
+            if (!object) {
+                continue;
+            }
+            if (player.getPrivateArea() !== object.getPrivateArea()) {
+                continue;
+            }
+            if (!player.getLocation().isWithinDistance(object.getLocation(), 64)) {
+                continue;
+            }
+            player.getPacketSender().sendObject(object);
+        }
+
+        for (const object of World.getRemovedObjects()) {
+            if (!object) {
+                continue;
+            }
+            if (player.getPrivateArea() !== object.getPrivateArea()) {
+                continue;
+            }
+            if (!player.getLocation().isWithinDistance(object.getLocation(), 64)) {
+                continue;
+            }
+            player.getPacketSender().sendObjectRemoval(object);
+        }
     }
 
     public static register(object: GameObject, playerUpdate: boolean) {

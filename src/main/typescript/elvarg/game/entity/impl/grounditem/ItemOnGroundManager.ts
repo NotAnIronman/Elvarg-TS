@@ -37,13 +37,13 @@ export class ItemOnGroundManager {
             case State.SEEN_BY_PLAYER:
                 let owner = World.getPlayerByName(item.getOwner())
                 if (owner != null) {
-                    ItemOnGroundManager.performPlayer(owner, item)
+                    ItemOnGroundManager.performPlayer(owner, item, type)
                 }
                 break;
             case State.SEEN_BY_EVERYONE:
                 for (let player of World.getPlayers()) {
                     if (player) {
-                        ItemOnGroundManager.performPlayer(player, item)
+                        ItemOnGroundManager.performPlayer(player, item, type)
                     }
                 }
                 break;
@@ -54,6 +54,10 @@ export class ItemOnGroundManager {
     public static performPlayer(player: Player, item: ItemOnGround, type?: OperationType): void {
         if (item.isPendingRemoval()) {
             type = OperationType.DELETE;
+        }
+        // Skip stale/disconnected sessions to avoid write-time crashes while broadcasting ground-item updates.
+        if (!World.isPlayerSessionConnected(player)) {
+            return;
         }
         if (item.getPosition().getZ() != player.getLocation().getZ())
             return;
@@ -79,8 +83,11 @@ export class ItemOnGroundManager {
                 player.getPacketSender().createGroundItem(item);
                 break;
             default:
-                throw new Error(
-                    "Unsupported operation (" + type.toString() + ") on: " + item.toString());
+                // Never crash the game loop on a malformed ground-item operation.
+                console.warn(
+                    "[ItemOnGroundManager] Unsupported operation (" + String(type) + ") on: " + item.toString()
+                );
+                return;
         }
     }
     public static register(item: ItemOnGround) {
@@ -190,12 +197,11 @@ export class ItemOnGroundManager {
     }
 
     public static exists(item: ItemOnGround): boolean {
-        return this.getGroundItem(item.getOwner(), item.getItem().getId(), item.getPosition()) !== undefined;
+        return this.getGroundItem(item.getOwner(), item.getItem().getId(), item.getPosition()) !== null;
     }
 
     private static isOwner(username: string, item: ItemOnGround): boolean {
         return item.getOwner() === username;
-        return false;
     }
 
 

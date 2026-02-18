@@ -36,6 +36,10 @@ export class PluginManager {
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
   private static commandHooks: PluginHook<PluginCommandEvent>[] = [];
+  private static commandHandlersByBase = new Map<
+    string,
+    PluginHook<PluginCommandEvent>[]
+  >();
   private static packetListeners = new Map<number, RegisteredPacketListener>();
 
   public static loadFromDirectory(
@@ -182,7 +186,63 @@ export class PluginManager {
         );
       }
     }
-    return event.handled === true;
+
+    if (event.handled) {
+      return true;
+    }
+
+    const baseHandlers = PluginManager.commandHandlersByBase.get(event.base);
+    if (!baseHandlers) {
+      return event.handled;
+    }
+
+    for (const hook of baseHandlers) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] command hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+
+    return event.handled;
+  }
+
+  private static validatePacketListenerRegistration(
+    pluginName: string,
+    opcode: number,
+    listener: PacketExecutor
+  ): boolean {
+    if (
+      !Number.isInteger(opcode) ||
+      opcode < 0 ||
+      opcode > 255 ||
+      !listener ||
+      typeof (listener as any).execute !== "function"
+    ) {
+      console.warn(
+        `[plugins] ${pluginName} attempted invalid packet listener registration for opcode=${opcode}`
+      );
+      return false;
+    }
+    return true;
+  }
+
+  private static registerPacketListenerInternal(
+    pluginName: string,
+    opcode: number,
+    listener: PacketExecutor
+  ): void {
+    const existing = PluginManager.packetListeners.get(opcode);
+    if (existing) {
+      console.warn(
+        `[plugins] packet listener opcode ${opcode} overridden: ${existing.pluginName} -> ${pluginName}`
+      );
+    }
+
+    PluginManager.packetListeners.set(opcode, { pluginName, listener });
   }
 
   private static discoverPluginFiles(
@@ -252,6 +312,20 @@ export class PluginManager {
         }
         PluginManager.packetHooks.push({ pluginName, handler });
       },
+      onEstablishedPacket: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.packetHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.stage !== "ESTABLISHED" || !event.player) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onPlayerLogin: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -311,13 +385,10 @@ export class PluginManager {
           return;
         }
 
-        PluginManager.commandHooks.push({
+        const wrapper: PluginHook<PluginCommandEvent> = {
           pluginName,
           handler: (event) => {
             if (!event || event.handled) {
-              return;
-            }
-            if (event.base !== normalized) {
               return;
             }
             const result = handler(event);
@@ -325,7 +396,12 @@ export class PluginManager {
               event.handled = true;
             }
           },
-        });
+        };
+
+        const existing =
+          PluginManager.commandHandlersByBase.get(normalized) ?? [];
+        existing.push(wrapper);
+        PluginManager.commandHandlersByBase.set(normalized, existing);
       },
       onObjectClick: (objectId, clickType, handler) => {
         if (
@@ -390,26 +466,41 @@ export class PluginManager {
       },
       registerPacketListener: (opcode, listener) => {
         if (
-          !Number.isInteger(opcode) ||
-          opcode < 0 ||
-          opcode > 255 ||
-          !listener ||
-          typeof (listener as any).execute !== "function"
+          !PluginManager.validatePacketListenerRegistration(
+            pluginName,
+            opcode,
+            listener
+          )
         ) {
-          console.warn(
-            `[plugins] ${pluginName} attempted invalid packet listener registration for opcode=${opcode}`
-          );
+          return;
+        }
+        PluginManager.registerPacketListenerInternal(pluginName, opcode, listener);
+      },
+      registerAlivePacketListener: (opcode, listener) => {
+        if (
+          !PluginManager.validatePacketListenerRegistration(
+            pluginName,
+            opcode,
+            listener
+          )
+        ) {
           return;
         }
 
-        const existing = PluginManager.packetListeners.get(opcode);
-        if (existing) {
-          console.warn(
-            `[plugins] packet listener opcode ${opcode} overridden: ${existing.pluginName} -> ${pluginName}`
-          );
-        }
+        const guardedListener: PacketExecutor = {
+          execute(player, packet) {
+            if (!player || player.getHitpoints?.() <= 0) {
+              return;
+            }
+            listener.execute(player, packet);
+          },
+        };
 
-        PluginManager.packetListeners.set(opcode, { pluginName, listener });
+        PluginManager.registerPacketListenerInternal(
+          pluginName,
+          opcode,
+          guardedListener
+        );
       },
       setPlayerPersistence: (persistence) => {
         if (

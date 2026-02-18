@@ -31,9 +31,13 @@ export class Server {
 
   private static setupFileLogging() {
     if (Server.consolePatched) return;
-    // Ensure log directory exists and clear the file on startup.
+    // Ensure log directory exists and append across restarts so crash evidence is preserved.
     fs.mkdirSync(path.dirname(Server.logFile), { recursive: true });
-    fs.writeFileSync(Server.logFile, "", { encoding: "utf8" });
+    fs.appendFileSync(
+      Server.logFile,
+      `${new Date().toISOString()} [INFO] ===== server_bootstrap pid=${process.pid} =====\n`,
+      { encoding: "utf8" }
+    );
 
     const original = {
       log: console.log,
@@ -64,9 +68,19 @@ export class Server {
     Server.consolePatched = true;
   }
 
+  private static installGlobalCrashHandlers() {
+    process.on("uncaughtException", (err) => {
+      console.error("[fatal] uncaughtException", err);
+    });
+    process.on("unhandledRejection", (reason) => {
+      console.error("[fatal] unhandledRejection", reason);
+    });
+  }
+
   public static main(args: string[]) {
     try {
       Server.setupFileLogging();
+      Server.installGlobalCrashHandlers();
 
       if (args.length === 1) {
         Server.PRODUCTION = parseInt(args[0], 10) === 1;

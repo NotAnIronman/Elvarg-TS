@@ -4,6 +4,7 @@ import { ValueType } from "./ValueType";
 import { ByteOrder } from "./ByteOrder";
 // import { CreationMenu } from "../../game/model/menu/CreationMenu";
 import { PacketType } from "./PacketType";
+import { PlayerStatus } from "../../game/model/PlayerStatus";
 // import { Skill } from "../../game/model/Skill";
 // import { GameConstants } from "../../game/GameConstants";
 // import { PlayerBot } from "../../game/entity/impl/playerbot/PlayerBot";
@@ -110,13 +111,9 @@ export class PacketSender {
   }
 
   sendSound(soundId: number, volume: number, delay: number): this {
-    const out = new PacketBuilder(175);
-    out
-      .putShort(soundId, ValueType.A, ByteOrder.LITTLE)
-      .put(volume)
-      .putShort(delay);
-    this.player.getSession().write(out);
-    return this;
+    // The web client decodes SFX on opcode 174 only.
+    // Sending opcode 175 makes the client treat it as an unknown packet and drop.
+    return this.sendSoundEffect(soundId, 1, delay, volume);
   }
 
   sendSong(id: number): this {
@@ -993,6 +990,20 @@ export class PacketSender {
   }
 
   sendInterfaceRemoval(): this {
+    // Keep client/server interface state aligned with Java behavior.
+    // A no-op here can leave stale inventory context active client-side, which
+    // affects default left-click item actions (e.g. "Drop" appearing as primary).
+    this.player.setStatus?.(PlayerStatus.NONE);
+    this.player.setEnteredAmountAction?.(null);
+    this.player.setEnteredSyntaxAction?.(null);
+    this.player.getDialogueManager?.()?.reset?.();
+    this.player.setShop?.(null);
+    this.player.setDestroyItem?.(-1);
+    this.player.setInterfaceId?.(-1);
+    this.player.setSearchingBank?.(false);
+    this.player.setTeleportInterfaceOpen?.(false);
+    this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
+    this.player.getSession().write(new PacketBuilder(219));
     return this;
   }
 
@@ -1138,15 +1149,42 @@ export class PacketSender {
     return this;
   }
 
-  alterGroundItem(_item: any): this {
+  alterGroundItem(item: any): this {
+    if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
+      return this;
+    }
+    this.sendPosition(item.getPosition());
+    const out = new PacketBuilder(84);
+    out.put(0);
+    out
+      .putShort(item.getItem().getId())
+      .putInt(item.getOldAmount?.() ?? 0)
+      .putInt(item.getItem().getAmount());
+    this.player.getSession().write(out);
     return this;
   }
 
-  deleteGroundItem(_item: any): this {
+  deleteGroundItem(item: any): this {
+    if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
+      return this;
+    }
+    this.sendPosition(item.getPosition());
+    const out = new PacketBuilder(156);
+    out.puts(0, ValueType.A);
+    out.putShort(item.getItem().getId());
+    this.player.getSession().write(out);
     return this;
   }
 
-  createGroundItem(_item: any): this {
+  createGroundItem(item: any): this {
+    if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
+      return this;
+    }
+    this.sendPosition(item.getPosition());
+    const out = new PacketBuilder(44);
+    out.putShort(item.getItem().getId(), ValueType.A, ByteOrder.LITTLE);
+    out.putInt(item.getItem().getAmount()).put(0);
+    this.player.getSession().write(out);
     return this;
   }
 
