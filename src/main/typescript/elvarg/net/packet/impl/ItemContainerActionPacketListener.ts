@@ -1,4 +1,3 @@
-// import { EquipmentMaking } from "../../../game/content/skill/skillable/impl/Smithing";
 // import { Player } from "../../../game/entity/impl/player/Player";
 import { Packet } from "../Packet";
 // import { Bank } from "../../../game/model/container/impl/Bank";

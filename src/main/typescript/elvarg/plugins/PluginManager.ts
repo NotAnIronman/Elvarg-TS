@@ -4,10 +4,12 @@ import { GameConstants } from "../game/GameConstants";
 import { PacketExecutor } from "../net/packet/PacketExecutor";
 import {
   PluginApi,
+  PluginItemActionEvent,
   PluginModule,
   PluginItemOnGroundItemEvent,
   PluginItemOnItemEvent,
   PluginItemOnObjectEvent,
+  PluginNpcDeathEvent,
   PluginNpcInteractionEvent,
   PluginObjectInteractionEvent,
   PluginPathBlockedEvent,
@@ -40,15 +42,21 @@ export class PluginManager {
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
   private static npcInteractionHooks: PluginHook<PluginNpcInteractionEvent>[] = [];
+  private static npcDeathHooks: PluginHook<PluginNpcDeathEvent>[] = [];
   private static itemOnObjectHooks: PluginHook<PluginItemOnObjectEvent>[] = [];
   private static itemOnItemHooks: PluginHook<PluginItemOnItemEvent>[] = [];
   private static itemOnGroundItemHooks: PluginHook<PluginItemOnGroundItemEvent>[] =
     [];
+  private static itemActionHooks: PluginHook<PluginItemActionEvent>[] = [];
   private static commandHooks: PluginHook<PluginCommandEvent>[] = [];
   private static commandHandlersByBase = new Map<
     string,
     PluginHook<PluginCommandEvent>[]
   >();
+  private static slayerAssignHooks: Array<{
+    pluginName: string;
+    handler: (player: any) => boolean;
+  }> = [];
   private static packetListeners = new Map<number, RegisteredPacketListener>();
 
   public static loadFromDirectory(
@@ -198,6 +206,35 @@ export class PluginManager {
     return event.handled === true;
   }
 
+  public static emitNpcDeath(event: PluginNpcDeathEvent): void {
+    for (const hook of PluginManager.npcDeathHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] npc_death hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+  }
+
+  public static emitSlayerAssignRequest(player: any): boolean {
+    for (const hook of PluginManager.slayerAssignHooks) {
+      try {
+        if (hook.handler(player) === true) {
+          return true;
+        }
+      } catch (err) {
+        console.error(
+          `[plugins] slayer_assign hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return false;
+  }
+
   public static emitItemOnObject(event: PluginItemOnObjectEvent): boolean {
     for (const hook of PluginManager.itemOnObjectHooks) {
       try {
@@ -235,6 +272,20 @@ export class PluginManager {
       } catch (err) {
         console.error(
           `[plugins] item_on_ground_item hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
+  public static emitItemAction(event: PluginItemActionEvent): boolean {
+    for (const hook of PluginManager.itemActionHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] item_action hook failed (${hook.pluginName})`,
           err
         );
       }
@@ -496,6 +547,26 @@ export class PluginManager {
           },
         });
       },
+      onNpcDeath: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.npcDeathHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.killer || !event.npc) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onSlayerAssignRequest: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.slayerAssignHooks.push({ pluginName, handler });
+      },
       onNpcClick: (npcId, clickType, handler) => {
         if (
           !Number.isInteger(npcId) ||
@@ -602,6 +673,51 @@ export class PluginManager {
               return;
             }
             handler(event);
+          },
+        });
+      },
+      onItemAction: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemActionHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              !event.player ||
+              !event.item ||
+              !Number.isInteger(event.slot) ||
+              !Number.isInteger(event.itemId) ||
+              !Number.isInteger(event.clickType)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onItemFirstAction: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemActionHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              event.clickType !== 1 ||
+              !event.player ||
+              !event.item
+            ) {
+              return;
+            }
+            const result = handler(event);
+            if (result !== false) {
+              event.handled = true;
+            }
           },
         });
       },

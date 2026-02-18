@@ -1,6 +1,5 @@
 import { Task } from "../Task";
 import { World } from "../../World";
-import { Slayer } from '../../../game/content/skill/slayer/Slayer'
 import { NPC } from "../../entity/impl/npc/NPC";
 import { NPCDropGenerator } from '../../../game/entity/impl/npc/NPCDropGenerator'
 import { Barricades } from "../../entity/impl/npc/impl/Barricades";
@@ -9,6 +8,7 @@ import { Animation } from "../../model/Animation";
 import { Priority } from "../../model/Priority";
 import { TaskManager } from "../TaskManager";
 import { NPCRespawnTask } from '../impl/NPCRespawnTask'
+import { PluginManager } from "../../../plugins/PluginManager";
 
 
 export class NPCDeathTask extends Task {
@@ -41,7 +41,16 @@ export class NPCDeathTask extends Task {
                     if (this.killer.getArea() !== null) {
                         this.killer.getArea().defeated(this.killer, this.npc);
                     }
-                    Slayer.killed(this.killer, this.npc);
+                    PluginManager.emitNpcDeath({
+                        killer: this.killer,
+                        npc: this.npc,
+                        npcId: this.npc.getId(),
+                        location: {
+                            x: this.npc.getLocation().getX(),
+                            y: this.npc.getLocation().getY(),
+                            z: this.npc.getLocation().getZ(),
+                        },
+                    });
                     NPCDropGenerator.start(this.killer, this.npc);
                 }
                 this.stop();

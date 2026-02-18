@@ -15,8 +15,6 @@ import { Barrows, Brother } from "../../../content/minigames/impl/Barrows"
 import { Presetable } from "../../../content/presets/Presetable";
 import { Presetables } from "../../../content/presets/Presetables";
 import { SkillManager } from "../../../content/skill/SkillManager";
-import { Skillable } from "../../../content/skill/skillable/Skillable";
-import { ActiveSlayerTask } from "../../../content/skill/slayer/ActiveSlayerTask"
 import { ItemDefinition } from "../../../definition/ItemDefinition";
 import { Mobile } from "../Mobile";
 import { NPC } from "../npc/NPC";
@@ -64,7 +62,6 @@ import { Trading } from "../../../content/Trading";
 import { Dueling } from "../../../content/Duelling";
 import { QuickPrayers } from "../../../content/QuickPrayers";
 import { MagicSpellbook } from "../../../model/MagicSpellbook";
-import { PouchContainer, Pouch } from "../../../content/skill/skillable/impl/Runecrafting";
 import { SkullType } from "../../../model/SkullType";
 import { EffectTimer } from "../../../model/EffectTimer";
 import { PetHandler } from "../../../content/PetHandler";
@@ -152,7 +149,7 @@ export class Player extends Mobile {
     public questPoints: number;
     public questProgress = new Map<number, number>();
     // Skilling
-    private skill: Skillable;
+    private skill: any;
     private creationMenu: CreationMenu;
     // Entering data
     public enteredAmountAction: EnteredAmountAction;
@@ -161,11 +158,14 @@ export class Player extends Mobile {
     // Time the account was created
     private creationDate = new Date();
     // RC
-    public pouches: PouchContainer[] = [new PouchContainer(Pouch.SMALL_POUCH),
-    new PouchContainer(Pouch.MEDIUM_POUCH), new PouchContainer(Pouch.LARGE_POUCH),
-    new PouchContainer(Pouch.GIANT_POUCH)];
+    public pouches: any[] = [
+        { pouch: { itemId: 5509, requiredLevel: 1, capacity: 3, decayChance: -1 }, runeEssenceAmt: 0, pureEssenceAmt: 0 },
+        { pouch: { itemId: 5510, requiredLevel: 25, capacity: 6, decayChance: 45 }, runeEssenceAmt: 0, pureEssenceAmt: 0 },
+        { pouch: { itemId: 5512, requiredLevel: 50, capacity: 9, decayChance: 29 }, runeEssenceAmt: 0, pureEssenceAmt: 0 },
+        { pouch: { itemId: 5514, requiredLevel: 75, capacity: 12, decayChance: 10 }, runeEssenceAmt: 0, pureEssenceAmt: 0 },
+    ];
     // Slayer
-    private slayerTask: ActiveSlayerTask;
+    private slayerTask: any;
     private slayerPoints: number;
     private consecutiveTasks: number;
 
@@ -1255,11 +1255,11 @@ export class Player extends Mobile {
         this.regionHeight = regionHeight;
     }
 
-    public getSkill(): Skillable | undefined {
+    public getSkill(): any {
         return this.skill;
     }
 
-    public setSkill(skill: Skillable | undefined) {
+    public setSkill(skill: any) {
         this.skill = skill;
     }
 
@@ -1271,11 +1271,11 @@ export class Player extends Mobile {
         this.creationMenu = creationMenu;
     }
 
-    public getPouches(): PouchContainer[] {
+    public getPouches(): any[] {
         return this.pouches;
     }
 
-    public setPouches(pouches: PouchContainer[]): void {
+    public setPouches(pouches: any[]): void {
         this.pouches = pouches;
     }
 
@@ -1460,11 +1460,11 @@ export class Player extends Mobile {
         this.enteredSyntaxAction = enteredSyntaxAction;
     }
 
-    public getSlayerTask(): ActiveSlayerTask {
+    public getSlayerTask(): any {
         return this.slayerTask;
     }
 
-    public setSlayerTask(slayerTask: ActiveSlayerTask): void {
+    public setSlayerTask(slayerTask: any): void {
         this.slayerTask = slayerTask;
     }
 

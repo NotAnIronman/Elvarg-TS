@@ -7,8 +7,8 @@ import { Player } from "../../../../entity/impl/player/Player";
 import { DialogueOption } from "../../DialogueOption";
 import { Skill } from "../../../Skill";
 import { SkillManager } from "../../../../content/skill/SkillManager";
-import { Slayer } from "../../../../content/skill/slayer/Slayer";
 import { PlayerDialogue } from "../../entries/impl/PlayerDialogue";
+import { PluginManager } from "../../../../../plugins/PluginManager";
 
 import { DialogueOptionAction } from "../../DialogueOptionAction";
 import { Action } from "../../../Action";
@@ -57,8 +57,9 @@ export class NieveDialogue extends DynamicDialogueBuilder {
 
             this.add(new ActionDialogue(2, new NieveAction(() => {
                 if (player.getSlayerTask() == null) {
-                  if (Slayer.assigns(player)) {
-                    this.add(new NpcDialogue(3, 6797, "You've been assigned to hunt " + player.getSlayerTask().getRemaining() + " " + player.getSlayerTask().getTask().toString() + ", come back when you're done."));
+                  if (PluginManager.emitSlayerAssignRequest(player)) {
+                    const assignedTask = player.getSlayerTask();
+                    this.add(new NpcDialogue(3, 6797, "You've been assigned to hunt " + assignedTask.getRemaining() + " " + assignedTask.getTask().toString() + ", come back when you're done."));
                     this.add(new PlayerDialogue(4, "Okay, thanks."));
                     this.add(new EndDialogue(5));
                     player.getDialogueManager().startDialog(this, 3);
@@ -98,4 +99,3 @@ export class NieveDialogue extends DynamicDialogueBuilder {
         }
     }
 }
-

@@ -9,7 +9,6 @@ import { PacketExecutor } from "../PacketExecutor";
 // import { MinigameHandler } from '../../../game/content/minigames/MinigameHandler';
 // import { Presetables } from '../../../game/content/presets/Presetables';
 // import { QuestHandler, Quests } from '../../../game/content/quests/QuestHandler';
-// import { Smithing } from '../../../game/content/skill/skillable/impl/Smithing';
 // import { Player } from '../../../game/entity/impl/player/Player';
 // import { Bank } from '../../../game/model/container/impl/Bank';
 // import { DialogueOption } from '../../../game/model/dialogues/DialogueOption';

@@ -6,13 +6,10 @@ import { PlayerRights } from "../../model/rights/PlayerRights";
 import { Flag } from "../../model/Flag";
 import { World } from "../../World";
 import { WildernessArea } from "../../model/areas/impl/WildernessArea";
-import { Runecrafting } from "./skillable/impl/Runecrafting";
 import { PrayerData, PrayerHandler } from "../PrayerHandler";
-import { Skillable } from "./skillable/Skillable";
 import { WeaponInterfaces } from "../combat/WeaponInterfaces";
 import { BonusManager } from "../../model/equipment/BonusManager";
 import { BountyHunter } from "../combat/bountyhunter/BountyHunter";
-import { Mining, Rock } from '../../content/skill/skillable/impl/Mining'
 import { GameObject } from "../../entity/impl/object/GameObject";
 import { EnteredAmountAction } from "../../model/EnteredAmountAction";
 
@@ -456,23 +453,10 @@ export class SkillManager {
     }
 
     startSkillables(object: GameObject): boolean {
-        // Check mining..
-        let rock: Rock
-        rock.forObjectId(object.getId());
-        if (rock) {
-            this.startSkillable(new Mining(object, rock));
-            return true;
-        }
-
-        // Check runecrafting
-        if (Runecrafting.initialize(this.player, object.getId())) {
-            return true;
-        }
-
         return false;
     }
 
-    startSkillable(skill: Skillable) {
+    startSkillable(skill: any) {
         // Stop previous skills..
         this.stopSkillable();
 

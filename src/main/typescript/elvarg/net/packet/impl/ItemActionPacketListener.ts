@@ -1,14 +1,13 @@
 import { PacketExecutor } from "../PacketExecutor";
 import { Packet } from "../Packet";
+import { PluginManager } from "../../../plugins/PluginManager";
 // import { Player } from "../../../game/entity/impl/player/Player";
 // import { Barricades } from "../../../game/entity/impl/npc/impl/Barricades";
-// import { Herblore } from '../../../game/content/skill/skillable/impl/Herblore'
 // import { Food } from "../../../game/content/Food";
 // import { TeleportHandler } from "../../../game/model/teleportation/TeleportHandler";
 // import { TeleportTablets } from '../../../game/model/teleportation/TeleportTablets'
 // import { TeleportType } from "../../../game/model/teleportation/TeleportType";
 // import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
-// import { Runecrafting } from "../../../game/content/skill/skillable/impl/Runecrafting";
 // import { PotionConsumable } from '../../../game/content/PotionConsumable'
 // import { Barrows } from '../../../game/content/minigames/impl/Barrows'
 // import { Animation } from "../../../game/model/Animation";
@@ -18,10 +17,8 @@ import { Packet } from "../Packet";
 // import { WildernessArea } from "../../../game/model/areas/impl/WildernessArea";
 // import { CombatSpecial } from "../../../game/content/combat/CombatSpecial";
 // import { ItemDefinition } from "../../../game/definition/ItemDefinition";
-// import { Prayer } from '../../../game/content/skill/skillable/impl/Prayer'
 // import { Gambling } from '../../../game/content/Gambiling'
 // import { GameConstants } from "../../../game/GameConstants";
-// import { BirdNest } from "../../../game/content/skill/skillable/impl/woodcutting/BirdNest";
 // import { BarrowsSet } from "../../../game/model/BarrowsSet";
 
 // class ItemActionTask extends Task{
@@ -203,6 +200,24 @@ export class ItemActionPacketListener implements PacketExecutor {
     }
 
     if (player.isTeleportingReturn() || player.getHitpoints() <= 0) {
+      return;
+    }
+
+    const currentItem = player.getInventory().getItems()[slot];
+    if (!currentItem || currentItem.getId() !== itemId) {
+      return;
+    }
+
+    const pluginHandled = PluginManager.emitItemAction({
+      player,
+      interfaceId,
+      item: currentItem,
+      itemId,
+      slot,
+      clickType: 1,
+      handled: false,
+    });
+    if (pluginHandled) {
       return;
     }
 
@@ -401,6 +416,20 @@ export class ItemActionPacketListener implements PacketExecutor {
     if (slot < 0 || slot >= player.getInventory().capacity()) return;
     if (player.getInventory().getItems()[slot].getId() != itemId) return;
 
+    const item = player.getInventory().getItems()[slot];
+    const pluginHandled = PluginManager.emitItemAction({
+      player,
+      interfaceId,
+      item,
+      itemId,
+      slot,
+      clickType: 2,
+      handled: false,
+    });
+    if (pluginHandled) {
+      return;
+    }
+
     // if (Runecrafting.handleTalisman(player, itemId)) {
     //     return;
     // }
@@ -437,6 +466,20 @@ export class ItemActionPacketListener implements PacketExecutor {
     let interfaceId = packet.readLEShortA();
     if (slot < 0 || slot >= player.getInventory().capacity()) return;
     if (player.getInventory().getItems()[slot].getId() != itemId) return;
+
+    const item = player.getInventory().getItems()[slot];
+    const pluginHandled = PluginManager.emitItemAction({
+      player,
+      interfaceId,
+      item,
+      itemId,
+      slot,
+      clickType: 3,
+      handled: false,
+    });
+    if (pluginHandled) {
+      return;
+    }
 
     // if (BarrowsSet.pack(player, itemId)) {
     //     return;

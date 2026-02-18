@@ -65,6 +65,13 @@ export interface PluginNpcInteractionEvent {
   handled: boolean;
 }
 
+export interface PluginNpcDeathEvent {
+  killer: any;
+  npc: any;
+  npcId: number;
+  location: { x: number; y: number; z: number };
+}
+
 export interface PluginItemOnObjectEvent {
   player: any;
   object: any;
@@ -97,6 +104,16 @@ export interface PluginItemOnGroundItemEvent {
   handled: boolean;
 }
 
+export interface PluginItemActionEvent {
+  player: any;
+  interfaceId: number;
+  item: any;
+  itemId: number;
+  slot: number;
+  clickType: number;
+  handled: boolean;
+}
+
 export interface PluginCommandEvent {
   player: any;
   raw: string;
@@ -115,6 +132,8 @@ export interface PluginApi {
   onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
   onNpcInteraction(handler: (event: PluginNpcInteractionEvent) => void): void;
+  onNpcDeath(handler: (event: PluginNpcDeathEvent) => void): void;
+  onSlayerAssignRequest(handler: (player: any) => boolean): void;
   onNpcClick(
     npcId: number,
     clickType: number,
@@ -127,6 +146,10 @@ export interface PluginApi {
   onItemOnObject(handler: (event: PluginItemOnObjectEvent) => void): void;
   onItemOnItem(handler: (event: PluginItemOnItemEvent) => void): void;
   onItemOnGroundItem(handler: (event: PluginItemOnGroundItemEvent) => void): void;
+  onItemAction(handler: (event: PluginItemActionEvent) => void): void;
+  onItemFirstAction(
+    handler: (event: PluginItemActionEvent) => void | boolean
+  ): void;
   onCommand(handler: (event: PluginCommandEvent) => void): void;
   registerCommand(
     command: string,

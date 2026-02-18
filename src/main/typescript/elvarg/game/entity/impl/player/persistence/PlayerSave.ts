@@ -2,7 +2,6 @@ import { PrayerHandler, PrayerData } from "../../../../content/PrayerHandler";
 import { FightType } from "../../../../content/combat/FightType";
 import { Presetable } from "../../../../content/presets/Presetable";
 import { SkillManager, Skills } from "../../../../content/skill/SkillManager";
-import { Runecrafting, PouchContainer } from "../../../../content/skill/skillable/impl/Runecrafting";
 import { Player } from "../Player";
 import { Item } from "../../../../model/Item";
 import { Location } from "../../../../model/Location";
@@ -392,11 +391,11 @@ export class PlayerSave {
         this.points = points;
     }
 
-    public getPouches(): PouchContainer[] {
+    public getPouches(): any[] {
         return this.pouches;
     }
 
-    public setPouches(pouches: PouchContainer[]): void {
+    public setPouches(pouches: any[]): void {
         this.pouches = pouches;
     }
 

@@ -6,6 +6,8 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
+const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
+const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
@@ -15,8 +17,26 @@ const CHOP_ANIMATION_INTERVAL_TICKS = 4;
 const CHOP_SOUND_INTERVAL_TICKS = 2;
 const MULTI_TREE_DEPLETION_ROLL_MAX = 15;
 const MULTI_TREE_DEPLETION_THRESHOLD = 2;
+const BIRD_NEST_DROP_CHANCE = 256;
 let woodcuttingTick = 0;
 let activeSessionsRef = null;
+
+const BIRD_NESTS = Object.freeze({
+  RED_EGG_NEST: ItemIds.BIRD_NEST,
+  GREEN_EGG_NEST: ItemIds.BIRD_NEST_2,
+  BLUE_EGG_NEST: ItemIds.BIRD_NEST_3,
+  SEED_NEST: ItemIds.BIRD_NEST_4,
+  RING_NEST: ItemIds.BIRD_NEST_5,
+  EMPTY_NEST: ItemIds.BIRD_NEST_6,
+});
+
+const SEARCHABLE_NEST_IDS = new Set([
+  BIRD_NESTS.RED_EGG_NEST,
+  BIRD_NESTS.GREEN_EGG_NEST,
+  BIRD_NESTS.BLUE_EGG_NEST,
+  BIRD_NESTS.SEED_NEST,
+  BIRD_NESTS.RING_NEST,
+]);
 
 const AXES = [
   { id: ItemIds.BRONZE_AXE, requiredLevel: 1, speed: 0.03, animationId: 879 },
@@ -253,6 +273,110 @@ function shouldDepleteTree(tree) {
   return roll >= MULTI_TREE_DEPLETION_THRESHOLD;
 }
 
+function rollBirdNestId() {
+  const random = Math.random();
+  if (random < 0.64) {
+    return BIRD_NESTS.SEED_NEST;
+  }
+  if (random < 0.96) {
+    return BIRD_NESTS.RING_NEST;
+  }
+  const color = randomIntInclusive(0, 2);
+  if (color === 0) {
+    return BIRD_NESTS.RED_EGG_NEST;
+  }
+  if (color === 1) {
+    return BIRD_NESTS.GREEN_EGG_NEST;
+  }
+  return BIRD_NESTS.BLUE_EGG_NEST;
+}
+
+function maybeDropBirdNest(player) {
+  if (!player || player.getLocation().getZ() > 0) {
+    return;
+  }
+  if (randomIntInclusive(1, BIRD_NEST_DROP_CHANCE) !== 1) {
+    return;
+  }
+
+  const nestId = rollBirdNestId();
+  ItemOnGroundManager.registers(player, new Item(nestId, 1));
+  player.getPacketSender().sendMessage("@red@A bird's nest falls out of the tree.");
+}
+
+function rollNestSeed() {
+  const random = randomIntInclusive(1, 1000);
+  if (random <= 220) return { id: ItemIds.ACORN, name: "acorn" };
+  if (random <= 350) return { id: ItemIds.WILLOW_SEED, name: "willow" };
+  if (random <= 400) return { id: ItemIds.MAPLE_SEED, name: "maple" };
+  if (random <= 430) return { id: ItemIds.YEW_SEED, name: "yew" };
+  if (random <= 440) return { id: ItemIds.MAGIC_SEED, name: "magic" };
+  if (random <= 600) return { id: ItemIds.APPLE_TREE_SEED, name: "apple" };
+  if (random <= 700) return { id: ItemIds.BANANA_TREE_SEED, name: "banana" };
+  if (random <= 790) return { id: ItemIds.ORANGE_TREE_SEED, name: "orange" };
+  if (random <= 850) return { id: ItemIds.CURRY_TREE_SEED, name: "curry" };
+  if (random <= 900) return { id: ItemIds.PINEAPPLE_SEED, name: "pineapple" };
+  if (random <= 930) return { id: ItemIds.PAPAYA_TREE_SEED, name: "papaya" };
+  if (random <= 960) return { id: ItemIds.PALM_TREE_SEED, name: "palm" };
+  if (random <= 980) return { id: ItemIds.CALQUAT_TREE_SEED, name: "calquat" };
+  return { id: ItemIds.SPIRIT_SEED, name: "spirit" };
+}
+
+function rollNestRing() {
+  const random = randomIntInclusive(1, 100);
+  if (random <= 35) return { id: ItemIds.GOLD_RING, name: "gold" };
+  if (random <= 75) return { id: ItemIds.SAPPHIRE_RING, name: "sapphire" };
+  if (random <= 90) return { id: ItemIds.EMERALD_RING, name: "emerald" };
+  if (random <= 98) return { id: ItemIds.RUBY_RING, name: "ruby" };
+  return { id: ItemIds.DIAMOND_RING, name: "diamond" };
+}
+
+function searchBirdNest(player, nestId) {
+  if (!SEARCHABLE_NEST_IDS.has(nestId)) {
+    return false;
+  }
+
+  if (player.getInventory().getFreeSlots() <= 0) {
+    player
+      .getPacketSender()
+      .sendMessage("Your inventory is too full to search the bird's nest.");
+    return true;
+  }
+
+  player.getInventory().deleteNumber(nestId, 1);
+  player.getInventory().adds(BIRD_NESTS.EMPTY_NEST, 1);
+
+  if (nestId === BIRD_NESTS.SEED_NEST) {
+    const seed = rollNestSeed();
+    player.getInventory().adds(seed.id, 1);
+    player
+      .getPacketSender()
+      .sendMessage(`You take a ${seed.name} seed out of the bird's nest.`);
+    return true;
+  }
+
+  if (nestId === BIRD_NESTS.RING_NEST) {
+    const ring = rollNestRing();
+    player.getInventory().adds(ring.id, 1);
+    player
+      .getPacketSender()
+      .sendMessage(`You take a ${ring.name} ring out of the bird's nest.`);
+    return true;
+  }
+
+  const eggId =
+    nestId === BIRD_NESTS.RED_EGG_NEST
+      ? ItemIds.BIRDS_EGG
+      : nestId === BIRD_NESTS.GREEN_EGG_NEST
+        ? ItemIds.BIRDS_EGG_3
+        : ItemIds.BIRDS_EGG_2;
+  player.getInventory().adds(eggId, 1);
+  player
+    .getPacketSender()
+    .sendMessage("You take the bird's egg out of the bird's nest.");
+  return true;
+}
+
 function stopWoodcutting(activeSessions, player, resetAnimation = true) {
   if (!activeSessions.has(player)) {
     return;
@@ -448,6 +572,7 @@ function processWoodcuttingTick(activeSessions, currentTick) {
     player.getInventory().adds(state.tree.logId, 1);
     player.getPacketSender().sendMessage("You get some logs.");
     player.getSkillManager().addExperiences(Skill.WOODCUTTING, state.tree.xpReward);
+    maybeDropBirdNest(player);
 
     if (shouldDepleteTree(state.tree)) {
       depleteTree(activeTree, state.tree);
@@ -487,6 +612,14 @@ module.exports = {
 
     api.onPlayerDisconnect(({ player }) => {
       stopWoodcutting(activeSessions, player, false);
+    });
+
+    api.onItemFirstAction((event) => {
+      if (searchBirdNest(event.player, event.itemId)) {
+        event.handled = true;
+        return true;
+      }
+      return false;
     });
 
     api.onObjectInteraction((event) => {

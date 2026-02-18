@@ -1,0 +1,256 @@
+const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
+const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
+const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
+const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
+const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
+const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
+const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
+const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
+const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+
+const DEPLETED_ROCK_ID = 2704;
+const MINING_ANIMATION_INTERVAL_TICKS = 6;
+
+const PICKAXES = [
+  { id: ItemIds.BRONZE_PICKAXE, requiredLevel: 1, speed: 0.03, animation: new Animation(625) },
+  { id: ItemIds.IRON_PICKAXE, requiredLevel: 1, speed: 0.05, animation: new Animation(626) },
+  { id: ItemIds.STEEL_PICKAXE, requiredLevel: 6, speed: 0.09, animation: new Animation(627) },
+  { id: ItemIds.BLACK_PICKAXE, requiredLevel: 11, speed: 0.11, animation: new Animation(627) },
+  { id: ItemIds.MITHRIL_PICKAXE, requiredLevel: 21, speed: 0.13, animation: new Animation(628) },
+  { id: ItemIds.ADAMANT_PICKAXE, requiredLevel: 31, speed: 0.16, animation: new Animation(629) },
+  { id: ItemIds.RUNE_PICKAXE, requiredLevel: 41, speed: 0.2, animation: new Animation(624) },
+  { id: ItemIds.DRAGON_PICKAXE, requiredLevel: 61, speed: 0.25, animation: new Animation(624) },
+];
+
+const PICKAXES_DESC = [...PICKAXES].sort((a, b) => b.requiredLevel - a.requiredLevel);
+
+const ROCKS = [
+  { objectIds: [9711, 9712, 9713, 15503, 15504, 15505], level: 1, xp: 5, oreId: ItemIds.CLAY, cycles: 11, respawnTicks: 2 },
+  { objectIds: [7453], level: 1, xp: 18, oreId: ItemIds.COPPER_ORE, cycles: 12, respawnTicks: 4 },
+  { objectIds: [7486], level: 1, xp: 8, oreId: ItemIds.TIN_ORE, cycles: 12, respawnTicks: 4 },
+  { objectIds: [7455, 7488], level: 15, xp: 35, oreId: ItemIds.IRON_ORE, cycles: 13, respawnTicks: 5 },
+  { objectIds: [7457], level: 20, xp: 40, oreId: ItemIds.SILVER_ORE, cycles: 14, respawnTicks: 7 },
+  { objectIds: [7456], level: 30, xp: 50, oreId: ItemIds.COAL, cycles: 15, respawnTicks: 7 },
+  { objectIds: [9720, 9721, 9722, 11951, 11183, 11184, 11185, 2099], level: 40, xp: 65, oreId: ItemIds.GOLD_ORE, cycles: 15, respawnTicks: 10 },
+  { objectIds: [7492, 7459], level: 50, xp: 80, oreId: ItemIds.MITHRIL_ORE, cycles: 17, respawnTicks: 11 },
+  { objectIds: [7460], level: 70, xp: 95, oreId: ItemIds.ADAMANTITE_ORE, cycles: 18, respawnTicks: 14 },
+  { objectIds: [14859, 4860, 2106, 2107, 7461], level: 85, xp: 125, oreId: ItemIds.RUNITE_ORE, cycles: 23, respawnTicks: 45 },
+];
+
+const ROCK_BY_OBJECT_ID = new Map();
+for (const rock of ROCKS) {
+  for (const id of rock.objectIds) {
+    ROCK_BY_OBJECT_ID.set(id, rock);
+  }
+}
+
+class RockRespawnTask extends Task {
+  constructor(delayTicks, originalRockObject, depletedObject) {
+    super(Math.max(1, delayTicks));
+    this.originalRockObject = originalRockObject;
+    this.depletedObject = depletedObject;
+  }
+
+  execute() {
+    const existingDepleted = MapObjects.get(
+      this.depletedObject.getId(),
+      this.depletedObject.getLocation(),
+      this.depletedObject.getPrivateArea()
+    );
+    if (existingDepleted) {
+      ObjectManager.deregister(existingDepleted, true);
+    }
+    ObjectManager.register(this.originalRockObject, true);
+    this.stop();
+  }
+}
+
+function getMiningLevel(player) {
+  return player.getSkillManager().getCurrentLevel(Skill.MINING);
+}
+
+function findBestPickaxe(player) {
+  const miningLevel = getMiningLevel(player);
+  const weapon = player.getEquipment().getItems()[Equipment.WEAPON_SLOT];
+  const weaponId = weapon ? weapon.getId() : -1;
+
+  for (const pickaxe of PICKAXES_DESC) {
+    if (miningLevel < pickaxe.requiredLevel) {
+      continue;
+    }
+    if (weaponId === pickaxe.id || player.getInventory().contains(pickaxe.id)) {
+      return pickaxe;
+    }
+  }
+  return null;
+}
+
+function cyclesRequired(player, rock, pickaxe) {
+  let cycles = rock.cycles + Math.floor(Math.random() * 5);
+  cycles -= getMiningLevel(player) * 0.1;
+  cycles -= cycles * pickaxe.speed;
+  return Math.max(3, Math.floor(cycles));
+}
+
+function stopMining(activeSessions, player, resetAnim = true) {
+  if (!activeSessions.has(player)) {
+    return;
+  }
+  activeSessions.delete(player);
+  if (resetAnim) {
+    player.performAnimation(Animation.DEFAULT_RESET_ANIMATION);
+  }
+}
+
+function depleteRock(rockObject, rock) {
+  const depleted = new GameObject(
+    DEPLETED_ROCK_ID,
+    rockObject.getLocation().clone(),
+    rockObject.getType(),
+    rockObject.getFace(),
+    rockObject.getPrivateArea()
+  );
+  ObjectManager.deregister(rockObject, true);
+  ObjectManager.register(depleted, true);
+  TaskManager.submit(new RockRespawnTask(rock.respawnTicks, rockObject, depleted));
+}
+
+function startMining(player, rockObject, rock, activeSessions) {
+  const pickaxe = findBestPickaxe(player);
+  if (!pickaxe) {
+    player.getPacketSender().sendMessage("You don't have a pickaxe which you can use.");
+    return false;
+  }
+
+  const miningLevel = getMiningLevel(player);
+  if (miningLevel < pickaxe.requiredLevel) {
+    player
+      .getPacketSender()
+      .sendMessage("You don't have a pickaxe which you have the required Mining level to use.");
+    return false;
+  }
+  if (miningLevel < rock.level) {
+    player
+      .getPacketSender()
+      .sendMessage(`You need a Mining level of at least ${rock.level} to mine this rock.`);
+    return false;
+  }
+  if (player.getInventory().isFull()) {
+    player.getInventory().full();
+    return false;
+  }
+
+  stopMining(activeSessions, player, false);
+  activeSessions.set(player, {
+    rock,
+    pickaxe,
+    objectId: rockObject.getId(),
+    location: rockObject.getLocation().clone(),
+    privateArea: rockObject.getPrivateArea(),
+    cyclesUntilOre: cyclesRequired(player, rock, pickaxe),
+    nextAnimationTick: 0,
+  });
+
+  player.getPacketSender().sendMessage("You swing your pickaxe at the rock..");
+  player.performAnimation(pickaxe.animation);
+  return true;
+}
+
+class MiningTask extends Task {
+  constructor(activeSessions) {
+    super(1);
+    this.activeSessions = activeSessions;
+    this.tick = 0;
+  }
+
+  execute() {
+    this.tick++;
+    for (const [player, state] of this.activeSessions) {
+      if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
+        this.activeSessions.delete(player);
+        continue;
+      }
+      if (player.getMovementQueue().size() > 0 || player.getForceMovement() != null) {
+        stopMining(this.activeSessions, player);
+        continue;
+      }
+
+      const rockObject = MapObjects.get(
+        state.objectId,
+        state.location,
+        state.privateArea
+      );
+      if (!rockObject) {
+        stopMining(this.activeSessions, player);
+        continue;
+      }
+
+      if (!player.getLocation().isWithinInteractionDistance(rockObject.getLocation())) {
+        stopMining(this.activeSessions, player);
+        continue;
+      }
+
+      const pickaxe = findBestPickaxe(player);
+      if (!pickaxe || getMiningLevel(player) < state.rock.level) {
+        stopMining(this.activeSessions, player);
+        continue;
+      }
+
+      state.pickaxe = pickaxe;
+
+      if (player.getInventory().isFull()) {
+        player.getInventory().full();
+        stopMining(this.activeSessions, player);
+        continue;
+      }
+
+      if (this.tick >= state.nextAnimationTick) {
+        player.performAnimation(state.pickaxe.animation);
+        state.nextAnimationTick = this.tick + MINING_ANIMATION_INTERVAL_TICKS;
+      }
+
+      state.cyclesUntilOre--;
+      if (state.cyclesUntilOre > 0) {
+        continue;
+      }
+
+      player.getInventory().adds(state.rock.oreId, 1);
+      player.getPacketSender().sendMessage("You get some ores.");
+      player.getSkillManager().addExperiences(Skill.MINING, state.rock.xp);
+      depleteRock(rockObject, state.rock);
+      stopMining(this.activeSessions, player);
+    }
+  }
+}
+
+module.exports = {
+  name: "Mining",
+  register(api) {
+    const activeSessions = new Map();
+    TaskManager.submit(new MiningTask(activeSessions));
+
+    api.onPlayerDisconnect(({ player }) => {
+      stopMining(activeSessions, player, false);
+    });
+
+    api.onObjectInteraction((event) => {
+      if (event.clickType !== 1) {
+        return;
+      }
+      const rock = ROCK_BY_OBJECT_ID.get(event.objectId);
+      if (!rock) {
+        return;
+      }
+
+      const started = startMining(event.player, event.object, rock, activeSessions);
+      if (started) {
+        event.handled = true;
+      }
+    });
+
+    api.log("registered", {
+      rocks: ROCK_BY_OBJECT_ID.size,
+      pickaxes: PICKAXES.length,
+    });
+  },
+};
