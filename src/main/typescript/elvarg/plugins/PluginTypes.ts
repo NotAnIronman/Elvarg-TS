@@ -55,6 +55,48 @@ export interface PluginObjectInteractionEvent {
   handled: boolean;
 }
 
+export interface PluginNpcInteractionEvent {
+  player: any;
+  npc: any;
+  npcId: number;
+  npcIndex: number;
+  clickType: number;
+  location: { x: number; y: number; z: number };
+  handled: boolean;
+}
+
+export interface PluginItemOnObjectEvent {
+  player: any;
+  object: any;
+  objectId: number;
+  item: any;
+  itemId: number;
+  itemSlot: number;
+  interfaceType: number;
+  location: { x: number; y: number; z: number };
+  handled: boolean;
+}
+
+export interface PluginItemOnItemEvent {
+  player: any;
+  usedItem: any;
+  usedItemId: number;
+  usedItemSlot: number;
+  usedWithItem: any;
+  usedWithItemId: number;
+  usedWithItemSlot: number;
+  handled: boolean;
+}
+
+export interface PluginItemOnGroundItemEvent {
+  player: any;
+  inventoryItem: any;
+  inventoryItemId: number;
+  groundItemId: number;
+  location: { x: number; y: number; z: number };
+  handled: boolean;
+}
+
 export interface PluginCommandEvent {
   player: any;
   raw: string;
@@ -72,6 +114,19 @@ export interface PluginApi {
   onPathBlocked(handler: (event: PluginPathBlockedEvent) => void): void;
   onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
+  onNpcInteraction(handler: (event: PluginNpcInteractionEvent) => void): void;
+  onNpcClick(
+    npcId: number,
+    clickType: number,
+    handler: (event: PluginNpcInteractionEvent) => void | boolean
+  ): void;
+  onNpcSecondClick(
+    npcId: number,
+    handler: (event: PluginNpcInteractionEvent) => void | boolean
+  ): void;
+  onItemOnObject(handler: (event: PluginItemOnObjectEvent) => void): void;
+  onItemOnItem(handler: (event: PluginItemOnItemEvent) => void): void;
+  onItemOnGroundItem(handler: (event: PluginItemOnGroundItemEvent) => void): void;
   onCommand(handler: (event: PluginCommandEvent) => void): void;
   registerCommand(
     command: string,

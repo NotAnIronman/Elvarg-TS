@@ -5,6 +5,10 @@ import { PacketExecutor } from "../net/packet/PacketExecutor";
 import {
   PluginApi,
   PluginModule,
+  PluginItemOnGroundItemEvent,
+  PluginItemOnItemEvent,
+  PluginItemOnObjectEvent,
+  PluginNpcInteractionEvent,
   PluginObjectInteractionEvent,
   PluginPathBlockedEvent,
   PluginPlayerPathBlockedEvent,
@@ -35,6 +39,11 @@ export class PluginManager {
   private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
+  private static npcInteractionHooks: PluginHook<PluginNpcInteractionEvent>[] = [];
+  private static itemOnObjectHooks: PluginHook<PluginItemOnObjectEvent>[] = [];
+  private static itemOnItemHooks: PluginHook<PluginItemOnItemEvent>[] = [];
+  private static itemOnGroundItemHooks: PluginHook<PluginItemOnGroundItemEvent>[] =
+    [];
   private static commandHooks: PluginHook<PluginCommandEvent>[] = [];
   private static commandHandlersByBase = new Map<
     string,
@@ -168,6 +177,64 @@ export class PluginManager {
       } catch (err) {
         console.error(
           `[plugins] object_interaction hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
+  public static emitNpcInteraction(event: PluginNpcInteractionEvent): boolean {
+    for (const hook of PluginManager.npcInteractionHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] npc_interaction hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
+  public static emitItemOnObject(event: PluginItemOnObjectEvent): boolean {
+    for (const hook of PluginManager.itemOnObjectHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] item_on_object hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
+  public static emitItemOnItem(event: PluginItemOnItemEvent): boolean {
+    for (const hook of PluginManager.itemOnItemHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] item_on_item hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
+  public static emitItemOnGroundItem(
+    event: PluginItemOnGroundItemEvent
+  ): boolean {
+    for (const hook of PluginManager.itemOnGroundItemHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] item_on_ground_item hook failed (${hook.pluginName})`,
           err
         );
       }
@@ -330,7 +397,15 @@ export class PluginManager {
         if (typeof handler !== "function") {
           return;
         }
-        PluginManager.loginHooks.push({ pluginName, handler });
+        PluginManager.loginHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.username) {
+              return;
+            }
+            handler(event);
+          },
+        });
       },
       onPlayerDisconnect: (handler) => {
         if (typeof handler !== "function") {
@@ -350,13 +425,34 @@ export class PluginManager {
         if (typeof handler !== "function") {
           return;
         }
-        PluginManager.regionLoadedHooks.push({ pluginName, handler });
+        PluginManager.regionLoadedHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !Number.isInteger(event.regionId) ||
+              !Number.isInteger(event.absX) ||
+              !Number.isInteger(event.absY)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
       },
       onPathBlocked: (handler) => {
         if (typeof handler !== "function") {
           return;
         }
-        PluginManager.pathBlockedHooks.push({ pluginName, handler });
+        PluginManager.pathBlockedHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.entity || !event.from || !event.to) {
+              return;
+            }
+            handler(event);
+          },
+        });
       },
       onPlayerPathBlocked: (handler) => {
         if (typeof handler !== "function") {
@@ -376,13 +472,159 @@ export class PluginManager {
         if (typeof handler !== "function") {
           return;
         }
-        PluginManager.objectInteractionHooks.push({ pluginName, handler });
+        PluginManager.objectInteractionHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.object) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onNpcInteraction: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.npcInteractionHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.npc) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onNpcClick: (npcId, clickType, handler) => {
+        if (
+          !Number.isInteger(npcId) ||
+          npcId < 0 ||
+          !Number.isInteger(clickType) ||
+          clickType < 1 ||
+          clickType > 4 ||
+          typeof handler !== "function"
+        ) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid npc click hook registration npcId=${npcId} clickType=${clickType}`
+          );
+          return;
+        }
+
+        PluginManager.npcInteractionHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled) {
+              return;
+            }
+            if (event.npcId !== npcId || event.clickType !== clickType) {
+              return;
+            }
+
+            const result = handler(event);
+            if (result !== false) {
+              event.handled = true;
+            }
+          },
+        });
+      },
+      onNpcSecondClick: (npcId, handler) => {
+        if (
+          !Number.isInteger(npcId) ||
+          npcId < 0 ||
+          typeof handler !== "function"
+        ) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid second-click npc hook registration npcId=${npcId}`
+          );
+          return;
+        }
+
+        PluginManager.npcInteractionHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled) {
+              return;
+            }
+            if (event.npcId !== npcId || event.clickType !== 2) {
+              return;
+            }
+
+            const result = handler(event);
+            if (result !== false) {
+              event.handled = true;
+            }
+          },
+        });
+      },
+      onItemOnObject: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemOnObjectHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.object) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onItemOnItem: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemOnItemHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              !event.player ||
+              !event.usedItem ||
+              !event.usedWithItem
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onItemOnGroundItem: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemOnGroundItemHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.inventoryItem) {
+              return;
+            }
+            handler(event);
+          },
+        });
       },
       onCommand: (handler) => {
         if (typeof handler !== "function") {
           return;
         }
-        PluginManager.commandHooks.push({ pluginName, handler });
+        PluginManager.commandHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              !event.player ||
+              typeof event.raw !== "string" ||
+              typeof event.base !== "string" ||
+              !Array.isArray(event.parts)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
       },
       registerCommand: (command, handler) => {
         if (typeof command !== "string" || typeof handler !== "function") {

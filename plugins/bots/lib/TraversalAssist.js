@@ -242,9 +242,6 @@ function createTraversalAssist(api, options = {}) {
 
   if (api && typeof api.onRegionLoaded === "function") {
     api.onRegionLoaded((event) => {
-      if (!event || !Number.isInteger(event.regionId)) {
-        return;
-      }
       indexRegion(event.regionId);
     });
   }

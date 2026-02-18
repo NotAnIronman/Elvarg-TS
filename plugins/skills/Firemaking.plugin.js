@@ -5,7 +5,6 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
-const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
@@ -28,9 +27,6 @@ const BONFIRE_ANIMATION = new Animation(896);
 const ANIMATION_INTERVAL_TICKS = 3;
 const BONFIRE_CYCLES = 2;
 const MAX_ACTION_DISTANCE = 25;
-const OPCODE_ITEM_ON_ITEM = 53;
-const OPCODE_ITEM_ON_OBJECT = 192;
-const OPCODE_ITEM_ON_GROUND_ITEM = 25;
 
 const LIGHTABLE_LOGS = [
   { name: "logs", itemId: ItemIds.LOGS, requiredLevel: 1, xpReward: 40, cycles: 7, respawnTicks: 60 },
@@ -397,38 +393,14 @@ class FiremakingTask extends Task {
   }
 }
 
-function handleItemOnItem(player, packet, activeSessions) {
-  const usedWithSlot = packet.readUnsignedShort();
-  const itemUsedSlot = packet.readUnsignedShortA();
-  const inventory = player.getInventory();
-
+function handleItemOnItem(event, activeSessions) {
+  const { player, usedItemId, usedWithItemId } = event;
   // Mirror legacy item-on-item behavior: every item-combine attempt clears
   // the client's selected-item state and interrupts active skilling.
   // If we only do this for firemaking combos, the client can remain stuck
   // in "Use item ->" mode and subsequent item selection appears broken.
   player.getPacketSender().sendInterfaceRemoval();
   player.getSkillManager()?.stopSkillable?.();
-
-  if (
-    usedWithSlot < 0 ||
-    itemUsedSlot < 0 ||
-    usedWithSlot >= inventory.capacity() ||
-    itemUsedSlot >= inventory.capacity()
-  ) {
-    return;
-  }
-
-  const itemUsed = inventory.getItems()[itemUsedSlot];
-  const usedWith = inventory.getItems()[usedWithSlot];
-  if (!itemUsed || !usedWith) {
-    return;
-  }
-
-  const itemUsedId = itemUsed.getId();
-  const usedWithId = usedWith.getId();
-  if (itemUsedId <= 0 || usedWithId <= 0) {
-    return;
-  }
 
   let logId = -1;
   if (itemUsedId === TINDERBOX_ID) {
@@ -446,22 +418,19 @@ function handleItemOnItem(player, packet, activeSessions) {
     return;
   }
 
-  startFiremakingAttempt(
+  const started = startFiremakingAttempt(
     player,
     log,
     { mode: SESSION_MODE.INVENTORY },
     activeSessions
   );
+  if (started) {
+    event.handled = true;
+  }
 }
 
-function handleItemOnGroundItem(player, packet, activeSessions) {
-  packet.readLEShort(); // interface id
-  const inventoryItemId = packet.readShortA();
-  const groundItemId = packet.readShort();
-  const y = packet.readShortA();
-  packet.readLEShortA(); // unused
-  const x = packet.readShort();
-
+function handleItemOnGroundItem(event, activeSessions) {
+  const { player, inventoryItemId, groundItemId, location } = event;
   if (inventoryItemId !== TINDERBOX_ID) {
     return;
   }
@@ -472,14 +441,14 @@ function handleItemOnGroundItem(player, packet, activeSessions) {
   }
 
   if (
-    Math.abs(player.getLocation().getX() - x) > MAX_ACTION_DISTANCE ||
-    Math.abs(player.getLocation().getY() - y) > MAX_ACTION_DISTANCE
+    Math.abs(player.getLocation().getX() - location.x) > MAX_ACTION_DISTANCE ||
+    Math.abs(player.getLocation().getY() - location.y) > MAX_ACTION_DISTANCE
   ) {
     player.getMovementQueue().reset();
     return;
   }
 
-  const position = new Location(x, y, player.getLocation().getZ());
+  const position = new Location(location.x, location.y, location.z);
   player.getMovementQueue().walkToGroundItem(position, () => {
     const groundItem = ItemOnGroundManager.getGroundItem(
       player.getUsername(),
@@ -501,28 +470,13 @@ function handleItemOnGroundItem(player, packet, activeSessions) {
       },
       activeSessions
     );
+    event.handled = true;
   });
 }
 
-function handleItemOnObject(player, packet, activeSessions) {
-  packet.readShort(); // interface type
-  const objectId = packet.readShort();
-  const objectY = packet.readLEShortA();
-  const itemSlot = packet.readLEShort();
-  const objectX = packet.readLEShortA();
-  const itemId = packet.readShort();
-
-  const inventory = player.getInventory();
-  if (itemSlot < 0 || itemSlot >= inventory.capacity()) {
-    return;
-  }
-
-  const item = inventory.getItems()[itemSlot];
-  if (!item || item.getId() !== itemId) {
-    return;
-  }
-
-  if (objectId !== FIRE_OBJECT_ID) {
+function handleItemOnObject(event, activeSessions) {
+  const { player, object, objectId, itemId } = event;
+  if (objectId !== FIRE_OBJECT_ID || !object) {
     return;
   }
 
@@ -531,34 +485,19 @@ function handleItemOnObject(player, packet, activeSessions) {
     return;
   }
 
-  const objectLocation = new Location(
-    objectX,
-    objectY,
-    player.getLocation().getZ()
-  );
-  const object = MapObjects.getPrivateArea(player, objectId, objectLocation);
-  if (!object) {
-    return;
-  }
-
-  player.getMovementQueue().walkToObject(object, {
-    execute: () => {
-      player.getMovementQueue().reset();
-      player.getMovementQueue().walkToReset();
-      player.setPositionToFace(object.getLocation());
-
-      startFiremakingAttempt(
-        player,
-        log,
-        {
-          mode: SESSION_MODE.BONFIRE,
-          location: object.getLocation(),
-          privateArea: object.getPrivateArea(),
-        },
-        activeSessions
-      );
+  const started = startFiremakingAttempt(
+    player,
+    log,
+    {
+      mode: SESSION_MODE.BONFIRE,
+      location: object.getLocation(),
+      privateArea: object.getPrivateArea(),
     },
-  });
+    activeSessions
+  );
+  if (started) {
+    event.handled = true;
+  }
 }
 
 module.exports = {
@@ -584,37 +523,24 @@ module.exports = {
     TaskManager.submit(new FiremakingTask(activeSessions));
 
     api.onPlayerDisconnect(({ player }) => {
-      if (!player) {
-        return;
-      }
       stopFiremaking(activeSessions, player, false);
     });
 
-    api.registerAlivePacketListener(OPCODE_ITEM_ON_ITEM, {
-      execute(player, packet) {
-        handleItemOnItem(player, packet, activeSessions);
-      },
+    api.onItemOnItem((event) => {
+      handleItemOnItem(event, activeSessions);
     });
 
-    api.registerAlivePacketListener(OPCODE_ITEM_ON_GROUND_ITEM, {
-      execute(player, packet) {
-        handleItemOnGroundItem(player, packet, activeSessions);
-      },
+    api.onItemOnGroundItem((event) => {
+      handleItemOnGroundItem(event, activeSessions);
     });
 
-    api.registerAlivePacketListener(OPCODE_ITEM_ON_OBJECT, {
-      execute(player, packet) {
-        handleItemOnObject(player, packet, activeSessions);
-      },
+    api.onItemOnObject((event) => {
+      handleItemOnObject(event, activeSessions);
     });
 
     api.log("registered", {
       lightableLogs: LIGHTABLE_LOGS.length,
-      packetListeners: [
-        OPCODE_ITEM_ON_ITEM,
-        OPCODE_ITEM_ON_GROUND_ITEM,
-        OPCODE_ITEM_ON_OBJECT,
-      ],
+      hooks: ["item_on_item", "item_on_ground_item", "item_on_object"],
     });
   },
 };

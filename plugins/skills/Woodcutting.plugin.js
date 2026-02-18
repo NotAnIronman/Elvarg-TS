@@ -486,19 +486,16 @@ module.exports = {
     TaskManager.submit(new WoodcuttingTask(activeSessions));
 
     api.onPlayerDisconnect(({ player }) => {
-      if (!player) {
-        return;
-      }
       stopWoodcutting(activeSessions, player, false);
     });
 
     api.onObjectInteraction((event) => {
-      if (!event || event.handled || event.clickType !== 1) {
+      if (event.clickType !== 1) {
         return;
       }
 
       const tree = TREES_BY_OBJECT_ID.get(event.objectId);
-      if (!tree || !event.player || !event.object) {
+      if (!tree) {
         return;
       }
 
