@@ -20,6 +20,10 @@ export interface PluginPlayerDisconnectEvent {
   source: string;
 }
 
+export interface PluginPlayerProcessEvent {
+  player: any;
+}
+
 export interface PluginRegionLoadedEvent {
   regionId: number;
   absX: number;
@@ -70,6 +74,60 @@ export interface PluginNpcDeathEvent {
   npc: any;
   npcId: number;
   location: { x: number; y: number; z: number };
+}
+
+export interface PluginCanAttackEvent {
+  attacker: any;
+  target: any;
+  allow: boolean | null;
+}
+
+export interface PluginCanTeleportEvent {
+  player: any;
+  allow: boolean | null;
+}
+
+export interface PluginCanEatEvent {
+  player: any;
+  itemId: number;
+  allow: boolean | null;
+}
+
+export interface PluginCanDrinkEvent {
+  player: any;
+  itemId: number;
+  allow: boolean | null;
+}
+
+export interface PluginCanTradeEvent {
+  player: any;
+  target: any;
+  allow: boolean | null;
+}
+
+export interface PluginCanEquipEvent {
+  player: any;
+  slot: number;
+  item: any;
+  allow: boolean | null;
+}
+
+export interface PluginSpellDisabledEvent {
+  player: any;
+  spellbook: any;
+  spellId: number;
+  disabled: boolean | null;
+}
+
+export interface PluginNpcAggressionToleranceEvent {
+  player: any;
+  npc: any;
+  override: boolean | null;
+}
+
+export interface PluginPlayerDefeatedEvent {
+  killer: any;
+  victim: any;
 }
 
 export interface PluginItemOnObjectEvent {
@@ -127,12 +185,24 @@ export interface PluginApi {
   onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
   onPlayerLogin(handler: (event: PluginPlayerLoginEvent) => void): void;
   onPlayerDisconnect(handler: (event: PluginPlayerDisconnectEvent) => void): void;
+  onPlayerProcess(handler: (event: PluginPlayerProcessEvent) => void): void;
   onRegionLoaded(handler: (event: PluginRegionLoadedEvent) => void): void;
   onPathBlocked(handler: (event: PluginPathBlockedEvent) => void): void;
   onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
   onNpcInteraction(handler: (event: PluginNpcInteractionEvent) => void): void;
   onNpcDeath(handler: (event: PluginNpcDeathEvent) => void): void;
+  onCanAttack(handler: (event: PluginCanAttackEvent) => void): void;
+  onCanTeleport(handler: (event: PluginCanTeleportEvent) => void): void;
+  onCanEat(handler: (event: PluginCanEatEvent) => void): void;
+  onCanDrink(handler: (event: PluginCanDrinkEvent) => void): void;
+  onCanTrade(handler: (event: PluginCanTradeEvent) => void): void;
+  onCanEquip(handler: (event: PluginCanEquipEvent) => void): void;
+  onSpellDisabled(handler: (event: PluginSpellDisabledEvent) => void): void;
+  onNpcAggressionTolerance(
+    handler: (event: PluginNpcAggressionToleranceEvent) => void
+  ): void;
+  onPlayerDefeated(handler: (event: PluginPlayerDefeatedEvent) => void): void;
   onSlayerAssignRequest(handler: (player: any) => boolean): void;
   onNpcClick(
     npcId: number,

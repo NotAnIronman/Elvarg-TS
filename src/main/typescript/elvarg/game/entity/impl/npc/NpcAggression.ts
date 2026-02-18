@@ -6,6 +6,7 @@ import { AreaManager } from "../../../model/areas/AreaManager";
 import { PrivateArea } from "../../../model/areas/impl/PrivateArea";
 import { Misc } from "../../../../util/Misc";
 import { NPC } from "./NPC";
+import { PluginManager } from "../../../../plugins/PluginManager";
 
 export class NpcAggression {
     public static NPC_TOLERANCE_SECONDS = 600; // 10 mins (Accurate to OSRS)
@@ -39,6 +40,7 @@ export class NpcAggression {
             }
 
             if (npcDefinition.buildsAggressionTolerance() && player.getAggressionTolerance().finished()
+                && PluginManager.emitNpcAggressionTolerance(player, npc) !== true
                 && (player.getArea() == null || !player.getArea().overridesNpcAggressionTolerance(player, npc.getId()))) {
                 // If Player has obtained tolerance to this NPC, don't be aggressive.
                 return;

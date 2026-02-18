@@ -2,6 +2,7 @@ import { PacketExecutor } from "../PacketExecutor";
 import { Packet } from "../Packet";
 import { Misc } from "../../../util/Misc";
 import { Server } from "../../../Server";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 const getWeaponInterfaces = () =>
   require("../../../game/content/combat/WeaponInterfaces")
@@ -121,7 +122,14 @@ export class EquipPacketListener implements PacketExecutor {
       return;
     }
 
-    if (player.getArea() && !player.getArea().canEquipItem(player, equipmentSlot, item)) {
+    if (PluginManager.emitCanEquip(player, equipmentSlot, item) === false) {
+      return;
+    }
+    if (
+      PluginManager.emitCanEquip(player, equipmentSlot, item) === null &&
+      player.getArea() &&
+      !player.getArea().canEquipItem(player, equipmentSlot, item)
+    ) {
       return;
     }
 

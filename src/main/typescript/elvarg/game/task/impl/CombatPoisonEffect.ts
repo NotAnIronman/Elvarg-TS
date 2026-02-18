@@ -8,16 +8,16 @@ import { HitMask } from "../../content/combat/hit/HitMask";
 
 export class CombatPoisonEffect extends Task {
   private entity: Mobile;
-  public tick;
+  private poisonTick: number;
 
   constructor(entity) {
     super(30, entity);
     this.entity = entity;
-    this.tick = 0;
+    this.poisonTick = 0;
   }
 
   public execute() {
-    this.tick++;
+    this.poisonTick++;
 
     if (!this.entity.isRegistered()) {
       this.stop();
@@ -34,7 +34,10 @@ export class CombatPoisonEffect extends Task {
       return;
     }
 
-    let poisonDamage = this.tick % 5 === 0 ? this.entity.getPoisonDamage() - 1 : this.entity.getPoisonDamage();
+    let poisonDamage =
+      this.poisonTick % 5 === 0
+        ? this.entity.getPoisonDamage() - 1
+        : this.entity.getPoisonDamage();
     this, poisonDamage = poisonDamage;
     this.entity.getCombat().getHitQueue().addPendingDamage([new HitDamage(poisonDamage, HitMask.GREEN)]);
 
@@ -288,7 +291,6 @@ export class CombatPoisonData {
     return CombatPoisonData.types[item.getId()];
   }
 }
-
 
 
 

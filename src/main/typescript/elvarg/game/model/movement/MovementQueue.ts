@@ -703,25 +703,13 @@ export class MovementQueue {
         const leaderQueue = following.getMovementQueue();
         let destX = leaderQueue.followX;
         let destY = leaderQueue.followY;
-        if (destX === -1 || destY === -1) {
-            destX = following.getLocation().getX();
-            destY = following.getLocation().getY();
-        }
 
         const currentX = this.character.getLocation().getX();
         const currentY = this.character.getLocation().getY();
-        if (currentX === destX && currentY === destY) {
-            return;
-        }
-
         if (
-            this.character.getLocation().isWithinDistance(following.getLocation(), 1) &&
-            !RS317PathFinder.isInDiagonalBlock(
-                this.character.getLocation(),
-                following.getLocation()
-            )
+            (destX === -1 && destY === -1) ||
+            (currentX === destX && currentY === destY)
         ) {
-            this.reset();
             return;
         }
 

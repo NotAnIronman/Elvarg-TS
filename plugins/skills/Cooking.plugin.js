@@ -91,11 +91,11 @@ class CookingTask extends Task {
   constructor(activeSessions) {
     super(1);
     this.activeSessions = activeSessions;
-    this.tick = 0;
+    this.cycle = 0;
   }
 
   execute() {
-    this.tick++;
+    this.cycle++;
 
     for (const [player, session] of this.activeSessions) {
       if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
@@ -128,10 +128,10 @@ class CookingTask extends Task {
         continue;
       }
 
-      if (this.tick < session.nextCookTick) {
+      if (this.cycle < session.nextCookTick) {
         continue;
       }
-      session.nextCookTick = this.tick + COOK_INTERVAL_TICKS;
+      session.nextCookTick = this.cycle + COOK_INTERVAL_TICKS;
       player.performAnimation(COOK_ANIMATION);
 
       player.getInventory().deleteNumber(session.cookable.raw, 1);

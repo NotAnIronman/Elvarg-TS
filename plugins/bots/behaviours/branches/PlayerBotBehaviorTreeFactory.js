@@ -27,6 +27,7 @@ class PlayerBotBehaviorTreeFactory {
     });
     this.woodcuttingBehavior = new WoodcuttingBehavior(botStatesByName, api, {
       behaviorMode: this.behaviorMode,
+      botWalkRadius: this.botWalkRadius,
     });
   }
 

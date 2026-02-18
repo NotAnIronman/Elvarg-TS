@@ -20,6 +20,7 @@ import { List } from 'list'
 import { TreeMap } from 'treemap'
 import { Task } from './task/Task';
 import { GameSyncTask } from './entity/updating/sync/GameSyncTask';
+import { PluginManager } from '../plugins/PluginManager';
 
 interface GameSyncTaskInterface {
     isParallel: boolean;
@@ -299,6 +300,7 @@ export class World {
         World.players.forEach((player) => {
             try {
                 player.process();
+                PluginManager.emitPlayerProcess({ player });
             } catch (e) {
                 console.error(e);
                 player.requestLogout();

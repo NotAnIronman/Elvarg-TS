@@ -13,6 +13,7 @@ import { PrayerHandler } from "../../content/PrayerHandler";
 import { Location } from "../../model/Location";
 import { BrokenItem } from "../../model/BrokenItem";
 import { Animation } from "../../model/Animation";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 export class PlayerDeathTask extends Task {
     private player: Player;
@@ -116,6 +117,7 @@ export class PlayerDeathTask extends Task {
                             if (this.killer.getArea() != null) {
                                 this.killer.getArea().defeated(this.killer, this.player);
                             }
+                            PluginManager.emitPlayerDefeated(this.killer, this.player);
                             if (!dropped) {
                                 this.killer.getPacketSender().sendMessage(`${this.player.getUsername()} had no valuable items to be dropped.`);
                             }

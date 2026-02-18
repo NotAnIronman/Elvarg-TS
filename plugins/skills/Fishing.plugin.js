@@ -185,11 +185,11 @@ class FishingTask extends Task {
   constructor(activeSessions) {
     super(1);
     this.activeSessions = activeSessions;
-    this.tick = 0;
+    this.cycle = 0;
   }
 
   execute() {
-    this.tick++;
+    this.cycle++;
 
     for (const [player, session] of this.activeSessions) {
       if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
@@ -224,9 +224,9 @@ class FishingTask extends Task {
         continue;
       }
 
-      if (this.tick >= session.nextAnimationTick) {
+      if (this.cycle >= session.nextAnimationTick) {
         player.performAnimation(new Animation(session.tool.animationId));
-        session.nextAnimationTick = this.tick + FISHING_ANIMATION_INTERVAL_TICKS;
+        session.nextAnimationTick = this.cycle + FISHING_ANIMATION_INTERVAL_TICKS;
       }
 
       session.cyclesUntilCatch--;

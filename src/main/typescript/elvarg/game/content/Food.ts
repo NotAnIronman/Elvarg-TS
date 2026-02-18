@@ -5,6 +5,7 @@ import { Sound } from "../Sound";
 import { Skill } from "../model/Skill";
 import { Item } from "../model/Item";
 import { Animation } from "../model/Animation";
+import { PluginManager } from "../../plugins/PluginManager";
 
 export class Food {
     /**
@@ -19,11 +20,13 @@ export class Food {
             return false;
         }
 
-        if (player.getArea() != null) {
-            if (!player.getArea().canEat(player, item)) {
-                player.getPacketSender().sendMessage("You cannot eat here.");
-                return true;
-            }
+        if (PluginManager.emitCanEat(player, item) === false) {
+            player.getPacketSender().sendMessage("You cannot eat here.");
+            return true;
+        }
+        if (PluginManager.emitCanEat(player, item) === null && player.getArea() != null && !player.getArea().canEat(player, item)) {
+            player.getPacketSender().sendMessage("You cannot eat here.");
+            return true;
         }
 
         // Check if we're currently able to eat..

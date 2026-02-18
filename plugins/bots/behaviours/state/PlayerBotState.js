@@ -32,6 +32,8 @@ function createWoodcuttingBehaviorState() {
     target: null,
     nextActionAt: 0,
     nextSearchAt: 0,
+    nextDebugChatAt: 0,
+    searchTarget: null,
   };
 }
 
@@ -42,6 +44,8 @@ function clearWoodcuttingBehaviorState(state) {
   state.woodcutting.target = null;
   state.woodcutting.nextActionAt = 0;
   state.woodcutting.nextSearchAt = 0;
+  state.woodcutting.nextDebugChatAt = 0;
+  state.woodcutting.searchTarget = null;
 }
 
 function resetMovementState(player) {

@@ -160,11 +160,11 @@ class MiningTask extends Task {
   constructor(activeSessions) {
     super(1);
     this.activeSessions = activeSessions;
-    this.tick = 0;
+    this.cycle = 0;
   }
 
   execute() {
-    this.tick++;
+    this.cycle++;
     for (const [player, state] of this.activeSessions) {
       if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
         this.activeSessions.delete(player);
@@ -204,9 +204,9 @@ class MiningTask extends Task {
         continue;
       }
 
-      if (this.tick >= state.nextAnimationTick) {
+      if (this.cycle >= state.nextAnimationTick) {
         player.performAnimation(state.pickaxe.animation);
-        state.nextAnimationTick = this.tick + MINING_ANIMATION_INTERVAL_TICKS;
+        state.nextAnimationTick = this.cycle + MINING_ANIMATION_INTERVAL_TICKS;
       }
 
       state.cyclesUntilOre--;

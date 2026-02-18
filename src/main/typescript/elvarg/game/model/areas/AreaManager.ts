@@ -1,41 +1,11 @@
-
-
 import { Location } from "../Location";
-import {CastleWars} from '../../content/minigames/impl/CastleWars'
 import { Mobile } from "../../entity/impl/Mobile";
-import { BarrowsArea } from '../../model/areas/impl/BarrowsArea'
-import { DuelArenaArea } from '../../model/areas/impl/DuelArenaArea'
-import {GodwarsDungeonArea} from '../../model/areas/impl/GodwarsDugeonArea'
-import {KingBlackDragonArea} from '../../model/areas/impl/KingBlackDragonArea'
-import {WildernessArea} from '../../model/areas/impl/WildernessArea'
 import { Area, BasicAttackResponse } from "./Area";
 import { CanAttackResponse } from "../../content/combat/CombatFactory";
-import { Boundary } from "../Boundary";
-import { PestControl } from "../../content/minigames/impl/pestcontrols/PestControl";
-import { CastleWarsZamorakWaitingArea } from "./impl/castlewars/CastleWarsZamorakWaitingArea";
-import { CastleWarsSaradominWaitingArea } from "./impl/castlewars/CastleWarsSaradominWaitingArea";
-import { CastleWarsGameArea } from "./impl/castlewars/CastleWarsGameArea";
-import { CastleWarsLobbyArea } from "./impl/castlewars/CastleWarsLobbyArea";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 export class AreaManager {
-
     public static areas: Area[] = [];
-/* TODO: Fix Areas
-    static {
-        AreaManager.areas.push(new BarrowsArea());
-        AreaManager.areas.push(new DuelArenaArea());
-        AreaManager.areas.push(new WildernessArea());
-        AreaManager.areas.push(new KingBlackDragonArea());
-        AreaManager.areas.push(new GodwarsDungeonArea());
-        AreaManager.areas.push(new CastleWarsLobbyArea());
-        AreaManager.areas.push(new CastleWarsZamorakWaitingArea());
-        AreaManager.areas.push(new CastleWarsSaradominWaitingArea());
-        AreaManager.areas.push(new CastleWarsGameArea());
-        AreaManager.areas.push(PestControl.GAME_AREA);
-        AreaManager.areas.push(PestControl.NOVICE_BOAT_AREA);
-        AreaManager.areas.push(PestControl.OUTPOST_AREA);
-    }
-*/
     /**
      * Processes areas for the given character.
      *
@@ -107,6 +77,13 @@ export class AreaManager {
      */
     public static canAttack(attacker: Mobile, target: Mobile): CanAttackResponse | BasicAttackResponse {
         if (attacker.getPrivateArea() != target.getPrivateArea()) {
+            return CanAttackResponse.CANT_ATTACK_IN_AREA;
+        }
+
+        if (PluginManager.emitCanAttack(attacker, target) === true) {
+            return CanAttackResponse.CAN_ATTACK;
+        }
+        if (PluginManager.emitCanAttack(attacker, target) === false) {
             return CanAttackResponse.CANT_ATTACK_IN_AREA;
         }
 

@@ -6,6 +6,7 @@ import { EffectTimer } from "../model/EffectTimer"
 import { Item } from "../model/Item"
 import { Skill } from "../model/Skill"
 import { TimerKey } from "../../util/timers/TimerKey"
+import { PluginManager } from "../../plugins/PluginManager";
 
 export class PotionConsumable {
     public static ANTIFIRE_POTIONS = new PotionConsumable([2452, 2454, 2456, 2458]);
@@ -102,16 +103,22 @@ export class PotionConsumable {
         if (!potion) {
             return false;
         }
-        if (player.getArea() != null) {
-            if (!player.getArea().canDrink(player, item)) {
-                player.getPacketSender().sendMessage("You cannot use potions here.");
+        if (PluginManager.emitCanDrink(player, item) === false) {
+            player.getPacketSender().sendMessage("You cannot use potions here.");
+            return true;
+        }
+        if (PluginManager.emitCanDrink(player, item) === null && player.getArea() != null && !player.getArea().canDrink(player, item)) {
+            player.getPacketSender().sendMessage("You cannot use potions here.");
+            return true;
+        }
+        if (potion === PotionConsumable.GUTHIX_REST || potion === PotionConsumable.SARADOMIN_BREW) {
+            if (PluginManager.emitCanEat(player, item) === false) {
+                player.getPacketSender().sendMessage("You cannot eat here.");
                 return true;
             }
-            if (potion === PotionConsumable.GUTHIX_REST || potion === PotionConsumable.SARADOMIN_BREW) {
-                if (!player.getArea().canEat(player, item)) {
-                    player.getPacketSender().sendMessage("You cannot eat here.");
-                    return true;
-                }
+            if (PluginManager.emitCanEat(player, item) === null && player.getArea() != null && !player.getArea().canEat(player, item)) {
+                player.getPacketSender().sendMessage("You cannot eat here.");
+                return true;
             }
         }
 

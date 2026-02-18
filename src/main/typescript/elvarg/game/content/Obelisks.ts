@@ -3,11 +3,11 @@ import { GameObject } from '../entity/impl/object/GameObject';
 import { ObjectManager } from '../entity/impl/object/ObjectManager';
 import { Graphic } from '../model/Graphic';
 import { Location } from '../model/Location';
-import { WildernessArea } from '../model/areas/impl/WildernessArea';
 import { Task } from '../task/Task';
 import { TaskManager } from '../task/TaskManager';
 import { Misc } from '../../util/Misc';
 import { TeleportType } from '../model/teleportation/TeleportType';
+import { Wilderness } from './wilderness/Wilderness';
 
 class ObeliskTask extends Task{
     constructor(private readonly func: Function, private readonly funcStop: Function){
@@ -47,7 +47,7 @@ export class Obelisks {
                     const newLocation = new Location(Obelisks.OBELISK_COORDS[random][0] + 2,
                         Obelisks.OBELISK_COORDS[random][1] + 2);
                     for (const player of World.getPlayers()) {
-                        if (player == null || !(player.getArea() instanceof WildernessArea))
+                        if (player == null || !Wilderness.isIn(player))
                             continue;
                         if (player.getLocation().isWithinDistance(obeliskLocation, 1) && !player.getCombat().getTeleblockTimer().finished())
                             player.getPacketSender().sendMessage("A magical spell is blocking you from teleporting.");

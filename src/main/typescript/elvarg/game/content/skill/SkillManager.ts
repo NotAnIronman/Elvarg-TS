@@ -5,13 +5,13 @@ import { GameConstants } from "../../GameConstants";
 import { PlayerRights } from "../../model/rights/PlayerRights";
 import { Flag } from "../../model/Flag";
 import { World } from "../../World";
-import { WildernessArea } from "../../model/areas/impl/WildernessArea";
 import { PrayerData, PrayerHandler } from "../PrayerHandler";
 import { WeaponInterfaces } from "../combat/WeaponInterfaces";
 import { BonusManager } from "../../model/equipment/BonusManager";
 import { BountyHunter } from "../combat/bountyhunter/BountyHunter";
 import { GameObject } from "../../entity/impl/object/GameObject";
 import { EnteredAmountAction } from "../../model/EnteredAmountAction";
+import { Wilderness } from "../wilderness/Wilderness";
 
 
 class SkillEntered implements EnteredAmountAction {
@@ -192,7 +192,7 @@ export class SkillManager {
     setLevel(skill: Skill, level: number) {
 
         // Make sure they aren't in wild
-        if (this.player.getArea() instanceof WildernessArea) {
+        if (Wilderness.isIn(this.player)) {
             if (this.player.getRights() != PlayerRights.ADMINISTRATOR && this.player.getRights() != PlayerRights.DEVELOPER
                 && this.player.getRights() != PlayerRights.OWNER) {
                 this.player.getPacketSender().sendMessage("You cannot do this in the Wilderness!");

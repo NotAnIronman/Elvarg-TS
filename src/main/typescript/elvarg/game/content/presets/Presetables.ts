@@ -2,7 +2,6 @@ import { Player } from "../../entity/impl/player/Player";
 import { GameConstants } from "../../GameConstants";
 import { Presetable } from "./Presetable";
 import { Skill } from "../../model/Skill";
-import { WildernessArea } from "../../model/areas/impl/WildernessArea";
 import { CombatFactory } from "../combat/CombatFactory";
 import { PredefinedPresets } from './PredefinedPresets'
 import { F2PMeleeFighterPreset } from "../../entity/impl/playerbot/fightstyle/impl/F2PMeleeFighterPreset";
@@ -17,6 +16,7 @@ import { PrayerHandler, PrayerData } from "../PrayerHandler";
 import { CombatSpecial } from "../combat/CombatSpecial";
 import { Flag } from "../../model/Flag";
 import { EnteredSyntaxAction } from "../../model/EnteredSyntaxAction";
+import { Wilderness } from "../wilderness/Wilderness";
 
 class PreseEntered implements EnteredSyntaxAction{
     constructor(private readonly execFunc: Function){
@@ -166,7 +166,7 @@ export class Presetables {
 
     private static edit(player: Player, index: number) {
         // Check if we can edit..
-        if (player.getArea() instanceof WildernessArea) {
+        if (Wilderness.isIn(player)) {
             player.getPacketSender().sendMessage("You can't edit a preset in the wilderness!");
             return;
         }
@@ -191,7 +191,7 @@ export class Presetables {
         player.getPacketSender().sendInterfaceRemoval();
 
         // Check if we can load...
-        if (player.getArea() instanceof WildernessArea) {
+        if (Wilderness.isIn(player)) {
             if (!player.isPlayerBot() && player.getRights() !== PlayerRights.DEVELOPER) {
                 player.getPacketSender().sendMessage("You can't load a preset in the wilderness!");
                 return;

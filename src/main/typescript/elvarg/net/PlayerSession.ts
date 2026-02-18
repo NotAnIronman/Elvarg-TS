@@ -15,15 +15,25 @@ import { Server, Socket } from "socket.io";
 import { PacketType } from "./packet/PacketType";
 import { IsaacRandom } from "./security/IsaacRandom";
 
+export interface OutboundPacketMeta {
+  opcode: number;
+  encOpcode: number;
+  payloadLength: number;
+  packetType: PacketType;
+  payloadPreview?: string;
+}
+
 export class PlayerSession {
   private packetsQueue: Packet[] = [];
   private lastPacketOpcodeQueue: number[] = [];
   private channel: Socket;
   private encryptor?: IsaacRandom;
+  private outboundPacketObserver?: (meta: OutboundPacketMeta) => void;
   // public player: Player;
 
-  constructor(channel: any) {
+  constructor(channel: any, outboundPacketObserver?: (meta: OutboundPacketMeta) => void) {
     this.channel = channel;
+    this.outboundPacketObserver = outboundPacketObserver;
     // this.player = new Player(this);
   }
 
@@ -106,9 +116,31 @@ export class PlayerSession {
       try {
         const packet = builder.toPacket();
         const opcode = packet.getOpcode();
+        if (!Number.isInteger(opcode) || opcode < 0 || opcode > 255) {
+          console.warn(
+            `[PlayerSession.write] dropping packet with invalid opcode=${opcode}`
+          );
+          return;
+        }
         const payload = packet.getBuffer();
         const encOpcode =
           this.encryptor != null ? (opcode + this.encryptor.nextInt()) & 0xff : opcode;
+        const payloadPreview = payload
+          .subarray(0, Math.min(16, payload.length))
+          .toString("hex");
+        if (this.outboundPacketObserver) {
+          try {
+            this.outboundPacketObserver({
+              opcode,
+              encOpcode,
+              payloadLength: payload.length,
+              packetType: packet.getType(),
+              payloadPreview,
+            });
+          } catch {
+            // Never fail packet writes because of debug observers.
+          }
+        }
         // Log outgoing packets to help diagnose client desyncs.
         try {
           console.log(

@@ -1,6 +1,7 @@
 // import { Player } from "../../../game/entity/impl/player/Player";
 import { PacketExecutor } from "../PacketExecutor";
 import { Packet } from "../Packet";
+import { PluginManager } from "../../../plugins/PluginManager";
 // import { World } from "../../../game/World";
 // import { PlayerStatus } from "../../../game/model/PlayerStatus";
 
@@ -48,11 +49,13 @@ export class TradeRequestPacketListener implements PacketExecutor {
       return;
     }
 
-    if (player.getArea() != null) {
-      if (!player.getArea().canTrade(player, target)) {
-        player.getPacketSender().sendMessage("You cannot trade here.");
-        return;
-      }
+    if (PluginManager.emitCanTrade(player, target) === false) {
+      player.getPacketSender().sendMessage("You cannot trade here.");
+      return;
+    }
+    if (PluginManager.emitCanTrade(player, target) === null && player.getArea() != null && !player.getArea().canTrade(player, target)) {
+      player.getPacketSender().sendMessage("You cannot trade here.");
+      return;
     }
 
     if (player.getLocalPlayers().indexOf(target) !== -1) {

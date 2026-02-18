@@ -4,10 +4,10 @@ import { Item } from "../../../game/model/Item";
 import { Sound } from "../../../game/Sound";
 import { Inventory } from "../../../game/model/container/impl/Inventory";
 import { ItemOnGroundManager } from "../../../game/entity/impl/grounditem/ItemOnGroundManager";
-import { WildernessArea } from "../../../game/model/areas/impl/WildernessArea";
 import { Sounds } from "../../../game/Sounds";
 import { PetHandler } from "../../../game/content/PetHandler";
 import { PlayerRights } from "../../../game/model/rights/PlayerRights";
+import { Wilderness } from "../../../game/content/wilderness/Wilderness";
 
 export class DropItemPacketListener implements PacketExecutor {
   public static destroyItemInterface(player: any, item: any) {
@@ -71,7 +71,7 @@ export class DropItemPacketListener implements PacketExecutor {
 
     if (item.getDefinition().isDropable()) {
       const toFloor = new Item(item.getId(), item.getAmount());
-      if (player.getArea() instanceof WildernessArea) {
+      if (Wilderness.isIn(player)) {
         ItemOnGroundManager.registerGlobal(player, toFloor);
       } else {
         ItemOnGroundManager.registers(player, toFloor);

@@ -13,10 +13,10 @@ import { FacingDirection } from "../../../model/FacingDirection";
 import { Ids } from "../../../model/Ids";
 import { Location } from "../../../model/Location";
 import { AreaManager } from "../../../model/areas/AreaManager";
-import { WildernessArea } from "../../../model/areas/impl/WildernessArea";
 import { TaskManager } from "../../../task/TaskManager";
 import { NPCDeathTask } from "../../../task/impl/NPCDeathTask"
 import * as util from 'util';
+import { Wilderness } from "../../../content/wilderness/Wilderness";
 
 
 export class NPC extends Mobile {
@@ -123,7 +123,7 @@ export class NPC extends Mobile {
 
     public isAggressiveTo(player: Player): boolean {
         return player.getSkillManager().getCombatLevel() <= (this.getCurrentDefinition().getCombatLevel() * 2)
-            || player.getArea() instanceof WildernessArea;
+            || Wilderness.isIn(player);
     }
 
     public aggressionDistance(): number {

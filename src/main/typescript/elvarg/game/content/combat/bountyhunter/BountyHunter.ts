@@ -6,9 +6,9 @@ import { ItemOnGroundManager } from "../../../entity/impl/grounditem/ItemOnGroun
 import { Player } from "../../../entity/impl/player/Player";
 import { BrokenItem } from "../../../model/BrokenItem";
 import { Item } from "../../../model/Item";
-import { WildernessArea } from "../../../model/areas/impl/WildernessArea";
 import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
 import { Misc } from "../../../../util/Misc";
+import { Wilderness } from "../../wilderness/Wilderness";
 export class BountyHunter {
     public static PLAYERS_IN_WILD: Player[] = [];
     public static TARGET_PAIRS: TargetPair[] = [];
@@ -20,7 +20,7 @@ export class BountyHunter {
 
     static process(player: Player) {
         const target: Player | undefined = BountyHunter.getTargetFor(player);
-        if (player.getArea() instanceof WildernessArea) {
+        if (Wilderness.isIn(player)) {
             if (!target) {
                 if (player.getTargetSearchTimer().finished()) {
                     if (!BountyHunter.validTargetContester(player)) {
@@ -358,7 +358,7 @@ export class BountyHunter {
         return (
             p != null &&
             p.isRegistered() &&
-            p.getArea() instanceof WildernessArea &&
+            Wilderness.isIn(p) &&
             p.getWildernessLevel() > 0 &&
             !p.isUntargetable() &&
             p.getHitpoints() > 0 &&

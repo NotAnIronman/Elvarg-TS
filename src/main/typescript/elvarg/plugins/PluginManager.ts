@@ -4,21 +4,31 @@ import { GameConstants } from "../game/GameConstants";
 import { PacketExecutor } from "../net/packet/PacketExecutor";
 import {
   PluginApi,
+  PluginCanAttackEvent,
+  PluginCanDrinkEvent,
+  PluginCanEatEvent,
+  PluginCanEquipEvent,
+  PluginCanTeleportEvent,
   PluginItemActionEvent,
   PluginModule,
   PluginItemOnGroundItemEvent,
   PluginItemOnItemEvent,
   PluginItemOnObjectEvent,
   PluginNpcDeathEvent,
+  PluginNpcAggressionToleranceEvent,
   PluginNpcInteractionEvent,
   PluginObjectInteractionEvent,
+  PluginPlayerDefeatedEvent,
   PluginPathBlockedEvent,
+  PluginPlayerProcessEvent,
   PluginPlayerPathBlockedEvent,
   PluginPacketEvent,
   PluginCommandEvent,
   PluginPlayerDisconnectEvent,
   PluginPlayerLoginEvent,
   PluginRegionLoadedEvent,
+  PluginSpellDisabledEvent,
+  PluginCanTradeEvent,
 } from "./PluginTypes";
 
 type PluginHook<T> = {
@@ -38,11 +48,21 @@ export class PluginManager {
   private static packetHooks: PluginHook<PluginPacketEvent>[] = [];
   private static loginHooks: PluginHook<PluginPlayerLoginEvent>[] = [];
   private static disconnectHooks: PluginHook<PluginPlayerDisconnectEvent>[] = [];
+  private static playerProcessHooks: PluginHook<PluginPlayerProcessEvent>[] = [];
   private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
   private static npcInteractionHooks: PluginHook<PluginNpcInteractionEvent>[] = [];
   private static npcDeathHooks: PluginHook<PluginNpcDeathEvent>[] = [];
+  private static canAttackHooks: PluginHook<PluginCanAttackEvent>[] = [];
+  private static canTeleportHooks: PluginHook<PluginCanTeleportEvent>[] = [];
+  private static canEatHooks: PluginHook<PluginCanEatEvent>[] = [];
+  private static canDrinkHooks: PluginHook<PluginCanDrinkEvent>[] = [];
+  private static canTradeHooks: PluginHook<PluginCanTradeEvent>[] = [];
+  private static canEquipHooks: PluginHook<PluginCanEquipEvent>[] = [];
+  private static spellDisabledHooks: PluginHook<PluginSpellDisabledEvent>[] = [];
+  private static npcAggressionToleranceHooks: PluginHook<PluginNpcAggressionToleranceEvent>[] = [];
+  private static playerDefeatedHooks: PluginHook<PluginPlayerDefeatedEvent>[] = [];
   private static itemOnObjectHooks: PluginHook<PluginItemOnObjectEvent>[] = [];
   private static itemOnItemHooks: PluginHook<PluginItemOnItemEvent>[] = [];
   private static itemOnGroundItemHooks: PluginHook<PluginItemOnGroundItemEvent>[] =
@@ -150,6 +170,19 @@ export class PluginManager {
     }
   }
 
+  public static emitPlayerProcess(event: PluginPlayerProcessEvent): void {
+    for (const hook of PluginManager.playerProcessHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] player_process hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+  }
+
   public static emitRegionLoaded(event: PluginRegionLoadedEvent): void {
     for (const hook of PluginManager.regionLoadedHooks) {
       try {
@@ -213,6 +246,183 @@ export class PluginManager {
       } catch (err) {
         console.error(
           `[plugins] npc_death hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+  }
+
+  public static emitCanAttack(
+    attacker: any,
+    target: any
+  ): boolean | null {
+    const event: PluginCanAttackEvent = { attacker, target, allow: null };
+    for (const hook of PluginManager.canAttackHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] can_attack hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitCanTeleport(player: any): boolean | null {
+    const event: PluginCanTeleportEvent = { player, allow: null };
+    for (const hook of PluginManager.canTeleportHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] can_teleport hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitCanEat(player: any, itemId: number): boolean | null {
+    const event: PluginCanEatEvent = { player, itemId, allow: null };
+    for (const hook of PluginManager.canEatHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] can_eat hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitCanDrink(player: any, itemId: number): boolean | null {
+    const event: PluginCanDrinkEvent = { player, itemId, allow: null };
+    for (const hook of PluginManager.canDrinkHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] can_drink hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitCanTrade(player: any, target: any): boolean | null {
+    const event: PluginCanTradeEvent = { player, target, allow: null };
+    for (const hook of PluginManager.canTradeHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] can_trade hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitCanEquip(player: any, slot: number, item: any): boolean | null {
+    const event: PluginCanEquipEvent = { player, slot, item, allow: null };
+    for (const hook of PluginManager.canEquipHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] can_equip hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitSpellDisabled(
+    player: any,
+    spellbook: any,
+    spellId: number
+  ): boolean | null {
+    const event: PluginSpellDisabledEvent = {
+      player,
+      spellbook,
+      spellId,
+      disabled: null,
+    };
+    for (const hook of PluginManager.spellDisabledHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] spell_disabled hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.disabled !== null) {
+        return event.disabled;
+      }
+    }
+    return null;
+  }
+
+  public static emitNpcAggressionTolerance(
+    player: any,
+    npc: any
+  ): boolean | null {
+    const event: PluginNpcAggressionToleranceEvent = {
+      player,
+      npc,
+      override: null,
+    };
+    for (const hook of PluginManager.npcAggressionToleranceHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] npc_aggression_tolerance hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+      if (event.override !== null) {
+        return event.override;
+      }
+    }
+    return null;
+  }
+
+  public static emitPlayerDefeated(killer: any, victim: any): void {
+    const event: PluginPlayerDefeatedEvent = { killer, victim };
+    for (const hook of PluginManager.playerDefeatedHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] player_defeated hook failed (${hook.pluginName})`,
           err
         );
       }
@@ -472,6 +682,20 @@ export class PluginManager {
           },
         });
       },
+      onPlayerProcess: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerProcessHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onRegionLoaded: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -555,6 +779,149 @@ export class PluginManager {
           pluginName,
           handler: (event) => {
             if (!event || !event.killer || !event.npc) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanAttack: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canAttackHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.attacker || !event.target) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanTeleport: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canTeleportHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanEat: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canEatHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !Number.isInteger(event.itemId)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanDrink: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canDrinkHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !Number.isInteger(event.itemId)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanTrade: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canTradeHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.target) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanEquip: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canEquipHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !event.item ||
+              !Number.isInteger(event.slot)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onSpellDisabled: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.spellDisabledHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !Number.isInteger(event.spellId)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onNpcAggressionTolerance: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.npcAggressionToleranceHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.npc) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerDefeated: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerDefeatedHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.victim) {
               return;
             }
             handler(event);

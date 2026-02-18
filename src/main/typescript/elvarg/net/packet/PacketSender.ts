@@ -315,14 +315,16 @@ export class PacketSender {
   }
 
   public sendEnterAmountPrompt(title: string): PacketSender {
-    const out = new PacketBuilder();
+    // Java parity: opcode 27 (variable) for enter amount.
+    const out = new PacketBuilder(27, PacketType.VARIABLE);
     out.putString(title);
     this.player.getSession().write(out);
     return this;
   }
 
   public sendEnterInputPrompt(title: string): PacketSender {
-    const out = new PacketBuilder();
+    // Java parity: opcode 187 (variable) for enter input.
+    const out = new PacketBuilder(187, PacketType.VARIABLE);
     out.putString(title);
     this.player.getSession().write(out);
     return this;
@@ -715,11 +717,19 @@ export class PacketSender {
   }
 
   public sendPositionalHint(position: any, tilePosition: number) {
+    if (
+      !position ||
+      typeof position.getX !== "function" ||
+      typeof position.getY !== "function" ||
+      typeof position.getZ !== "function"
+    ) {
+      return this;
+    }
     const out = new PacketBuilder(254);
     out.put(tilePosition);
-    // out.putShort(position.getX());
-    // out.putShort(position.getY());
-    // out.put(position.getZ());
+    out.putShort(position.getX());
+    out.putShort(position.getY());
+    out.put(position.getZ());
     this.player.getSession().write(out);
     return this;
   }
@@ -1004,14 +1014,10 @@ export class PacketSender {
     this.player.setShop?.(null);
     this.player.setDestroyItem?.(-1);
     this.player.setInterfaceId?.(-1);
-    this.player.setWalkableInterfaceId?.(-1);
     this.player.setSearchingBank?.(false);
     this.player.setTeleportInterfaceOpen?.(false);
     this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
-    // Reset walkable/overlay context before removing interfaces; stale walkable
-    // overlays can leak alternate item interaction priorities into inventory.
-    this.player.getSession().write(new PacketBuilder(208).putInt(-1));
-    this.player.getSession().write(new PacketBuilder(68));
+    // Java parity: close interfaces with opcode 219 only.
     this.player.getSession().write(new PacketBuilder(219));
     return this;
   }

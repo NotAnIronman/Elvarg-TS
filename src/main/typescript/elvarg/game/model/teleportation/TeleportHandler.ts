@@ -1,7 +1,5 @@
 
 import { Player } from "../../entity/impl/player/Player";
-import { WildernessArea } from "../areas/impl/WildernessArea";
-import { AreaManager } from "../areas/AreaManager";
 import { TeleportType } from "./TeleportType";
 import { GameConstants } from "../../GameConstants";
 import { Task } from "../../task/Task";
@@ -11,6 +9,8 @@ import { TeleportButton } from './TeleportButton'
 import { Sound } from "../../Sound";
 import { Sounds } from "../../Sounds";
 import { Location } from "../Location";
+import { PluginManager } from "../../../plugins/PluginManager";
+import { Wilderness } from "../../content/wilderness/Wilderness";
 
 class TelportHandlerTask extends Task {
     execute(): void {
@@ -38,14 +38,13 @@ export class TeleportHandler {
     public static teleport(player: Player, targetLocation: Location, teleportType: TeleportType, wildernessWarning: boolean): void {
         if (wildernessWarning) {
             let warning = "";
-            const area = AreaManager.get(targetLocation);
-            const wilderness = area instanceof WildernessArea;
-            const wildernessLevel = WildernessArea.getLevel(targetLocation.getY());
+            const wilderness = Wilderness.isInLocation(targetLocation);
+            const wildernessLevel = Wilderness.levelForY(targetLocation.getY());
             if (wilderness) {
                 warning += "Are you sure you want to teleport there? ";
                 if (wildernessLevel > 0) {
                     warning += "It's in level @red@" + wildernessLevel + "@bla@ wilderness! ";
-                    if (WildernessArea.multi(targetLocation.getX(), targetLocation.getY())) {
+                    if (Wilderness.isMulti(targetLocation.getX(), targetLocation.getY())) {
                         warning += "Additionally, @red@it's a multi zone@bla@. Other players may attack you simultaneously.";
                     } else {
                         warning += "Other players will be able to attack you.";
@@ -105,7 +104,7 @@ export class TeleportHandler {
         }
 
         if (!player.getCombat().getTeleblockTimer().finished()) {
-            if (player.getArea() instanceof WildernessArea) {
+            if (Wilderness.isIn(player)) {
                 player.getPacketSender().sendMessage("A magical spell is blocking you from teleporting.");
                 return false;
             } else {
@@ -122,6 +121,10 @@ export class TeleportHandler {
             if (!player.getArea().canTeleport(player)) {
                 return false;
             }
+        }
+
+        if (PluginManager.emitCanTeleport(player) === false) {
+            return false;
         }
 
         return true;

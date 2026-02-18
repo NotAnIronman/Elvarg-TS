@@ -28,7 +28,6 @@ import { Location } from "../../model/Location";
 import { Skill } from "../../model/Skill";
 import { SkullType } from "../../model/SkullType"
 import { AreaManager } from "../../model/areas/AreaManager";
-import { WildernessArea } from "../../model/areas/impl/WildernessArea";
 import { Equipment } from "../../model/container/impl/Equipment";
 import { MovementQueue } from "../../model/movement/MovementQueue";
 import { PathFinder } from "../../model/movement/path/PathFinder";
@@ -47,6 +46,7 @@ import { CombatPoisonData } from "../../task/impl/CombatPoisonEffect";
 import { DuelRule } from "../Duelling";
 import { PoisonType } from "../../task/impl/CombatPoisonEffect";
 import { CombatConstants } from "./CombatConstants";
+import { Wilderness } from "../wilderness/Wilderness";
 
 const getPlayerCtor = () =>
     require("../../entity/impl/player/Player").Player as typeof import("../../entity/impl/player/Player").Player;
@@ -726,7 +726,7 @@ export class CombatFactory {
             return;
         }
 
-        if (!(attacker.getArea() instanceof WildernessArea)) {
+        if (!Wilderness.isIn(attacker)) {
             return;
         }
 

@@ -111,6 +111,16 @@ class LoginSession {
     preview?: string;
     timestamp: string;
   }> = [];
+  private recentKeepAliveCount = 0;
+  private recentKeepAliveAt: string | null = null;
+  private pendingInboundPacket: {
+    opcode: number;
+    encOpcode: number;
+    rand: number;
+    size: number | null;
+    lengthBytes: 0 | 1 | 2;
+    headerSize: number;
+  } | null = null;
 
   constructor(private socket: WebSocket) {
     this.log("connection_open", {
@@ -312,7 +322,16 @@ class LoginSession {
     this.player = player;
 
     // Build game-layer player for packet listeners.
-    const session = new PlayerSession(this.socket as any);
+    const session = new PlayerSession(this.socket as any, (meta) => {
+      this.recordRecentPacket(
+        "OUT",
+        meta.opcode,
+        meta.payloadLength,
+        PACKET_GUIDE[meta.opcode]?.name,
+        undefined,
+        meta.payloadPreview
+      );
+    });
     if (this.encryptor) {
       session.setEncryptor(this.encryptor);
     }
@@ -541,19 +560,27 @@ class LoginSession {
     opcode: number,
     payloadLength: number,
     label?: string,
-    payload?: Buffer
+    payload?: Buffer,
+    previewFromMeta?: string
   ) {
+    const timestamp = new Date().toISOString();
+    if (direction === "IN" && opcode === 0) {
+      this.recentKeepAliveCount++;
+      this.recentKeepAliveAt = timestamp;
+      return;
+    }
     const preview =
-      payload && payload.length
+      previewFromMeta ??
+      (payload && payload.length
         ? payload.subarray(0, Math.min(12, payload.length)).toString("hex")
-        : undefined;
+        : undefined);
     this.recentPacketEvents.push({
       direction,
       opcode,
       payloadLength,
       label,
       preview,
-      timestamp: new Date().toISOString(),
+      timestamp,
     });
     if (this.recentPacketEvents.length > 24) {
       this.recentPacketEvents.shift();
@@ -910,6 +937,8 @@ class LoginSession {
       wasInAddQueue: addIndex !== -1,
       queuedForRemoval,
       registered: player.isRegistered(),
+      recentKeepAliveCount: this.recentKeepAliveCount,
+      recentKeepAliveAt: this.recentKeepAliveAt,
       recentPackets: this.recentPacketEvents.slice(),
     });
     PluginManager.emitPlayerDisconnect({
@@ -978,35 +1007,66 @@ class LoginSession {
     let data = Buffer.concat([this.recvBuffer, buffer]);
     let offset = 0;
     while (true) {
-      if (data.length - offset < 1) break;
-      const encOpcode = data.readUInt8(offset++);
-      const rand = this.decryptor.nextInt() & 0xff;
-      const opcode = (encOpcode - rand) & 0xff;
-      let headerSize = 1;
-      let size = PACKET_SIZES[opcode];
-      if (size === undefined) {
-        this.log("packet_unknown_size", { opcode, encOpcode, rand });
-        break;
-      }
-      if (size === -1) {
+      let opcode: number;
+      let encOpcode: number;
+      let rand: number;
+      let size: number | null;
+      let lengthBytes: 0 | 1 | 2;
+      let headerSize: number;
+
+      if (this.pendingInboundPacket) {
+        ({ opcode, encOpcode, rand, size, lengthBytes, headerSize } = this.pendingInboundPacket);
+        this.pendingInboundPacket = null;
+      } else {
         if (data.length - offset < 1) {
-          offset--; // rewind opcode
+          break;
+        }
+        encOpcode = data.readUInt8(offset++);
+        rand = this.decryptor.nextInt() & 0xff;
+        opcode = (encOpcode - rand) & 0xff;
+        headerSize = 1;
+        const mappedSize = PACKET_SIZES[opcode];
+        if (mappedSize === undefined) {
+          this.log("packet_unknown_size", { opcode, encOpcode, rand });
+          continue;
+        }
+        if (mappedSize === -1) {
+          size = null;
+          lengthBytes = 1;
+        } else if (mappedSize === -2) {
+          size = null;
+          lengthBytes = 2;
+        } else {
+          size = mappedSize;
+          lengthBytes = 0;
+        }
+      }
+
+      if (lengthBytes === 1) {
+        if (data.length - offset < 1) {
+          this.pendingInboundPacket = { opcode, encOpcode, rand, size: null, lengthBytes, headerSize };
           break;
         }
         size = data.readUInt8(offset++);
-        headerSize = 2;
-      } else if (size === -2) {
+        headerSize += 1;
+        lengthBytes = 0;
+      } else if (lengthBytes === 2) {
         if (data.length - offset < 2) {
-          offset--;
+          this.pendingInboundPacket = { opcode, encOpcode, rand, size: null, lengthBytes, headerSize };
           break;
         }
         size = data.readUInt16BE(offset);
         offset += 2;
-        headerSize = 3;
+        headerSize += 2;
+        lengthBytes = 0;
+      }
+
+      if (size == null) {
+        this.pendingInboundPacket = { opcode, encOpcode, rand, size, lengthBytes, headerSize };
+        break;
       }
       if (data.length - offset < size) {
-        // Not enough data yet; rewind and wait for the rest.
-        offset -= headerSize;
+        this.pendingInboundPacket = { opcode, encOpcode, rand, size, lengthBytes, headerSize };
         break;
       }
 

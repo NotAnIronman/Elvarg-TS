@@ -8,6 +8,7 @@ import { Skill } from "../../../model/Skill";
 import { Autocasting } from "./Autocasting";
 import { CombatSpells } from "./CombatSpells";
 import { PlayerMagicStaff } from "./PlayerMagicStaff";
+import { PluginManager } from "../../../../plugins/PluginManager";
 
 export abstract class Spell {
 
@@ -29,12 +30,29 @@ export abstract class Spell {
             return false;
         }
 
-        if (player.getArea() != null) {
-            if (player.getArea().isSpellDisabled(player, this.getSpellbook(), this.spellId())) {
-                player.getCombat().setCastSpell(null);
-                player.getCombat().reset();
-                return false;
-            }
+        if (
+            PluginManager.emitSpellDisabled(
+                player,
+                this.getSpellbook(),
+                this.spellId()
+            ) === true
+        ) {
+            player.getCombat().setCastSpell(null);
+            player.getCombat().reset();
+            return false;
+        }
+        if (
+            PluginManager.emitSpellDisabled(
+                player,
+                this.getSpellbook(),
+                this.spellId()
+            ) === null &&
+            player.getArea() != null &&
+            player.getArea().isSpellDisabled(player, this.getSpellbook(), this.spellId())
+        ) {
+            player.getCombat().setCastSpell(null);
+            player.getCombat().reset();
+            return false;
         }
 
         if (player.getSpellbook() === this.getSpellbook()) {
