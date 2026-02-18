@@ -725,21 +725,25 @@ export class PacketSender {
   }
 
   // public sendEntityHint(mobile: Mobile) {
-  //     // let type = mobile instanceof Player ? 10 : 1;
-  //     let type =  1;
-  //     const out = new PacketBuilder(254);
-  //     out.put(type);
-  //     out.putShort(mobile.getIndex());
-  //     out.putShorts(0, ByteOrder.TRIPLE_INT);
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
+  // Use client hint-arrow packet to point at a target entity.
+  public sendEntityHint(mobile: any): PacketSender {
+    if (!mobile || typeof mobile.getIndex !== "function") {
+      return this;
+    }
+    const type = mobile?.isPlayer?.() ? 10 : 1;
+    const out = new PacketBuilder(254);
+    out.put(type);
+    out.putShort(mobile.getIndex());
+    out.putTypeInt(0, ValueType.STANDARD, ByteOrder.TRIPLE_INT);
+    this.player.getSession().write(out);
+    return this;
+  }
 
   public sendEntityHintRemoval(playerHintRemoval: boolean): PacketSender {
     let type = playerHintRemoval ? 10 : 1;
     let out = new PacketBuilder(254);
     out.put(type).putShort(-1);
-    out.putShorts(0, ByteOrder.TRIPLE_INT);
+    out.putTypeInt(0, ValueType.STANDARD, ByteOrder.TRIPLE_INT);
     this.player.getSession().write(out);
     return this;
   }
@@ -1000,9 +1004,14 @@ export class PacketSender {
     this.player.setShop?.(null);
     this.player.setDestroyItem?.(-1);
     this.player.setInterfaceId?.(-1);
+    this.player.setWalkableInterfaceId?.(-1);
     this.player.setSearchingBank?.(false);
     this.player.setTeleportInterfaceOpen?.(false);
     this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
+    // Reset walkable/overlay context before removing interfaces; stale walkable
+    // overlays can leak alternate item interaction priorities into inventory.
+    this.player.getSession().write(new PacketBuilder(208).putInt(-1));
+    this.player.getSession().write(new PacketBuilder(68));
     this.player.getSession().write(new PacketBuilder(219));
     return this;
   }
@@ -1081,10 +1090,6 @@ export class PacketSender {
   }
 
   sendProjectile(..._args: any[]): this {
-    return this;
-  }
-
-  sendEntityHint(_target?: any, _index?: any): this {
     return this;
   }
 

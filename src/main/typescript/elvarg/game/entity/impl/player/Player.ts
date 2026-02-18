@@ -1384,6 +1384,15 @@ export class Player extends Mobile {
         this.currentChatMessage = currentChatMessage;
     }
 
+    public sendChat(message: string, colour: number = 0, effect: number = 0) {
+        if (!message) {
+            return;
+        }
+        const packed = Misc.textPack(message);
+        this.getChatMessageQueue().push(new ChatMessage(colour, effect, packed));
+        this.getUpdateFlag().flag(Flag.CHAT);
+    }
+
     public getPreviousTeleports(): Map<TeleportButton, Location> {
         return this.previousTeleports;
     }

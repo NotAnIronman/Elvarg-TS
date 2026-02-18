@@ -16,6 +16,7 @@ const CHOP_SOUND_INTERVAL_TICKS = 2;
 const MULTI_TREE_DEPLETION_ROLL_MAX = 15;
 const MULTI_TREE_DEPLETION_THRESHOLD = 2;
 let woodcuttingTick = 0;
+let activeSessionsRef = null;
 
 const AXES = [
   { id: ItemIds.BRONZE_AXE, requiredLevel: 1, speed: 0.03, animationId: 879 },
@@ -26,7 +27,7 @@ const AXES = [
   { id: ItemIds.ADAMANT_AXE, requiredLevel: 31, speed: 0.16, animationId: 869 },
   { id: ItemIds.RUNE_AXE, requiredLevel: 41, speed: 0.19, animationId: 867 },
   { id: ItemIds.DRAGON_AXE, requiredLevel: 61, speed: 0.25, animationId: 2846 },
-  { id: ItemIds.INFERNAL_AXE, requiredLevel: 61, speed: 0.30, animationId: 2117 },
+  { id: ItemIds.INFERNAL_AXE, requiredLevel: 61, speed: 0.3, animationId: 2117 },
 ];
 
 const AXES_BY_REQUIREMENT_DESC = [...AXES].sort(
@@ -189,6 +190,10 @@ for (const tree of TREES) {
   }
 }
 
+const TREE_LOG_IDS = Object.freeze(
+  Array.from(new Set(TREES.map((tree) => tree.logId)))
+);
+
 function randomIntInclusive(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -218,6 +223,19 @@ function findBestUsableAxe(player) {
   }
 
   return null;
+}
+
+function findBestUsableAxeByLevel(level) {
+  for (const axe of AXES_BY_REQUIREMENT_DESC) {
+    if (level >= axe.requiredLevel) {
+      return axe;
+    }
+  }
+  return null;
+}
+
+function isWoodcuttingActive(player) {
+  return !!(activeSessionsRef && player && activeSessionsRef.has(player));
 }
 
 function calculateCyclesRequired(player, tree, axe) {
@@ -463,6 +481,7 @@ module.exports = {
   name: "Woodcutting",
   register(api) {
     const activeSessions = new Map();
+    activeSessionsRef = activeSessions;
 
     TaskManager.submit(new WoodcuttingTask(activeSessions));
 
@@ -510,4 +529,12 @@ module.exports = {
       axes: AXES.length,
     });
   },
+  AXES,
+  AXES_BY_REQUIREMENT_DESC,
+  TREES,
+  TREES_BY_OBJECT_ID,
+  TREE_LOG_IDS,
+  findBestUsableAxe,
+  findBestUsableAxeByLevel,
+  isWoodcuttingActive,
 };

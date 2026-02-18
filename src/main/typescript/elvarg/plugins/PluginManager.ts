@@ -336,7 +336,15 @@ export class PluginManager {
         if (typeof handler !== "function") {
           return;
         }
-        PluginManager.disconnectHooks.push({ pluginName, handler });
+        PluginManager.disconnectHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.username) {
+              return;
+            }
+            handler(event);
+          },
+        });
       },
       onRegionLoaded: (handler) => {
         if (typeof handler !== "function") {

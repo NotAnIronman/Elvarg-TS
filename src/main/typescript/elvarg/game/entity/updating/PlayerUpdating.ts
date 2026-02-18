@@ -25,7 +25,7 @@ export class PlayerUpdating {
         .trim()
         .toLowerCase();
     private static readonly DEBUG_TARGET_FILTER = (
-        process.env.PLAYER_UPDATE_DEBUG_TARGET ?? "walkerbot1"
+        process.env.PLAYER_UPDATE_DEBUG_TARGET ?? "playerbot1"
     )
         .trim()
         .toLowerCase();

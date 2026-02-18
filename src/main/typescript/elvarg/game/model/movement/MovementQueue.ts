@@ -27,9 +27,14 @@ export class MovementQueue {
     private static RANDOM: RandomGen = new RandomGen();
     private static LOG_DIR = path.join(process.cwd(), "logs");
     private static LOG_FILE = path.join(MovementQueue.LOG_DIR, "movement.log");
-    private static LOG_READY = false;
+    private static LOG_READY = true;
+    private static LOG_ENABLED = false;
 
     private static log(line: string) {
+        if (!MovementQueue.LOG_ENABLED) {
+            return;
+        }
+
         const msg = `${new Date().toISOString()} ${line}`;
         console.log(msg);
         try {
@@ -321,6 +326,8 @@ export class MovementQueue {
 
         if (this.character.getCombatFollowing() != null) {
             this.processCombatFollowing();
+        } else if (this.character.getFollowing() != null) {
+            this.processFollowing();
         }
 
         if (this.points.length > 0) {
@@ -651,6 +658,75 @@ export class MovementQueue {
         }
 
         PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY());
+    }
+
+    public processFollowing() {
+        const following = this.character.getFollowing();
+        if (!following) {
+            return;
+        }
+
+        if (following === this.character || !following.isRegistered()) {
+            this.character.setFollowing(null);
+            this.character.setMobileInteraction(null);
+            return;
+        }
+
+        if (following.getPrivateArea() != this.character.getPrivateArea()) {
+            this.character.setFollowing(null);
+            this.character.setMobileInteraction(null);
+            return;
+        }
+
+        // Keep follow behavior stable and avoid runaway pathing when the leader is too far away.
+        if (
+            following.isTeleportingReturn() ||
+            !following.getLocation().isWithinDistance(this.character.getLocation(), 15)
+        ) {
+            if (this.character.isPlayer() && following.isPlayer()) {
+                this.character.sendMessage(`Unable to find ${following.getAsPlayer().getUsername()}.`);
+            }
+            this.character.setFollowing(null);
+            this.character.setMobileInteraction(null);
+            this.character.setPositionToFace(null);
+            this.reset();
+            return;
+        }
+
+        this.character.setMobileInteraction(following);
+        this.character.setPositionToFace(following.getLocation());
+
+        if (!this.getMobility().canMove()) {
+            return;
+        }
+
+        const leaderQueue = following.getMovementQueue();
+        let destX = leaderQueue.followX;
+        let destY = leaderQueue.followY;
+        if (destX === -1 || destY === -1) {
+            destX = following.getLocation().getX();
+            destY = following.getLocation().getY();
+        }
+
+        const currentX = this.character.getLocation().getX();
+        const currentY = this.character.getLocation().getY();
+        if (currentX === destX && currentY === destY) {
+            return;
+        }
+
+        if (
+            this.character.getLocation().isWithinDistance(following.getLocation(), 1) &&
+            !RS317PathFinder.isInDiagonalBlock(
+                this.character.getLocation(),
+                following.getLocation()
+            )
+        ) {
+            this.reset();
+            return;
+        }
+
+        this.reset();
+        PathFinder.calculateWalkRoute(this.character, destX, destY);
     }
 
     // Gets the size of the queue.

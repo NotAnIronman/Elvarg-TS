@@ -103,6 +103,14 @@ class LoginSession {
   private gamePlayer: Player | null = null;
   private recvBuffer: Buffer = Buffer.alloc(0);
   private disconnectedCleanupDone = false;
+  private recentPacketEvents: Array<{
+    direction: "IN" | "OUT";
+    opcode: number;
+    payloadLength: number;
+    label?: string;
+    preview?: string;
+    timestamp: string;
+  }> = [];
 
   constructor(private socket: WebSocket) {
     this.log("connection_open", {
@@ -503,6 +511,7 @@ class LoginSession {
       payloadLength: payload.length,
       payloadHex: payload.toString("hex"),
     });
+    this.recordRecentPacket("OUT", opcode, payload.length, label ?? guide?.name, payload);
     PacketLogger.logOutgoing({
       direction: "OUT",
       opcode,
@@ -524,6 +533,30 @@ class LoginSession {
         stack: (err as Error)?.stack,
       });
       // Avoid crashing the session on malformed payloads; drop the packet.
+    }
+  }
+
+  private recordRecentPacket(
+    direction: "IN" | "OUT",
+    opcode: number,
+    payloadLength: number,
+    label?: string,
+    payload?: Buffer
+  ) {
+    const preview =
+      payload && payload.length
+        ? payload.subarray(0, Math.min(12, payload.length)).toString("hex")
+        : undefined;
+    this.recentPacketEvents.push({
+      direction,
+      opcode,
+      payloadLength,
+      label,
+      preview,
+      timestamp: new Date().toISOString(),
+    });
+    if (this.recentPacketEvents.length > 24) {
+      this.recentPacketEvents.shift();
     }
   }
 
@@ -877,6 +910,7 @@ class LoginSession {
       wasInAddQueue: addIndex !== -1,
       queuedForRemoval,
       registered: player.isRegistered(),
+      recentPackets: this.recentPacketEvents.slice(),
     });
     PluginManager.emitPlayerDisconnect({
       player,
@@ -987,6 +1021,13 @@ class LoginSession {
         payloadLength: payload.length,
         payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
       });
+      this.recordRecentPacket(
+        "IN",
+        opcode,
+        payload.length,
+        PACKET_GUIDE[opcode]?.name,
+        payload
+      );
       PacketLogger.logIncoming({
         direction: "IN",
         opcode,
@@ -999,7 +1040,11 @@ class LoginSession {
         payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
       });
       if (payload.length === 0) {
-        this.log("packet_empty_payload", { opcode });
+        this.log("packet_empty_payload", {
+          opcode,
+          expectedSize: size,
+          stage: this.stage,
+        });
       }
 
       const hookPacket = new Packet(opcode, payload);
