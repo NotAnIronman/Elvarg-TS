@@ -27,7 +27,7 @@ const { DitchTraversalService } = require("./behaviours/traversal/DitchTraversal
 const { PathBlockedHandler } = require("./behaviours/traversal/PathBlockedHandler");
 const { FollowBackTrigger } = require("./behaviours/handlers/FollowBackTrigger");
 
-const BOT_COUNT = 5;
+const BOT_COUNT = 60;
 const BOT_WALK_RADIUS = 6;
 const BOT_DECISION_TICKS = 1;
 const BOT_BASE_COOLDOWN_MS = 1200;
@@ -45,9 +45,24 @@ const BOT_HOME_RADIUS = BOT_WALK_RADIUS;
 const FOLLOW_BACK_DURATION_MS = 3 * 60 * 1000;
 const FOLLOW_REPATH_INTERVAL_MS = 500;
 const FOLLOW_BLOCKED_RETRY_MS = 200;
+const AUTO_MODE_DECISION_MIN_MS = 4500;
+const AUTO_MODE_DECISION_MAX_MS = 14000;
+const AUTO_MODE_ROAMING_MIN_MS = 22000;
+const AUTO_MODE_ROAMING_MAX_MS = 80000;
+const AUTO_MODE_WOODCUTTING_MIN_MS = 30000;
+const AUTO_MODE_WOODCUTTING_MAX_MS = 105000;
+const AUTO_MODE_SPARRING_MIN_MS = 18000;
+const AUTO_MODE_SPARRING_MAX_MS = 50000;
+const AUTO_MODE_POST_SPARRING_COOLDOWN_MIN_MS = 35000;
+const AUTO_MODE_POST_SPARRING_COOLDOWN_MAX_MS = 110000;
+const AUTO_MODE_SPARRING_MAX_DISTANCE_TILES = 16;
+const AUTO_MODE_ROAM_WEIGHT = 0.55;
+const AUTO_MODE_WOODCUTTING_WEIGHT = 0.3;
+const AUTO_MODE_SPARRING_WEIGHT = 0.15;
 const BOT_BEHAVIOR_MODE = Object.freeze({
   ROAMING: "roaming",
   WOODCUTTING: "woodcutting",
+  SPARRING: "sparring",
   FOLLOW_BACK: "follow_back",
   RETURN_HOME: "return_home",
 });
@@ -490,7 +505,24 @@ module.exports = {
 
     if (entries.length > 0) {
       TaskManager.submit(
-        new BotBehaviorTask(entries, traversalService, BOT_DECISION_TICKS)
+        new BotBehaviorTask(entries, traversalService, BOT_DECISION_TICKS, {
+          api,
+          behaviorMode: BOT_BEHAVIOR_MODE,
+          roamWeight: AUTO_MODE_ROAM_WEIGHT,
+          woodcuttingWeight: AUTO_MODE_WOODCUTTING_WEIGHT,
+          sparringWeight: AUTO_MODE_SPARRING_WEIGHT,
+          decisionDelayMinMs: AUTO_MODE_DECISION_MIN_MS,
+          decisionDelayMaxMs: AUTO_MODE_DECISION_MAX_MS,
+          roamingMinMs: AUTO_MODE_ROAMING_MIN_MS,
+          roamingMaxMs: AUTO_MODE_ROAMING_MAX_MS,
+          woodcuttingMinMs: AUTO_MODE_WOODCUTTING_MIN_MS,
+          woodcuttingMaxMs: AUTO_MODE_WOODCUTTING_MAX_MS,
+          sparringMinMs: AUTO_MODE_SPARRING_MIN_MS,
+          sparringMaxMs: AUTO_MODE_SPARRING_MAX_MS,
+          postSparringCooldownMinMs: AUTO_MODE_POST_SPARRING_COOLDOWN_MIN_MS,
+          postSparringCooldownMaxMs: AUTO_MODE_POST_SPARRING_COOLDOWN_MAX_MS,
+          sparringMaxDistanceTiles: AUTO_MODE_SPARRING_MAX_DISTANCE_TILES,
+        })
       );
     }
 
@@ -508,6 +540,13 @@ module.exports = {
       ditchObjectId: WILDERNESS_DITCH_OBJECT_ID,
       roamRadius: BOT_WALK_RADIUS,
       followBackDurationMs: FOLLOW_BACK_DURATION_MS,
+      autoMode: {
+        decisionMinMs: AUTO_MODE_DECISION_MIN_MS,
+        decisionMaxMs: AUTO_MODE_DECISION_MAX_MS,
+        roamingWeight: AUTO_MODE_ROAM_WEIGHT,
+        woodcuttingWeight: AUTO_MODE_WOODCUTTING_WEIGHT,
+        sparringWeight: AUTO_MODE_SPARRING_WEIGHT,
+      },
       homeRadius: BOT_HOME_RADIUS,
     });
   },

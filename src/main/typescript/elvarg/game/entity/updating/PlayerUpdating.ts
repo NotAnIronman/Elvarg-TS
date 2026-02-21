@@ -616,13 +616,13 @@ export class PlayerUpdating {
     private static updateSingleHit(builder: PacketBuilder, target: Player) {
         builder.putShort(target.primaryHit.damage);
         builder.put(target.primaryHit.hitmask.ordinal);
-        builder.putShort(target.points);
+        builder.putShort(target.getHitpoints());
         builder.putShort(target.skillManager.getMaxLevel(Skill.HITPOINTS));
     }
     private static updateDoubleHit(builder: PacketBuilder, target: Player) {
         builder.putShort(target.secondaryHit.damage);
         builder.put(target.secondaryHit.hitmask.ordinal);
-        builder.putShort(target.points);
+        builder.putShort(target.getHitpoints());
         builder.putShort(target.skillManager.getMaxLevel(Skill.HITPOINTS));
     }
     private static updateFacingPosition(builder: PacketBuilder, target: Player) {

@@ -180,6 +180,22 @@ export interface PluginCommandEvent {
   handled: boolean;
 }
 
+export interface PluginCombatEngine {
+  getMethod(attacker: any): any;
+  canReach(attacker: any, method: any, target: any): boolean;
+  canAttack(attacker: any, method: any, target: any): any;
+  addPendingHit(hit: any): void;
+  executeHit(hit: any): void;
+}
+
+export interface PluginCombatMethodResolver {
+  resolve(attacker: any): any | null;
+}
+
+export interface PluginNpcCombatMethodProvider {
+  provide(npc: any): any | null;
+}
+
 export interface PluginApi {
   onPacketReceived(handler: (event: PluginPacketEvent) => void): void;
   onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
@@ -238,6 +254,11 @@ export interface PluginApi {
   registerAlivePacketListener(opcode: number, listener: PacketExecutor): void;
   setPlayerPersistence(persistence: PlayerPersistence): void;
   log(message: string, extra?: Record<string, unknown>): void;
+  setCombatEngine(engine: PluginCombatEngine): void;
+  registerCombatMethodResolver(resolver: PluginCombatMethodResolver): void;
+  registerNpcCombatMethodProvider(
+    provider: PluginNpcCombatMethodProvider
+  ): void;
 }
 
 export interface PluginModule {

@@ -8,6 +8,7 @@ const { FollowBackActionNode } = require("../nodes/actions/FollowBackActionNode"
 const { ReturnHomeActionNode } = require("../nodes/actions/ReturnHomeActionNode");
 const { BotReadyConditionNode } = require("../nodes/conditions/BotReadyConditionNode");
 const { RoamingBehavior } = require("../modes/RoamingBehavior");
+const { SparringBehavior } = require("../modes/SparringBehavior");
 const { WoodcuttingBehavior } = require("../modes/WoodcuttingBehavior");
 
 class PlayerBotBehaviorTreeFactory {
@@ -24,6 +25,9 @@ class PlayerBotBehaviorTreeFactory {
       behaviorMode: this.behaviorMode,
       endpointLingerMs: this.endpointLingerMs,
       botWalkRadius: this.botWalkRadius,
+    });
+    this.sparringBehavior = new SparringBehavior(botStatesByName, api, {
+      behaviorMode: this.behaviorMode,
     });
     this.woodcuttingBehavior = new WoodcuttingBehavior(botStatesByName, api, {
       behaviorMode: this.behaviorMode,
@@ -57,6 +61,14 @@ class PlayerBotBehaviorTreeFactory {
           requiredMode: this.behaviorMode.WOODCUTTING,
         }),
         new ActionNode((context) => this.woodcuttingBehavior.tick(context)),
+      ]),
+      new SequenceNode([
+        new BotReadyConditionNode(this.botStatesByName, {
+          requiredMode: this.behaviorMode.SPARRING,
+          requireNotInCombat: false,
+          requireNotBusy: false,
+        }),
+        new ActionNode((context) => this.sparringBehavior.tick(context)),
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {

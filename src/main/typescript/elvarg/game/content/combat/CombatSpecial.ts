@@ -250,11 +250,15 @@ export class CombatSpecial {
     }
 
     public static updateBar(player: Player) {
-        if (player.getWeapon().getSpecialBar() == -1 || player.getWeapon().getSpecialMeter() == -1) {
+        const weapon = player.getWeapon();
+        if (!weapon || typeof weapon.getSpecialBar !== "function" || typeof weapon.getSpecialMeter !== "function") {
+            return;
+        }
+        if (weapon.getSpecialBar() == -1 || weapon.getSpecialMeter() == -1) {
             return;
         }
         let specialCheck = 10;
-        let specialBar = player.getWeapon().getSpecialMeter();
+        let specialBar = weapon.getSpecialMeter();
         let specialAmount = player.getSpecialPercentage() / 10;
 
         for (let i = 0; i < 10; i++) {
@@ -262,7 +266,11 @@ export class CombatSpecial {
             specialCheck--;
         }
         player.getPacketSender().updateSpecialAttackOrb().sendString(
-            player.isSpecialActivated() ? ("@yel@ Special Attack (" + player.getSpecialPercentage() + "%)") : ("@bla@ Special Attack (" + player.getSpecialPercentage() + "%)"), player.getWeapon().getSpecialMeter());
+            player.isSpecialActivated()
+                ? ("@yel@ Special Attack (" + player.getSpecialPercentage() + "%)")
+                : ("@bla@ Special Attack (" + player.getSpecialPercentage() + "%)"),
+            weapon.getSpecialMeter()
+        );
         player.getPacketSender().sendSpecialAttackState(player.isSpecialActivated());
     }
 

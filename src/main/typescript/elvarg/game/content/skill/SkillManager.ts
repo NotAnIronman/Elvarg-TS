@@ -36,6 +36,15 @@ export class SkillManager {
         11805606, 13034431];
     // Explicit 0 delay so the client renders the level-up fireworks immediately.
     public static readonly LEVEL_UP_GRAPHIC: Graphic = new Graphic(199, 0);
+    private static readonly BASE_COMBAT_SKILLS = [
+        Skill.ATTACK,
+        Skill.DEFENCE,
+        Skill.STRENGTH,
+        Skill.HITPOINTS,
+        Skill.RANGED,
+        Skill.PRAYER,
+        Skill.MAGIC,
+    ];
 
     /**
      * The player associated with this Skills instance.
@@ -283,16 +292,16 @@ export class SkillManager {
         const ranged = this.skills.maxLevel[Skill.RANGED.getIndex()];
         const magic = this.skills.maxLevel[Skill.MAGIC.getIndex()];
         let combatLevel = 3;
-        combatLevel = (defence + hp + Math.floor(prayer / 2)) * 0.2535 + 1;
+        combatLevel = Math.floor((defence + hp + Math.floor(prayer / 2)) * 0.2535) + 1;
         const melee = (attack + strength) * 0.325;
         const ranger = Math.floor(ranged * 1.5) * 0.325;
         const mage = Math.floor(magic * 1.5) * 0.325;
         if (melee >= ranger && melee >= mage) {
-            combatLevel += melee;
+            combatLevel = Math.floor(combatLevel + melee);
         } else if (ranger >= melee && ranger >= mage) {
-            combatLevel += ranger;
+            combatLevel = Math.floor(combatLevel + ranger);
         } else if (mage >= melee && mage >= ranger) {
-            combatLevel += mage;
+            combatLevel = Math.floor(combatLevel + mage);
         }
         if (combatLevel > 126) {
             return 126;
@@ -301,6 +310,49 @@ export class SkillManager {
             return 3;
         }
         return combatLevel;
+    }
+
+    private applyMinimumSkill(skill: Skill, minLevel: number, minExperience?: number): boolean {
+        const idx = skill.getIndex();
+        let updated = false;
+
+        if (this.skills.maxLevel[idx] < minLevel) {
+            this.skills.maxLevel[idx] = minLevel;
+            updated = true;
+        }
+        if (this.skills.level[idx] < minLevel) {
+            this.skills.level[idx] = minLevel;
+            updated = true;
+        }
+        if (minExperience != null && this.skills.experience[idx] < minExperience) {
+            this.skills.experience[idx] = minExperience;
+            updated = true;
+        }
+        if (updated) {
+            this.updateSkill(skill);
+        }
+        return updated;
+    }
+
+    public ensureCombatBaseline(): SkillManager {
+        let baselineXp = SkillManager.getExperienceForLevel(10);
+        let updated = false;
+
+        baselineXp = Math.max(baselineXp, 1184);
+        this.applyMinimumSkill(Skill.HITPOINTS, 10, baselineXp);
+
+        for (const skill of SkillManager.BASE_COMBAT_SKILLS) {
+            if (skill === Skill.HITPOINTS) {
+                continue;
+            }
+            updated = this.applyMinimumSkill(skill, 1) || updated;
+        }
+
+        if (updated && this.player) {
+            BonusManager.update(this.player);
+        }
+
+        return this;
     }
 
     public getTotalLevel(): number {

@@ -37,6 +37,31 @@ function createWoodcuttingBehaviorState() {
   };
 }
 
+function createSparringBehaviorState() {
+  return {
+    targetUsername: null,
+    endsAt: 0,
+    nextActionAt: 0,
+  };
+}
+
+function clearSparringBehaviorState(state) {
+  if (!state?.sparring) {
+    return;
+  }
+  state.sparring.targetUsername = null;
+  state.sparring.endsAt = 0;
+  state.sparring.nextActionAt = 0;
+}
+
+function createAutonomyState() {
+  return {
+    nextDecisionAt: 0,
+    modeEndsAt: 0,
+    pvpCooldownUntil: 0,
+  };
+}
+
 function clearWoodcuttingBehaviorState(state) {
   if (!state?.woodcutting) {
     return;
@@ -85,6 +110,7 @@ function setModeRoaming(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearSparringBehaviorState(state);
 }
 
 function setModeReturnHome(player, state, behaviorMode) {
@@ -95,6 +121,7 @@ function setModeReturnHome(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
 }
 
@@ -121,6 +148,7 @@ function setModeFollowBack(
   state.awaitingDitchTransition = null;
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearSparringBehaviorState(state);
   state.roaming.target = {
     x: followTarget.getLocation().getX(),
     y: followTarget.getLocation().getY(),
@@ -142,7 +170,45 @@ function setModeWoodcutting(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
+}
+
+function setModeSparring(
+  player,
+  state,
+  targetPlayer,
+  nowMs,
+  durationMs,
+  behaviorMode
+) {
+  if (!player || !state || !targetPlayer || durationMs <= 0) {
+    return false;
+  }
+  const targetUsername = targetPlayer.getUsername?.();
+  if (!targetUsername) {
+    return false;
+  }
+
+  state.mode = behaviorMode.SPARRING;
+  clearFollowState(player, state);
+  clearRoamingBehaviorState(state);
+  clearWoodcuttingBehaviorState(state);
+  clearSparringBehaviorState(state);
+  state.awaitingDitchTransition = null;
+  if (!state.sparring) {
+    state.sparring = createSparringBehaviorState();
+  }
+
+  state.sparring.targetUsername = targetUsername;
+  state.sparring.endsAt = nowMs + durationMs;
+  state.sparring.nextActionAt = nowMs;
+
+  resetMovementState(player);
+  player.setFollowing(targetPlayer);
+  player.setMobileInteraction(targetPlayer);
+  player.setPositionToFace(targetPlayer.getLocation());
+  return true;
 }
 
 function isInsideHomeArea(player, state, botHomeRadius) {
@@ -182,6 +248,8 @@ function createInitialState(home, behaviorMode) {
     // behavior modes (minigames, skilling, PvP) from coupling to roam fields.
     roaming: createRoamingBehaviorState(),
     woodcutting: createWoodcuttingBehaviorState(),
+    sparring: createSparringBehaviorState(),
+    autonomy: createAutonomyState(),
     followTargetUsername: null,
     followUntilMs: 0,
     nextFollowRepathAt: 0,
@@ -207,6 +275,7 @@ module.exports = {
   markResumeSoon,
   resetMovementState,
   setModeFollowBack,
+  setModeSparring,
   setModeReturnHome,
   setModeRoaming,
   setModeWoodcutting,

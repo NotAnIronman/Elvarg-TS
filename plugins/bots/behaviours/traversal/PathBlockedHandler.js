@@ -51,6 +51,10 @@ class PathBlockedHandler {
       return;
     }
 
+    if (state.mode === this.behaviorMode.SPARRING) {
+      return;
+    }
+
     this.handleRoamBlocked(player, state, event, nowMs);
   }
 

@@ -15,10 +15,10 @@ export class CombatEquipment {
     public static readonly MAGE_VOID_HELM = 11663;
     public static readonly RANGED_VOID_HELM = 11664;
     public static readonly MELEE_VOID_HELM = 11665;
-    public static readonly VOID_ARMOUR = [
-        BODY_SLOT, 8839,
-        LEG_SLOT, 8840,
-        HANDS_SLOT, 8842
+    public static readonly VOID_ARMOUR: [number, number][] = [
+        [BODY_SLOT, 8839],
+        [LEG_SLOT, 8840],
+        [HANDS_SLOT, 8842],
     ];
     public static readonly OBSIDIAN_WEAPONS = [
         746, 747, 6523, 6525, 6526, 6527, 6528
@@ -52,15 +52,16 @@ export class CombatEquipment {
         let correctEquipment = 0;
         let helmet = attackType == CombatType.MAGIC ? CombatEquipment.MAGE_VOID_HELM :
             attackType == CombatType.RANGED ? CombatEquipment.RANGED_VOID_HELM : CombatEquipment.MELEE_VOID_HELM;
-        for (let armour of CombatEquipment.VOID_ARMOUR) {
-            if (player.getEquipment().getItems()[armour[0]].getId() == armour[1]) {
+        const equipmentItems = player.getEquipment().getItems();
+        for (let [slot, id] of CombatEquipment.VOID_ARMOUR) {
+            if (equipmentItems[slot].getId() == id) {
                 correctEquipment++;
             }
         }
-        if (player.getEquipment().getItems()[SHIELD_SLOT].getId() == CombatEquipment.VOID_KNIGHT_DEFLECTOR) {
+        if (equipmentItems[SHIELD_SLOT].getId() == CombatEquipment.VOID_KNIGHT_DEFLECTOR) {
             correctEquipment++;
         }
-        return correctEquipment >= 3 && player.getEquipment().getItems()[HEAD_SLOT].getId() == helmet;
+        return correctEquipment >= 3 && equipmentItems[HEAD_SLOT].getId() == helmet;
     }
 
     public static hasDragonProtectionGear(player: Player): boolean {

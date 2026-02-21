@@ -81,7 +81,9 @@ export class Combat {
 
         this.character.setCombatFollowing(this.target);
 
-        // Face target
+        // Face the target and make the target face us so both sides appear engaged
+        this.character.setPositionToFace(this.target.getLocation());
+        this.target.setPositionToFace(this.character.getLocation());
         this.character.setMobileInteraction(this.target);
 
         if (!CombatFactory.canReach(this.character, this.method, this.target)) {
@@ -135,22 +137,27 @@ export class Combat {
                         CombatSpecial.updateBar(p);
                     }
                 }
+                break;
             }
             case CanAttackResponse.ALREADY_UNDER_ATTACK: {
                 if (this.character.isPlayer()) {
                     this.character.getAsPlayer().getPacketSender().sendMessage("You are already under attack!");
                 }
                 this.character.getCombat().reset();
+                break;
             }
             case CanAttackResponse.CANT_ATTACK_IN_AREA: {
                 this.character.getCombat().reset();
+                break;
             }
             case CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED: {
+                break;
             }
             case CanAttackResponse.LEVEL_DIFFERENCE_TOO_GREAT: {
                 this.character.getAsPlayer().getPacketSender().sendMessage("Your level difference is too great.");
                 this.character.getAsPlayer().getPacketSender().sendMessage("You need to move deeper into the Wilderness.");
                 this.character.getCombat().reset();
+                break;
             }
             case CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY: {
                 let p = this.character.getAsPlayer();
@@ -158,45 +165,54 @@ export class Combat {
                 p.setSpecialActivated(false);
                 CombatSpecial.updateBar(this.character.getAsPlayer());
                 p.getCombat().reset();
+                break;
             }
             case CanAttackResponse.STUNNED: {
                 let p = this.character.getAsPlayer();
                 p.getPacketSender().sendMessage("You're currently stunned and cannot attack.");
                 p.getCombat().reset();
+                break;
             }
             case CanAttackResponse.DUEL_NOT_STARTED_YET: {
                 let p = this.character.getAsPlayer();
                 p.getPacketSender().sendMessage("The duel has not started yet!");
                 p.getCombat().reset();
+                break;
             }
             case CanAttackResponse.DUEL_WRONG_OPPONENT: {
                 let p = this.character.getAsPlayer();
                 p.getPacketSender().sendMessage("This is not your opponent!");
                 p.getCombat().reset();
+                break;
             }
             case CanAttackResponse.DUEL_MELEE_DISABLED: {
                 let p = this.character.getAsPlayer();
                 StatementDialogue.send(p, "Melee has been disabled in this duel!");
                 p.getCombat().reset();
+                break;
             }
             case CanAttackResponse.DUEL_RANGED_DISABLED: {
                 let p = this.character.getAsPlayer();
                 StatementDialogue.send(p, "Ranged has been disabled in this duel!");
                 p.getCombat().reset();
+                break;
             }
             case CanAttackResponse.DUEL_MAGIC_DISABLED: {
                 let p = this.character.getAsPlayer();
                 StatementDialogue.send(p, "Magic has been disabled in this duel!");
                 p.getCombat().reset();
+                break;
             }
             case CanAttackResponse.TARGET_IS_IMMUNE: {
                 if (this.character.isPlayer()) {
     (this.character as Player).getPacketSender().sendMessage("This npc is currently immune to attacks.");
 }
                 this.character.getCombat().reset();
+                break;
             }
             case CanAttackResponse.INVALID_TARGET: {
                 this.character.getCombat().reset();
+                break;
             }
         }
     }

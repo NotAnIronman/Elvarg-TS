@@ -29,6 +29,9 @@ import {
   PluginRegionLoadedEvent,
   PluginSpellDisabledEvent,
   PluginCanTradeEvent,
+  PluginCombatEngine,
+  PluginCombatMethodResolver,
+  PluginNpcCombatMethodProvider,
 } from "./PluginTypes";
 
 type PluginHook<T> = {
@@ -78,6 +81,10 @@ export class PluginManager {
     handler: (player: any) => boolean;
   }> = [];
   private static packetListeners = new Map<number, RegisteredPacketListener>();
+  private static combatEngine: PluginCombatEngine | null = null;
+  private static combatEngineOwner: string | null = null;
+  private static combatMethodResolvers: PluginCombatMethodResolver[] = [];
+  private static npcCombatMethodProviders: PluginNpcCombatMethodProvider[] = [];
 
   public static loadFromDirectory(
     pluginDirectory = path.join(process.cwd(), "plugins")
@@ -1256,6 +1263,33 @@ export class PluginManager {
           `[plugins] player persistence set by ${pluginName}: ${previousName} -> ${nextName}`
         );
       },
+      setCombatEngine: (engine) => {
+        if (!engine || typeof engine.getMethod !== "function") {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid combat engine registration`
+          );
+          return;
+        }
+        PluginManager.setCombatEngineInternal(pluginName, engine);
+      },
+      registerCombatMethodResolver: (resolver) => {
+        if (!resolver || typeof resolver.resolve !== "function") {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid combat method resolver registration`
+          );
+          return;
+        }
+        PluginManager.registerCombatMethodResolverInternal(pluginName, resolver);
+      },
+      registerNpcCombatMethodProvider: (provider) => {
+        if (!provider || typeof provider.provide !== "function") {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid NPC combat method provider registration`
+          );
+          return;
+        }
+        PluginManager.registerNpcCombatMethodProviderInternal(pluginName, provider);
+      },
       log: (message, extra) => {
         if (extra && Object.keys(extra).length > 0) {
           console.log(`[plugin:${pluginName}] ${message}`, extra);
@@ -1264,5 +1298,47 @@ export class PluginManager {
         }
       },
     };
+  }
+
+  public static getCombatEngine(): PluginCombatEngine | null {
+    return PluginManager.combatEngine;
+  }
+
+  public static getCombatMethodResolvers(): PluginCombatMethodResolver[] {
+    return PluginManager.combatMethodResolvers.slice();
+  }
+
+  public static getNpcCombatMethodProviders(): PluginNpcCombatMethodProvider[] {
+    return PluginManager.npcCombatMethodProviders.slice();
+  }
+
+  private static setCombatEngineInternal(
+    pluginName: string,
+    engine: PluginCombatEngine
+  ): void {
+    if (!engine) {
+      return;
+    }
+    if (PluginManager.combatEngine) {
+      console.warn(
+        `[plugins] combat engine overridden (${PluginManager.combatEngineOwner ?? "unknown"} -> ${pluginName})`
+      );
+    }
+    PluginManager.combatEngine = engine;
+    PluginManager.combatEngineOwner = pluginName;
+  }
+
+  private static registerCombatMethodResolverInternal(
+    pluginName: string,
+    resolver: PluginCombatMethodResolver
+  ): void {
+    PluginManager.combatMethodResolvers.push(resolver);
+  }
+
+  private static registerNpcCombatMethodProviderInternal(
+    pluginName: string,
+    provider: PluginNpcCombatMethodProvider
+  ): void {
+    PluginManager.npcCombatMethodProviders.push(provider);
   }
 }

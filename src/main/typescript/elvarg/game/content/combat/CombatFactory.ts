@@ -47,6 +47,7 @@ import { DuelRule } from "../Duelling";
 import { PoisonType } from "../../task/impl/CombatPoisonEffect";
 import { CombatConstants } from "./CombatConstants";
 import { Wilderness } from "../wilderness/Wilderness";
+import { CombatRuntime } from "./CombatRuntime";
 
 const getPlayerCtor = () =>
     require("../../entity/impl/player/Player").Player as typeof import("../../entity/impl/player/Player").Player;
@@ -69,38 +70,7 @@ export class CombatFactory {
     public static readonly MAGIC_COMBAT = new MagicCombatMethod();
 
     static getMethod(attacker: Mobile) {
-        if (attacker.isPlayer()) {
-            let p: Player = attacker.getAsPlayer();
-            // Update player data..
-            // Update ranged ammo / weapon
-            p.getCombat().setAmmunition(RangedWeapon.getFor(p));
-            p.getCombat().setRangedWeapon(RangedWeapon.getFor(p));
-
-            // Check if player is maging..
-            if (p.getCombat().getCastSpell() != null ||
-                // Ensure player needs staff equipped to use autocast
-                (p.getCombat().getAutocastSpell() != null && p.getEquipment().hasStaffEquipped())) {
-                return this.MAGIC_COMBAT;
-            }
-
-            // Check special attacks..
-            if (getPlayerCtor().getCombatSpecial() != null) {
-                if (p.isSpecialActivated()) {
-                    return getPlayerCtor().getCombatSpecial().getCombatMethod();
-                }
-            }
-
-            // Check if player is ranging..
-            if (p.getCombat().getRangedWeapon() != null) {
-                return this.RANGED_COMBAT;
-            }
-
-        } else if (attacker.isNpc()) {
-            return attacker.getAsNpc().getCombatMethod();
-        }
-
-        // Return melee by default
-        return this.MELEE_COMBAT;
+        return CombatRuntime.getMethod(attacker);
     }
 
     static getHitDamage(entity: Mobile, victim: Mobile, type: CombatType) {
@@ -208,75 +178,7 @@ export class CombatFactory {
     }
 
     static canReach(attacker: Mobile, method: CombatMethod, target: Mobile) {
-        if (!CombatFactory.validTarget(attacker, target)) {
-            attacker.getCombat().reset();
-            return true;
-        }
-        let isMoving = target.getMovementQueue().isMovings();
-
-        // Walk back if npc is too far away from spawn position.
-        if (attacker.isNpc()) {
-            let npc = attacker.getAsNpc();
-            if (npc.getCurrentDefinition().doesRetreat()) {
-                if (npc.getMovementCoordinator().getCoordinateState() == CoordinateState.RETREATING) {
-                    npc.getCombat().reset();
-                    return false;
-                }
-                if (npc.getLocation().getDistance(npc.getSpawnPosition()) >= npc.getCurrentDefinition().getCombatFollowDistance()) {
-                    npc.getCombat().reset();
-                    npc.getMovementCoordinator().setCoordinateState(CoordinateState.RETREATING);
-                    return false;
-                }
-            }
-        }
-
-        let attackerPosition = attacker.getLocation();
-        let targetPosition = target.getLocation();
-
-        if (attackerPosition.equals(targetPosition)) {
-            if (!attacker.getTimers().has(TimerKey.STEPPING_OUT)) {
-                MovementQueue.clippedStep(attacker);
-                attacker.getTimers().registers(TimerKey.STEPPING_OUT, 2);
-            }
-            return false;
-        }
-        let requiredDistance = method.attackDistance(attacker);
-        let distance = attacker.calculateDistance(target);
-
-        // Standing under the target
-        if (distance == 0) {
-            if (attacker.isPlayer()) {
-                return false;
-            }
-            if (attacker.isNpc() && attacker.getSize() == 0) {
-                return false;
-            }
-        }
-
-        if (method.type() == CombatType.MELEE && isMoving && attacker.getMovementQueue().isMovings()) {
-            // If we're using Melee and either player is moving, increase required distance
-            requiredDistance++;
-        }
-
-        // Too far away from the target
-        if (distance > requiredDistance) {
-            return false;
-        }
-
-        // Don't allow diagonal attacks for smaller entities
-        if (method.type() == CombatType.MELEE && attacker.getSize() == 1 && target.getSize() == 1 && !isMoving && !target.getMovementQueue().isMovings()) {
-            if (PathFinder.isDiagonalLocation(attacker, target)) {
-                CombatFactory.stepOut(attacker, target);
-                return false;
-            }
-        }
-
-        // Make sure we the path is clear for projectiles..
-        if (attacker.useProjectileClipping() && !RegionManager.canProjectileAttackTarget(attacker, target)) {
-            return false;
-        }
-
-        return true;
+        return CombatRuntime.canReach(attacker, method, target);
     }
 
     public static fullVeracs(entity: Mobile): boolean {
@@ -365,231 +267,18 @@ export class CombatFactory {
     }
 
     public static canAttack(attacker: Mobile, method: CombatMethod, target: Mobile): CanAttackResponse {
-        if (!CombatFactory.validTarget(attacker, target)) {
-            return CanAttackResponse.INVALID_TARGET;
-        }
-
-        // Here we check if we are already in combat with another entity.
-        // Only check if we aren't in multi.
-        if (!(AreaManager.inMulti(attacker) && AreaManager.inMulti(target))) {
-            if (CombatFactory.isBeingAttacked(attacker) && attacker.getCombat().getAttacker() != target
-                && attacker.getCombat().getAttacker().getHitpoints() > 0
-                || !attacker.getCombat().getHitQueue().isEmpty(target)) {
-
-                return CanAttackResponse.ALREADY_UNDER_ATTACK;
-            }
-
-            // Here we check if we are already in combat with another entity.
-            if (CombatFactory.isBeingAttacked(target) && target.getCombat().getAttacker() != attacker
-                || !target.getCombat().getHitQueue().isEmpty(attacker)) {
-                return CanAttackResponse.ALREADY_UNDER_ATTACK;
-            }
-        }
-
-        // Check if we can attack in this area
-        let areaResponse = AreaManager.canAttack(attacker, target) as any;
-        if (areaResponse != CanAttackResponse.CAN_ATTACK) {
-            return areaResponse as CanAttackResponse;
-        }
-
-        if (!method.canAttack(attacker, target)) {
-            return CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED;
-        }
-
-        if (attacker.isPlayer()) {
-            let p: Player = attacker.getAsPlayer();
-
-            // Check if we're using a special attack..
-            if (p.isSpecialActivated() && getPlayerCtor().getCombatSpecial() != null) {
-                // Check if we have enough special attack percentage.
-                // If not, reset special attack.
-                if (p.getSpecialPercentage() < getPlayerCtor().getCombatSpecial().getDrainAmount()) {
-                    return CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY;
-                }
-            }
-
-            if (p.getTimers().has(TimerKey.STUN)) {
-                return CanAttackResponse.STUNNED;
-            }
-
-            // Duel rules
-            if (p.getDueling().inDuel()) {
-                if (method.type() == CombatType.MELEE && p.getDueling().getRules()[DuelRule.NO_MELEE.getButtonId()]) {
-                    return CanAttackResponse.DUEL_MELEE_DISABLED;
-                } else if (method.type() == CombatType.RANGED && p.getDueling().getRules()[DuelRule.NO_RANGED.getButtonId()]) {
-                    return CanAttackResponse.DUEL_RANGED_DISABLED;
-                } else if (method.type() == CombatType.MAGIC && p.getDueling().getRules()[DuelRule.NO_MAGIC.getButtonId()]) {
-                    return CanAttackResponse.DUEL_MAGIC_DISABLED;
-                }
-            }
-        }
-
-        // Check immune npcs..
-        if (target.isNpc()) {
-            let npc = <NPC>target;
-            if (npc.getTimers().has(TimerKey.ATTACK_IMMUNITY)) {
-                return CanAttackResponse.TARGET_IS_IMMUNE;
-            }
-        }
-        return CanAttackResponse.CAN_ATTACK;
+        return CombatRuntime.canAttack(attacker, method, target);
     }
 
     public static addPendingHit(qHit: PendingHit) {
-        let attacker = qHit.getAttacker();
-        let target = qHit.getTarget();
-        if (target.getHitpoints() <= 0) {
-            return;
-        }
-
-        if (attacker.isPlayer()) {
-            // Reward the player experience for this attack..
-            CombatFactory.rewardExp(attacker.getAsPlayer(), qHit);
-
-            // Check if the player should be skulled for making this attack..
-            if (target.isPlayer()) {
-                CombatFactory.handleSkull(attacker.getAsPlayer(), target.getAsPlayer());
-            }
-        }
-
-        // If target is teleporting or needs placement
-        // Dont continue to add the hit.
-        if (target.isUntargetable() || target.isNeedsPlacement()) {
-            return;
-        }
-
-        // Add this hit to the target's hitQueue
-        target.getCombat().getHitQueue().addPendingHit(qHit);
+        CombatRuntime.addPendingHit(qHit);
     }
 
     public static executeHit(qHit: PendingHit) {
-        let attacker = qHit.getAttacker();
-        let target = qHit.getTarget();
-        let method = qHit.getCombatMethod();
-        let combatType = qHit.getCombatType();
-        let damage = qHit.getTotalDamage();
-
-        // If target/attacker is dead, don't continue.
-        if (target.getHitpoints() <= 0 || attacker.getHitpoints() <= 0) {
-            return;
+        CombatRuntime.executeHit(qHit);
+        if (qHit && typeof qHit.getAttacker === "function" && typeof qHit.getTarget === "function") {
+            this.handleRetaliation(qHit.getAttacker(), qHit.getTarget());
         }
-
-        // If target is teleporting or needs placement
-        // Don't continue to add the hit.
-        if (target.isUntargetable() || target.isNeedsPlacement()) {
-            return;
-        }
-
-        // Before target takes damage, manipulate the hit to handle
-        // last-second effects
-        qHit = target.manipulateHit(qHit);
-
-        // Do block animation
-        target.performAnimation(new Animation(target.getBlockAnim()));
-
-        // Do other stuff for players..
-        if (target.isPlayer()) {
-            let p_ = target.getAsPlayer();
-            Sounds.sendSound(p_, Sound.FEMALE_GETTING_HIT);
-
-            // Close their current interface
-            if (p_.getRights() != PlayerRights.DEVELOPER && p_.busy()) {
-                p_.getPacketSender().sendInterfaceRemoval();
-            }
-
-            // Prayer effects
-            if (qHit.isAccurate()) {
-
-                if (PrayerHandler.isActivated(p_, PrayerHandler.REDEMPTION)) {
-                    CombatFactory.handleRedemption(attacker, p_, damage);
-                }
-
-                if (PrayerHandler.isActivated(attacker, PrayerHandler.SMITE)) {
-                    CombatFactory.handleSmite(attacker, p_, damage);
-                }
-            }
-        }
-        let magic_splash = (combatType === CombatType.MAGIC && !qHit.isAccurate());
-        if (!(magic_splash && attacker.isPlayer())) {
-            target.getCombat().getHitQueue().addPendingDamage(qHit.getHits());
-        }
-
-        // Make sure to let the combat method know we finished the attack
-        // Only if this isn't custom hit (handleAfterHitEffects() will be false then)
-        if (qHit.getHandleAfterHitEffects()) {
-            if (method) {
-                method.handleAfterHitEffects(qHit);
-            }
-        }
-
-        // Check for poisonous weapons..
-        // And do other effects, such as barrows effects..
-        if (attacker.isPlayer()) {
-            let p_ = attacker.getAsPlayer();
-            // Randomly apply poison if poisonous weapon is equipped.
-            if (damage > 0 && Math.floor(Math.random() * 20) <= 5) { // 1/4
-
-                let poison: CombatPoisonData
-                let isRanged = false;
-
-                if (combatType === CombatType.MELEE || p_.getWeapon() === WeaponInterfaces.DART
-                    || p_.getWeapon() === WeaponInterfaces.KNIFE
-                    || p_.getWeapon() === WeaponInterfaces.THROWNAXE
-                    || p_.getWeapon() === WeaponInterfaces.JAVELIN) {
-                    poison = CombatPoisonData.getPoisonType(p_.getEquipment().get(Equipment.WEAPON_SLOT));
-                } else if (combatType === CombatType.RANGED) {
-                    isRanged = true;
-                    poison = CombatPoisonData.getPoisonType(p_.getEquipment().get(Equipment.AMMUNITION_SLOT));
-                }
-
-                if (poison && (!isRanged || Math.floor(Math.random() * 10) <= 5)) { // Range 1/8
-                    CombatFactory.poisonEntity(target, CombatPoisonData.getPoisonType());
-                }
-            }
-
-            // Handle barrows effects if damage is more than zero.
-            if (qHit.getTotalDamage() > 0) {
-                if (Math.floor(Math.random() * 10) >= 8) {
-
-                    // Apply Guthan's effect..
-                    if (this.fullGuthans(p_)) {
-                        CombatFactory.handleGuthans(p_, target, qHit.getTotalDamage());
-                    }
-
-                    // Other barrows effects here..
-                }
-            }
-        } else if (attacker.isNpc()) {
-            let npc = attacker.getAsNpc();
-            if (npc.getCurrentDefinition().isPoisonous()) {
-                if (Math.floor(Math.random() * 10) <= 5) {
-                    CombatFactory.poisonEntity(target, PoisonType.SUPER);
-                }
-            }
-
-
-        }
-        if (qHit.getTotalDamage() > 0) {
-            if (target.isPlayer()) {
-                let player = target.getAsPlayer();
-                if (player.getEquipment().get(Equipment.RING_SLOT).getId() === ItemIdentifiers.RING_OF_RECOIL) {
-                    CombatFactory.handleRecoil(player, attacker, qHit.getTotalDamage());
-                }
-            }
-            if (target.hasVengeanceReturn()) {
-                CombatFactory.handleVengeance(target, attacker, qHit.getTotalDamage());
-            }
-        }
-
-        // Auto retaliate if needed
-        CombatFactory.handleRetaliation(attacker, target);
-
-        // Set under attack
-        target.getCombat().setUnderAttack(attacker);
-
-        // Add damage to target damage map
-        target.getCombat().addDamage(attacker, qHit.getTotalDamage());
-
-        // Bot-specific damage handling skipped.
     }
 
     public static rewardExp(player: Player, hit: PendingHit) {
@@ -780,7 +469,9 @@ export class CombatFactory {
         if (!CombatFactory.isAttacking(target)) {
             let auto_ret = false;
             if (target.isPlayer()) {
-                auto_ret = target.getAsPlayer().autoRetaliateReturn() && !target.getMovementQueue().isMovings();
+                auto_ret =
+                    target.isPlayerBot() ||
+                    (target.getAsPlayer().autoRetaliateReturn() && !target.getMovementQueue().isMovings());
             } else if (target.isNpc()) {
                 auto_ret = target.getAsNpc().getMovementCoordinator().getCoordinateState() == CoordinateState.HOME;
             }
@@ -789,6 +480,9 @@ export class CombatFactory {
                 return;
             }
 
+            if (target.getMovementQueue) {
+                target.getMovementQueue().reset();
+            }
             TaskManager.submit(new CombatFactoryTask(1, target, false, () => {
                 target.getCombat().attack(attacker);
             }));

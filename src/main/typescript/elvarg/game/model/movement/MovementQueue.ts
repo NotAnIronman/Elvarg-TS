@@ -648,11 +648,16 @@ export class MovementQueue {
                 }
                 return;
             }
-            let attackDistance = CombatFactory.getMethod(this.character).attackDistance(this.character);
+            const attackDistance = CombatFactory.getMethod(this.character).attackDistance(this.character);
 
             // Find the nearest tile surrounding the target
-            let destinations = PathFinder.getClosestAttackableTile(this.character, following, attackDistance);
+            destination = PathFinder.getClosestAttackableTile(this.character, following, attackDistance);
             if (destination == null) {
+                if (this.character.isPlayer()) {
+                    this.character.getAsPlayer().sendMessage("I can't reach that!");
+                    this.character.getAsPlayer().getCombat().reset();
+                }
+                this.reset();
                 return;
             }
         }
@@ -855,12 +860,6 @@ export class MovementQueue {
 
         PathFinder.calculateEntityRoute(this.player, destX, destY);
 
-        if (!this.player.getMovementQueue().foundRoute) {
-            // If the path finder couldn't find a route, you can't reach the entity
-            this.player.getPacketSender().sendMessage("I can't reach that!");
-            return;
-        }
-
         let finalDestinationX = this.player.getMovementQueue().pathX;
         let finalDestinationY = this.player.getMovementQueue().pathY;
 
@@ -899,13 +898,15 @@ export class MovementQueue {
                 return;
             }
 
-            if (!this.player.getMovementQueue().hasRoute() || this.player.getLocation().getX() !== finalDestinationX || this.player.getLocation().getY() !== finalDestinationY) {
-                // Player hasn't got a route or they're not already at destination
+            if (!this.player.getMovementQueue().hasRoute()) {
+                // Player hasn't got a route.
                 reachStage = -1;
                 return;
             }
 
-            reachStage = 1;
+            if (this.player.getLocation().getX() === finalDestinationX && this.player.getLocation().getY() === finalDestinationY) {
+                reachStage = 1;
+            }
             return;
         }));
     }

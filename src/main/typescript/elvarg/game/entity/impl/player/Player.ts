@@ -208,7 +208,7 @@ export class Player extends Mobile {
     private placeholders = true;
     private infiniteHealth: boolean;
     private fightType = FightType.UNARMED_KICK;
-    public weapon: WeaponInterfaces;
+    public weapon: WeaponInterfaces = WeaponInterfaces.UNARMED;
     private autoRetaliate = true;
 
     // GWD
@@ -358,10 +358,13 @@ export class Player extends Mobile {
         // If player is using magic, attack speed is
         // Calculated in the MagicCombatMethod class.
 
-        let speed = this.getWeapon().getSpeed();
+        const weapon = this.getWeapon() ?? WeaponInterfaces.UNARMED;
+        const baseSpeed =
+            weapon && typeof weapon.getSpeed === "function" ? weapon.getSpeed() : 4;
+        let speed = Math.max(baseSpeed, 1);
 
         if (this.getFightType().toString().toLowerCase().includes("rapid")) {
-            speed--;
+            speed = Math.max(speed - 1, 1);
         }
 
         return speed;
@@ -568,6 +571,7 @@ export class Player extends Mobile {
         this.getUpdateFlag().flag(Flag.APPEARANCE);
         this.setResetMovementQueue(true);
         this.getCombat().reset();
+        this.getSkillManager().ensureCombatBaseline();
     }
 
 

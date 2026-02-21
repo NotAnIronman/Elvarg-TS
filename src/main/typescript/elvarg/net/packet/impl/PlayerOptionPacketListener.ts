@@ -3,25 +3,34 @@
 import { Packet } from "../Packet";
 // import { PlayerRights } from '../../../game/model/rights/PlayerRights';
 import { PacketConstants } from "../PacketConstants";
+import { World } from "../../../game/World";
+import type { Player } from "../../../game/entity/impl/player/Player";
 
 export class PlayerOptionPacketListener {
   // public static attack(player: Player, packet: Packet) {
   public static attack(player: any, packet: Packet) {
-    let index: number = packet.readLEShort();
-    // if (index > World.getPlayers().capacityReturn() || index < 0)
-    //     return;
-    // const attacked: Player = World.getPlayers().get(index);
-
-    // if (attacked == null || attacked.getHitpoints() <= 0 || attacked.equals(player)) {
-    //     player.getMovementQueue().reset();
-    //     return;
-    // }
-
-    // if (player.getRights() === PlayerRights.DEVELOPER) {
-    //     player.getPacketSender().sendMessage("AttacKInfo "+attacked.getLocation().toString() + " " + player.getLocation().getDistance(attacked.getLocation()));
-    // }
-
-    // player.getCombat().attack(attacked);
+    if (player == null || player.busy()) {
+      return;
+    }
+    const index: number = packet.readLEShort();
+    if (index < 0 || index >= World.getPlayers().capacityReturn()) {
+      return;
+    }
+    const attacked: Player = World.getPlayers().get(index);
+    if (!attacked || attacked.getHitpoints() <= 0 || attacked.equals(player)) {
+      player.getMovementQueue().reset();
+      return;
+    }
+    player.getMovementQueue().walkToEntity(attacked, () => {
+      if (attacked.getHitpoints() <= 0) {
+        player.getMovementQueue().reset();
+        return;
+      }
+      // Hand movement control over to combat-follow once attack starts.
+      player.getMovementQueue().reset();
+      player.setPositionToFace(attacked.getLocation());
+      player.getCombat().attack(attacked);
+    });
   }
 
   /**

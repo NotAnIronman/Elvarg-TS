@@ -12,21 +12,30 @@ class FollowBackTrigger {
     this.behaviorMode = options.behaviorMode;
   }
 
+  resolveTargetedPlayer(opcode, packet) {
+    const payload = packet?.getBuffer?.();
+    if (!payload || payload.length < 2) {
+      return null;
+    }
+    const parsed = new Packet(opcode, payload);
+    const targetIndex = parsed.readLEShort();
+    if (targetIndex < 0) {
+      return null;
+    }
+    return World.getPlayers().get(targetIndex) ?? null;
+  }
+
   handleEstablishedPacket({ opcode, packet, player }, nowMs = Date.now()) {
-    if (opcode !== PacketConstants.FOLLOW_PLAYER_OPCODE || !packet || !player) {
+    if (
+      (opcode !== PacketConstants.FOLLOW_PLAYER_OPCODE &&
+        opcode !== PacketConstants.ATTACK_PLAYER_OPCODE) ||
+      !packet ||
+      !player
+    ) {
       return;
     }
 
-    const payload = packet.getBuffer?.();
-    if (!payload || payload.length < 2) {
-      return;
-    }
-    const followPacket = new Packet(opcode, payload);
-    const targetIndex = followPacket.readLEShort();
-    if (targetIndex < 1) {
-      return;
-    }
-    const followed = World.getPlayers().get(targetIndex);
+    const followed = this.resolveTargetedPlayer(opcode, packet);
     const followedUsername = followed?.getUsername?.();
 
     if (
@@ -44,10 +53,35 @@ class FollowBackTrigger {
     if (!state) {
       return;
     }
-    if (state.mode !== this.behaviorMode.ROAMING) {
-      followed?.sendChat?.("Sorry, busy rn.");
+
+    if (opcode === PacketConstants.FOLLOW_PLAYER_OPCODE) {
+      if (state.mode !== this.behaviorMode.ROAMING) {
+        followed?.sendChat?.("Sorry, busy rn.");
+        return;
+      }
+      if (
+        !setModeFollowBack(
+          followed,
+          state,
+          player,
+          nowMs,
+          this.followBackDurationMs,
+          this.behaviorMode
+        )
+      ) {
+        return;
+      }
+
+      this.api.log("follow_back_started", {
+        bot: followedUsername,
+        follower: player.getUsername?.() ?? null,
+        durationMs: this.followBackDurationMs,
+      });
       return;
     }
+
+    // Attack packets should immediately pull bots out of roaming and into
+    // follow/retaliation state so roaming pathing never competes with combat.
     if (
       !setModeFollowBack(
         followed,
@@ -61,9 +95,20 @@ class FollowBackTrigger {
       return;
     }
 
-    this.api.log("follow_back_started", {
+    const botCombat = followed.getCombat?.();
+    if (
+      botCombat &&
+      followed.getHitpoints?.() > 0 &&
+      player.getHitpoints?.() > 0 &&
+      botCombat.getTarget?.() !== player
+    ) {
+      followed.getMovementQueue?.().reset?.();
+      botCombat.attack(player);
+    }
+
+    this.api.log("follow_back_started_by_attack", {
       bot: followedUsername,
-      follower: player.getUsername?.() ?? null,
+      attacker: player.getUsername?.() ?? null,
       durationMs: this.followBackDurationMs,
     });
   }

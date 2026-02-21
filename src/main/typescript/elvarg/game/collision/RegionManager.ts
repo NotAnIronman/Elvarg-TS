@@ -537,7 +537,16 @@ export class RegionManager {
             a = to;
             b = from;
         }
-        return this.canProjectileAttack(attacker, from, to);
+        return RegionManager.canProjectileMove(
+            a.getX(),
+            a.getY(),
+            b.getX(),
+            b.getY(),
+            a.getZ(),
+            attacker.getSize(),
+            attacker.getSize(),
+            attacker.getPrivateArea()
+        );
     }
     public static canProjectileAttackTarget(attacker: Mobile, target: Mobile): boolean {
         let a = attacker.getLocation();
