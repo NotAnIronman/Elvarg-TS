@@ -70,10 +70,10 @@ export class ItemsKeptOnDeath {
               return 1;
             }
           });
-        let toKeep: Item[];
+        const toKeep: Item[] = [];
         const amountToKeep = ItemsKeptOnDeath.getAmountToKeep(player);
         for (let i = 0; i < amountToKeep && i < items.length; i++) {
-            toKeep.unshift(items[i]);
+            toKeep.push(items[i]);
         }
         return toKeep;
     }

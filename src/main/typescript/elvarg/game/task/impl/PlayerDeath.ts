@@ -45,7 +45,8 @@ export class PlayerDeathTask extends Task {
                     }
                     const droppedItems: Item[] = [];
                     if (this.loseItems) {
-                        this.itemsToKeep = ItemsKeptOnDeath.getItemsToKeep(this.player);
+                        const itemsToKeep = ItemsKeptOnDeath.getItemsToKeep(this.player);
+                        this.itemsToKeep = Array.isArray(itemsToKeep) ? itemsToKeep : [];
                         const playerItems = this.player.getInventory().getValidItems().concat(this.player.getEquipment().getValidItems());
                         const position = this.player.getLocation();
                         let dropped = false;

@@ -7,6 +7,7 @@ import { PlayerRights } from "./model/rights/PlayerRights"
 
 export class GameConstants {
     public static readonly NAME: string = "RspsApp";
+    public static readonly NPC_BITS: number = 18;
     public static readonly CLIENT_UID: number = 8784521;
     public static readonly DEFINITIONS_DIRECTORY: string = "./data/definitions/";
     public static readonly CLIPPING_DIRECTORY: string = "./data/clipping/";

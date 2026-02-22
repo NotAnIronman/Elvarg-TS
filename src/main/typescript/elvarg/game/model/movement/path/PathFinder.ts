@@ -16,8 +16,13 @@ export class PathFinder {
     private static LOG_DIR = path.join(process.cwd(), "logs");
     private static LOG_FILE = path.join(PathFinder.LOG_DIR, "movement.log");
     private static LOG_READY = false;
+    private static LOG_ENABLED = false;
 
     private static log(line: string) {
+        if (!PathFinder.LOG_ENABLED) {
+            return;
+        }
+
         const msg = `${new Date().toISOString()} [pathfinder] ${line}`;
         console.log(msg);
         try {

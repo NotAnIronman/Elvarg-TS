@@ -1291,10 +1291,11 @@ export class PluginManager {
         PluginManager.registerNpcCombatMethodProviderInternal(pluginName, provider);
       },
       log: (message, extra) => {
+
         if (extra && Object.keys(extra).length > 0) {
-          console.log(`[plugin:${pluginName}] ${message}`, extra);
+        //  console.log(`[plugin:${pluginName}] ${message}`, extra);
         } else {
-          console.log(`[plugin:${pluginName}] ${message}`);
+        //  console.log(`[plugin:${pluginName}] ${message}`);
         }
       },
     };

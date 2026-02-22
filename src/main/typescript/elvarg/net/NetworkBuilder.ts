@@ -92,7 +92,7 @@ const MALE_LOOK_RANGES: Array<[number, number]> = [
   [36, 40], // legs
   [42, 43], // feet
 ];
-const NPC_BITS = 14;
+const NPC_BITS = GameConstants.NPC_BITS;
 
 class LoginSession {
   private stage: LoginStage = "HANDSHAKE";
@@ -589,6 +589,8 @@ class LoginSession {
 
   private sendInitialPackets(player: PlayerState) {
     const { location, appearance, username, index } = player;
+    // Match Java PacketSender#sendMapRegion semantics:
+    // wire values are location.getRegionX()+6 where getRegionX() is (x>>3)-6 => (x>>3).
     const regionX = location.x >> 3;
     const regionY = location.y >> 3;
     const localX = location.x - ((regionX - 6) << 3);
@@ -816,14 +818,26 @@ class LoginSession {
     // Colors (hair, torso, legs, feet, skin)
     appearance.colors.forEach((c) => putByte(c & 0xff));
 
-    // Animations (unarmed defaults)
-    putShort(808); // stand
-    putShort(823); // turn
-    putShort(819); // walk
-    putShort(820); // turn 180
-    putShort(821); // turn 90 cw
-    putShort(822); // turn 90 ccw
-    putShort(824); // run
+    // Animations: mirror PlayerUpdating#updateAppearance defaults.
+    const skillAnim = this.gamePlayer?.getSkillAnimation?.() ?? 0;
+    if (skillAnim > 0) {
+      for (let i = 0; i < 7; i++) {
+        putShort(skillAnim);
+      }
+    } else {
+      const weaponDef = this.gamePlayer
+        ?.getEquipment?.()
+        ?.getItems?.()
+        ?.[3]
+        ?.getDefinition?.();
+      putShort(weaponDef?.getStandAnim?.() ?? 808);
+      putShort(0x337); // turn
+      putShort(weaponDef?.getWalkAnim?.() ?? 819);
+      putShort(0x334); // turn 180
+      putShort(0x335); // turn 90 cw
+      putShort(0x336); // turn 90 ccw
+      putShort(weaponDef?.getRunAnim?.() ?? 824);
+    }
 
     // Name as long
     putLong(Misc.stringToLongBigInt(username));
@@ -1246,7 +1260,7 @@ class LoginSession {
       putBits(5, dx & 0x1f);
       putBits(1, 0); // discard walking queue
       putBits(3, 0); // facing direction index
-      putBits(NPC_BITS, npc.id & 0x3fff);
+      putBits(NPC_BITS, npc.id & ((1 << NPC_BITS) - 1));
       putBits(1, 0); // no update mask
     }
 

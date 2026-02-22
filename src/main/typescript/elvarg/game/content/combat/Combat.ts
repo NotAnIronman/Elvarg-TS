@@ -81,9 +81,8 @@ export class Combat {
 
         this.character.setCombatFollowing(this.target);
 
-        // Face the target and make the target face us so both sides appear engaged
-        this.character.setPositionToFace(this.target.getLocation());
-        this.target.setPositionToFace(this.character.getLocation());
+        // Match Java behaviour: rely on entity interaction for combat facing.
+        // Position-to-face can become stale and override interaction turning.
         this.character.setMobileInteraction(this.target);
 
         if (!CombatFactory.canReach(this.character, this.method, this.target)) {

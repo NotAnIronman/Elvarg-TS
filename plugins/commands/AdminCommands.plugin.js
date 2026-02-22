@@ -29,6 +29,7 @@ const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/conten
 const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
+const MAX_NPC_COMMAND_SPAWNS = 20;
 
 function parseIntArg(value) {
   const parsed = Number.parseInt(value, 10);
@@ -62,6 +63,36 @@ function requireRights(player, predicate) {
     return false;
   }
   return true;
+}
+
+function queueNpcSpawn(player, id, amount = 1) {
+  const origin = player.getLocation().clone();
+  const spawnCount = Math.min(Math.max(1, amount), MAX_NPC_COMMAND_SPAWNS);
+  let spawned = 0;
+
+  for (let i = 0; i < spawnCount; i++) {
+    const spawn = origin.clone();
+    if (i > 0) {
+      const offsetX = (i % 3) - 1;
+      const offsetY = ((Math.floor(i / 3)) % 3) - 1;
+      spawn.setX(origin.getX() + offsetX);
+      spawn.setY(origin.getY() + offsetY);
+    }
+
+    const npc = NPC.create(id, spawn);
+    const currentHp = npc.getHitpoints?.();
+    if (!Number.isFinite(currentHp) || currentHp <= 0) {
+      npc.setHitpoints(10);
+    }
+
+    World.getAddNPCQueue().push(npc);
+    if (player.getPrivateArea()) {
+      player.getPrivateArea().add(npc);
+    }
+    spawned++;
+  }
+
+  return spawned;
 }
 
 class UpdateTask extends Task {
@@ -247,14 +278,33 @@ module.exports = {
         return true;
       }
       const id = parseIntArg(parts[1]);
-      if (id === null) {
+      const amount = parts.length >= 3 ? parseIntArg(parts[2]) : 1;
+      if (id === null || id < 0 || amount === null || amount < 1) {
+        player.getPacketSender().sendMessage("Usage: ::npc id [amount]");
         return true;
       }
-      const npc = NPC.create(id, player.getLocation().clone());
-      World.getAddNPCQueue().push(npc);
-      if (player.getPrivateArea()) {
-        player.getPrivateArea().add(npc);
+      const spawned = queueNpcSpawn(player, id, amount);
+      player.getPacketSender().sendMessage(
+        `Queued ${spawned} NPC${spawned === 1 ? "" : "s"} (id=${id}).`
+      );
+      return true;
+    });
+
+    // Accept common typo for convenience while testing.
+    api.registerCommand("npd", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
       }
+      const id = parseIntArg(parts[1]);
+      const amount = parts.length >= 3 ? parseIntArg(parts[2]) : 1;
+      if (id === null || id < 0 || amount === null || amount < 1) {
+        player.getPacketSender().sendMessage("Usage: ::npc id [amount]");
+        return true;
+      }
+      const spawned = queueNpcSpawn(player, id, amount);
+      player.getPacketSender().sendMessage(
+        `Queued ${spawned} NPC${spawned === 1 ? "" : "s"} (id=${id}).`
+      );
       return true;
     });
 
@@ -263,15 +313,17 @@ module.exports = {
         return true;
       }
       const id = parseIntArg(parts[1]);
-      if (id === null) {
+      const amount = parts.length >= 3 ? parseIntArg(parts[2]) : 1;
+      if (id === null || id < 0 || amount === null || amount < 1) {
+        player.getPacketSender().sendMessage("Usage: ::n id [amount]");
         return true;
       }
-      const npc = NPC.create(id, player.getLocation().clone());
-      World.getAddNPCQueue().push(npc);
-      if (player.getPrivateArea()) {
-        player.getPrivateArea().add(npc);
-      }
-      player.getPacketSender().sendMessage("Spawned NPC in-memory. Persistent spawn file write is not enabled in plugins.");
+      const spawned = queueNpcSpawn(player, id, amount);
+      player
+        .getPacketSender()
+        .sendMessage(
+          `Spawned ${spawned} NPC${spawned === 1 ? "" : "s"} in-memory (id=${id}). Persistent spawn file write is not enabled in plugins.`
+        );
       return true;
     });
 

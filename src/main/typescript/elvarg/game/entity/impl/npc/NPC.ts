@@ -10,6 +10,7 @@ import { CoordinateState, NPCMovementCoordinator } from "./NPCMovementCoordinato
 import { Barricades } from "./impl/Barricades";
 import type { Player } from "../player/Player";
 import { FacingDirection } from "../../../model/FacingDirection";
+import { Direction } from "../../../model/Direction";
 import { Ids } from "../../../model/Ids";
 import { Location } from "../../../model/Location";
 import { AreaManager } from "../../../model/areas/AreaManager";
@@ -17,6 +18,7 @@ import { TaskManager } from "../../../task/TaskManager";
 import { NPCDeathTask } from "../../../task/impl/NPCDeathTask"
 import * as util from 'util';
 import { Wilderness } from "../../../content/wilderness/Wilderness";
+import { MovementQueue } from "../../../model/movement/MovementQueue";
 
 
 export class NPC extends Mobile {
@@ -31,7 +33,7 @@ export class NPC extends Mobile {
     private isDying: boolean;
     private owner: Player;
     private visible: boolean = true;
-    private face: FacingDirection = FacingDirection.NORTH;
+    private face: FacingDirection = FacingDirection.SOUTH;
     private pet: boolean;
     public barricadeFireTicks = 8;
     public barricadeOnFire: boolean;
@@ -137,6 +139,14 @@ export class NPC extends Mobile {
             this.getTimers().process();
             this.getMovementQueue().process();
             this.movementCoordinator.process();
+
+            const interactingMobile = this.getInteractingMobile();
+            if (interactingMobile != null
+                && this.getLocation().getDistance(interactingMobile.getLocation()) > MovementQueue.NPC_INTERACT_RADIUS) {
+                this.setMobileInteraction(null);
+                this.setPositionToFace(null);
+            }
+
             this.getCombat().process();
             this.handleBarricadeTicks();
             AreaManager.process(this);
@@ -354,8 +364,30 @@ export class NPC extends Mobile {
         return this.face;
     }
 
-    public setFace(face: FacingDirection): void {
-        this.face = face;
+    private static toFacingDirection(face: FacingDirection | Direction | number): FacingDirection {
+        if (face instanceof FacingDirection) {
+            return face;
+        }
+        const direction =
+            face instanceof Direction
+                ? face
+                : Direction.valueOf(Number.isInteger(face) ? face : Direction.SOUTH.getId());
+        switch (direction.getId()) {
+            case 1:
+                return FacingDirection.NORTH;
+            case 3:
+                return FacingDirection.WEST;
+            case 4:
+                return FacingDirection.EAST;
+            case 6:
+                return FacingDirection.SOUTH;
+            default:
+                return FacingDirection.SOUTH;
+        }
+    }
+
+    public setFace(face: FacingDirection | Direction | number): void {
+        this.face = NPC.toFacingDirection(face);
     }
 
     public isPet(): boolean {

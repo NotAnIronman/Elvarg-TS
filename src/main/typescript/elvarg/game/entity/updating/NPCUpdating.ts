@@ -7,6 +7,7 @@ import { Location } from '../../model/Location';
 import { PacketBuilder, AccessType, ValueType } from '../../../net/packet/PacketBuilder';
 import { PacketType } from '../../../net/packet/PacketType';
 import { ByteOrder } from '../../../net/packet/ByteOrder';
+import { GameConstants } from '../../GameConstants';
 /**
  * Represents a player's npc updating task, which loops through all local
  * npcs and updates their masks according to their current attributes.
@@ -21,19 +22,19 @@ import { ByteOrder } from '../../../net/packet/ByteOrder';
  */
 
 export class NPCUpdating {
-    public static update(player: Player): void {
-        // Disable NPC updates for bring-up to avoid client T2s until the format
-        // matches the reference server.
-        player.getSession()?.write(new PacketBuilder(65, PacketType.VARIABLE_SHORT).writePutBytes("\x00"));
-        return;
+    private static readonly MAX_LOCAL_NPCS = 79; // Kept in sync with Java server behaviour.
 
+    public static update(player: Player): void {
         let update = new PacketBuilder();
         let packet = new PacketBuilder(65, PacketType.VARIABLE_SHORT);
         packet.initializeAccess(AccessType.BIT);
-        packet.putBits(8, player.getLocalNpcs().length);
+        const localNpcs = player.getLocalNpcs();
+        packet.putBits(8, localNpcs.length);
 
-        for (let npcIterator of player.getLocalNpcs()) {
-            let npc = npcIterator;
+        // Keep iteration order stable to mirror the client-side local NPC list.
+        // Remove stale NPC references in-place (Java iterator.remove equivalent).
+        for (let index = 0; index < localNpcs.length;) {
+            const npc = localNpcs[index];
             if (World.getNpcs().get(npc.getIndex()) != null
                 && npc.isVisible()
                 && player.getLocation().isViewableFrom(npc.getLocation())
@@ -43,22 +44,24 @@ export class NPCUpdating {
                 if (npc.getUpdateFlag().isUpdateRequired()) {
                     NPCUpdating.appendUpdates(npc, update);
                 }
+                index++;
             } else {
-                npcIterator.onRemove();
+                npc.onRemove();
+                localNpcs.splice(index, 1);
                 packet.putBits(1, 1);
                 packet.putBits(2, 3);
             }
         }
 
         for (let npc of World.getNpcs()) {
-            if (player.getLocalNpcs().length >= 79) //Originally 255
+            if (localNpcs.length >= NPCUpdating.MAX_LOCAL_NPCS) // Originally 255 in legacy.
                 break;
-            if (npc == null || player.getLocalNpcs().includes(npc) || !npc.isVisible() || npc.isNeedsPlacement()
+            if (npc == null || localNpcs.includes(npc) || !npc.isVisible() || npc.isNeedsPlacement()
                 || npc.getPrivateArea() != player.getPrivateArea())
                 continue;
 
             if (npc.getLocation().isViewableFrom(player.getLocation())) {
-                player.getLocalNpcs().push(npc);
+                localNpcs.push(npc);
                 NPCUpdating.addNPC(player, npc, packet);
                 if (npc.getUpdateFlag().isUpdateRequired()) {
                     NPCUpdating.appendUpdates(npc, update);
@@ -87,12 +90,16 @@ export class NPCUpdating {
      */
 
     private static addNPC(player: Player, npc: NPC, builder: PacketBuilder) {
+        const face = npc.getFace() as any;
+        const faceDirection = face?.getDirection ? face.getDirection() : face;
+        const faceId = typeof faceDirection?.getId === "function" ? faceDirection.getId() : 0;
 
         builder.putBits(14, npc.getIndex());
         builder.putBits(5, npc.getLocation().getY() - player.getLocation().getY());
         builder.putBits(5, npc.getLocation().getX() - player.getLocation().getX());
         builder.putBits(1, 0);
-        builder.putBits(14, npc.getId());
+        builder.putBits(3, faceId & 0x7);
+        builder.putBits(GameConstants.NPC_BITS, npc.getId());
         builder.putBits(1, npc.getUpdateFlag().isUpdateRequired() ? 1 : 0);
     }
 
