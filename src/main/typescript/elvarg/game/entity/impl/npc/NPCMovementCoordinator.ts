@@ -34,6 +34,9 @@ export class NPCMovementCoordinator {
                 if (CombatFactory.inCombat(this.npc)) {
                     return;
                 }
+                if (this.npc.getInteractingMobile() != null) {
+                    return;
+                }
                 if (!this.npc.getMovementQueue().isMovings()) {
                     if (Misc.getRandom(9) <= 1) {
                         let pos = this.generateLocalPosition();
@@ -154,8 +157,7 @@ export class NPCMovementCoordinator {
             if (this.npc.getLocation().getY() - y < spawnY - 1)
                 return null;
         }
-        // Return an absolute tile, not a relative offset (the queue expects world coords).
-        return new Location(this.npc.getLocation().getX() + x, this.npc.getLocation().getY() + y);
+        return new Location(x, y);
     }
 
     public getCoordinateState(): CoordinateState {

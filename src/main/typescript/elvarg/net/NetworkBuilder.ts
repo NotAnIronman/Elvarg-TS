@@ -852,10 +852,8 @@ class LoginSession {
   }
 
   private startKeepAlive() {
-    setInterval(() => {
-      if (this.stage !== "ESTABLISHED") return;
-      this.sendPacket(0, Buffer.alloc(0), PacketType.FIXED, "keepalive_tick");
-    }, 10000);
+    // The client already sends opcode 0 idle packets. Sending server opcode 0 here
+    // is non-Java parity and can trigger client-side disconnects.
   }
 
   private sendConfig(id: number, state: number) {

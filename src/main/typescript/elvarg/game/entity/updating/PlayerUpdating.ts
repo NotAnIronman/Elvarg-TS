@@ -613,15 +613,29 @@ export class PlayerUpdating {
         builder.putInt(
             ((target.graphic.height * 50) << 16) + (target.graphic.delay & 0xffff));
     }
+    private static resolveHitmaskValue(hit: any): number {
+        const raw =
+            typeof hit?.getHitmask === "function"
+                ? hit.getHitmask()
+                : hit?.hitmask;
+
+        if (typeof raw === "number" && Number.isFinite(raw)) {
+            return raw;
+        }
+        if (raw != null && typeof raw.ordinal === "number") {
+            return raw.ordinal;
+        }
+        return 0;
+    }
     private static updateSingleHit(builder: PacketBuilder, target: Player) {
         builder.putShort(target.primaryHit.damage);
-        builder.put(target.primaryHit.hitmask.ordinal);
+        builder.put(PlayerUpdating.resolveHitmaskValue(target.primaryHit));
         builder.putShort(target.getHitpoints());
         builder.putShort(target.skillManager.getMaxLevel(Skill.HITPOINTS));
     }
     private static updateDoubleHit(builder: PacketBuilder, target: Player) {
         builder.putShort(target.secondaryHit.damage);
-        builder.put(target.secondaryHit.hitmask.ordinal);
+        builder.put(PlayerUpdating.resolveHitmaskValue(target.secondaryHit));
         builder.putShort(target.getHitpoints());
         builder.putShort(target.skillManager.getMaxLevel(Skill.HITPOINTS));
     }

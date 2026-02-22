@@ -72,7 +72,7 @@ export class NPCUpdating {
         if (update.getBuffer().length > 0) {
             packet.putBits(14, 16383);
             packet.initializeAccess(AccessType.BYTE);
-            packet.writeBuffer(update.getBuffer().toString());
+            packet.putBytes(update.getBuffer());
         } else {
             packet.initializeAccess(AccessType.BYTE);
         }

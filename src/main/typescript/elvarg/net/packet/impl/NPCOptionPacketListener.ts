@@ -1,4 +1,5 @@
 import { World } from "../../../game/World";
+import { CombatSpells } from "../../../game/content/combat/magic/CombatSpells";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { Packet } from "../Packet";
 import { PacketConstants } from "../PacketConstants";
@@ -25,10 +26,7 @@ export class NPCOptionPacketListener implements PacketExecutor {
       return;
     }
 
-    const clickType = opcodeToClickType(packet.getOpcode());
-    if (clickType === 0) {
-      return;
-    }
+    const opcode = packet.getOpcode();
 
     const index = packet.readLEShortA();
     if (index < 0 || index > World.getNpcs().capacityReturn()) {
@@ -44,8 +42,44 @@ export class NPCOptionPacketListener implements PacketExecutor {
       return;
     }
 
+    player.setPositionToFace(npc.getLocation());
+
+    if (
+      opcode === PacketConstants.ATTACK_NPC_OPCODE ||
+      opcode === PacketConstants.MAGE_NPC_OPCODE
+    ) {
+      if (!npc.getCurrentDefinition?.()?.isAttackable?.()) {
+        return;
+      }
+      if (npc.getHitpoints?.() <= 0) {
+        player.getMovementQueue().reset();
+        return;
+      }
+
+      if (opcode === PacketConstants.MAGE_NPC_OPCODE) {
+        const spellId = packet.readShortA();
+        const spell = CombatSpells.getCombatSpell(spellId);
+        if (!spell) {
+          player.getMovementQueue().reset();
+          return;
+        }
+        player.getCombat().setCastSpell(spell);
+      }
+
+      player.getCombat().attack(npc);
+      return;
+    }
+
+    const clickType = opcodeToClickType(opcode);
+    if (clickType === 0) {
+      return;
+    }
+
     player.getMovementQueue().walkToEntity(npc, () => {
       player.setPositionToFace(npc.getLocation());
+      npc.setMobileInteraction?.(player);
+      npc.setPositionToFace?.(player.getLocation());
+
       const handled = PluginManager.emitNpcInteraction({
         player,
         npc,

@@ -24,7 +24,7 @@ export class TimedObjectReplacementTask extends Task {
         } else if (TimedObjectReplacementTask.tick >= this.ticks) {
             ObjectManager.deregister(this.temp, !this.sameTile);
             ObjectManager.register(this.original, true);
-            stop();
+            this.stop();
         }
         TimedObjectReplacementTask.tick++;
     }

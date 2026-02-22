@@ -164,7 +164,7 @@ export class PlayerDeathTask extends Task {
                     }
 
                     // Stop the event..
-                    stop();
+                    this.stop();
                     break;
                 }
 

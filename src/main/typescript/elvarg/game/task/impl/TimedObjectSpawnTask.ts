@@ -25,7 +25,7 @@ export class TimedObjectSpawnTask extends Task {
                 this.action.execute();
             }
 
-            stop();
+            this.stop();
         }
         TimedObjectSpawnTask.tick++;
     }
