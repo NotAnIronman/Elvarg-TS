@@ -508,7 +508,7 @@ export class PacketSender {
   //     this.player.setSearchingBank(false);
   //     this.player.setTeleportInterfaceOpen(false);
   //     this.player.getAppearance().setCanChangeAppearance(false);
-  //     this.player.getSession().write(new PacketBuilder(219));
+  //     this.player.getSession().write(new PacketBuilder(219, PacketType.FIXED));
   //     return this;
   // }
 
@@ -1018,7 +1018,7 @@ export class PacketSender {
     this.player.setTeleportInterfaceOpen?.(false);
     this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
     // Java parity: close interfaces with opcode 219 only.
-    this.player.getSession().write(new PacketBuilder(219));
+    this.player.getSession().write(new PacketBuilder(219, PacketType.FIXED));
     return this;
   }
 

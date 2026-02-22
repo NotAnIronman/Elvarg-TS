@@ -1148,7 +1148,7 @@ class LoginSession {
 
       switch (opcode) {
         case 0:
-          this.sendPacket(0, Buffer.alloc(0), PacketType.FIXED, "keepalive_echo");
+          // Client idle keepalive; consume without echo for Java parity.
           continue;
         case 11:
           this.handleAppearanceChange(payload);
