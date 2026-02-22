@@ -116,7 +116,7 @@ export class Player extends Mobile {
     private hostAddress: string;
     private isDiscordLogin: boolean = false;
     private cachedDiscordAccessToken: string = "";
-    public longUsername: number;
+    public longUsername: bigint = 0n;
     private session: PlayerSession;
     private playerInteractingOption: PlayerInteractingOption;
     public status: PlayerStatus = PlayerStatus.NONE;
@@ -636,11 +636,11 @@ export class Player extends Mobile {
         return this;
     }
 
-    public getLongUsername(): number {
+    public getLongUsername(): bigint {
         return this.longUsername;
     }
 
-    public setLongUsername(longUsername: number): Player {
+    public setLongUsername(longUsername: bigint): Player {
         this.longUsername = longUsername;
         return this;
     }

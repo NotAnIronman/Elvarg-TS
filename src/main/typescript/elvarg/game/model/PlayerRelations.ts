@@ -4,9 +4,11 @@ import { Misc } from "../../util/Misc";
 import { ClanChatManager } from "../content/clan/ClanChatManager";
 
 export class PlayerRelations {
+    private static readonly MAX_FRIENDS = 200;
+    private static readonly MAX_IGNORES = 100;
     private status: PrivateChatStatus = PrivateChatStatus.ON;
-    public friendList: Array<number> = new Array<number>(200);
-    public ignoreList: Array<number> = new Array<number>(100);
+    public friendList: Array<bigint> = [];
+    public ignoreList: Array<bigint> = [];
     private privateMessageId = 1;
     private player: Player;
 
@@ -35,16 +37,59 @@ export class PlayerRelations {
         return this.status;
     }
 
-    public getFriendList(): Array<number> {
+    public getFriendList(): Array<bigint> {
         return this.friendList;
     }
 
-    public getIgnoreList(): Array<number> {
+    public getIgnoreList(): Array<bigint> {
         return this.ignoreList;
     }
 
     updateLists(online: boolean) {
-        // Temporarily disabled to reduce packet noise while aligning the protocol.
+        if (this.status === PrivateChatStatus.OFF) {
+            online = false;
+        }
+
+        this.player.getPacketSender().sendFriendStatus(2);
+
+        World.getPlayers().forEach((other) => {
+            if (!other) {
+                return;
+            }
+
+            let temporaryOnlineStatus = online;
+            if (other.getRelations().friendList.includes(this.player.getLongUsername())) {
+                if (
+                    (this.status === PrivateChatStatus.FRIENDS_ONLY &&
+                        !this.friendList.includes(other.getLongUsername())) ||
+                    this.status === PrivateChatStatus.OFF ||
+                    this.ignoreList.includes(other.getLongUsername())
+                ) {
+                    temporaryOnlineStatus = false;
+                }
+                other.getPacketSender().sendFriend(
+                    this.player.getLongUsername(),
+                    temporaryOnlineStatus ? 1 : 0
+                );
+            }
+
+            let otherVisibleToPlayer = true;
+            if (this.friendList.includes(other.getLongUsername())) {
+                if (
+                    (other.getRelations().status === PrivateChatStatus.FRIENDS_ONLY &&
+                        !other.getRelations().getFriendList().includes(this.player.getLongUsername())) ||
+                    other.getRelations().status === PrivateChatStatus.OFF ||
+                    other.getRelations().getIgnoreList().includes(this.player.getLongUsername())
+                ) {
+                    otherVisibleToPlayer = false;
+                }
+                this.player.getPacketSender().sendFriend(
+                    other.getLongUsername(),
+                    otherVisibleToPlayer ? 1 : 0
+                );
+            }
+        });
+
         return this;
     }
 
@@ -69,19 +114,19 @@ export class PlayerRelations {
         }
     }
 
-    public sendAddFriend(name: number): void {
+    public sendAddFriend(name: bigint): void {
         this.player.getPacketSender().sendFriend(name, 0);
     }
 
-    public sendDeleteFriend(name: number): void {
+    public sendDeleteFriend(name: bigint): void {
         this.player.getPacketSender().sendDeleteFriend(name);
     }
 
-    public sendAddIgnore(name: number): void {
+    public sendAddIgnore(name: bigint): void {
         this.player.getPacketSender().sendAddIgnore(name);
     }
 
-    public sendDeleteIgnore(name: number): void {
+    public sendDeleteIgnore(name: bigint): void {
         this.player.getPacketSender().sendDeleteIgnore(name);
     }
 
@@ -92,12 +137,12 @@ export class PlayerRelations {
         return this;
     }
 
-    public addFriend(username: number): void {
+    public addFriend(username: bigint): void {
         const name = Misc.formatName(Misc.longToString(username));
         if (name === this.player.getUsername()) {
             return;
         }
-        if (this.friendList.length >= 200) {
+        if (this.friendList.length >= PlayerRelations.MAX_FRIENDS) {
             this.player.getPacketSender().sendMessage("Your friend list is full!");
             return;
         }
@@ -123,10 +168,10 @@ export class PlayerRelations {
     }
 
     public isFriendWith(player: string): boolean {
-        return this.friendList.indexOf(Misc.stringToLong(player)) !== -1;
+        return this.friendList.indexOf(Misc.stringToLongBigInt(player)) !== -1;
     }
 
-    public deleteFriend(username: number): void {
+    public deleteFriend(username: bigint): void {
         const name = Misc.formatName(Misc.longToString(username));
         if (name === this.player.getUsername()) {
             return;
@@ -149,12 +194,12 @@ export class PlayerRelations {
         }
     }
 
-    public addIgnore(username: number): void {
+    public addIgnore(username: bigint): void {
         const name = Misc.formatName(Misc.longToString(username));
         if (name === this.player.getUsername()) {
             return;
         }
-        if (this.ignoreList.length >= 100) {
+        if (this.ignoreList.length >= PlayerRelations.MAX_IGNORES) {
             this.player.getPacketSender().sendMessage("Your ignore list is full!");
             return;
         }
@@ -175,7 +220,7 @@ export class PlayerRelations {
         }
     }
 
-    public deleteIgnore(username: number): void {
+    public deleteIgnore(username: bigint): void {
         const name = Misc.formatName(Misc.longToString(username));
         if (name === this.player.getUsername()) {
             return;

@@ -233,10 +233,7 @@ module.exports = {
       stopMining(activeSessions, player, false);
     });
 
-    api.onObjectInteraction((event) => {
-      if (event.clickType !== 1) {
-        return;
-      }
+    api.onObjectFirstClick([...ROCK_BY_OBJECT_ID.keys()], (event) => {
       const rock = ROCK_BY_OBJECT_ID.get(event.objectId);
       if (!rock) {
         return;

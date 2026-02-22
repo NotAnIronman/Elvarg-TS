@@ -640,6 +640,50 @@ export class PluginManager {
   }
 
   private static createApi(pluginName: string): PluginApi {
+    const registerObjectClickHook = (
+      clickType: number,
+      objectIds: number | number[],
+      handler: (event: PluginObjectInteractionEvent) => void | boolean,
+      label = "object"
+    ): void => {
+      const normalized = Array.isArray(objectIds) ? objectIds : [objectIds];
+      if (!normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} click hook registration objectIds=[]`
+        );
+        return;
+      }
+
+      const validIds = normalized.filter(
+        (id) => Number.isInteger(id) && id >= 0
+      ) as number[];
+      if (validIds.length !== normalized.length || typeof handler !== "function") {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} click hook registration objectIds=${JSON.stringify(objectIds)}`
+        );
+        return;
+      }
+
+      const objectIdSet = new Set(validIds);
+
+      PluginManager.objectInteractionHooks.push({
+        pluginName,
+        handler: (event) => {
+          if (!event || event.handled || event.clickType !== clickType) {
+            return;
+          }
+          if (!objectIdSet.has(event.objectId)) {
+            return;
+          }
+
+          const result = handler(event);
+          if (result !== false) {
+            event.handled = true;
+          }
+        },
+      });
+    };
+
     return {
       onPacketReceived: (handler) => {
         if (typeof handler !== "function") {
@@ -1143,66 +1187,30 @@ export class PluginManager {
         existing.push(wrapper);
         PluginManager.commandHandlersByBase.set(normalized, existing);
       },
-      onObjectClick: (objectId, clickType, handler) => {
-        if (
-          !Number.isInteger(objectId) ||
-          objectId < 0 ||
-          !Number.isInteger(clickType) ||
-          clickType < 1 ||
-          clickType > 5 ||
-          typeof handler !== "function"
-        ) {
+      onObjectClick: (objectIds, clickType, handler) => {
+        if (!Number.isInteger(clickType) || clickType < 1 || clickType > 5) {
           console.warn(
-            `[plugins] ${pluginName} attempted invalid object click hook registration objectId=${objectId} clickType=${clickType}`
+            `[plugins] ${pluginName} attempted invalid object click hook registration objectIds=${JSON.stringify(objectIds)} clickType=${clickType}`
           );
           return;
         }
 
-        PluginManager.objectInteractionHooks.push({
-          pluginName,
-          handler: (event) => {
-            if (!event || event.handled) {
-              return;
-            }
-            if (event.objectId !== objectId || event.clickType !== clickType) {
-              return;
-            }
-
-            const result = handler(event);
-            if (result !== false) {
-              event.handled = true;
-            }
-          },
-        });
+        registerObjectClickHook(clickType, objectIds, handler, "object");
       },
-      onObjectFirstClick: (objectId, handler) => {
-        if (
-          !Number.isInteger(objectId) ||
-          objectId < 0 ||
-          typeof handler !== "function"
-        ) {
-          console.warn(
-            `[plugins] ${pluginName} attempted invalid first-click object hook registration objectId=${objectId}`
-          );
-          return;
-        }
-
-        PluginManager.objectInteractionHooks.push({
-          pluginName,
-          handler: (event) => {
-            if (!event || event.handled) {
-              return;
-            }
-            if (event.objectId !== objectId || event.clickType !== 1) {
-              return;
-            }
-
-            const result = handler(event);
-            if (result !== false) {
-              event.handled = true;
-            }
-          },
-        });
+      onObjectFirstClick: (objectIds, handler) => {
+        registerObjectClickHook(1, objectIds, handler, "first");
+      },
+      onObjectSecondClick: (objectIds, handler) => {
+        registerObjectClickHook(2, objectIds, handler, "second");
+      },
+      onObjectThirdClick: (objectIds, handler) => {
+        registerObjectClickHook(3, objectIds, handler, "third");
+      },
+      onObjectFourthClick: (objectIds, handler) => {
+        registerObjectClickHook(4, objectIds, handler, "fourth");
+      },
+      onObjectFifthClick: (objectIds, handler) => {
+        registerObjectClickHook(5, objectIds, handler, "fifth");
       },
       registerPacketListener: (opcode, listener) => {
         if (

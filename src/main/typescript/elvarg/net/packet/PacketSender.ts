@@ -787,7 +787,7 @@ export class PacketSender {
     return this;
   }
 
-  public sendFriend(name: number, world: number) {
+  public sendFriend(name: number | bigint, world: number) {
     world = world !== 0 ? world + 9 : world;
     const out = new PacketBuilder(50);
     out.putLong(name);
@@ -796,21 +796,21 @@ export class PacketSender {
     return this;
   }
 
-  public sendDeleteFriend(name: number) {
+  public sendDeleteFriend(name: number | bigint) {
     const out = new PacketBuilder(51);
     out.putLong(name);
     this.player.getSession().write(out);
     return this;
   }
 
-  public sendAddIgnore(name: number) {
+  public sendAddIgnore(name: number | bigint) {
     const out = new PacketBuilder(214);
     out.putLong(name);
     this.player.getSession().write(out);
     return this;
   }
 
-  public sendDeleteIgnore(name: number) {
+  public sendDeleteIgnore(name: number | bigint) {
     const out = new PacketBuilder(215);
     out.putLong(name);
     this.player.getSession().write(out);

@@ -120,10 +120,7 @@ module.exports = {
       }
     });
 
-    api.onObjectInteraction((event) => {
-      if (event.clickType !== 1) {
-        return;
-      }
+    api.onObjectFirstClick(Obelisks.OBELISK_IDS, (event) => {
       if (!Wilderness.isIn(event.player)) {
         return;
       }

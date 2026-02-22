@@ -196,10 +196,7 @@ function handlePouchAction(player, itemId, clickType) {
 module.exports = {
   name: "Runecrafting",
   register(api) {
-    api.onObjectInteraction((event) => {
-      if (event.clickType !== 1) {
-        return;
-      }
+    api.onObjectFirstClick([...RUNES_BY_ALTAR_ID.keys()], (event) => {
       const runeData = RUNES_BY_ALTAR_ID.get(event.objectId);
       if (!runeData) {
         return;

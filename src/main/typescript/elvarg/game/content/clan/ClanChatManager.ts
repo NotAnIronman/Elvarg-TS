@@ -689,7 +689,9 @@ export class ClanChatManager {
         } else if (button >= 38752 && button <= 38951) {
             const index = button - 38752;
             if (index < player.getRelations().getFriendList().length) {
-                target = Misc.formatPlayerName(Misc.longToString(player.getRelations().getFriendList().indexOf(index)));
+                target = Misc.formatPlayerName(
+                    Misc.longToString(player.getRelations().getFriendList()[index])
+                );
                 clan = ClanChatManager.getClanChat(player);
                 if (clan === null) {
                     player.getPacketSender().sendMessage("Please enable your clanchat before changing ranks.");
@@ -807,6 +809,5 @@ export class ClanChatManager {
         return false;
     }
 }
-
 
 

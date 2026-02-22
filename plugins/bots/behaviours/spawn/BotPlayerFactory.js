@@ -15,7 +15,7 @@ function createBotPlayer(username, spawn) {
   const session = new BotPlayerSession();
   const bot = new Player(session, spawn.clone());
   bot.setUsername(username);
-  bot.setLongUsername(Misc.stringToLong(username));
+  bot.setLongUsername(Misc.stringToLongBigInt(username));
   bot.setHostAddress("bot");
   bot.setRunning(false);
   bot.setLastKnownRegion(spawn.clone());

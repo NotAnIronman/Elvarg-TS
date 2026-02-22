@@ -240,10 +240,7 @@ module.exports = {
       event.handled = true;
     });
 
-    api.onObjectInteraction((event) => {
-      if (event.clickType !== 1) {
-        return;
-      }
+    api.onObjectFirstClick([...STALLS.keys()], (event) => {
       const stall = STALLS.get(event.objectId);
       if (!stall) {
         return;

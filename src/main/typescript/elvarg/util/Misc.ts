@@ -808,15 +808,29 @@ export class Misc {
     return Misc.fixName(name.replace(" ", "_"));
   }
 
-  public static longToString(l: number): string {
-    let i = 0;
-    let ac: string[] = new Array(12);
-    while (l != 0) {
-      let l1 = l;
-      l /= 37;
-      ac[11 - i++] = Misc.VALID_CHARACTERS[l1 - l * 37];
+  public static longToString(l: number | bigint): string {
+    let value: bigint;
+    if (typeof l === "bigint") {
+      value = l;
+    } else {
+      if (!Number.isFinite(l)) {
+        return "";
+      }
+      value = BigInt(Math.trunc(l));
     }
-    return ac.slice(12 - i, i).join("");
+
+    if (value <= 0n) {
+      return "";
+    }
+
+    const chars: string[] = [];
+    while (value !== 0n && chars.length < 12) {
+      const index = Number(value % 37n);
+      chars.push(Misc.VALID_PLAYER_CHARACTERS[index] ?? "_");
+      value /= 37n;
+    }
+
+    return chars.reverse().join("");
   }
 
   public static fixName(name: string): string {

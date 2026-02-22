@@ -337,7 +337,7 @@ class LoginSession {
     }
     const gamePlayer = new Player(session, new Location(player.location.x, player.location.y, player.location.plane));
     gamePlayer.setUsername(username);
-    gamePlayer.setLongUsername(Misc.stringToLong(username));
+    gamePlayer.setLongUsername(Misc.stringToLongBigInt(username));
     gamePlayer.setHostAddress((this.socket as any)?._socket?.remoteAddress ?? "");
     const loadedPlayerSave = this.loadPersistedPlayer(gamePlayer, password);
     if (!loadedPlayerSave) {

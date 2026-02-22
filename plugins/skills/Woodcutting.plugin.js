@@ -622,11 +622,7 @@ module.exports = {
       return false;
     });
 
-    api.onObjectInteraction((event) => {
-      if (event.clickType !== 1) {
-        return;
-      }
-
+    api.onObjectFirstClick([...TREES_BY_OBJECT_ID.keys()], (event) => {
       const tree = TREES_BY_OBJECT_ID.get(event.objectId);
       if (!tree) {
         return;

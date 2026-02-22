@@ -14,6 +14,8 @@ import { ItemContainer } from "../../../../model/container/ItemContainer";
 import { StackType } from "../../../../model/container/StackType";
 
 export class PlayerSave {
+    private static readonly MAX_FRIENDS = 200;
+    private static readonly MAX_IGNORES = 100;
     private passwordHashWithSalt: string;
     private isDiscordLogin: boolean;
     private cachedDiscordAccessToken: string;
@@ -63,8 +65,8 @@ export class PlayerSave {
     private appearance: number[];
     private skills: Skills;
     private quickPrayers: PrayerData[];
-    private friends: number[];
-    private ignores: number[];
+    private friends: string[];
+    private ignores: string[];
     private banks: Map<number, Item[]>;
     private presets: Presetable[];
     private questPoints: number;
@@ -439,19 +441,19 @@ export class PlayerSave {
         this.quickPrayers = quickPrayers;
     }
 
-    public getFriends(): number[] {
+    public getFriends(): string[] {
         return this.friends;
     }
 
-    public setFriends(friends: number[]) {
+    public setFriends(friends: string[]) {
         this.friends = friends;
     }
 
-    public getIgnores(): number[] {
+    public getIgnores(): string[] {
         return this.ignores;
     }
 
-    public setIgnores(ignores: number[]) {
+    public setIgnores(ignores: string[]) {
         this.ignores = ignores;
     }
 
@@ -501,6 +503,43 @@ export class PlayerSave {
 
     setQuestProgress(questProgress: Map<number, number>) {
         this.questProgress = questProgress;
+    }
+
+    private static normalizeRelationListToBigInt(
+        values: Array<number | string | bigint> | null | undefined,
+        max: number
+    ): bigint[] {
+        if (!Array.isArray(values) || values.length === 0) {
+            return [];
+        }
+        const out: bigint[] = [];
+        const seen = new Set<bigint>();
+        for (const value of values) {
+            let normalized: bigint;
+            try {
+                normalized = typeof value === "bigint" ? value : BigInt(String(value));
+            } catch {
+                continue;
+            }
+            if (normalized <= 0n || seen.has(normalized)) {
+                continue;
+            }
+            seen.add(normalized);
+            out.push(normalized);
+            if (out.length >= max) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    private static normalizeRelationListToStrings(
+        values: Array<number | string | bigint> | null | undefined,
+        max: number
+    ): string[] {
+        return PlayerSave
+            .normalizeRelationListToBigInt(values, max)
+            .map((value) => value.toString());
     }
 
     applyToPlayer(player: Player) {
@@ -570,13 +609,23 @@ export class PlayerSave {
             player.setPresets(this.presets);
         }
 
-        for (let l of this.friends) {
-            player.getRelations().getFriendList().push(l);
-        }
+        const friendList = player.getRelations().getFriendList();
+        friendList.length = 0;
+        friendList.push(
+            ...PlayerSave.normalizeRelationListToBigInt(
+                this.friends,
+                PlayerSave.MAX_FRIENDS
+            )
+        );
 
-        for (let l of this.ignores) {
-            player.getRelations().getIgnoreList().push(l);
-        }
+        const ignoreList = player.getRelations().getIgnoreList();
+        ignoreList.length = 0;
+        ignoreList.push(
+            ...PlayerSave.normalizeRelationListToBigInt(
+                this.ignores,
+                PlayerSave.MAX_IGNORES
+            )
+        );
 
         for (let i = 0; i < player.getBanks().length; i++) {
             if (i == Bank.BANK_SEARCH_TAB_INDEX) {
@@ -656,8 +705,14 @@ export class PlayerSave {
         playerSave.questPoints = player.getQuestPoints();
         playerSave.questProgress = player.getQuestProgress();
 
-        playerSave.friends = player.getRelations().getFriendList();
-        playerSave.ignores = player.getRelations().getIgnoreList();
+        playerSave.friends = PlayerSave.normalizeRelationListToStrings(
+            player.getRelations().getFriendList(),
+            PlayerSave.MAX_FRIENDS
+        );
+        playerSave.ignores = PlayerSave.normalizeRelationListToStrings(
+            player.getRelations().getIgnoreList(),
+            PlayerSave.MAX_IGNORES
+        );
 
         playerSave.presets = player.getPresets();
 

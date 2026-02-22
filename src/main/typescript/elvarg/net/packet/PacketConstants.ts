@@ -30,7 +30,6 @@ import { ObjectActionPacketListener } from "../../net/packet/impl/ObjectActionPa
 import { NPCOptionPacketListener } from "../../net/packet/impl/NPCOptionPacketListener";
 import { ItemActionPacketListener } from "../../net/packet/impl/ItemActionPacketListener";
 import { UseItemPacketListener } from "../../net/packet/impl/UseItemPacketListener";
-import { PlayerRelationPacketListener } from "../../net/packet/impl/PlayerRelationPacketListener";
 import { TradeRequestPacketListener } from "../../net/packet/impl/TradeRequestPacketListener";
 import { CreationMenuPacketListener } from "../../net/packet/impl/CreationMenuPacketListener";
 import { TeleportPacketListener } from "../../net/packet/impl/TeleportPacketListener";
@@ -175,11 +174,6 @@ export class PacketConstants {
     [PacketConstants.ITEM_ON_OBJECT, new UseItemPacketListener()],
     [PacketConstants.ITEM_ON_GROUND_ITEM, new UseItemPacketListener()],
     [PacketConstants.ITEM_ON_PLAYER, new UseItemPacketListener()],
-    [PacketConstants.ADD_FRIEND_OPCODE, new PlayerRelationPacketListener()],
-    [PacketConstants.REMOVE_FRIEND_OPCODE, new PlayerRelationPacketListener()],
-    [PacketConstants.ADD_IGNORE_OPCODE, new PlayerRelationPacketListener()],
-    [PacketConstants.REMOVE_IGNORE_OPCODE, new PlayerRelationPacketListener()],
-    [PacketConstants.SEND_PM_OPCODE, new PlayerRelationPacketListener()],
     [PacketConstants.TRADE_REQUEST_OPCODE, new TradeRequestPacketListener()],
     [PacketConstants.CREATION_MENU_OPCODE, new CreationMenuPacketListener()],
     // Stubs for remaining opcodes we see from the client but have no gameplay hooked yet.
@@ -193,7 +187,6 @@ export class PacketConstants {
     [100, new NOPPacketListener()],
     [101, new NOPPacketListener()],
     [115, new NOPPacketListener()],
-    [126, new PlayerRelationPacketListener()], // send pm
     [139, new TradeRequestPacketListener()],
     [144, new UseItemPacketListener()],
     [155, new NPCOptionPacketListener()],

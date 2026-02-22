@@ -164,6 +164,14 @@ export class Packet {
         return high * 0x100000000 + low;
     }
 
+    public readLongBigInt(): bigint {
+        const slice = this.safeSlice(8);
+        if (!slice) return 0n;
+        const high = BigInt(slice.readUInt32BE(0));
+        const low = BigInt(slice.readUInt32BE(4));
+        return (high << 32n) | low;
+    }
+
     public getBytesReverse(amount: number, type: ValueType): number[] {
         let data = new Array(amount);
         let dataPosition = 0;

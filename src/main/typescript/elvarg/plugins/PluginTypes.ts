@@ -242,12 +242,28 @@ export interface PluginApi {
     handler: (event: PluginCommandEvent) => void | boolean
   ): void;
   onObjectClick(
-    objectId: number,
+    objectIds: number | number[],
     clickType: number,
     handler: (event: PluginObjectInteractionEvent) => void | boolean
   ): void;
   onObjectFirstClick(
-    objectId: number,
+    objectIds: number | number[],
+    handler: (event: PluginObjectInteractionEvent) => void | boolean
+  ): void;
+  onObjectSecondClick(
+    objectIds: number | number[],
+    handler: (event: PluginObjectInteractionEvent) => void | boolean
+  ): void;
+  onObjectThirdClick(
+    objectIds: number | number[],
+    handler: (event: PluginObjectInteractionEvent) => void | boolean
+  ): void;
+  onObjectFourthClick(
+    objectIds: number | number[],
+    handler: (event: PluginObjectInteractionEvent) => void | boolean
+  ): void;
+  onObjectFifthClick(
+    objectIds: number | number[],
     handler: (event: PluginObjectInteractionEvent) => void | boolean
   ): void;
   registerPacketListener(opcode: number, listener: PacketExecutor): void;

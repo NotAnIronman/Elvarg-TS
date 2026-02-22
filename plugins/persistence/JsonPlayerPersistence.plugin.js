@@ -164,8 +164,8 @@ class JsonPlayerPersistence extends PlayerPersistence {
     save.equipment = this.hydrateItems(parsed.equipment, 14);
     save.skills = this.hydrateSkills(parsed.skills);
     save.quickPrayers = this.hydrateQuickPrayers(parsed.quickPrayers);
-    save.friends = this.hydrateNumberArray(parsed.friends);
-    save.ignores = this.hydrateNumberArray(parsed.ignores);
+    save.friends = this.hydrateRelationArray(parsed.friends, { max: 200 });
+    save.ignores = this.hydrateRelationArray(parsed.ignores, { max: 100 });
     save.recentKills = this.hydrateStringArray(parsed.recentKills);
     save.banks = this.hydrateBanks(parsed.banks);
     save.questProgress = this.hydrateQuestProgress(parsed.questProgress);
@@ -336,11 +336,58 @@ class JsonPlayerPersistence extends PlayerPersistence {
     return [];
   }
 
-  hydrateNumberArray(raw) {
+  hydrateNumberArray(raw, options = {}) {
     if (!Array.isArray(raw)) {
       return [];
     }
-    return raw.map((value) => this.toNumber(value, 0));
+    const max = Number.isInteger(options.max) ? options.max : Number.MAX_SAFE_INTEGER;
+    const out = [];
+    const seen = new Set();
+    for (const value of raw) {
+      const numeric = Number(value);
+      if (!Number.isSafeInteger(numeric) || numeric <= 0 || seen.has(numeric)) {
+        continue;
+      }
+      seen.add(numeric);
+      out.push(numeric);
+      if (out.length >= max) {
+        break;
+      }
+    }
+    return out;
+  }
+
+  hydrateRelationArray(raw, options = {}) {
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    const max = Number.isInteger(options.max) ? options.max : Number.MAX_SAFE_INTEGER;
+    const out = [];
+    const seen = new Set();
+    for (const value of raw) {
+      let normalized;
+      try {
+        const asBigInt =
+          typeof value === "bigint"
+            ? value
+            : BigInt(String(value ?? "").trim());
+        if (asBigInt <= 0n) {
+          continue;
+        }
+        normalized = asBigInt.toString();
+      } catch {
+        continue;
+      }
+      if (seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      out.push(normalized);
+      if (out.length >= max) {
+        break;
+      }
+    }
+    return out;
   }
 
   hydrateStringArray(raw) {
