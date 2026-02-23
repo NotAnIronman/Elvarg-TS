@@ -572,6 +572,10 @@ export class Player extends Mobile {
         this.setResetMovementQueue(true);
         this.getCombat().reset();
         this.getSkillManager().ensureCombatBaseline();
+
+        // Keep baseline right-click player interactions available outside wilderness/duel areas.
+        this.getPacketSender().sendInteractionOption("Follow", 3, false);
+        this.getPacketSender().sendInteractionOption("Trade With", 4, false);
     }
 
 

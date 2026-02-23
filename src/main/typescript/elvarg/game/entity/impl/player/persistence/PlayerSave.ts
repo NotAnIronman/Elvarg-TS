@@ -12,10 +12,38 @@ import { DonatorRights } from "../../../../model/rights/DonatorRights";
 import { PlayerRights } from "../../../../model/rights/PlayerRights";
 import { ItemContainer } from "../../../../model/container/ItemContainer";
 import { StackType } from "../../../../model/container/StackType";
+import { Appearance } from "../../../../model/Appearance";
 
 export class PlayerSave {
     private static readonly MAX_FRIENDS = 200;
     private static readonly MAX_IGNORES = 100;
+    private static readonly DEFAULT_MALE_APPEARANCE = [0, 3, 18, 26, 34, 38, 42, 14, 2, 14, 5, 4, 0];
+    private static readonly DEFAULT_FEMALE_APPEARANCE = [1, 48, 57, 65, 68, 77, 80, 57, 2, 14, 5, 4, 0];
+    private static readonly MALE_LOOK_RANGES: Array<[number, number]> = [
+        [0, 8],   // head
+        [10, 17], // beard
+        [18, 25], // chest
+        [26, 31], // arms
+        [33, 34], // hands
+        [36, 40], // legs
+        [42, 43], // feet
+    ];
+    private static readonly FEMALE_LOOK_RANGES: Array<[number, number]> = [
+        [45, 54], // head
+        [57, 57], // jaw/beard placeholder
+        [56, 60], // chest
+        [61, 65], // arms
+        [67, 68], // hands
+        [70, 77], // legs
+        [79, 80], // feet
+    ];
+    private static readonly COLOR_RANGES: Array<[number, number]> = [
+        [0, 11], // hair
+        [0, 15], // torso
+        [0, 15], // legs
+        [0, 5],  // feet
+        [0, 7],  // skin
+    ];
     private passwordHashWithSalt: string;
     private isDiscordLogin: boolean;
     private cachedDiscordAccessToken: string;
@@ -542,6 +570,68 @@ export class PlayerSave {
             .map((value) => value.toString());
     }
 
+    private static toFiniteInt(value: unknown, fallback: number): number {
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.trunc(value);
+        }
+        if (typeof value === "string" && value.trim().length > 0) {
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) {
+                return Math.trunc(parsed);
+            }
+        }
+        return fallback;
+    }
+
+    private static clamp(value: number, min: number, max: number): number {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    private static sanitizeAppearance(appearance: unknown): number[] {
+        const raw = Array.isArray(appearance) ? appearance : [];
+        const gender = PlayerSave.toFiniteInt(raw[Appearance.GENDER], 0) === 1 ? 1 : 0;
+        const defaults = gender === 1
+            ? PlayerSave.DEFAULT_FEMALE_APPEARANCE
+            : PlayerSave.DEFAULT_MALE_APPEARANCE;
+        const lookRanges = gender === 1
+            ? PlayerSave.FEMALE_LOOK_RANGES
+            : PlayerSave.MALE_LOOK_RANGES;
+        const sanitized = [...defaults];
+
+        const lookIndices = [
+            Appearance.HEAD,
+            Appearance.BEARD,
+            Appearance.CHEST,
+            Appearance.ARMS,
+            Appearance.HANDS,
+            Appearance.LEGS,
+            Appearance.FEET,
+        ];
+
+        lookIndices.forEach((lookIndex, idx) => {
+            const [min, max] = lookRanges[idx];
+            const candidate = PlayerSave.toFiniteInt(raw[lookIndex], defaults[lookIndex]);
+            sanitized[lookIndex] = PlayerSave.clamp(candidate, min, max);
+        });
+
+        const colorIndices = [
+            Appearance.HAIR_COLOUR,
+            Appearance.TORSO_COLOUR,
+            Appearance.LEG_COLOUR,
+            Appearance.FEET_COLOUR,
+            Appearance.SKIN_COLOUR,
+        ];
+
+        colorIndices.forEach((colorIndex, idx) => {
+            const [min, max] = PlayerSave.COLOR_RANGES[idx];
+            const candidate = PlayerSave.toFiniteInt(raw[colorIndex], defaults[colorIndex]);
+            sanitized[colorIndex] = PlayerSave.clamp(candidate, min, max);
+        });
+
+        sanitized[Appearance.GENDER] = gender;
+        return sanitized;
+    }
+
     applyToPlayer(player: Player) {
         player.setPasswordHashWithSalt(this.passwordHashWithSalt);
         player.setDiscordLogin(this.isDiscordLogin);
@@ -599,7 +689,9 @@ export class PlayerSave {
 
         player.getInventory().setItems(this.inventory);
         player.getEquipment().setItems(this.equipment);
-        player.getAppearance().set();
+        const sanitizedAppearance = PlayerSave.sanitizeAppearance(this.appearance);
+        player.getAppearance().setLookArray(sanitizedAppearance);
+        this.appearance = sanitizedAppearance;
         player.getSkillManager().setSkills(this.skills);
         player.getQuickPrayers().setPrayers(this.quickPrayers);
         player.setQuestPoints(this.questPoints);
@@ -699,7 +791,7 @@ export class PlayerSave {
 
         playerSave.inventory = player.getInventory().getItems();
         playerSave.equipment = player.getEquipment().getItems();
-        playerSave.appearance = player.getAppearance().getLook();
+        playerSave.appearance = PlayerSave.sanitizeAppearance(player.getAppearance().getLook());
         playerSave.skills = player.getSkillManager().getSkills();
         playerSave.quickPrayers = player.getQuickPrayers().getPrayers();
         playerSave.questPoints = player.getQuestPoints();

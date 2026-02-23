@@ -58,6 +58,16 @@ class SparringBehavior {
     if (player.getForceMovement() != null) {
       return "running";
     }
+
+    // Keep PvP interaction state sticky while sparring so bots continue
+    // facing/following correctly even if another flow temporarily clears it.
+    if (player.getFollowing?.() !== target) {
+      player.setFollowing?.(target);
+    }
+    if (player.getInteractingMobile?.() !== target) {
+      player.setMobileInteraction?.(target);
+    }
+
     if (nowMs < (sparring.nextActionAt ?? 0)) {
       return "running";
     }

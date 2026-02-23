@@ -127,12 +127,12 @@ export class MovementQueue {
         let size = character.getSize();
         if (character.getMovementQueue().canWalk(-size, 0))
             character.getMovementQueue().walkStep(-size, 0);
-        else if (character.getMovementQueue().canWalk(-size, 0))
-            character.getMovementQueue().walkStep(-size, 0);
+        else if (character.getMovementQueue().canWalk(size, 0))
+            character.getMovementQueue().walkStep(size, 0);
         else if (character.getMovementQueue().canWalk(0, -size))
             character.getMovementQueue().walkStep(0, -size);
-        else if (character.getMovementQueue().canWalk(0, -size))
-            character.getMovementQueue().walkStep(0, -size);
+        else if (character.getMovementQueue().canWalk(0, size))
+            character.getMovementQueue().walkStep(0, size);
     }
 
     public static randomClippedStep(character: Mobile, size: number) {
@@ -476,6 +476,8 @@ export class MovementQueue {
 
         // Update interaction
         this.character.setMobileInteraction(following);
+        // Keep facing synchronized even when interaction-target decode is delayed client-side.
+        this.character.setPositionToFace(following.getLocation().clone());
 
         // Make sure we reset the current movement queue to prevent erratic back and forth
         this.reset();

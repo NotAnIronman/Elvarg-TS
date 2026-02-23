@@ -53,7 +53,10 @@ export class NPCUpdating {
             }
         }
 
-        for (let npc of World.getNpcs()) {
+        const activeNpcs = World.getActiveNpcsForUpdate();
+        const npcSource = activeNpcs.length > 0 ? activeNpcs : World.getNpcs();
+
+        for (let npc of npcSource) {
             if (localNpcs.length >= NPCUpdating.MAX_LOCAL_NPCS) // Originally 255 in legacy.
                 break;
             if (npc == null || localNpcs.includes(npc) || !npc.isVisible() || npc.isNeedsPlacement()
@@ -185,7 +188,15 @@ export class NPCUpdating {
         }
         if (flag.flagged(Flag.ENTITY_INTERACTION)) {
             let entity = npc.getInteractingMobile();
-            block.putShort(entity == null ? -1 : entity.getIndex() + (entity instanceof Player ? 32768 : 0));
+            if (entity == null) {
+                block.putShort(-1);
+            } else {
+                const entityIsPlayer =
+                    typeof entity.isPlayer === "function"
+                        ? entity.isPlayer()
+                        : entity instanceof Player;
+                block.putShort(entity.getIndex() + (entityIsPlayer ? 32768 : 0));
+            }
         }
         if (flag.flagged(Flag.FORCED_CHAT) && npc.getForcedChat() != null) {
             block.putString(npc.getForcedChat());

@@ -30,12 +30,14 @@ interface GameSyncTaskInterface {
 
 export class World {
     private static readonly MAX_PLAYERS = 500;
+    private static readonly NPC_ACTIVE_REGION_RADIUS = 1;
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
     private static npcs: MobileList<NPC> = new MobileList<NPC>(5000);
     private static items: ItemOnGround[] = [];
     private static playerArray: Player[] = []
+    private static activeNpcsForUpdate: NPC[] = [];
 
     /**
      * The collection of active {@link GameObject}s..
@@ -151,6 +153,51 @@ export class World {
         return this.npcs;
     }
 
+    public static getActiveNpcsForUpdate(): NPC[] {
+        return this.activeNpcsForUpdate;
+    }
+
+    private static getRegionKey(x: number, y: number, z: number): string {
+        return `${z}:${x >> 6}:${y >> 6}`;
+    }
+
+    private static buildActiveNpcRegionKeys(): Set<string> {
+        const keys = new Set<string>();
+        World.players.forEach((player) => {
+            if (!player) {
+                return;
+            }
+            const loc = player.getLocation();
+            const baseRegionX = loc.getX() >> 6;
+            const baseRegionY = loc.getY() >> 6;
+            const z = loc.getZ();
+            for (let dx = -World.NPC_ACTIVE_REGION_RADIUS; dx <= World.NPC_ACTIVE_REGION_RADIUS; dx++) {
+                for (let dy = -World.NPC_ACTIVE_REGION_RADIUS; dy <= World.NPC_ACTIVE_REGION_RADIUS; dy++) {
+                    keys.add(`${z}:${baseRegionX + dx}:${baseRegionY + dy}`);
+                }
+            }
+        });
+        return keys;
+    }
+
+    private static shouldProcessNpc(npc: NPC, activeRegionKeys: Set<string>): boolean {
+        if (!npc) {
+            return false;
+        }
+
+        // Keep active combat/death flows alive even if temporarily out of region focus.
+        if (npc.getInteractingMobile() != null || npc.isDyingFunction?.()) {
+            return true;
+        }
+
+        if (activeRegionKeys.size === 0) {
+            return false;
+        }
+
+        const loc = npc.getLocation();
+        return activeRegionKeys.has(World.getRegionKey(loc.getX(), loc.getY(), loc.getZ()));
+    }
+
     public static getPlayerBots(): TreeMap<string, any> {
         // TODO: Re-enable player bot map once bot lifecycle is implemented again.
         return this.playerBots;
@@ -227,6 +274,8 @@ export class World {
     }
 
     public static process() {
+        World.activeNpcsForUpdate = [];
+
         // Process all active {@link Task}s..
         try {
             TaskManager.process();
@@ -307,8 +356,13 @@ export class World {
             }
         });
 
+        const activeNpcRegions = World.buildActiveNpcRegionKeys();
         World.npcs.forEach((npc) => {
             try {
+                if (!World.shouldProcessNpc(npc, activeNpcRegions)) {
+                    return;
+                }
+                World.activeNpcsForUpdate.push(npc);
                 npc.process();
             } catch (e) {
                 console.error(e);

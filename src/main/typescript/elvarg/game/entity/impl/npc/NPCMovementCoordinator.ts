@@ -14,6 +14,7 @@ export class NPCMovementCoordinator {
     constructor(npc: NPC) {
         this.npc = npc;
         this.coordinateState = CoordinateState.HOME;
+        this.radius = 0;
     }
 
     public process() {
@@ -142,19 +143,19 @@ export class NPCMovementCoordinator {
         let spawnX = this.npc.getSpawnPosition().getX();
         let spawnY = this.npc.getSpawnPosition().getY();
         if (x == 1) {
-            if (this.npc.getLocation().getX() + x > spawnX + 1)
+            if (this.npc.getLocation().getX() + x > spawnX + this.radius)
                 return null;
         }
         if (x == -1) {
-            if (this.npc.getLocation().getX() - x < spawnX - 1)
+            if (this.npc.getLocation().getX() + x < spawnX - this.radius)
                 return null;
         }
         if (y == 1) {
-            if (this.npc.getLocation().getY() + y > spawnY + 1)
+            if (this.npc.getLocation().getY() + y > spawnY + this.radius)
                 return null;
         }
         if (y == -1) {
-            if (this.npc.getLocation().getY() - y < spawnY - 1)
+            if (this.npc.getLocation().getY() + y < spawnY - this.radius)
                 return null;
         }
         return new Location(x, y);

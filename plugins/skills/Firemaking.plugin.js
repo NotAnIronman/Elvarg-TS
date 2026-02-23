@@ -403,10 +403,10 @@ function handleItemOnItem(event, activeSessions) {
   player.getSkillManager()?.stopSkillable?.();
 
   let logId = -1;
-  if (itemUsedId === TINDERBOX_ID) {
-    logId = usedWithId;
-  } else if (usedWithId === TINDERBOX_ID) {
-    logId = itemUsedId;
+  if (usedItemId === TINDERBOX_ID) {
+    logId = usedWithItemId;
+  } else if (usedWithItemId === TINDERBOX_ID) {
+    logId = usedItemId;
   }
 
   if (logId <= 0) {

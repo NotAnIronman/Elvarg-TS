@@ -32,6 +32,8 @@ const PACKET_SIZES: number[] = [
   2, 6, 0, 8, 0, -1, 0, 0, 0, 1, // 40
   0, 0, 0, 12, 0, 0, 0, 8, 0, 0, // 50
   -1, 8, 0, 0, 0, 0, 0, 0, 0, 0, // 60
+  // Web client uses compact object-interaction packets (6-byte object clicks / 12-byte item-on-object)
+  // where Java decoder tables often list 8/14. Keep these values in sync with web PacketSender payloads.
   6, 0, 2, 2, 8, 6, 0, -1, 0, 6, // 70
   -1, 0, 0, 0, 0, 1, 4, 6, 0, 0, // 80
   0, 0, 0, 0, 0, 3, 0, 0, -1, 0, // 90
@@ -1085,14 +1087,17 @@ class LoginSession {
       const payload = data.subarray(offset, offset + size);
       offset += size;
 
-      this.log("packet_received", {
-        opcode,
-        encOpcode,
-        rand,
-        sizeUsed: size,
-        payloadLength: payload.length,
-        payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
-      });
+      const isIdleKeepAlive = opcode === 0 && size === 0;
+      if (!isIdleKeepAlive) {
+        this.log("packet_received", {
+          opcode,
+          encOpcode,
+          rand,
+          sizeUsed: size,
+          payloadLength: payload.length,
+          payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
+        });
+      }
       this.recordRecentPacket(
         "IN",
         opcode,
@@ -1100,18 +1105,20 @@ class LoginSession {
         PACKET_GUIDE[opcode]?.name,
         payload
       );
-      PacketLogger.logIncoming({
-        direction: "IN",
-        opcode,
-        stage: this.stage,
-        label: PACKET_GUIDE[opcode]?.name,
-        player: this.player?.username,
-        encOpcode,
-        rand,
-        payloadLength: payload.length,
-        payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
-      });
-      if (payload.length === 0) {
+      if (!isIdleKeepAlive) {
+        PacketLogger.logIncoming({
+          direction: "IN",
+          opcode,
+          stage: this.stage,
+          label: PACKET_GUIDE[opcode]?.name,
+          player: this.player?.username,
+          encOpcode,
+          rand,
+          payloadLength: payload.length,
+          payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
+        });
+      }
+      if (payload.length === 0 && !isIdleKeepAlive) {
         this.log("packet_empty_payload", {
           opcode,
           expectedSize: size,

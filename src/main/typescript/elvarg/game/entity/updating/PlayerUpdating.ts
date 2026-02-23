@@ -647,8 +647,12 @@ export class PlayerUpdating {
     private static updateEntityInteraction(builder: PacketBuilder, target: Player) {
         let entity = target.interactingMobile;
         if (entity != null) {
-            let index = entity.index;
-            if (entity instanceof Player)
+            let index = typeof entity.getIndex === "function" ? entity.getIndex() : entity.index;
+            const entityIsPlayer =
+                typeof entity.isPlayer === "function"
+                    ? entity.isPlayer()
+                    : entity instanceof Player;
+            if (entityIsPlayer)
                 index += +32768;
             builder.putShorts(index, ByteOrder.LITTLE);
         } else {

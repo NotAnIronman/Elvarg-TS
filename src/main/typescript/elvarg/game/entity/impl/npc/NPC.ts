@@ -20,7 +20,6 @@ import * as util from 'util';
 import { Wilderness } from "../../../content/wilderness/Wilderness";
 import { MovementQueue } from "../../../model/movement/MovementQueue";
 
-
 export class NPC extends Mobile {
     getSize(): number {
         return this.size();
@@ -141,10 +140,29 @@ export class NPC extends Mobile {
             this.movementCoordinator.process();
 
             const interactingMobile = this.getInteractingMobile();
-            if (interactingMobile != null
-                && this.getLocation().getDistance(interactingMobile.getLocation()) > MovementQueue.NPC_INTERACT_RADIUS) {
-                this.setMobileInteraction(null);
-                this.setPositionToFace(null);
+            if (interactingMobile != null) {
+                const interactionLocation = interactingMobile.getLocation?.();
+                const outOfRange =
+                    interactionLocation != null
+                    && this.getLocation().getDistance(interactionLocation) > MovementQueue.NPC_INTERACT_RADIUS;
+                const targetUnregistered =
+                    typeof interactingMobile.isRegistered === "function"
+                    && !interactingMobile.isRegistered();
+                const clearInteraction = targetUnregistered || interactionLocation == null || outOfRange;
+
+                if (clearInteraction) {
+                    this.setMobileInteraction(null);
+                    if (this.movementCoordinator.getRadius() === 0) {
+                        // OSRS-like behavior for stationary NPCs: after an interaction ends,
+                        // they return to their spawn-facing idle direction instead of
+                        // keeping the last player-facing orientation.
+                        // Ref: https://oldschool.runescape.wiki/w/Wander_radius
+                        const facingDirection = this.getFace().getDirection();
+                        this.setPositionToFace(this.getLocation().clone().add(facingDirection.getX(), facingDirection.getY()));
+                    } else {
+                        this.setPositionToFace(null);
+                    }
+                }
             }
 
             this.getCombat().process();

@@ -175,8 +175,6 @@ export abstract class Mobile extends Entity {
         this.needsPlacement = false;
         this.resetMovementQueue = false;
         this.forcedChat = null;
-        this.interactingMobile = null;
-        this.positionToFace = null;
         this.animation = null;
         this.graphic = null;
     }

@@ -18,7 +18,8 @@ export class Appearance {
     canChangeAppearance = false;
     headHint = -1;
     bountyHunterSkull = -1;
-    look: number[] = new Array(13);
+    // Match Java int[13] semantics: all slots start at 0.
+    look: number[] = new Array(13).fill(0);
     player: Player;
 
     constructor(player: Player) {

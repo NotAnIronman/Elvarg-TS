@@ -64,7 +64,11 @@ export class Combat {
         // Reset attacker if we haven't been attacked in 6 seconds.
         if (this.lastAttack.elapsedTime(6000)) {
             this.setUnderAttack(null);
-            return;
+            // Keep processing our own target even when we're no longer under attack,
+            // otherwise PvP facing/pressure can drop until a new hit lands on us.
+            if (this.target == null) {
+                return;
+            }
         }
 
         // Handle attacking
@@ -81,9 +85,11 @@ export class Combat {
 
         this.character.setCombatFollowing(this.target);
 
-        // Match Java behaviour: rely on entity interaction for combat facing.
-        // Position-to-face can become stale and override interaction turning.
+        // Primary combat lock-on comes from entity interaction.
         this.character.setMobileInteraction(this.target);
+        // Also push a face-position fallback each tick so clients can keep facing
+        // correctly if interaction target resolution is delayed for a cycle.
+        this.character.setPositionToFace(this.target.getLocation().clone());
 
         if (!CombatFactory.canReach(this.character, this.method, this.target)) {
             // Make sure the character is within reach before processing combat

@@ -15,6 +15,8 @@ export class PacketDecoder {
         2, 6, 0, 8, 0, -1, 0, 0, 0, 1, // 40
         0, 0, 0, 12, 0, 0, 0, 8, 0, 0, // 50
         -1, 8, 0, 0, 0, 0, 0, 0, 0, 0, // 60
+        // Web client uses compact object-interaction packets (6-byte object clicks / 12-byte item-on-object)
+        // where Java decoder tables often list 8/14. Keep these values in sync with web PacketSender payloads.
         6, 0, 2, 2, 8, 6, 0, -1, 0, 6, // 70
         -1, 0, 0, 0, 0, 1, 4, 6, 0, 0, // 80
         0, 0, 0, 0, 0, 3, 0, 0, -1, 0, // 90
