@@ -12,6 +12,17 @@ class FollowBackTrigger {
     this.behaviorMode = options.behaviorMode;
   }
 
+  formatBehaviorLabel(mode) {
+    if (typeof mode !== "string") {
+      return "unknown";
+    }
+    const normalized = mode.trim();
+    if (!normalized.length) {
+      return "unknown";
+    }
+    return normalized.replace(/[_-]+/g, " ");
+  }
+
   resolveTargetedPlayer(opcode, packet) {
     const payload = packet?.getBuffer?.();
     if (!payload || payload.length < 2) {
@@ -56,7 +67,8 @@ class FollowBackTrigger {
 
     if (opcode === PacketConstants.FOLLOW_PLAYER_OPCODE) {
       if (state.mode !== this.behaviorMode.ROAMING) {
-        followed?.sendChat?.("Sorry, busy rn.");
+        const behaviorLabel = this.formatBehaviorLabel(state.mode);
+        followed?.sendChat?.(`Sorry, busy with: ${behaviorLabel}.`);
         return;
       }
       if (

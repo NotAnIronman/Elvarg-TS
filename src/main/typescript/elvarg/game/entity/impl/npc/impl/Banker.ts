@@ -9,7 +9,7 @@ class Banker implements NPCInteraction {
     }
 
     secondOptionClick(player: Player, npc: NPC) {
-        player.getBank(player.currentBankTab).open();
+        player.getBank(player.getCurrentBankTab()).open();
     }
 
     thirdOptionClick(player: Player, npc: NPC) { }

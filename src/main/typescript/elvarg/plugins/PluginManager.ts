@@ -31,7 +31,11 @@ import {
   PluginCanTradeEvent,
   PluginCombatEngine,
   PluginCombatMethodResolver,
+  PluginItemDropEvent,
+  PluginButtonClickEvent,
+  PluginInterfaceActionClickEvent,
   PluginNpcCombatMethodProvider,
+  PluginPlayerLogoutEvent,
 } from "./PluginTypes";
 
 type PluginHook<T> = {
@@ -51,6 +55,7 @@ export class PluginManager {
   private static packetHooks: PluginHook<PluginPacketEvent>[] = [];
   private static loginHooks: PluginHook<PluginPlayerLoginEvent>[] = [];
   private static disconnectHooks: PluginHook<PluginPlayerDisconnectEvent>[] = [];
+  private static logoutHooks: PluginHook<PluginPlayerLogoutEvent>[] = [];
   private static playerProcessHooks: PluginHook<PluginPlayerProcessEvent>[] = [];
   private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
@@ -71,6 +76,10 @@ export class PluginManager {
   private static itemOnGroundItemHooks: PluginHook<PluginItemOnGroundItemEvent>[] =
     [];
   private static itemActionHooks: PluginHook<PluginItemActionEvent>[] = [];
+  private static itemDropHooks: PluginHook<PluginItemDropEvent>[] = [];
+  private static buttonClickHooks: PluginHook<PluginButtonClickEvent>[] = [];
+  private static interfaceActionClickHooks: PluginHook<PluginInterfaceActionClickEvent>[] =
+    [];
   private static commandHooks: PluginHook<PluginCommandEvent>[] = [];
   private static commandHandlersByBase = new Map<
     string,
@@ -177,6 +186,19 @@ export class PluginManager {
     }
   }
 
+  public static emitPlayerLogout(event: PluginPlayerLogoutEvent): void {
+    for (const hook of PluginManager.logoutHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] logout hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+  }
+
   public static emitPlayerProcess(event: PluginPlayerProcessEvent): void {
     for (const hook of PluginManager.playerProcessHooks) {
       try {
@@ -219,7 +241,14 @@ export class PluginManager {
   public static emitObjectInteraction(
     event: PluginObjectInteractionEvent
   ): boolean {
+    if (!event || !event.player || !event.object || event.handled) {
+      return false;
+    }
+
     for (const hook of PluginManager.objectInteractionHooks) {
+      if (event.handled) {
+        break;
+      }
       try {
         hook.handler(event);
       } catch (err) {
@@ -232,6 +261,9 @@ export class PluginManager {
     return event.handled === true;
   }
 
+  // NOTE FOR MAINTAINERS:
+  // Keep common event guard clauses centralized in emit* methods so plugin
+  // consumers do not have to repeat the same checks in every handler.
   public static emitNpcInteraction(event: PluginNpcInteractionEvent): boolean {
     for (const hook of PluginManager.npcInteractionHooks) {
       try {
@@ -510,6 +542,75 @@ export class PluginManager {
     return event.handled === true;
   }
 
+  public static emitItemDrop(event: PluginItemDropEvent): boolean {
+    for (const hook of PluginManager.itemDropHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] item_drop hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
+  public static emitButtonClick(event: PluginButtonClickEvent): boolean {
+    if (
+      !event ||
+      !event.player ||
+      event.handled ||
+      !Number.isInteger(event.buttonId)
+    ) {
+      return false;
+    }
+
+    for (const hook of PluginManager.buttonClickHooks) {
+      if (event.handled) {
+        break;
+      }
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] button_click hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
+  public static emitInterfaceActionClick(
+    event: PluginInterfaceActionClickEvent
+  ): boolean {
+    if (
+      !event ||
+      !event.player ||
+      event.handled ||
+      !Number.isInteger(event.buttonId) ||
+      !Number.isInteger(event.action)
+    ) {
+      return false;
+    }
+
+    for (const hook of PluginManager.interfaceActionClickHooks) {
+      if (event.handled) {
+        break;
+      }
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] interface_action_click hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
   public static emitCommand(event: PluginCommandEvent): boolean {
     for (const hook of PluginManager.commandHooks) {
       try {
@@ -684,6 +785,86 @@ export class PluginManager {
       });
     };
 
+    const registerButtonHook = (
+      buttonIds: number | number[],
+      handler: (event: PluginButtonClickEvent) => void | boolean,
+      label = "button"
+    ): void => {
+      const normalized = Array.isArray(buttonIds) ? buttonIds : [buttonIds];
+      if (!normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=[]`
+        );
+        return;
+      }
+
+      const validIds = normalized.filter(
+        (id) => Number.isInteger(id) && id >= 0
+      ) as number[];
+      if (validIds.length !== normalized.length || typeof handler !== "function") {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=${JSON.stringify(buttonIds)}`
+        );
+        return;
+      }
+
+      const buttonIdSet = new Set(validIds);
+
+      PluginManager.buttonClickHooks.push({
+        pluginName,
+        handler: (event) => {
+          if (!event || event.handled || !buttonIdSet.has(event.buttonId)) {
+            return;
+          }
+
+          const result = handler(event);
+          if (result !== false) {
+            event.handled = true;
+          }
+        },
+      });
+    };
+
+    const registerInterfaceActionButtonHook = (
+      buttonIds: number | number[],
+      handler: (event: PluginInterfaceActionClickEvent) => void | boolean,
+      label = "interface_action_button"
+    ): void => {
+      const normalized = Array.isArray(buttonIds) ? buttonIds : [buttonIds];
+      if (!normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=[]`
+        );
+        return;
+      }
+
+      const validIds = normalized.filter(
+        (id) => Number.isInteger(id) && id >= 0
+      ) as number[];
+      if (validIds.length !== normalized.length || typeof handler !== "function") {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=${JSON.stringify(buttonIds)}`
+        );
+        return;
+      }
+
+      const buttonIdSet = new Set(validIds);
+
+      PluginManager.interfaceActionClickHooks.push({
+        pluginName,
+        handler: (event) => {
+          if (!event || event.handled || !buttonIdSet.has(event.buttonId)) {
+            return;
+          }
+
+          const result = handler(event);
+          if (result !== false) {
+            event.handled = true;
+          }
+        },
+      });
+    };
+
     return {
       onPacketReceived: (handler) => {
         if (typeof handler !== "function") {
@@ -724,6 +905,20 @@ export class PluginManager {
           return;
         }
         PluginManager.disconnectHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.username) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerLogout: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.logoutHooks.push({
           pluginName,
           handler: (event) => {
             if (!event || !event.player || !event.username) {
@@ -1116,6 +1311,28 @@ export class PluginManager {
           },
         });
       },
+      onItemDrop: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemDropHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              !event.player ||
+              !event.item ||
+              !Number.isInteger(event.slot) ||
+              !Number.isInteger(event.itemId) ||
+              !Number.isInteger(event.interfaceId)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onItemFirstAction: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -1138,6 +1355,55 @@ export class PluginManager {
             }
           },
         });
+      },
+      onButtonClick: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.buttonClickHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              !event.player ||
+              !Number.isInteger(event.buttonId)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onButton: (buttonIds, handler) => {
+        registerButtonHook(buttonIds, handler, "button");
+      },
+      onInterfaceActionClick: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.interfaceActionClickHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              !event.player ||
+              !Number.isInteger(event.buttonId) ||
+              !Number.isInteger(event.action)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onInterfaceActionButton: (buttonIds, handler) => {
+        registerInterfaceActionButtonHook(
+          buttonIds,
+          handler,
+          "interface_action_button"
+        );
       },
       onCommand: (handler) => {
         if (typeof handler !== "function") {

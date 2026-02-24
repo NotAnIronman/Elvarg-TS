@@ -7,6 +7,7 @@ const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Chance } = require("../../src/main/typescript/elvarg/util/Chance");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { ItemIds, NpcIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { Pets } = require("../npcs/Pets.plugin");
 
 const FISHING_ANIMATION_INTERVAL_TICKS = 4;
 
@@ -239,6 +240,7 @@ class FishingTask extends Task {
         player.getInventory().addItem(new Item(fish.id, 1));
         player.getPacketSender().sendMessage(`You catch a ${fish.name}.`);
         player.getSkillManager().addExperiences(Skill.FISHING, fish.experience);
+        Pets.onSkill(player, Skill.FISHING);
       }
 
       if (session.tool.needed > 0) {

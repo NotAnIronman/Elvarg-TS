@@ -36,68 +36,83 @@ export class Bank extends ItemContainer {
     }
 
     public static withdraw(player: Player, item: number, slot: number, amount: number, fromBankTab: number) {
-        if (player.status !== PlayerStatus.BANKING && player.interfaceId !== 5292) {
+        if (player.getStatus() === PlayerStatus.BANKING && player.getInterfaceId() === 5292) {
 
-        let itemTab = Bank.getTabForItem(player, item);
-        if (itemTab !== fromBankTab) {
-            if (!player.isSearchingBank) {
-                return;
-            }
-        }
-        let maxAmount = player.getBank(itemTab).getAmount(item);
-        if (amount === -1 || amount > maxAmount) {
-            amount = maxAmount;
-        }
-        if (player.isSearchingBank) {
-            if (!player.getBank(itemTab).contains(item) || !player.getBank(this.BANK_SEARCH_TAB_INDEX).contains(item)
-                    || amount <= 0) {
-                return;
-            }
-            if (fromBankTab !== this.BANK_SEARCH_TAB_INDEX) {
-                return;
-            }
-            slot = player.getBank(itemTab).getSlotForItemId(item);
-            player.getBank(itemTab).switchsItem(player.getInventory(), new Item(item, amount),
-            player.getBank(itemTab).getSlotForItemId(item), false, false);
-            if (slot === 0) {
-                Bank.reconfigureTabs(player);
+            // The item's real tab
+            const itemTab = Bank.getTabForItem(player, item);
+
+            // Check if we're withdrawing the item from the proper tab, but only if we
+            // aren't bank searching.
+            if (itemTab !== fromBankTab) {
+                if (!player.isSearchingBank()) {
+                    return;
+                }
             }
 
-            player.getBank(this.BANK_SEARCH_TAB_INDEX).refreshItems();
+            // Make sure we're only withdrawing what we have.
+            let maxAmount = player.getBank(itemTab).getAmount(item);
+            if (amount === -1 || amount > maxAmount) {
+                amount = maxAmount;
+            }
+
+            if (player.isSearchingBank()) {
+                if (!player.getBank(itemTab).contains(item) || !player.getBank(Bank.BANK_SEARCH_TAB_INDEX).contains(item)
+                        || amount <= 0) {
+                    return;
+                }
+                if (fromBankTab !== Bank.BANK_SEARCH_TAB_INDEX) {
+                    return;
+                }
+
+                slot = player.getBank(itemTab).getSlotForItemId(item);
+
+                player.getBank(itemTab).switchItem(
+                    player.getInventory(),
+                    new Item(item, amount),
+                    false,
+                    slot,
+                    false
+                );
+
+                if (slot === 0) {
+                    Bank.reconfigureTabs(player);
+                }
+
+                player.getBank(Bank.BANK_SEARCH_TAB_INDEX).refreshItems();
 
             } else {
 
-            // Withdrawing an item which belongs in another tab from the main tab
-            if (player.getCurrentBankTab() === 0 && fromBankTab !== 0) {
-                slot = player.getBank(itemTab).getSlotForItemId(item);
+                // Withdrawing an item which belongs in another tab from the main tab.
+                if (player.getCurrentBankTab() === 0 && fromBankTab !== 0) {
+                    slot = player.getBank(itemTab).getSlotForItemId(item);
+                }
+
+                // Make sure the item is in the slot we've found.
+                if (player.getBank(itemTab).getItems()[slot].getId() !== item) {
+                    return;
+                }
+
+                // Delete placeholder.
+                if (amount <= 0) {
+                    player.getBank(itemTab).getItems()[slot].setId(-1);
+                    player.getBank(player.getCurrentBankTab()).sortItems().refreshItems();
+                    return;
+                }
+
+                // Perform the switch.
+                player.getBank(itemTab).switchItem(player.getInventory(), new Item(item, amount), false, slot, false);
+
+                // Update all tabs if we removed an item from the first item slot.
+                if (slot === 0) {
+                    Bank.reconfigureTabs(player);
+                }
+
+                // Refresh items in our current tab.
+                player.getBank(player.getCurrentBankTab()).refreshItems();
+
             }
 
-            // Make sure the item is in the slot we've found
-            if (player.getBank(itemTab).getItems()[slot].getId() !== item) {
-                return;
-            }
-
-            // Delete placeholder
-            if (amount <= 0) {
-                player.getBank(itemTab).getItems()[slot].setId(-1);
-                player.getBank(player.getCurrentBankTab()).sortItems().refreshItems();
-                return;
-            }
-
-            // Perform the switch
-            player.getBank(itemTab).switchItem(player.getInventory(), new Item(item, amount), false, slot, false);
-
-            // Update all tabs if we removed an item from the first item slot
-            if (slot === 0) {
-                Bank.reconfigureTabs(player);
-            }
-
-            // Refresh items in our current tab
-            player.getBank(player.getCurrentBankTab()).refreshItems();
-
-            }
-
-            // Refresh inventory
+            // Refresh inventory.
             player.getInventory().refreshItems();
         }
     }
@@ -409,7 +424,7 @@ export class Bank extends ItemContainer {
                         this.depositItems(player, player.getInventory(), false);
                         break;
                     case 50007:
-                        this.depositItems(player, player.getInventory(), false);
+                        this.depositItems(player, player.getEquipment(), false);
                         break;
                     case 5384:
                     case 50001:
@@ -726,7 +741,5 @@ class bankEntered implements EnteredSyntaxAction{
     }
 
 }
-
-
 
 

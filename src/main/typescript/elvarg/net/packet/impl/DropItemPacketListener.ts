@@ -5,9 +5,9 @@ import { Sound } from "../../../game/Sound";
 import { Inventory } from "../../../game/model/container/impl/Inventory";
 import { ItemOnGroundManager } from "../../../game/entity/impl/grounditem/ItemOnGroundManager";
 import { Sounds } from "../../../game/Sounds";
-import { PetHandler } from "../../../game/content/PetHandler";
 import { PlayerRights } from "../../../game/model/rights/PlayerRights";
 import { Wilderness } from "../../../game/content/wilderness/Wilderness";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 export class DropItemPacketListener implements PacketExecutor {
   public static destroyItemInterface(player: any, item: any) {
@@ -63,8 +63,15 @@ export class DropItemPacketListener implements PacketExecutor {
     // Stop skilling..
     player.getSkillManager().stopSkillable();
 
-    // Check if we're dropping a pet..
-    if (PetHandler.drop(player, id, false)) {
+    const pluginHandled = PluginManager.emitItemDrop({
+      player,
+      interfaceId,
+      item,
+      itemId: id,
+      slot: itemSlot,
+      handled: false,
+    });
+    if (pluginHandled) {
       Sounds.sendSound(player, Sound.DROP_ITEM);
       return;
     }

@@ -9,6 +9,7 @@ const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/
 const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { Pets } = require("../npcs/Pets.plugin");
 
 const SESSION_MODE = Object.freeze({
   INVENTORY: "inventory",
@@ -281,6 +282,7 @@ function completeInventoryOrGroundFire(player, state) {
 
   spawnFire(player, state.location, state.log.respawnTicks);
   player.getSkillManager().addExperiences(Skill.FIREMAKING, state.log.xpReward);
+  Pets.onSkill(player, Skill.FIREMAKING);
   player.getPacketSender().sendMessage("The logs catch fire and begin to burn.");
   return true;
 }
@@ -297,6 +299,7 @@ function completeBonfire(player, state) {
 
   player.getInventory().deleteNumber(state.log.itemId, 1);
   player.getSkillManager().addExperiences(Skill.FIREMAKING, state.log.xpReward);
+  Pets.onSkill(player, Skill.FIREMAKING);
   player.getPacketSender().sendMessage("You add a log to the fire.");
   return true;
 }

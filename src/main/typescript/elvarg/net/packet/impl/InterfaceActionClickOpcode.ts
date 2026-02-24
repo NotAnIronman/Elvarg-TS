@@ -5,6 +5,7 @@
 // import { Player } from "../../../game/entity/impl/player/Player";
 import { Packet } from "../Packet";
 import { PacketExecutor } from "../PacketExecutor";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 export class InterfaceActionClickOpcode implements PacketExecutor {
   // execute(player: Player, packet: Packet) {
@@ -16,6 +17,17 @@ export class InterfaceActionClickOpcode implements PacketExecutor {
       player == null ||
       player.getHitpoints() <= 0 ||
       player.isTeleportingReturn()
+    ) {
+      return;
+    }
+
+    if (
+      PluginManager.emitInterfaceActionClick({
+        player,
+        buttonId: interfaceId,
+        action,
+        handled: false,
+      })
     ) {
       return;
     }

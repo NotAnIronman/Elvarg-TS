@@ -1,8 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
-const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
-const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
+const {
+  registerNpcSpawnSource,
+  ensureNpcSpawnsLoaded,
+} = require("./lib/NpcSpawnRegistry");
 
 const SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
@@ -25,6 +26,17 @@ function toInt(value, fallback = 0) {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+function toOptionalRadius(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(n));
+}
+
 function toFacingId(value, fallback = -1) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.trunc(value);
@@ -40,6 +52,17 @@ function toFacingId(value, fallback = -1) {
   return fallback;
 }
 
+function resolveSpawnPosition(spawn) {
+  const position = spawn?.position;
+  if (Array.isArray(position)) {
+    return position.length > 0 ? position[0] : null;
+  }
+  if (position && typeof position === "object") {
+    return position;
+  }
+  return null;
+}
+
 function resolveSpawnsFile() {
   for (const file of SPAWN_FILE_CANDIDATES) {
     if (fs.existsSync(file)) {
@@ -52,90 +75,63 @@ function resolveSpawnsFile() {
   );
 }
 
-function loadSpawnsFromFile() {
-  const spawnsFile = resolveSpawnsFile();
-  const raw = fs.readFileSync(spawnsFile, "utf8");
+function readSpawnRowsFromFile() {
+  const raw = fs.readFileSync(resolveSpawnsFile(), "utf8");
   const parsed = JSON.parse(raw);
-  return {
-    spawnsFile,
-    spawns: Array.isArray(parsed) ? parsed : [],
-  };
+  return Array.isArray(parsed) ? parsed : [];
 }
 
-function createNpc(spawn) {
+function normalizeSpawn(spawn) {
+  const position = resolveSpawnPosition(spawn);
   const id = toInt(spawn?.id, -1);
-  const x = toInt(spawn?.position?.x, NaN);
-  const y = toInt(spawn?.position?.y, NaN);
-  const z = toInt(spawn?.position?.z ?? spawn?.position?.p ?? 0, 0);
-  const radius = toInt(spawn?.radius ?? 0, 0);
+  const x = toInt(position?.x, NaN);
+  const y = toInt(position?.y, NaN);
+  const z = toInt(position?.z ?? position?.p ?? 0, 0);
+  const radius = toOptionalRadius(spawn?.radius);
   const facing = toFacingId(spawn?.facing ?? spawn?.direction ?? -1, -1);
+  const description = String(spawn?.description ?? "");
 
   if (id < 0 || !Number.isFinite(x) || !Number.isFinite(y)) {
     return null;
   }
 
-  const npc = new NPC(id, new Location(x, y, z));
-  npc.getMovementCoordinator().setRadius(Math.max(0, radius));
-  npc.setFace(facing);
-  return npc;
+  return {
+    id,
+    x,
+    y,
+    z,
+    radius,
+    facing,
+    description,
+  };
 }
 
-function removeAllWorldNpcs() {
-  const worldNpcs = World.getNpcs();
-  const existing = Array.from(worldNpcs);
-  for (const npc of existing) {
-    worldNpcs.remove(npc);
-  }
+function loadSpawns() {
+  const rows = readSpawnRowsFromFile();
+  const normalizedSpawns = [];
 
-  World.getAddNPCQueue().length = 0;
-  World.getRemoveNPCQueue().length = 0;
-}
-
-function loadWorldSpawns(api) {
-  const { spawnsFile, spawns } = loadSpawnsFromFile();
-  removeAllWorldNpcs();
-
-  let loaded = 0;
-  for (const spawn of spawns) {
-    const npc = createNpc(spawn);
-    if (!npc) {
+  for (const row of rows) {
+    const normalized = normalizeSpawn(row);
+    if (!normalized) {
       continue;
     }
-
-    World.getAddNPCQueue().push(npc);
-    loaded++;
+    normalizedSpawns.push(normalized);
   }
 
-  api.log("loaded_elvarg_npc_spawns", {
-    file: spawnsFile,
-    totalInFile: spawns.length,
-    count: loaded,
-  });
+  return normalizedSpawns;
 }
 
 module.exports = {
   name: "ElvargNpcSpawns",
   register(api) {
-    let firstLoginRefreshDone = false;
+    registerNpcSpawnSource({
+      api,
+      sourceName: "elvarg",
+      loadSpawns,
+    });
 
-    const runLoad = () => {
-      try {
-        loadWorldSpawns(api);
-      } catch (error) {
-        console.error("[plugin:ElvargNpcSpawns] failed to load npc spawns", error);
-      }
-    };
-
-    runLoad();
-
-    // NpcSpawnDefinitionLoader currently injects a test spawn during boot;
-    // refresh once after startup to enforce full JSON spawns.
     api.onPlayerLogin(() => {
-      if (firstLoginRefreshDone) {
-        return;
-      }
-      firstLoginRefreshDone = true;
-      runLoad();
+      ensureNpcSpawnsLoaded(api);
     });
   },
 };

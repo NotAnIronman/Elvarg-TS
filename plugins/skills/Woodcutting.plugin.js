@@ -11,6 +11,7 @@ const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { Pets } = require("../npcs/Pets.plugin");
 
 const TREE_STUMP_OBJECT_ID = ObjectIds.TREE_STUMP_3;
 const CHOP_ANIMATION_INTERVAL_TICKS = 4;
@@ -572,6 +573,7 @@ function processWoodcuttingTick(activeSessions, currentTick) {
     player.getInventory().adds(state.tree.logId, 1);
     player.getPacketSender().sendMessage("You get some logs.");
     player.getSkillManager().addExperiences(Skill.WOODCUTTING, state.tree.xpReward);
+    Pets.onSkill(player, Skill.WOODCUTTING);
     maybeDropBirdNest(player);
 
     if (shouldDepleteTree(state.tree)) {

@@ -64,9 +64,9 @@ import { QuickPrayers } from "../../../content/QuickPrayers";
 import { MagicSpellbook } from "../../../model/MagicSpellbook";
 import { SkullType } from "../../../model/SkullType";
 import { EffectTimer } from "../../../model/EffectTimer";
-import { PetHandler } from "../../../content/PetHandler";
 import { Task } from "../../../task/Task";
 import { World } from "../../../World";
+import { PluginManager } from "../../../../plugins/PluginManager";
 
 export class Player extends Mobile {
     getSize(): number {
@@ -199,13 +199,14 @@ export class Player extends Mobile {
     private auguryUnlocked: boolean;
     private targetTeleportUnlocked: boolean;
     // Banking
-    public currentBankTab: number;
+    // Java primitive int defaults to 0; initialize explicitly in TS to avoid undefined tab routing.
+    public currentBankTab = 0;
     public banks: Bank[] = Array(Bank.TOTAL_BANK_TABS).fill(null); // last index is for bank searches
-    private noteWithdrawal: boolean;
-    private insertMode: boolean;
-    private searchingBank: boolean;
+    private noteWithdrawal = false;
+    private insertMode = false;
+    private searchingBank = false;
     private searchSyntax = "";
-    private placeholders = true;
+    private placeholders = false;
     private infiniteHealth: boolean;
     private fightType = FightType.UNARMED_KICK;
     public weapon: WeaponInterfaces = WeaponInterfaces.UNARMED;
@@ -544,7 +545,10 @@ export class Player extends Mobile {
 
         // Do stuff...
         Barrows.brotherDespawn(this);
-        PetHandler.pickup(this, this.getCurrentPet());
+        PluginManager.emitPlayerLogout({
+            player: this,
+            username: this.getUsername(),
+        });
         this.getRelations().updateLists(false);
         BountyHunter.unassign(this);
         ClanChatManager.leave(this, false);
@@ -950,11 +954,18 @@ export class Player extends Mobile {
     }
 
     public getCurrentBankTab(): number {
+        if (!Number.isInteger(this.currentBankTab) || this.currentBankTab < 0 || this.currentBankTab >= Bank.TOTAL_BANK_TABS) {
+            this.currentBankTab = 0;
+        }
         return this.currentBankTab;
     }
 
     public setCurrentBankTab(tab: number): Player {
-        this.currentBankTab = tab;
+        if (!Number.isInteger(tab) || tab < 0 || tab >= Bank.TOTAL_BANK_TABS) {
+            this.currentBankTab = 0;
+        } else {
+            this.currentBankTab = tab;
+        }
         return this;
     }
 
@@ -979,6 +990,9 @@ export class Player extends Mobile {
     }
 
     public getBank(index: number): Bank {
+        if (!Number.isInteger(index) || index < 0 || index >= Bank.TOTAL_BANK_TABS) {
+            index = 0;
+        }
         if (this.banks[index] == null) {
             this.banks[index] = new Bank(this);
         }
@@ -986,6 +1000,9 @@ export class Player extends Mobile {
     }
 
     public setBank(index: number, bank: Bank): Player {
+        if (!Number.isInteger(index) || index < 0 || index >= Bank.TOTAL_BANK_TABS) {
+            index = 0;
+        }
         this.banks[index] = bank;
         return this;
     }

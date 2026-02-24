@@ -2,8 +2,8 @@ const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/
 const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { ItemContainerActionPacketListener } = require("../../src/main/typescript/elvarg/net/packet/impl/ItemContainerActionPacketListener");
-const { ButtonClickPacketListener } = require("../../src/main/typescript/elvarg/net/packet/impl/ButtonClickPacketListener");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { handleBankContainerAction } = require("./BankBooths.plugin");
 
 const IFACE = 4465;
 const CONTAINER = 7423;
@@ -11,7 +11,6 @@ const SIDEBAR = 192;
 
 const BTN_DEPOSIT = new Set([50004, 50007]);
 const BTN_CLOSE = new Set([5384, 50001]);
-
 const DEPOSIT_OPCODES = [
   PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE,
   PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE,
@@ -32,9 +31,7 @@ const DEPOSIT_BOX_IDS = [
   ObjectIds.BANK_DEPOSIT_BOX_9,
   ObjectIds.DOOR_223,
 ].filter((id) => Number.isInteger(id));
-
 const itemContainerFallback = new ItemContainerActionPacketListener();
-const buttonFallback = new ButtonClickPacketListener();
 
 function refresh(player) {
   const sender = player?.getPacketSender?.();
@@ -98,10 +95,8 @@ function handleDepositContainerAction(player, opcode, payload) {
   return true;
 }
 
-function handleDepositButton(player, payload) {
+function handleDepositButton(player, button) {
   if (!player || player.getInterfaceId?.() !== IFACE) return false;
-
-  const button = new Packet(PacketConstants.BUTTON_CLICK_OPCODE, payload).readInt();
   if (BTN_DEPOSIT.has(button)) {
     Bank.depositItems(player, player.getInventory(), true);
     refresh(player);
@@ -134,20 +129,18 @@ module.exports = {
         const opcode = packet.getOpcode();
         const payload = packet.getBuffer();
         if (handleDepositContainerAction(player, opcode, payload)) return;
+        if (handleBankContainerAction(player, opcode, payload)) return;
         itemContainerFallback.execute(player, new Packet(opcode, payload));
       },
     };
-
     for (const opcode of DEPOSIT_OPCODES) {
       api.registerAlivePacketListener(opcode, onContainer);
     }
 
-    api.registerAlivePacketListener(PacketConstants.BUTTON_CLICK_OPCODE, {
-      execute(player, packet) {
-        const payload = packet.getBuffer();
-        if (handleDepositButton(player, payload)) return;
-        buttonFallback.execute(player, new Packet(PacketConstants.BUTTON_CLICK_OPCODE, payload));
-      },
+    api.onButtonClick((event) => {
+      if (handleDepositButton(event.player, event.buttonId)) {
+        event.handled = true;
+      }
     });
   },
 };

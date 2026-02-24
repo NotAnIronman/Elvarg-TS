@@ -1,8 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
-const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
-const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
+const {
+  registerNpcSpawnSource,
+  ensureNpcSpawnsLoaded,
+} = require("./lib/NpcSpawnRegistry");
 
 const SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns_osrs.json"),
@@ -27,6 +28,17 @@ const LEGACY_FISHING_SPOT_NET_HARPOON_ID = 1511;
 function toInt(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+
+function toOptionalRadius(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(n));
 }
 
 function toFacingId(value, fallback = -1) {
@@ -67,14 +79,10 @@ function resolveSpawnsFile() {
   );
 }
 
-function loadSpawnsFromFile() {
-  const spawnsFile = resolveSpawnsFile();
-  const raw = fs.readFileSync(spawnsFile, "utf8");
+function readSpawnRowsFromFile() {
+  const raw = fs.readFileSync(resolveSpawnsFile(), "utf8");
   const parsed = JSON.parse(raw);
-  return {
-    spawnsFile,
-    spawns: Array.isArray(parsed) ? parsed : [],
-  };
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function isFishingSpot(spawn) {
@@ -87,7 +95,6 @@ function normalizeFishingSpotId(spawn, id) {
     return id;
   }
 
-  // Explicitly map the spot the user called out.
   if (id === 5234) {
     return LEGACY_FISHING_SPOT_NET_HARPOON_ID;
   }
@@ -125,115 +132,57 @@ function normalizeNpcId(spawn) {
   return normalizeFishingSpotId(spawn, id);
 }
 
-function createNpc(spawn) {
+function normalizeSpawn(spawn) {
   const id = normalizeNpcId(spawn);
   const position = resolveSpawnPosition(spawn);
   const x = toInt(position?.x ?? spawn?.x, NaN);
   const y = toInt(position?.y ?? spawn?.y, NaN);
   const z = toInt(position?.z ?? position?.p ?? spawn?.z ?? spawn?.p ?? 0, 0);
-  const radius = toInt(spawn?.radius ?? 0, 0);
-  const direction = toFacingId(spawn?.facing ?? spawn?.direction ?? -1, -1);
+  const radius = toOptionalRadius(spawn?.radius);
+  const facing = toFacingId(spawn?.facing ?? spawn?.direction ?? -1, -1);
+  const description = String(spawn?.description ?? spawn?.name ?? "");
 
   if (id < 0 || !Number.isFinite(x) || !Number.isFinite(y)) {
     return null;
   }
 
-  // Plugin load runs before NPC implementation maps are initialized, so use
-  // direct construction instead of NPC.create(...).
-  const npc = new NPC(id, new Location(x, y, z));
-  npc.getMovementCoordinator().setRadius(Math.max(0, radius));
-  npc.setFace(direction);
-  if (typeof npc.setDescription === "function") {
-    npc.setDescription(String(spawn?.description ?? spawn?.name ?? ""));
-  }
-  return npc;
+  return {
+    id,
+    x,
+    y,
+    z,
+    radius,
+    facing,
+    description,
+  };
 }
 
-function prioritizeSpawnsForCapacity(spawns, capacity) {
-  if (capacity <= 0) {
-    return {
-      selected: [],
-      fishingTotal: 0,
-      fishingSelected: 0,
-    };
-  }
+function loadSpawns() {
+  const rows = readSpawnRowsFromFile();
+  const normalizedSpawns = [];
 
-  const fishing = [];
-  const other = [];
-
-  for (const spawn of spawns) {
-    if (isFishingSpot(spawn)) {
-      fishing.push(spawn);
-    } else {
-      other.push(spawn);
+  for (const row of rows) {
+    const normalized = normalizeSpawn(row);
+    if (!normalized) {
+      continue;
     }
+    normalizedSpawns.push(normalized);
   }
 
-  const selected = fishing.concat(other).slice(0, capacity);
-  const fishingSelected = selected.filter((spawn) => isFishingSpot(spawn)).length;
-
-  return {
-    selected,
-    fishingTotal: fishing.length,
-    fishingSelected,
-  };
+  return normalizedSpawns;
 }
 
 module.exports = {
   name: "OSRSNpcSpawns",
   register(api) {
-    let firstLoginRefreshDone = false;
+    registerNpcSpawnSource({
+      api,
+      sourceName: "osrs",
+      loadSpawns,
+    });
 
-    const runLoad = () => {
-      try {
-        const { spawnsFile, spawns } = loadSpawnsFromFile();
-
-        // World NPC indices are bounded; queueing beyond capacity drops entries.
-        const maxNpcs = Math.max(0, World.getNpcs().capacityReturn() - 1);
-        const { selected, fishingTotal, fishingSelected } = prioritizeSpawnsForCapacity(
-          spawns,
-          maxNpcs
-        );
-
-        // Replace existing world spawns with the OSRS set.
-        World.getNpcs().clear();
-        World.getAddNPCQueue().length = 0;
-        World.getRemoveNPCQueue().length = 0;
-
-        let loaded = 0;
-        for (const spawn of selected) {
-          const npc = createNpc(spawn);
-          if (!npc) {
-            continue;
-          }
-          World.getAddNPCQueue().push(npc);
-          loaded++;
-        }
-
-        api.log("loaded_osrs_npc_spawns", {
-          file: spawnsFile,
-          totalInFile: spawns.length,
-          selectedForCapacity: selected.length,
-          worldNpcCapacity: maxNpcs,
-          fishingSpotsInFile: fishingTotal,
-          fishingSpotsSelected: fishingSelected,
-          count: loaded,
-        });
-      } catch (error) {
-        console.error("[plugin:OSRSNpcSpawns] failed to load npc spawns", error);
-      }
-    };
-
-    runLoad();
-
-    // ElvargNpcSpawns refreshes once on first login; refresh OSRS once after that
-    // so the active world spawn set remains OSRS.
     api.onPlayerLogin(() => {
-      if (firstLoginRefreshDone) {
-        return;
-      }
-      firstLoginRefreshDone = true;
-      runLoad();
+      ensureNpcSpawnsLoaded(api);
     });
   },
 };

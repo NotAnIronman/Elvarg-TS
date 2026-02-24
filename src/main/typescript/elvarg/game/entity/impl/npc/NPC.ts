@@ -40,7 +40,7 @@ export class NPC extends Mobile {
     constructor(id: number, position: Location) {
         super(position)
         this.id = id;
-        this.spawnPosition = position;
+        this.spawnPosition = position.clone();
 
         if (this.getDefinition() == null) {
             this.setHitpoints(this.hitpoints = 10);
@@ -105,7 +105,7 @@ export class NPC extends Mobile {
 
     public NPC(id: number, position: Location) {
         this.id = id;
-        this.spawnPosition = position;
+        this.spawnPosition = position.clone();
 
         if (this.getDefinition() == null) {
             this.setHitpoints(10);

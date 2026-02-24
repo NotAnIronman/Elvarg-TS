@@ -1,0 +1,311 @@
+const { World } = require("../../../src/main/typescript/elvarg/game/World");
+const { NPC } = require("../../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
+const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
+
+const NPC_SPAWN_REGISTRY_STATE_KEY = "__npcSpawnRegistryState";
+
+const SOURCE_PRIORITY = Object.freeze({
+  osrs: 10,
+  elvarg: 20,
+});
+
+function getState() {
+  if (!globalThis[NPC_SPAWN_REGISTRY_STATE_KEY]) {
+    globalThis[NPC_SPAWN_REGISTRY_STATE_KEY] = {
+      api: null,
+      sources: new Map(),
+      sourceSpawns: new Map(),
+      initialLoadScheduled: false,
+      spawnedNpcs: new Set(),
+      hasAppliedSpawns: false,
+    };
+  }
+  return globalThis[NPC_SPAWN_REGISTRY_STATE_KEY];
+}
+
+function sourcePriority(name) {
+  return SOURCE_PRIORITY[name] ?? 100;
+}
+
+function getOrderedSourceNames(sourceNames) {
+  return Array.from(sourceNames).sort((a, b) => {
+    const priorityDiff = sourcePriority(a) - sourcePriority(b);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+    return a.localeCompare(b);
+  });
+}
+
+function buildNpcKey(spawn) {
+  return `${spawn.id}:${spawn.x}:${spawn.y}:${spawn.z}`;
+}
+
+function resolveNpcRadius(npc, explicitRadius) {
+  if (Number.isFinite(explicitRadius)) {
+    return Math.max(0, Math.trunc(explicitRadius));
+  }
+
+  let definitionRadius = NaN;
+  if (npc && typeof npc.getDefinition === "function") {
+    const definition = npc.getDefinition();
+    if (definition && typeof definition.getWalkRadius === "function") {
+      definitionRadius = Number(definition.getWalkRadius());
+    }
+  }
+  if (Number.isFinite(definitionRadius) && definitionRadius > 0) {
+    return Math.max(0, Math.trunc(definitionRadius));
+  }
+
+  const size = npc && typeof npc.getSize === "function" ? Number(npc.getSize()) : NaN;
+  if (Number.isFinite(size) && size > 0) {
+    return Math.max(0, Math.trunc(size) + 5);
+  }
+
+  return 0;
+}
+
+function removeSpawnRegistryNpcs(state) {
+  if (!state || !state.spawnedNpcs) {
+    return;
+  }
+
+  const addQueue = World.getAddNPCQueue();
+  const removeQueue = World.getRemoveNPCQueue();
+  const worldNpcs = World.getNpcs();
+
+  for (const npc of state.spawnedNpcs) {
+    if (!npc) {
+      continue;
+    }
+
+    for (let index = addQueue.indexOf(npc); index !== -1; index = addQueue.indexOf(npc)) {
+      addQueue.splice(index, 1);
+    }
+
+    for (let index = removeQueue.indexOf(npc); index !== -1; index = removeQueue.indexOf(npc)) {
+      removeQueue.splice(index, 1);
+    }
+
+    if (typeof npc.isRegistered === "function" && npc.isRegistered()) {
+      worldNpcs.remove(npc);
+    }
+  }
+
+  state.spawnedNpcs.clear();
+}
+
+function clearPlayerLocalNpcs() {
+  for (const player of World.getPlayers()) {
+    if (!player || typeof player.getLocalNpcs !== "function") {
+      continue;
+    }
+    const localNpcs = player.getLocalNpcs();
+    if (Array.isArray(localNpcs)) {
+      localNpcs.length = 0;
+    }
+  }
+}
+
+function addNpcFromSpawn(spawn, state) {
+  const npc = NPC.create(spawn.id, new Location(spawn.x, spawn.y, spawn.z));
+  npc.getMovementCoordinator().setRadius(resolveNpcRadius(npc, spawn.radius));
+  npc.setFace(Number.isFinite(spawn.facing) ? Math.trunc(spawn.facing) : -1);
+  if (typeof npc.setDescription === "function" && spawn.description) {
+    npc.setDescription(spawn.description);
+  }
+  const added = World.getNpcs().add(npc);
+  if (added && state?.spawnedNpcs) {
+    state.spawnedNpcs.add(npc);
+  }
+  return added;
+}
+
+function countRegisteredSpawnRegistryNpcs(state) {
+  if (!state?.spawnedNpcs) {
+    return 0;
+  }
+  let count = 0;
+  for (const npc of state.spawnedNpcs) {
+    if (npc && typeof npc.isRegistered === "function" && npc.isRegistered()) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function getCombinedSpawns(state) {
+  const orderedSources = getOrderedSourceNames(state.sourceSpawns.keys());
+  const dedupedByKey = new Map();
+  let totalCandidates = 0;
+
+  for (const sourceName of orderedSources) {
+    const sourceSpawns = state.sourceSpawns.get(sourceName);
+    if (!Array.isArray(sourceSpawns)) {
+      continue;
+    }
+
+    totalCandidates += sourceSpawns.length;
+
+    for (const spawn of sourceSpawns) {
+      if (
+        !spawn ||
+        typeof spawn.id !== "number" ||
+        !Number.isFinite(spawn.x) ||
+        !Number.isFinite(spawn.y) ||
+        !Number.isFinite(spawn.z)
+      ) {
+        continue;
+      }
+      dedupedByKey.set(buildNpcKey(spawn), spawn);
+    }
+  }
+
+  return {
+    orderedSources,
+    totalCandidates,
+    spawns: Array.from(dedupedByKey.values()),
+  };
+}
+
+function setGlobalHooks(state) {
+  const orderedSources = getOrderedSourceNames(state.sources.keys());
+  globalThis.__npcSpawnSource = orderedSources.join("+") || "none";
+  globalThis.__npcSpawnReload = () => reloadAllNpcSpawnSources(state.api);
+}
+
+function applyCombinedSpawns(api) {
+  const state = getState();
+  const combined = getCombinedSpawns(state);
+
+  const maxNpcs = Math.max(0, World.getNpcs().capacityReturn() - 1);
+  const selected = combined.spawns.slice(0, maxNpcs);
+
+  removeSpawnRegistryNpcs(state);
+
+  let loaded = 0;
+  for (const spawn of selected) {
+    if (addNpcFromSpawn(spawn, state)) {
+      loaded++;
+    }
+  }
+
+  state.hasAppliedSpawns = true;
+
+  clearPlayerLocalNpcs();
+
+  if (api && typeof api.log === "function") {
+    api.log("applied_npc_spawns", {
+      sources: combined.orderedSources,
+      totalCandidates: combined.totalCandidates,
+      deduped: combined.spawns.length,
+      selectedForCapacity: selected.length,
+      worldNpcCapacity: maxNpcs,
+      count: loaded,
+    });
+  }
+
+  return {
+    loaded,
+    orderedSources: combined.orderedSources,
+    totalCandidates: combined.totalCandidates,
+    deduped: combined.spawns.length,
+    selectedForCapacity: selected.length,
+    worldNpcCapacity: maxNpcs,
+  };
+}
+
+function reloadNpcSpawnSource(sourceName, api) {
+  const state = getState();
+  const source = state.sources.get(sourceName);
+  if (!source || typeof source.loadSpawns !== "function") {
+    return false;
+  }
+
+  try {
+    const sourceSpawns = source.loadSpawns();
+    if (!Array.isArray(sourceSpawns)) {
+      console.warn(
+        `[plugin:npc-spawns] source ${sourceName} returned non-array spawns; using empty list`
+      );
+      state.sourceSpawns.set(sourceName, []);
+    } else {
+      state.sourceSpawns.set(sourceName, sourceSpawns);
+    }
+
+    if (api && typeof api.log === "function") {
+      api.log("loaded_npc_spawn_source", {
+        source: sourceName,
+        sourceSpawnCount: Array.isArray(sourceSpawns) ? sourceSpawns.length : 0,
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`[plugin:npc-spawns] failed to load source ${sourceName}`, error);
+    return false;
+  }
+}
+
+function reloadAllNpcSpawnSources(api) {
+  const state = getState();
+  const orderedSources = getOrderedSourceNames(state.sources.keys());
+
+  let ok = true;
+  for (const sourceName of orderedSources) {
+    const loaded = reloadNpcSpawnSource(sourceName, api);
+    if (!loaded) {
+      ok = false;
+    }
+  }
+
+  applyCombinedSpawns(api);
+  setGlobalHooks(state);
+  return ok;
+}
+
+function scheduleInitialLoad(api) {
+  const state = getState();
+  if (state.initialLoadScheduled) {
+    return;
+  }
+
+  state.initialLoadScheduled = true;
+  setImmediate(() => {
+    state.initialLoadScheduled = false;
+    reloadAllNpcSpawnSources(api);
+  });
+}
+
+function registerNpcSpawnSource({ api, sourceName, loadSpawns }) {
+  if (typeof sourceName !== "string" || sourceName.trim().length === 0) {
+    throw new Error("registerNpcSpawnSource requires a non-empty sourceName");
+  }
+
+  if (typeof loadSpawns !== "function") {
+    throw new Error(
+      `registerNpcSpawnSource(${sourceName}) requires loadSpawns()`
+    );
+  }
+
+  const state = getState();
+  state.api = api;
+  state.sources.set(sourceName, { loadSpawns });
+  setGlobalHooks(state);
+  scheduleInitialLoad(api);
+}
+
+function ensureNpcSpawnsLoaded(api) {
+  const state = getState();
+  const registeredCount = countRegisteredSpawnRegistryNpcs(state);
+  if (state.hasAppliedSpawns && registeredCount > 0) {
+    return true;
+  }
+  return reloadAllNpcSpawnSources(api);
+}
+
+module.exports = {
+  registerNpcSpawnSource,
+  ensureNpcSpawnsLoaded,
+  reloadAllNpcSpawnSources,
+};

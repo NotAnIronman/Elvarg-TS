@@ -7,6 +7,7 @@ const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/imp
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { Pets } = require("../npcs/Pets.plugin");
 
 const DEPLETED_ROCK_ID = 2704;
 const MINING_ANIMATION_INTERVAL_TICKS = 6;
@@ -217,6 +218,7 @@ class MiningTask extends Task {
       player.getInventory().adds(state.rock.oreId, 1);
       player.getPacketSender().sendMessage("You get some ores.");
       player.getSkillManager().addExperiences(Skill.MINING, state.rock.xp);
+      Pets.onSkill(player, Skill.MINING);
       depleteRock(rockObject, state.rock);
       stopMining(this.activeSessions, player);
     }

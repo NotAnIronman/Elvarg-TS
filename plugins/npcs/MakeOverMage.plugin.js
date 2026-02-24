@@ -1,6 +1,5 @@
 const { Appearance } = require("../../src/main/typescript/elvarg/game/model/Appearance");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
-const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
@@ -132,12 +131,12 @@ function applyAppearance(player, packet) {
 
 function handleMakeoverButton(player, button) {
   if (!isMakeoverSession(player)) {
-    return;
+    return false;
   }
 
   if (CLOSE_BUTTON_IDS.has(button)) {
     player.getPacketSender().sendInterfaceRemoval();
-    return;
+    return true;
   }
 
   if (
@@ -146,7 +145,10 @@ function handleMakeoverButton(player, button) {
   ) {
     // Client handles preview/selection for these widgets; keep makeover session alive.
     player.getAppearance()?.setCanChangeAppearance?.(true);
+    return true;
   }
+
+  return false;
 }
 
 module.exports = {
@@ -160,13 +162,13 @@ module.exports = {
       event.handled = true;
     });
 
-    api.onEstablishedPacket((event) => {
-      if (!event || event.opcode !== PacketConstants.BUTTON_CLICK_OPCODE || !event.player) {
+    api.onButtonClick((event) => {
+      if (!event || !event.player) {
         return;
       }
-      const inspect = new Packet(PacketConstants.BUTTON_CLICK_OPCODE, event.packet.getBuffer());
-      const button = inspect.readInt();
-      handleMakeoverButton(event.player, button);
+      if (handleMakeoverButton(event.player, event.buttonId)) {
+        event.handled = true;
+      }
     });
 
     api.registerAlivePacketListener(PacketConstants.CHANGE_APPEARANCE, {

@@ -20,6 +20,11 @@ export interface PluginPlayerDisconnectEvent {
   source: string;
 }
 
+export interface PluginPlayerLogoutEvent {
+  player: any;
+  username: string;
+}
+
 export interface PluginPlayerProcessEvent {
   player: any;
 }
@@ -172,11 +177,33 @@ export interface PluginItemActionEvent {
   handled: boolean;
 }
 
+export interface PluginItemDropEvent {
+  player: any;
+  interfaceId: number;
+  item: any;
+  itemId: number;
+  slot: number;
+  handled: boolean;
+}
+
 export interface PluginCommandEvent {
   player: any;
   raw: string;
   base: string;
   parts: string[];
+  handled: boolean;
+}
+
+export interface PluginButtonClickEvent {
+  player: any;
+  buttonId: number;
+  handled: boolean;
+}
+
+export interface PluginInterfaceActionClickEvent {
+  player: any;
+  buttonId: number;
+  action: number;
   handled: boolean;
 }
 
@@ -201,6 +228,7 @@ export interface PluginApi {
   onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
   onPlayerLogin(handler: (event: PluginPlayerLoginEvent) => void): void;
   onPlayerDisconnect(handler: (event: PluginPlayerDisconnectEvent) => void): void;
+  onPlayerLogout(handler: (event: PluginPlayerLogoutEvent) => void): void;
   onPlayerProcess(handler: (event: PluginPlayerProcessEvent) => void): void;
   onRegionLoaded(handler: (event: PluginRegionLoadedEvent) => void): void;
   onPathBlocked(handler: (event: PluginPathBlockedEvent) => void): void;
@@ -233,8 +261,21 @@ export interface PluginApi {
   onItemOnItem(handler: (event: PluginItemOnItemEvent) => void): void;
   onItemOnGroundItem(handler: (event: PluginItemOnGroundItemEvent) => void): void;
   onItemAction(handler: (event: PluginItemActionEvent) => void): void;
+  onItemDrop(handler: (event: PluginItemDropEvent) => void): void;
   onItemFirstAction(
     handler: (event: PluginItemActionEvent) => void | boolean
+  ): void;
+  onButtonClick(handler: (event: PluginButtonClickEvent) => void): void;
+  onButton(
+    buttonIds: number | number[],
+    handler: (event: PluginButtonClickEvent) => void | boolean
+  ): void;
+  onInterfaceActionClick(
+    handler: (event: PluginInterfaceActionClickEvent) => void
+  ): void;
+  onInterfaceActionButton(
+    buttonIds: number | number[],
+    handler: (event: PluginInterfaceActionClickEvent) => void | boolean
   ): void;
   onCommand(handler: (event: PluginCommandEvent) => void): void;
   registerCommand(

@@ -4,8 +4,8 @@ const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { TeleportHandler } = require("../../src/main/typescript/elvarg/game/model/teleportation/TeleportHandler");
-const { PetHandler } = require("../../src/main/typescript/elvarg/game/content/PetHandler");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { Pets } = require("../npcs/Pets.plugin");
 
 const CRAFT_RUNES_GRAPHIC = new Graphic(186);
 const CRAFT_RUNES_ANIMATION = new Animation(791);
@@ -248,7 +248,7 @@ module.exports = {
         player
           .getSkillManager()
           .addExperiences(Skill.RUNECRAFTING, craftedEssence * runeData.xp);
-        PetHandler.onSkill(player, Skill.RUNECRAFTING);
+        Pets.onSkill(player, Skill.RUNECRAFTING);
       }
 
       event.handled = true;

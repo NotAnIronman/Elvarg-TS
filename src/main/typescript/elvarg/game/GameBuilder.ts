@@ -10,7 +10,6 @@ import { ItemDefinitionLoader } from "./definition/loader/impl/ItemDefinitionLoa
 import { ShopDefinitionLoader } from "./definition/loader/impl/ShopDefinitionLoader";
 import { NpcDefinitionLoader } from "./definition/loader/impl/NpcDefinitionLoader";
 import { NpcDropDefinitionLoader } from "./definition/loader/impl/NpcDropDefinitionLoader";
-import { NpcSpawnDefinitionLoader } from "./definition/loader/impl/NpcSpawnDefinitionLoader";
 
 export class GameBuilder {
     private backgroundLoader = new BackgroundLoader();
@@ -47,7 +46,6 @@ export class GameBuilder {
             yield () => new ShopDefinitionLoader().load();
             yield () => new NpcDefinitionLoader().load();
             yield () => new NpcDropDefinitionLoader().load();
-            yield () => new NpcSpawnDefinitionLoader().load();
             //yield () => new NPCSpawnDumper().dump();
         }
     

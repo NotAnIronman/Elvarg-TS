@@ -15,6 +15,7 @@ import { PacketExecutor } from "../PacketExecutor";
 // import { BonusManager } from '../../../game/model/equipment/BonusManager';
 // import { PlayerRights } from '../../../game/model/rights/PlayerRights';
 import { Packet } from "../Packet";
+import { PluginManager } from "../../../plugins/PluginManager";
 // import { Dueling } from '../../../game/content/Duelling';
 
 export class ButtonClickPacketListener implements PacketExecutor {
@@ -122,6 +123,16 @@ export class ButtonClickPacketListener implements PacketExecutor {
     let button = packet.readInt();
 
     if (player.getHitpoints() <= 0 || player.isTeleporting) {
+      return;
+    }
+
+    if (
+      PluginManager.emitButtonClick({
+        player,
+        buttonId: button,
+        handled: false,
+      })
+    ) {
       return;
     }
 

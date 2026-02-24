@@ -22,7 +22,6 @@ const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ClanChatManager } = require("../../src/main/typescript/elvarg/game/content/clan/ClanChatManager");
 const { NpcDropDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader");
-const { NpcSpawnDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcSpawnDefinitionLoader");
 const { ShopDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/ShopDefinitionLoader");
 const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
@@ -704,9 +703,26 @@ module.exports = {
         return true;
       }
       try {
-        World.getNpcs().clear();
-        new NpcSpawnDefinitionLoader().load();
-        player.getPacketSender().sendConsoleMessage("Reloaded npc spawns.");
+        const reloadNpcSpawns = globalThis.__npcSpawnReload;
+        if (typeof reloadNpcSpawns !== "function") {
+          player
+            .getPacketSender()
+            .sendMessage(
+              "NPC spawn plugin reload hook is unavailable. Check NPC spawn plugin startup logs."
+            );
+          return true;
+        }
+
+        const loaded = reloadNpcSpawns();
+        if (loaded === false) {
+          player.getPacketSender().sendMessage("Error reloading npc spawns.");
+          return true;
+        }
+
+        const source = String(globalThis.__npcSpawnSource ?? "unknown");
+        player
+          .getPacketSender()
+          .sendConsoleMessage(`Reloaded npc spawns via plugin source: ${source}.`);
       } catch (error) {
         console.error(error);
         player.getPacketSender().sendMessage("Error reloading npc spawns.");

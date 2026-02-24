@@ -334,7 +334,30 @@ export class World {
             let npc = World.addNPCQueue.shift();
             if (!npc)
                 break;
-            World.npcs.add(npc);
+            const added = World.npcs.add(npc);
+            if (!added) {
+                console.warn("[world:npc] add_queue_failed", {
+                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                    npcIndex: typeof npc.getIndex === "function" ? npc.getIndex() : null,
+                    registered: typeof npc.isRegistered === "function" ? npc.isRegistered() : null,
+                    worldNpcCount: World.npcs.sizeReturn(),
+                    worldNpcCapacity: World.npcs.capacityReturn(),
+                    addNpcQueueSize: World.addNPCQueue.length,
+                });
+                continue;
+            }
+            if (typeof npc.isPet === "function" && npc.isPet()) {
+                const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
+                const ownerName = owner && typeof owner.getUsername === "function"
+                    ? owner.getUsername()
+                    : null;
+                console.info("[world:npc] add_queue_pet", {
+                    owner: ownerName,
+                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                    npcIndex: typeof npc.getIndex === "function" ? npc.getIndex() : null,
+                    addNpcQueueSize: World.addNPCQueue.length,
+                });
+            }
         }
 
         // Removing pending npcs..
@@ -342,7 +365,31 @@ export class World {
             let npc = World.removeNPCQueue.shift();
             if (!npc)
                 break;
+            const wasRegistered =
+                typeof npc.isRegistered === "function" ? npc.isRegistered() : null;
+            const indexBefore = typeof npc.getIndex === "function" ? npc.getIndex() : null;
             World.npcs.remove(npc);
+            if (typeof npc.isPet === "function" && npc.isPet()) {
+                const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
+                const ownerName = owner && typeof owner.getUsername === "function"
+                    ? owner.getUsername()
+                    : null;
+                console.info("[world:npc] remove_queue_pet", {
+                    owner: ownerName,
+                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                    npcIndex: indexBefore,
+                    wasRegistered,
+                    nowRegistered:
+                        typeof npc.isRegistered === "function" ? npc.isRegistered() : null,
+                    removeNpcQueueSize: World.removeNPCQueue.length,
+                });
+            } else if (wasRegistered === false) {
+                console.warn("[world:npc] remove_queue_unregistered", {
+                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                    npcIndex: indexBefore,
+                    removeNpcQueueSize: World.removeNPCQueue.length,
+                });
+            }
         }
 
         // Sequential processing to avoid null-slot crashes during bring-up.

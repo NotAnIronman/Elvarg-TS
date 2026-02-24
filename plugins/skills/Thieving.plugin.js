@@ -8,7 +8,7 @@ const { HitDamage } = require("../../src/main/typescript/elvarg/game/content/com
 const { HitMask } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitMask");
 const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { NpcIds, ObjectIds, ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
-const { PetHandler } = require("../../src/main/typescript/elvarg/game/content/PetHandler");
+const { Pets } = require("../npcs/Pets.plugin");
 
 const THIEVING_ANIMATION = new Animation(881);
 const NPC_ATTACK_ANIMATION = new Animation(401);
@@ -220,7 +220,7 @@ module.exports = {
               .getPacketSender()
               .sendMessage(`You steal ${loot.getAmount()} x ${loot.getDefinition().getName()}.`);
             player.getSkillManager().addExperiences(Skill.THIEVING, def.xp);
-            PetHandler.onSkill(player, Skill.THIEVING);
+            Pets.onSkill(player, Skill.THIEVING);
             return;
           }
 
@@ -273,7 +273,7 @@ module.exports = {
       player
         .getPacketSender()
         .sendMessage(`You steal ${reward.getAmount()} x ${reward.getDefinition().getName()}.`);
-      PetHandler.onSkill(player, Skill.THIEVING);
+      Pets.onSkill(player, Skill.THIEVING);
       event.handled = true;
     });
 
