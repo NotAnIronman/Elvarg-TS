@@ -727,18 +727,56 @@ export class MovementQueue {
             return;
         }
 
+        const followerDistance = this.character.calculateDistance(following);
         const leaderQueue = following.getMovementQueue();
+        const leaderMoving = leaderQueue.isMovings();
         const destX = leaderQueue.followX;
         const destY = leaderQueue.followY;
+
+        // When not overlapping and already adjacent to a stationary leader,
+        // do not re-route; this avoids jittering too close/too far while idle.
+        if (followerDistance <= 1 && !leaderMoving && followerDistance !== 0) {
+            return;
+        }
+
+        let destination: Location | null = null;
+        if (destX !== -1 && destY !== -1) {
+            destination = new Location(destX, destY, this.character.getLocation().getZ());
+        }
+
         if (
-            (destX === -1 && destY === -1) ||
-            new Location(destX, destY).equals(this.character.getLocation())
+            destination == null ||
+            destination.equals(this.character.getLocation()) ||
+            followerDistance > 1
+        ) {
+            destination = this.getClosestFollowTile(following) ?? destination;
+        }
+
+        if (
+            destination == null ||
+            destination.equals(this.character.getLocation())
         ) {
             return;
         }
 
+        // Avoid resetting and rebuilding identical routes each tick.
+        if (this.points.length > 0 && this.lastDestX === destination.getX() && this.lastDestY === destination.getY()) {
+            return;
+        }
+
         this.reset();
-        PathFinder.calculateWalkRoute(this.character, destX, destY);
+        PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY());
+    }
+
+    private getClosestFollowTile(leader: Mobile): Location | null {
+        const privateArea = this.character.getPrivateArea();
+        const current = this.character.getLocation();
+        const candidates = leader
+            .outterTiles()
+            .filter(tile => !RegionManager.blocked(tile, privateArea))
+            .sort((a, b) => a.getDistance(current) - b.getDistance(current));
+
+        return candidates.length > 0 ? candidates[0] : null;
     }
 
     private tryTeleportPetToFollower(following: Mobile): boolean {

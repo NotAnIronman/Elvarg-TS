@@ -18,7 +18,7 @@ export class GameConstants {
     public static PLAYER_PERSISTENCE: PlayerPersistence = new NullPlayerPersistence();
     public static readonly CONCURRENCY: boolean = false;
     // Disable regional NPC processing optimization to avoid visibility churn during login/debug.
-    public static readonly ENABLE_REGION_BASED_NPC_PROCESSING: boolean = false;
+    public static readonly ENABLE_REGION_BASED_NPC_PROCESSING: boolean = true;
     // Keep OSRS spawn source opt-in until client cache parity is confirmed for those ids.
     public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = true;
     // Tick rate for the main game loop in milliseconds.

@@ -128,7 +128,19 @@ export class PluginManager {
       return;
     }
 
+    const disablePlayerBots =
+      process.argv.includes("--disablePlayerBots") ||
+      process.env.DISABLE_PLAYER_BOTS === "1";
+
     for (const pluginPath of pluginFiles) {
+      if (
+        disablePlayerBots &&
+        pluginPath.includes(path.sep + "bots" + path.sep) &&
+        pluginPath.endsWith("PlayerBots.plugin.js")
+      ) {
+        console.info("[plugins] skipped PlayerBots due --disablePlayerBots");
+        continue;
+      }
       PluginManager.loadPlugin(pluginPath);
     }
 
