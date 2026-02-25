@@ -61,13 +61,7 @@ export class NPCDrop {
         this.itemId = itemId;
         this.minAmount = minAmount;
         this.maxAmount = maxAmount;
-        if (chance === null) {
-            this.chance = chance;
-
-        } else {
-            this.chance = -1;
-
-        }
+        this.chance = chance != null ? chance : -1;
     }
 
     getItemId(): number {

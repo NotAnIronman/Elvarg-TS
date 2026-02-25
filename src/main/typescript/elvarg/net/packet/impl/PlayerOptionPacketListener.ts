@@ -1,36 +1,23 @@
-// import { Player } from '../../../game/entity/impl/player/Player';
-// import { World } from '../../../game/World';
 import { Packet } from "../Packet";
-// import { PlayerRights } from '../../../game/model/rights/PlayerRights';
+import { PacketExecutor } from "../PacketExecutor";
 import { PacketConstants } from "../PacketConstants";
 import { World } from "../../../game/World";
 import type { Player } from "../../../game/entity/impl/player/Player";
 
-export class PlayerOptionPacketListener {
-  // public static attack(player: Player, packet: Packet) {
-  public static attack(player: any, packet: Packet) {
-    if (player == null || player.busy()) {
-      return;
-    }
+export class PlayerOptionPacketListener implements PacketExecutor {
+  private static attack(player: any, packet: Packet) {
     const index: number = packet.readLEShort();
     if (index < 0 || index >= World.getPlayers().capacityReturn()) {
       return;
     }
+
     const attacked: Player = World.getPlayers().get(index);
     if (!attacked || attacked.getHitpoints() <= 0 || attacked.equals(player)) {
       player.getMovementQueue().reset();
       return;
     }
-    player.getMovementQueue().walkToEntity(attacked, () => {
-      if (attacked.getHitpoints() <= 0) {
-        player.getMovementQueue().reset();
-        return;
-      }
-      // Hand movement control over to combat-follow once attack starts.
-      player.getMovementQueue().reset();
-      player.setPositionToFace(attacked.getLocation());
-      player.getCombat().attack(attacked);
-    });
+
+    player.getCombat().attack(attacked);
   }
 
   /**
@@ -39,19 +26,22 @@ export class PlayerOptionPacketListener {
    * @param player The player clicking the other entity.
    * @param packet The packet to read values from.
    */
-  // public static option1(player: Player, packet: Packet) {
-  public static option1(player: any, packet: Packet) {
-    let id: number = packet.readShort() & 0xffff;
-    // if (id < 0 || id > World.getPlayers().capacityReturn())
-    //     return;
-    // let player2: Player = World.getPlayers().get(id);
-    // if (player2 == null)
-    //     return;
-    // player.getMovementQueue().walkToEntity(player2, () => {
-    //     if (player.getArea() != null) {
-    //         player.getArea().onPlayerRightClick(player, player2, 1);
-    //     }
-    // });
+  private static option1(player: any, packet: Packet) {
+    const id: number = packet.readShort() & 0xffff;
+    if (id < 0 || id >= World.getPlayers().capacityReturn()) {
+      return;
+    }
+
+    const player2: Player = World.getPlayers().get(id);
+    if (!player2) {
+      return;
+    }
+
+    player.getMovementQueue().walkToEntity(player2, () => {
+      if (player.getArea() != null) {
+        player.getArea().onPlayerRightClick(player, player2, 1);
+      }
+    });
   }
 
   /**
@@ -60,38 +50,43 @@ export class PlayerOptionPacketListener {
    * @param player The player clicking the other entity.
    * @param packet The packet to read values from.
    */
-  // public static option2(player: Player, packet: Packet) {
-  public static option2(player: any, packet: Packet) {
-    let id: number = packet.readShort() & 0xffff;
-    // if (id < 0 || id > World.getPlayers().capacityReturn())
-    //     return;
-    // let player2: Player = World.getPlayers().get(id);
-    // if (player2 == null)
-    //     return;
-    // player.getMovementQueue().walkToEntity(player2, () => {
-    //         if (player.getArea() != null) {
-    //             player.getArea().onPlayerRightClick(player, player2, 2);
-    //         }
-    // });
+  private static option2(player: any, packet: Packet) {
+    const id: number = packet.readShort() & 0xffff;
+    if (id < 0 || id >= World.getPlayers().capacityReturn()) {
+      return;
+    }
+
+    const player2: Player = World.getPlayers().get(id);
+    if (!player2) {
+      return;
+    }
+
+    player.getMovementQueue().walkToEntity(player2, () => {
+      if (player.getArea() != null) {
+        player.getArea().onPlayerRightClick(player, player2, 2);
+      }
+    });
   }
 
-  // private static option3(player: Player, packet: Packet) {
   private static option3(player: any, packet: Packet) {
-    let id = packet.readLEShortA() & 0xffff;
-    // if (id < 0 || id > World.getPlayers().capacityReturn())
-    //     return;
-    // let player2 = World.getPlayers().get(id);
-    // if (player2 == null)
-    //     return;
-    // player.getMovementQueue().walkToEntity(player2, () => {
-    //         if (player.getArea() != null) {
-    //             player.getArea().onPlayerRightClick(player, player2, 3);
-    //         }
-    // });
+    const id: number = packet.readLEShortA() & 0xffff;
+    if (id < 0 || id >= World.getPlayers().capacityReturn()) {
+      return;
+    }
+
+    const player2: Player = World.getPlayers().get(id);
+    if (!player2) {
+      return;
+    }
+
+    player.getMovementQueue().walkToEntity(player2, () => {
+      if (player.getArea() != null) {
+        player.getArea().onPlayerRightClick(player, player2, 3);
+      }
+    });
   }
 
-  // execute(player: Player, packet: Packet) {
-  execute(player: any, packet: Packet) {
+  execute(player: any, packet: Packet): void {
     if (player == null || player.getHitpoints() <= 0) {
       return;
     }

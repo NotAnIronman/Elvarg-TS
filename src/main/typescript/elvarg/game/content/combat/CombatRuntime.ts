@@ -1,5 +1,6 @@
 import { PluginManager } from "../../../plugins/PluginManager";
 import {
+  PluginCombatDamageProvider,
   PluginCombatEngine,
   PluginCombatMethodResolver,
   PluginNpcCombatMethodProvider,
@@ -57,5 +58,64 @@ export class CombatRuntime {
 
   static executeHit(hit: any): void {
     this.ensureEngine().executeHit(hit);
+  }
+
+  static calculateMaxMeleeHit(entity: Mobile): number | null {
+    const provider = PluginManager.getCombatDamageProvider();
+    if (!provider) {
+      return null;
+    }
+    const value = provider.calculateMaxMeleeHit(entity);
+    return Number.isFinite(value) ? Math.floor(value) : null;
+  }
+
+  static calculateMaxRangedHit(entity: Mobile): number | null {
+    const provider = PluginManager.getCombatDamageProvider();
+    if (!provider) {
+      return null;
+    }
+    const value = provider.calculateMaxRangedHit(entity);
+    return Number.isFinite(value) ? Math.floor(value) : null;
+  }
+
+  static calculateMagicMaxHit(entity: Mobile): number | null {
+    const provider = PluginManager.getCombatDamageProvider();
+    if (!provider) {
+      return null;
+    }
+    const value = provider.calculateMagicMaxHit(entity);
+    return Number.isFinite(value) ? Math.floor(value) : null;
+  }
+
+  static getHitDamage(attacker: Mobile, victim: Mobile, combatType: any): any | null {
+    const provider: PluginCombatDamageProvider | null =
+      PluginManager.getCombatDamageProvider();
+    if (!provider) {
+      return null;
+    }
+    return provider.getHitDamage(attacker, victim, combatType);
+  }
+
+  static applyExtraHitRolls(
+    attacker: Mobile,
+    target: Mobile,
+    combatType: any,
+    damage: any,
+    accurate: boolean,
+    method: any
+  ): boolean {
+    const provider = PluginManager.getCombatDamageProvider();
+    if (!provider) {
+      return false;
+    }
+    provider.applyExtraHitRolls(
+      attacker,
+      target,
+      combatType,
+      damage,
+      accurate,
+      method
+    );
+    return true;
   }
 }

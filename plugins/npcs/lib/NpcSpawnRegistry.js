@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const { World } = require("../../../src/main/typescript/elvarg/game/World");
 const { NPC } = require("../../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
 const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
@@ -9,6 +11,11 @@ const SOURCE_PRIORITY = Object.freeze({
   elvarg: 20,
 });
 
+const NPC_DEFINITION_FILE_CANDIDATES = [
+  path.join(process.cwd(), "data", "definitions", "npc_defs.json"),
+  path.join(process.cwd(), "data", "npc_defs.json"),
+];
+
 function getState() {
   if (!globalThis[NPC_SPAWN_REGISTRY_STATE_KEY]) {
     globalThis[NPC_SPAWN_REGISTRY_STATE_KEY] = {
@@ -18,6 +25,7 @@ function getState() {
       initialLoadScheduled: false,
       spawnedNpcs: new Set(),
       hasAppliedSpawns: false,
+      supportedNpcIds: null,
     };
   }
   return globalThis[NPC_SPAWN_REGISTRY_STATE_KEY];
@@ -39,6 +47,55 @@ function getOrderedSourceNames(sourceNames) {
 
 function buildNpcKey(spawn) {
   return `${spawn.id}:${spawn.x}:${spawn.y}:${spawn.z}`;
+}
+
+function resolveNpcDefinitionFile() {
+  for (const file of NPC_DEFINITION_FILE_CANDIDATES) {
+    if (fs.existsSync(file)) {
+      return file;
+    }
+  }
+  return null;
+}
+
+function loadSupportedNpcIds(state, api) {
+  const file = resolveNpcDefinitionFile();
+  if (!file) {
+    state.supportedNpcIds = null;
+    console.warn(
+      `[plugin:npc-spawns] npc_defs.json not found; skipping spawn id compatibility filtering`
+    );
+    return false;
+  }
+
+  try {
+    const raw = fs.readFileSync(file, "utf8");
+    const defs = JSON.parse(raw);
+    const ids = new Set();
+    if (Array.isArray(defs)) {
+      for (const def of defs) {
+        const id = Number(def?.id);
+        if (!Number.isFinite(id)) {
+          continue;
+        }
+        ids.add(Math.trunc(id));
+      }
+    }
+    state.supportedNpcIds = ids;
+
+    if (api && typeof api.log === "function") {
+      api.log("npc_spawn_supported_ids_loaded", {
+        file,
+        count: ids.size,
+      });
+    }
+
+    return true;
+  } catch (error) {
+    state.supportedNpcIds = null;
+    console.error(`[plugin:npc-spawns] failed to load npc defs from ${file}`, error);
+    return false;
+  }
 }
 
 function resolveNpcRadius(npc, explicitRadius) {
@@ -137,7 +194,10 @@ function countRegisteredSpawnRegistryNpcs(state) {
 function getCombinedSpawns(state) {
   const orderedSources = getOrderedSourceNames(state.sourceSpawns.keys());
   const dedupedByKey = new Map();
+  const unsupportedIdCountById = new Map();
   let totalCandidates = 0;
+  let filteredUnsupportedNpcIds = 0;
+  const supportedNpcIds = state?.supportedNpcIds ?? null;
 
   for (const sourceName of orderedSources) {
     const sourceSpawns = state.sourceSpawns.get(sourceName);
@@ -151,19 +211,43 @@ function getCombinedSpawns(state) {
       if (
         !spawn ||
         typeof spawn.id !== "number" ||
+        !Number.isFinite(spawn.id) ||
         !Number.isFinite(spawn.x) ||
         !Number.isFinite(spawn.y) ||
         !Number.isFinite(spawn.z)
       ) {
         continue;
       }
-      dedupedByKey.set(buildNpcKey(spawn), spawn);
+
+      const npcId = Math.trunc(spawn.id);
+      if (supportedNpcIds && !supportedNpcIds.has(npcId)) {
+        filteredUnsupportedNpcIds++;
+        unsupportedIdCountById.set(
+          npcId,
+          (unsupportedIdCountById.get(npcId) ?? 0) + 1
+        );
+        continue;
+      }
+
+      dedupedByKey.set(buildNpcKey(spawn), {
+        ...spawn,
+        id: npcId,
+      });
     }
   }
+
+  const filteredUnsupportedNpcIdSamples = Array.from(
+    unsupportedIdCountById.entries()
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([id, count]) => ({ id, count }));
 
   return {
     orderedSources,
     totalCandidates,
+    filteredUnsupportedNpcIds,
+    filteredUnsupportedNpcIdSamples,
     spawns: Array.from(dedupedByKey.values()),
   };
 }
@@ -198,6 +282,8 @@ function applyCombinedSpawns(api) {
     api.log("applied_npc_spawns", {
       sources: combined.orderedSources,
       totalCandidates: combined.totalCandidates,
+      filteredUnsupportedNpcIds: combined.filteredUnsupportedNpcIds,
+      filteredUnsupportedNpcIdSamples: combined.filteredUnsupportedNpcIdSamples,
       deduped: combined.spawns.length,
       selectedForCapacity: selected.length,
       worldNpcCapacity: maxNpcs,
@@ -209,6 +295,8 @@ function applyCombinedSpawns(api) {
     loaded,
     orderedSources: combined.orderedSources,
     totalCandidates: combined.totalCandidates,
+    filteredUnsupportedNpcIds: combined.filteredUnsupportedNpcIds,
+    filteredUnsupportedNpcIdSamples: combined.filteredUnsupportedNpcIdSamples,
     deduped: combined.spawns.length,
     selectedForCapacity: selected.length,
     worldNpcCapacity: maxNpcs,
@@ -250,6 +338,8 @@ function reloadNpcSpawnSource(sourceName, api) {
 function reloadAllNpcSpawnSources(api) {
   const state = getState();
   const orderedSources = getOrderedSourceNames(state.sources.keys());
+
+  loadSupportedNpcIds(state, api);
 
   let ok = true;
   for (const sourceName of orderedSources) {

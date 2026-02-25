@@ -29,6 +29,7 @@ import {
   PluginRegionLoadedEvent,
   PluginSpellDisabledEvent,
   PluginCanTradeEvent,
+  PluginCombatDamageProvider,
   PluginCombatEngine,
   PluginCombatMethodResolver,
   PluginItemDropEvent,
@@ -92,6 +93,8 @@ export class PluginManager {
   private static packetListeners = new Map<number, RegisteredPacketListener>();
   private static combatEngine: PluginCombatEngine | null = null;
   private static combatEngineOwner: string | null = null;
+  private static combatDamageProvider: PluginCombatDamageProvider | null = null;
+  private static combatDamageProviderOwner: string | null = null;
   private static combatMethodResolvers: PluginCombatMethodResolver[] = [];
   private static npcCombatMethodProviders: PluginNpcCombatMethodProvider[] = [];
 
@@ -1546,6 +1549,22 @@ export class PluginManager {
         }
         PluginManager.setCombatEngineInternal(pluginName, engine);
       },
+      setCombatDamageProvider: (provider) => {
+        if (
+          !provider ||
+          typeof provider.calculateMaxMeleeHit !== "function" ||
+          typeof provider.calculateMaxRangedHit !== "function" ||
+          typeof provider.calculateMagicMaxHit !== "function" ||
+          typeof provider.getHitDamage !== "function" ||
+          typeof provider.applyExtraHitRolls !== "function"
+        ) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid combat damage provider registration`
+          );
+          return;
+        }
+        PluginManager.setCombatDamageProviderInternal(pluginName, provider);
+      },
       registerCombatMethodResolver: (resolver) => {
         if (!resolver || typeof resolver.resolve !== "function") {
           console.warn(
@@ -1579,6 +1598,10 @@ export class PluginManager {
     return PluginManager.combatEngine;
   }
 
+  public static getCombatDamageProvider(): PluginCombatDamageProvider | null {
+    return PluginManager.combatDamageProvider;
+  }
+
   public static getCombatMethodResolvers(): PluginCombatMethodResolver[] {
     return PluginManager.combatMethodResolvers.slice();
   }
@@ -1601,6 +1624,22 @@ export class PluginManager {
     }
     PluginManager.combatEngine = engine;
     PluginManager.combatEngineOwner = pluginName;
+  }
+
+  private static setCombatDamageProviderInternal(
+    pluginName: string,
+    provider: PluginCombatDamageProvider
+  ): void {
+    if (!provider) {
+      return;
+    }
+    if (PluginManager.combatDamageProvider) {
+      console.warn(
+        `[plugins] combat damage provider overridden (${PluginManager.combatDamageProviderOwner ?? "unknown"} -> ${pluginName})`
+      );
+    }
+    PluginManager.combatDamageProvider = provider;
+    PluginManager.combatDamageProviderOwner = pluginName;
   }
 
   private static registerCombatMethodResolverInternal(

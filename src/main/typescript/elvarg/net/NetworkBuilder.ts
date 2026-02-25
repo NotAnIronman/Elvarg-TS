@@ -325,14 +325,24 @@ class LoginSession {
 
     // Build game-layer player for packet listeners.
     const session = new PlayerSession(this.socket as any, (meta) => {
+      const label = PACKET_GUIDE[meta.opcode]?.name;
       this.recordRecentPacket(
         "OUT",
         meta.opcode,
         meta.payloadLength,
-        PACKET_GUIDE[meta.opcode]?.name,
+        label,
         undefined,
         meta.payloadPreview
       );
+      PacketLogger.logOutgoing({
+        direction: "OUT",
+        opcode: meta.opcode,
+        stage: this.stage,
+        label,
+        player: this.player?.username,
+        payloadLength: meta.payloadLength,
+        payloadPreview: meta.payloadPreview,
+      });
     });
     if (this.encryptor) {
       session.setEncryptor(this.encryptor);

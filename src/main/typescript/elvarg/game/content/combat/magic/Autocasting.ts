@@ -7,8 +7,6 @@ import { Skill } from "../../../model/Skill";
 import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
 import { CombatSpell } from "./CombatSpell";
 import { Spell } from "./Spell";
-
-const getFightType = () => require("../FightType").FightType as typeof import("../FightType").FightType;
 const getBonusManager = () => require("../../../model/equipment/BonusManager").BonusManager as typeof import("../../../model/equipment/BonusManager").BonusManager;
 const getWeaponInterfaces = () => require("../WeaponInterfaces").WeaponInterfaces as typeof import("../WeaponInterfaces").WeaponInterfaces;
 
@@ -166,8 +164,7 @@ export class Autocasting {
 
     private static updateConfigsOnAutocast(player: Player, autocast: boolean) {
         if (autocast) {
-            const FightType = getFightType();
-            player.getPacketSender().sendConfig(FightType.getParentId(), 3);
+            player.getPacketSender().sendConfig(player.getFightType().getParentId(), 3);
         }
     }
 

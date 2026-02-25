@@ -140,37 +140,80 @@ export class FightType {
     public static GHRAZI_RAPIER_BLOCK = new FightType(8145, 43, 3, ATTACK_STAB, FightStyle.DEFENSIVE)
 
 
-    private static animation: number;
-    private static attackSound: Sound;
-    private static parentId: number;
-    private static childId: number;
-    private static bonusType: number;
-    private static style: FightStyle;
+    private animation: number;
+    private attackSound: Sound;
+    private parentId: number;
+    private childId: number;
+    private bonusType: number;
+    private style: FightStyle;
 
     private constructor(animation: number, parentId: number, childId: number, bonusType: number, style: FightStyle, sound?: Sound) {
-        FightType.animation = animation;
-        FightType.parentId = parentId;
-        FightType.childId = childId;
-        FightType.bonusType = bonusType;
-        FightType.style = style;
-        FightType.attackSound = sound;
+        this.animation = animation;
+        this.parentId = parentId;
+        this.childId = childId;
+        this.bonusType = bonusType;
+        this.style = style;
+        this.attackSound = sound ?? Sound.WEAPON;
     }
 
-    public static getAnimation(): number {
+    public static values(): FightType[] {
+        return Object.values(FightType).filter((value): value is FightType => value instanceof FightType);
+    }
+
+    public static resolve(value: unknown): FightType | null {
+        if (value instanceof FightType) {
+            return value;
+        }
+
+        if (!value || typeof value !== "object") {
+            return null;
+        }
+
+        const raw = value as Record<string, unknown>;
+        const animation = FightType.asFiniteInt(raw.animation);
+        const parentId = FightType.asFiniteInt(raw.parentId);
+        const childId = FightType.asFiniteInt(raw.childId);
+        const bonusType = FightType.asFiniteInt(raw.bonusType);
+        if (animation === null && parentId === null && childId === null && bonusType === null) {
+            return null;
+        }
+
+        const candidates = FightType.values().filter((fightType) => {
+            return (animation === null || fightType.animation === animation)
+                && (parentId === null || fightType.parentId === parentId)
+                && (childId === null || fightType.childId === childId)
+                && (bonusType === null || fightType.bonusType === bonusType);
+        });
+
+        if (candidates.length === 0) {
+            return null;
+        }
+
+        return candidates[0];
+    }
+
+    private static asFiniteInt(value: unknown): number | null {
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+            return null;
+        }
+        return value | 0;
+    }
+
+    public getAnimation(): number {
         return this.animation;
     }
 
     /**
      * Gets the parent config      *
      * @return the parent      */
-    public static getParentId(): number {
+    public getParentId(): number {
         return this.parentId;
     }
 
     /**
      * Gets the child config      *
      * @return the child      */
-    public static getChildId(): number {
+    public getChildId(): number {
         return this.childId;
     }
 
@@ -179,12 +222,12 @@ export class FightType {
      *
      * @return the bonus type.
      */
-    public static getBonusType(): number {
+    public getBonusType(): number {
         return this.bonusType;
 
     }
-    public static getBonusTypes(): number {
-        return FightType.bonusType;
+    public getBonusTypes(): number {
+        return this.bonusType;
 
     }
 
@@ -193,11 +236,11 @@ export class FightType {
      *
      * @return the fighting style.
      */
-    public static getStyle(): FightStyle {
+    public getStyle(): FightStyle {
         return this.style;
     }
 
-    public static getCorrespondingBonus(): number {
+    public getCorrespondingBonus(): number {
         switch (this.bonusType) {
             case ATTACK_CRUSH:
                 return DEFENCE_CRUSH;
@@ -214,7 +257,7 @@ export class FightType {
         }
     }
 
-    public static getAttackSound(): Sound {
+    public getAttackSound(): Sound {
         return this.attackSound;
     }
 

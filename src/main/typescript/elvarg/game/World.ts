@@ -180,9 +180,13 @@ export class World {
         return keys;
     }
 
-    private static shouldProcessNpc(npc: NPC, activeRegionKeys: Set<string>): boolean {
+    private static shouldProcessNpc(npc: NPC, activeRegionKeys: Set<string> | null): boolean {
         if (!npc) {
             return false;
+        }
+
+        if (!GameConstants.PROCESS_NPCS_BY_ACTIVE_REGIONS) {
+            return true;
         }
 
         // Keep active combat/death flows alive even if temporarily out of region focus.
@@ -190,7 +194,7 @@ export class World {
             return true;
         }
 
-        if (activeRegionKeys.size === 0) {
+        if (!activeRegionKeys || activeRegionKeys.size === 0) {
             return false;
         }
 
@@ -403,7 +407,9 @@ export class World {
             }
         });
 
-        const activeNpcRegions = World.buildActiveNpcRegionKeys();
+        const activeNpcRegions = GameConstants.PROCESS_NPCS_BY_ACTIVE_REGIONS
+            ? World.buildActiveNpcRegionKeys()
+            : null;
         World.npcs.forEach((npc) => {
             try {
                 if (!World.shouldProcessNpc(npc, activeNpcRegions)) {

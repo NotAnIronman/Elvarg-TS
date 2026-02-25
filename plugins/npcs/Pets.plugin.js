@@ -17,7 +17,8 @@ const PETS = [
   { enumName: "CALLISTO_CUB", petId: 497, morphId: 0, itemId: 13178, dialogue: 130 },
   {
     enumName: "HELLPUPPY",
-    petId: 964,
+    // 317 clients reliably render the legacy hellcat model id.
+    petId: 1625,
     morphId: 0,
     itemId: 13247,
     dialogue: 138,
