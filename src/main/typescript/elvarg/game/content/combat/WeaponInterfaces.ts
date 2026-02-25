@@ -56,9 +56,9 @@ export class WeaponInterfaces {
         //Set default attack style to aggressive!
         for (const type of Object.values(weapon.getFightType())) {
             if (type instanceof FightType) {
-                if (FightType.getStyle() == FightStyle.AGGRESSIVE) {
+                if (type.getStyle() == FightStyle.AGGRESSIVE) {
                     player.setFightType(type);
-                    player.getPacketSender().sendConfig(FightType.getParentId(), FightType.getChildId());
+                    player.getPacketSender().sendConfig(type.getParentId(), type.getChildId());
                     return;
                 }
             }
@@ -67,7 +67,7 @@ export class WeaponInterfaces {
         //Still no proper attack style.
         //Set it to the first one..
         player.setFightType(player.getWeapon().getFightType()[0]);
-        player.getPacketSender().sendConfig(FightType.getParentId(), FightType.getChildId());
+        player.getPacketSender().sendConfig(player.getFightType().getParentId(), player.getFightType().getChildId());
     }
 
     public static changeCombatSettings(player: Player, button: number): boolean {

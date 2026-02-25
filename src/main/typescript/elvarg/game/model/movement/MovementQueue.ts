@@ -20,6 +20,7 @@ import { NpcIdentifiers } from "../../../util/NpcIdentifiers";
 import { RandomGen } from "../../../util/RandomGen";
 import { TimerKey } from "../../../util/timers/TimerKey";
 import { Action } from "../Action";
+import { GameConstants } from "../../GameConstants";
 import * as fs from "fs";
 import * as path from "path";
 export class MovementQueue {
@@ -326,7 +327,7 @@ export class MovementQueue {
 
         if (this.character.getCombatFollowing() != null) {
             this.processCombatFollowing();
-        } else if (this.character.getFollowing() != null) {
+        } else if (this.character.getFollowing() != null && !this.character.isPlayer()) {
             this.processFollowing();
         }
 
@@ -476,8 +477,6 @@ export class MovementQueue {
 
         // Update interaction
         this.character.setMobileInteraction(following);
-        // Keep facing synchronized even when interaction-target decode is delayed client-side.
-        this.character.setPositionToFace(following.getLocation().clone());
 
         // Make sure we reset the current movement queue to prevent erratic back and forth
         this.reset();
@@ -506,7 +505,6 @@ export class MovementQueue {
             if (this.character.isNpc()) {
                 const npc = this.character.getAsNpc();
                 if (npc.isPet()) {
-                    npc.setVisible(false);
                     const tiles = new Array<Location>();
                     for (const tile of following.outterTiles()) {
                         if (RegionManager.blocked(tile, following.getPrivateArea())) {
@@ -515,9 +513,13 @@ export class MovementQueue {
                         tiles.push(tile);
                     }
                     if (tiles.length !== 0) {
+                        npc.setVisible(false);
                         npc.moveTo(tiles[Misc.getRandom(tiles.length - 1)]);
                         npc.setVisible(true);
                         npc.setArea(following.getArea());
+                    } else {
+                        // Never leave pets stuck invisible when no adjacent tile is currently valid.
+                        npc.setVisible(true);
                     }
                     return;
                 }
@@ -676,20 +678,39 @@ export class MovementQueue {
         if (following === this.character || !following.isRegistered()) {
             this.character.setFollowing(null);
             this.character.setMobileInteraction(null);
+            this.character.setPositionToFace(null);
             return;
         }
 
         if (following.getPrivateArea() != this.character.getPrivateArea()) {
+            if (this.tryTeleportPetToFollower(following)) {
+                return;
+            }
             this.character.setFollowing(null);
             this.character.setMobileInteraction(null);
+            this.character.setPositionToFace(null);
+            this.reset();
             return;
         }
 
-        // Keep follow behavior stable and avoid runaway pathing when the leader is too far away.
+        // Keep parity with Java follow task behavior for generic following.
+        // For pets, OSRS-like behavior is to snap back to the owner when they
+        // get too far away.
+        const tooFarAway = !following
+            .getLocation()
+            .isWithinDistance(this.character.getLocation(), GameConstants.PET_FOLLOW_AUTO_TELEPORT_DISTANCE);
+        if (tooFarAway && this.tryTeleportPetToFollower(following)) {
+            return;
+        }
+
+        // Keep parity with Java follow task behavior.
         if (
             following.isTeleportingReturn() ||
-            !following.getLocation().isWithinDistance(this.character.getLocation(), 15)
+            tooFarAway
         ) {
+            if (this.tryTeleportPetToFollower(following)) {
+                return;
+            }
             if (this.character.isPlayer() && following.isPlayer()) {
                 this.character.sendMessage(`Unable to find ${following.getAsPlayer().getUsername()}.`);
             }
@@ -702,26 +723,92 @@ export class MovementQueue {
 
         this.character.setMobileInteraction(following);
         this.character.setPositionToFace(following.getLocation());
-
         if (!this.getMobility().canMove()) {
             return;
         }
 
+        const followerDistance = this.character.calculateDistance(following);
         const leaderQueue = following.getMovementQueue();
-        let destX = leaderQueue.followX;
-        let destY = leaderQueue.followY;
+        const leaderMoving = leaderQueue.isMovings();
+        const destX = leaderQueue.followX;
+        const destY = leaderQueue.followY;
 
-        const currentX = this.character.getLocation().getX();
-        const currentY = this.character.getLocation().getY();
+        // When not overlapping and already adjacent to a stationary leader,
+        // do not re-route; this avoids jittering too close/too far while idle.
+        if (followerDistance <= 1 && !leaderMoving && followerDistance !== 0) {
+            return;
+        }
+
+        let destination: Location | null = null;
+        if (destX !== -1 && destY !== -1) {
+            destination = new Location(destX, destY, this.character.getLocation().getZ());
+        }
+
         if (
-            (destX === -1 && destY === -1) ||
-            (currentX === destX && currentY === destY)
+            destination == null ||
+            destination.equals(this.character.getLocation()) ||
+            followerDistance > 1
+        ) {
+            destination = this.getClosestFollowTile(following) ?? destination;
+        }
+
+        if (
+            destination == null ||
+            destination.equals(this.character.getLocation())
         ) {
             return;
         }
 
+        // Avoid resetting and rebuilding identical routes each tick.
+        if (this.points.length > 0 && this.lastDestX === destination.getX() && this.lastDestY === destination.getY()) {
+            return;
+        }
+
         this.reset();
-        PathFinder.calculateWalkRoute(this.character, destX, destY);
+        PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY());
+    }
+
+    private getClosestFollowTile(leader: Mobile): Location | null {
+        const privateArea = this.character.getPrivateArea();
+        const current = this.character.getLocation();
+        const candidates = leader
+            .outterTiles()
+            .filter(tile => !RegionManager.blocked(tile, privateArea))
+            .sort((a, b) => a.getDistance(current) - b.getDistance(current));
+
+        return candidates.length > 0 ? candidates[0] : null;
+    }
+
+    private tryTeleportPetToFollower(following: Mobile): boolean {
+        if (!this.character.isNpc()) {
+            return false;
+        }
+
+        const npc = this.character.getAsNpc();
+        if (!npc.isPet()) {
+            return false;
+        }
+
+        const tiles: Location[] = [];
+        for (const tile of following.outterTiles()) {
+            if (RegionManager.blocked(tile, following.getPrivateArea())) {
+                continue;
+            }
+            tiles.push(tile);
+        }
+
+        const destination =
+            tiles.length > 0
+                ? tiles[Misc.getRandom(tiles.length - 1)]
+                : following.getLocation().clone();
+
+        npc.setVisible(false);
+        npc.moveTo(destination);
+        npc.setVisible(true);
+        npc.setArea(following.getArea());
+        npc.setPositionToFace(following.getLocation());
+        npc.setMobileInteraction(following);
+        return true;
     }
 
     // Gets the size of the queue.

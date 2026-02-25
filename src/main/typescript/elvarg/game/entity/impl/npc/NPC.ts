@@ -16,11 +16,77 @@ import { Location } from "../../../model/Location";
 import { AreaManager } from "../../../model/areas/AreaManager";
 import { TaskManager } from "../../../task/TaskManager";
 import { NPCDeathTask } from "../../../task/impl/NPCDeathTask"
-import * as util from 'util';
 import { Wilderness } from "../../../content/wilderness/Wilderness";
 import { MovementQueue } from "../../../model/movement/MovementQueue";
+import { GameConstants } from "../../../GameConstants";
 
 export class NPC extends Mobile {
+    private static sameLocation(a: Location | null | undefined, b: Location | null | undefined): boolean {
+        if (a == null && b == null) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.equals(b);
+    }
+
+    private static formatLocation(location: Location | null | undefined): string {
+        if (location == null) {
+            return "null";
+        }
+        return `${location.getX()},${location.getY()},${location.getZ()}`;
+    }
+
+    private interactingMobileForLog(): string {
+        const interactingMobile = this.getInteractingMobile();
+        if (interactingMobile == null) {
+            return "none";
+        }
+        if (typeof interactingMobile.isPlayer === "function" && interactingMobile.isPlayer()) {
+            const username = interactingMobile.getAsPlayer?.()?.getUsername?.() ?? "unknown";
+            return `player:${username}#${interactingMobile.getIndex?.() ?? "?"}`;
+        }
+        if (typeof interactingMobile.isNpc === "function" && interactingMobile.isNpc()) {
+            const npcId = interactingMobile.getAsNpc?.()?.getId?.() ?? "?";
+            return `npc:${npcId}#${interactingMobile.getIndex?.() ?? "?"}`;
+        }
+        return "unknown";
+    }
+
+    private resolveFaceChangeReason(reason?: string): string {
+        if (reason) {
+            return reason;
+        }
+        const stack = new Error().stack;
+        if (!stack) {
+            return "unspecified";
+        }
+        const frames = stack
+            .split("\n")
+            .slice(1)
+            .map((line) => line.trim())
+            .filter((line) => !line.includes(".setPositionToFace") && !line.includes("resolveFaceChangeReason"));
+        return frames[0] ?? "unspecified";
+    }
+
+    public setPositionToFace(positionToFace: Location, reason?: string): NPC {
+        const previousFaceTarget = this.getPositionToFace?.() ?? null;
+        super.setPositionToFace(positionToFace);
+        if (!GameConstants.DEBUG_NPC_FACE_POSITION_CHANGES) {
+            return this;
+        }
+        if (NPC.sameLocation(previousFaceTarget, positionToFace)) {
+            return this;
+        }
+        const npcName = this.getCurrentDefinition()?.getName?.() ?? "unknown";
+        const activeTarget = this.interactingMobileForLog();
+        console.info(
+            `[npc.face] idx=${this.getIndex()} id=${this.getId()} name=${npcName} npcLoc=${NPC.formatLocation(this.getLocation())} old=${NPC.formatLocation(previousFaceTarget)} new=${NPC.formatLocation(positionToFace)} target=${activeTarget} reason=${this.resolveFaceChangeReason(reason)}`
+        );
+        return this;
+    }
+
     getSize(): number {
         return this.size();
     }
@@ -145,12 +211,29 @@ export class NPC extends Mobile {
                 const outOfRange =
                     interactionLocation != null
                     && this.getLocation().getDistance(interactionLocation) > MovementQueue.NPC_INTERACT_RADIUS;
+                // Keep interaction/facing active when this NPC is intentionally tracking
+                // the same target via follow/combat. Without this guard, pets can oscillate:
+                // follow sets face-to-player, then NPC.process clears interaction for range
+                // and resets face back to spawn direction in the same cycle.
+                const trackingInteractionTarget =
+                    this.getFollowing() === interactingMobile
+                    || this.getCombatFollowing() === interactingMobile
+                    || this.getCombat().getTarget() === interactingMobile;
                 const targetUnregistered =
                     typeof interactingMobile.isRegistered === "function"
                     && !interactingMobile.isRegistered();
-                const clearInteraction = targetUnregistered || interactionLocation == null || outOfRange;
+                const clearInteraction =
+                    targetUnregistered
+                    || interactionLocation == null
+                    || (outOfRange && !trackingInteractionTarget);
 
                 if (clearInteraction) {
+                    const clearReason =
+                        targetUnregistered
+                            ? "target_unregistered"
+                            : interactionLocation == null
+                                ? "missing_target_location"
+                                : "out_of_range";
                     this.setMobileInteraction(null);
                     if (this.movementCoordinator.getRadius() === 0) {
                         // OSRS-like behavior for stationary NPCs: after an interaction ends,
@@ -158,9 +241,12 @@ export class NPC extends Mobile {
                         // keeping the last player-facing orientation.
                         // Ref: https://oldschool.runescape.wiki/w/Wander_radius
                         const facingDirection = this.getFace().getDirection();
-                        this.setPositionToFace(this.getLocation().clone().add(facingDirection.getX(), facingDirection.getY()));
+                        this.setPositionToFace(
+                            this.getLocation().clone().add(facingDirection.getX(), facingDirection.getY()),
+                            `clear_interaction_stationary_reset_to_spawn_facing:${clearReason}`
+                        );
                     } else {
-                        this.setPositionToFace(null);
+                        this.setPositionToFace(null, `clear_interaction_mobile_clear_face_target:${clearReason}`);
                     }
                 }
             }

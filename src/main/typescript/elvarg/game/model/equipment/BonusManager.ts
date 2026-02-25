@@ -41,9 +41,9 @@ export class BonusManager {
     private static readonly RANGED_MAXHIT_FRAME = 15116;
     private static readonly MAGIC_MAXHIT_FRAME = 15117;
 
-    private attackBonus: number[] = new Array(5);
-    private defenceBonus: number[] = new Array(5);
-    private otherBonus: number[] = new Array(4);
+    private attackBonus: number[] = new Array(5).fill(0);
+    private defenceBonus: number[] = new Array(5).fill(0);
+    private otherBonus: number[] = new Array(4).fill(0);
 
     public static open(player: Player) {
         player.getPacketSender().sendInterface(BonusManager.INTERFACE_ID);
@@ -52,7 +52,7 @@ export class BonusManager {
 
     public static update(player: Player) {
         let totalBonuses = BonusManager.STRING_ID.length;
-        let bonuses = new Array(totalBonuses);
+        let bonuses = new Array(totalBonuses).fill(0);
         for (const item of player.getEquipment().getItems()) {
             const definition = ItemDefinition.forId(item.getId());
             if (definition.getBonuses() != null) {

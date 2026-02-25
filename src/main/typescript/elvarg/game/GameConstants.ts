@@ -8,21 +8,35 @@ import { PlayerRights } from "./model/rights/PlayerRights"
 export class GameConstants {
     public static readonly NAME: string = "RspsApp";
     public static readonly NPC_BITS: number = 18;
+    // Keep optional OSRS spawns disabled by default; legacy 317 data is the baseline.
+    //public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = false;
+    // Region-scoped NPC processing can hide NPC updates when parity is off; keep global by default.
+    public static readonly PROCESS_NPCS_BY_ACTIVE_REGIONS: boolean = false;
     public static readonly CLIENT_UID: number = 8784521;
     public static readonly DEFINITIONS_DIRECTORY: string = "./data/definitions/";
     public static readonly CLIPPING_DIRECTORY: string = "./data/clipping/";
     public static PLAYER_PERSISTENCE: PlayerPersistence = new NullPlayerPersistence();
     public static readonly CONCURRENCY: boolean = false;
+    // Disable regional NPC processing optimization to avoid visibility churn during login/debug.
+    public static readonly ENABLE_REGION_BASED_NPC_PROCESSING: boolean = true;
+    // Keep OSRS spawn source opt-in until client cache parity is confirmed for those ids.
+    public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = true;
     // Tick rate for the main game loop in milliseconds.
     // Java server runs at ~600ms per cycle; mirror that here.
     public static readonly GAME_ENGINE_PROCESSING_CYCLE_RATE: number = 600;
-    public static readonly QUEUED_LOOP_THRESHOLD: number = 45;
+    public static readonly QUEUED_LOOP_THRESHOLD: number = 150;
+    // OSRS wiki documents that pets auto-teleport when stuck/too far; use the
+    // existing follow break range from Java follow behavior as the auto-teleport
+    // threshold for pets in this server.
+    public static readonly PET_FOLLOW_AUTO_TELEPORT_DISTANCE: number = 15;
     public static readonly DEFAULT_LOCATION = new Location(3089, 3524);
     public static readonly QUEUE_SWITCHING_REFRESH: boolean = true;
     public static readonly DROP_THRESHOLD: number = 2;
     public static readonly COMBAT_SKILLS_EXP_MULTIPLIER: number = 6;
     public static readonly REGULAR_SKILLS_EXP_MULTIPLIER: number = 18;
     public static readonly DEBUG_ATTACK_DISTANCE: boolean = false;
+    // Logs whenever an NPC's face-position target changes (old/new target + reason).
+    public static readonly DEBUG_NPC_FACE_POSITION_CHANGES: boolean = true;
     public static readonly TAB_INTERFACES: number[] = [2423, 3917, 31000, 3213, 1644, 5608, -1, 37128, 5065, 5715, 2449,
         42500, 147, 32000];
 

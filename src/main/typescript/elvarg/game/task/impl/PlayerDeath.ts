@@ -14,8 +14,10 @@ import { Location } from "../../model/Location";
 import { BrokenItem } from "../../model/BrokenItem";
 import { Animation } from "../../model/Animation";
 import { PluginManager } from "../../../plugins/PluginManager";
+import { TaskManager } from "../TaskManager";
 
 export class PlayerDeathTask extends Task {
+    private static readonly OPEN_PRESETS_DELAY_TICKS = 2;
     private player: Player;
     private killer: Player | undefined;
     private loseItems = true;
@@ -158,7 +160,7 @@ export class PlayerDeathTask extends Task {
                         this.player.moveTo(GameConstants.DEFAULT_LOCATION);
                         if (this.loseItems) {
                             if (this.player.isOpenPresetsOnDeath()) {
-                                Presetables.opens(this.player);
+                                this.openPresetsAfterDeath();
                             }
                         }
                     }
@@ -207,5 +209,23 @@ export class PlayerDeathTask extends Task {
             this.player.resetAttributes();
             this.player.moveTo(GameConstants.DEFAULT_LOCATION);
         }
+    }
+
+    private openPresetsAfterDeath(): void {
+        const player = this.player;
+        // Delay preset UI opening until after death teleport/region packets settle.
+        TaskManager.submit(new (class extends Task {
+            constructor() {
+                super(PlayerDeathTask.OPEN_PRESETS_DELAY_TICKS, false);
+            }
+
+            public execute(): void {
+                this.stop();
+                if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
+                    return;
+                }
+                Presetables.opens(player);
+            }
+        })());
     }
 }

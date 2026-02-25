@@ -1,9 +1,12 @@
 const fs = require("fs");
 const path = require("path");
+const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const {
   registerNpcSpawnSource,
   ensureNpcSpawnsLoaded,
 } = require("./lib/NpcSpawnRegistry");
+const getGameConstants = () =>
+  require("../../src/main/typescript/elvarg/game/GameConstants").GameConstants;
 
 const SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns_osrs.json"),
@@ -175,6 +178,17 @@ function loadSpawns() {
 module.exports = {
   name: "OSRSNpcSpawns",
   register(api) {
+    const GameConstants = getGameConstants();
+    if (!GameConstants.ENABLE_OSRS_NPC_SPAWNS) {
+      if (api && typeof api.log === "function") {
+        api.log("osrs_spawn_source_disabled", {
+          flag: "GameConstants.ENABLE_OSRS_NPC_SPAWNS",
+          enabled: false,
+        });
+      }
+      return;
+    }
+
     registerNpcSpawnSource({
       api,
       sourceName: "osrs",

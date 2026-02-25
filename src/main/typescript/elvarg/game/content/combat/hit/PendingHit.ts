@@ -12,7 +12,7 @@ export class PendingHit {
     private method: CombatMethod;
     private combatType: CombatType;
     private hits: HitDamage[];
-    private totalDamage: number;
+    private totalDamage = 0;
     private delay: number;
     private accurate: boolean;
     private handleAfterHitEffects: boolean;
@@ -90,9 +90,18 @@ export class PendingHit {
         }
 
         let hits: HitDamage[] = new Array(hitAmount);
+        this.totalDamage = 0;
         for (let i = 0; i < hits.length; i++) {
             this.accurate = !rollAccuracy || AccuracyFormulasDpsCalc.rollAccuracy(this.attacker, this.target, this.combatType);
             let damage: HitDamage = this.accurate ? CombatFactory.getHitDamage(this.attacker, this.target, this.combatType) : new HitDamage(0, HitMask.BLUE);
+            CombatFactory.applyExtraHitRolls(
+                this.attacker,
+                this.target,
+                this.combatType,
+                damage,
+                this.accurate,
+                this.method
+            );
             this.totalDamage += damage.getDamage();
             hits[i] = damage;
         }
@@ -110,7 +119,7 @@ export class PendingHit {
         if (this.attacker.isNpc()) {
             return new Array();
         }
-        return ((this.attacker as Player).getFightType().constructor().getStyle().skill(this.combatType));
+        return (this.attacker as Player).getFightType().getStyle().skill(this.combatType);
     }
 
     public getCombatType(): CombatType {

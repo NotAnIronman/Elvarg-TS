@@ -22,7 +22,9 @@ import { GameConstants } from '../../GameConstants';
  */
 
 export class NPCUpdating {
-    private static readonly MAX_LOCAL_NPCS = 79; // Kept in sync with Java server behaviour.
+    // 317 NPC local count is encoded on 8 bits (0-255). Using 79 can starve nearby
+    // spawns in crowded areas and make newly spawned NPCs (e.g. pets) appear invisible.
+    private static readonly MAX_LOCAL_NPCS = 255;
 
     public static update(player: Player): void {
         let update = new PacketBuilder();
@@ -35,7 +37,9 @@ export class NPCUpdating {
         // Remove stale NPC references in-place (Java iterator.remove equivalent).
         for (let index = 0; index < localNpcs.length;) {
             const npc = localNpcs[index];
-            if (World.getNpcs().get(npc.getIndex()) != null
+            const worldNpcAtIndex = World.getNpcs().get(npc.getIndex());
+            if (worldNpcAtIndex != null
+                && npc.isRegistered()
                 && npc.isVisible()
                 && player.getLocation().isViewableFrom(npc.getLocation())
                 && !npc.isNeedsPlacement()
@@ -46,17 +50,39 @@ export class NPCUpdating {
                 }
                 index++;
             } else {
-                npc.onRemove();
                 localNpcs.splice(index, 1);
                 packet.putBits(1, 1);
                 packet.putBits(2, 3);
             }
         }
 
-        const activeNpcs = World.getActiveNpcsForUpdate();
-        const npcSource = activeNpcs.length > 0 ? activeNpcs : World.getNpcs();
+        // Keep the owner's active pet in their local NPC list even when normal
+        // candidate scans are noisy. This prevents "spawned but invisible" pets
+        // when the pet is registered in-world but missed by the regular add pass.
+        const currentPet = player.getCurrentPet?.() as NPC | null;
+        if (
+            currentPet != null
+            && currentPet.isRegistered()
+            && currentPet.isVisible()
+        ) {
+            if (currentPet.getPrivateArea() != player.getPrivateArea()) {
+                currentPet.setArea(player.getArea());
+            }
+            if (
+                !localNpcs.includes(currentPet)
+                && localNpcs.length < NPCUpdating.MAX_LOCAL_NPCS
+                && currentPet.getLocation().isViewableFrom(player.getLocation())
+            ) {
+                localNpcs.push(currentPet);
+                NPCUpdating.addNPC(player, currentPet, packet);
+                if (currentPet.getUpdateFlag().isUpdateRequired()) {
+                    NPCUpdating.appendUpdates(currentPet, update);
+                }
+            }
+        }
 
-        for (let npc of npcSource) {
+        // Keep add-to-local parity with Java: iterate the world NPC list directly.
+        for (let npc of World.getNpcs()) {
             if (localNpcs.length >= NPCUpdating.MAX_LOCAL_NPCS) // Originally 255 in legacy.
                 break;
             if (npc == null || localNpcs.includes(npc) || !npc.isVisible() || npc.isNeedsPlacement()
@@ -213,22 +239,13 @@ export class NPCUpdating {
             block.put(transform ? 1 : 0);
 
             if (transform) {
-                block.putShort(npc.getNpcTransformationId());
+                block.putShort(npc.getNpcTransformationId(), ValueType.A, ByteOrder.LITTLE);
             }
         }
         if (flag.flagged(Flag.FACE_POSITION) && npc.getPositionToFace() != null) {
-            let position: Location = npc.getPositionToFace();
-
-            if (npc.getUpdateFlag().flagged(Flag.FACE_POSITION) && npc.getPositionToFace() != null) {
-                position = npc.getPositionToFace();
-
-                if (npc.getUpdateFlag().flagged(Flag.FACE_POSITION) && npc.getPositionToFace() != null) {
-                    position = npc.getPositionToFace();
-
-                    block.putShorts(position.getX() * 2 + 1, ByteOrder.LITTLE);
-                    block.putShorts(position.getY() * 2 + 1, ByteOrder.LITTLE);
-                }
-            }
+            const position: Location = npc.getPositionToFace();
+            block.putShorts(position.getX() * 2 + 1, ByteOrder.LITTLE);
+            block.putShorts(position.getY() * 2 + 1, ByteOrder.LITTLE);
         }
     }
     /**

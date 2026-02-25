@@ -10,10 +10,17 @@ import type { Player } from "../../../entity/impl/player/Player";
 import type { NPC } from "../../../entity/impl/npc/NPC";
 import { Equipment } from "../../../model/container/impl/Equipment";
 import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
-import { FightType } from "../FightType";
 
-const getPlayerCtor = () =>
-    require("../../../entity/impl/player/Player").Player as typeof import("../../../entity/impl/player/Player").Player;
+const getPlayerCombatSpecial = (player: Player): any | null => {
+    const accessor = (player as any)?.getCombatSpecial;
+    if (typeof accessor === "function") {
+        const resolved = accessor.call(player);
+        if (resolved) {
+            return resolved;
+        }
+    }
+    return (player as any)?.combatSpecial ?? null;
+};
 
 export class DamageFormulas {
     private static effectiveStrengthLevel(player: Player): number {
@@ -36,7 +43,7 @@ export class DamageFormulas {
 
         str = (str * prayerBonus);
 
-        let fightStyle = FightType.getStyle();
+        let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.AGGRESSIVE)
             str += 3;
         else if (fightStyle == FightStyle.CONTROLLED)
@@ -68,8 +75,9 @@ export class DamageFormulas {
                 maxHit *= (mult / 100);
             }
 
-            if (player.isSpecialActivated()) {
-                maxHit *= getPlayerCtor().getCombatSpecial().getStrengthMultiplier();
+            const special = getPlayerCombatSpecial(player);
+            if (player.isSpecialActivated() && special != null) {
+                maxHit *= special.getStrengthMultiplier();
             }
         } else {
             maxHit = entity.getAsNpc().getCurrentDefinition().getMaxHit();
@@ -127,7 +135,7 @@ export class DamageFormulas {
         }
         rngStrength = (rngStrength * prayerMod);
 
-        let fightStyle = FightType.getStyle();
+        let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.ACCURATE)
             rngStrength += 3;
         rngStrength += 8;
@@ -147,8 +155,13 @@ export class DamageFormulas {
         maxHit += 320;
         maxHit /= 640;
 
-        if (player.isSpecialActivated() && getPlayerCtor().getCombatSpecial().getCombatMethod().type() == CombatType.RANGED) {
-            maxHit *= getPlayerCtor().getCombatSpecial().getStrengthMultiplier();
+        const special = getPlayerCombatSpecial(player);
+        if (
+            player.isSpecialActivated() &&
+            special != null &&
+            special.getCombatMethod().type() == CombatType.RANGED
+        ) {
+            maxHit *= special.getStrengthMultiplier();
         }
 
         return Math.floor(maxHit);

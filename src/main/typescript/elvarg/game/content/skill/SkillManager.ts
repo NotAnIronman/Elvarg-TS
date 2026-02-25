@@ -32,7 +32,7 @@ export class SkillManager {
         75127, 83014, 91721, 101333, 111945, 123660, 136594, 150872, 166636, 184040, 203254, 224466, 247886, 273742,
         302288, 333804, 368599, 407015, 449428, 496254, 547953, 605032, 668051, 737627, 814445, 899257, 992895,
         1096278, 1210421, 1336443, 1475581, 1629200, 1798808, 1986068, 2192818, 2421087, 2673114, 2951373, 3258594,
-        3597792, 3972294, 4385776, 4842295, 5346332, 5902831, , 7195629, 7944614, 8771558, 9684577, 10692629,
+        3597792, 3972294, 4385776, 4842295, 5346332, 5902831, 6517253, 7195629, 7944614, 8771558, 9684577, 10692629,
         11805606, 13034431];
     // Explicit 0 delay so the client renders the level-up fireworks immediately.
     public static readonly LEVEL_UP_GRAPHIC: Graphic = new Graphic(199, 0);
@@ -105,11 +105,29 @@ export class SkillManager {
         return 99;
     }
 
+    private static sanitizeExperienceValue(value: number): number {
+        if (!Number.isFinite(value) || value <= 0) {
+            return 0;
+        }
+        const floored = Math.floor(value);
+        if (floored >= SkillManager.MAX_EXPERIENCE) {
+            return SkillManager.MAX_EXPERIENCE;
+        }
+        return floored;
+    }
+
     addExperiences(skill: Skill, experience: number): SkillManager {
         return this.addExperience(skill, experience, true);
     }
 
     addExperience(skill: Skill, experience: number, multipliers: boolean): SkillManager {
+        if (!skill || typeof skill.getIndex !== "function") {
+            return this;
+        }
+        if (!Number.isFinite(experience) || experience <= 0) {
+            return this;
+        }
+
         // Multipliers...
         if (multipliers) {
             if (skill == Skill.ATTACK || skill == Skill.DEFENCE || skill == Skill.STRENGTH || skill == Skill.HITPOINTS
@@ -128,19 +146,25 @@ export class SkillManager {
             return this;
 
         // If we already have max exp, don't add any more.
-        if (this.skills.experience[skill.getIndex()] >= SkillManager.MAX_EXPERIENCE)
+        const skillIndex = skill.getIndex();
+        const currentExperience = SkillManager.sanitizeExperienceValue(this.skills.experience[skillIndex]);
+        this.skills.experience[skillIndex] = currentExperience;
+        if (currentExperience >= SkillManager.MAX_EXPERIENCE)
             return this;
 
         // The skill's level before any experience is added
-        const startingLevel = this.skills.maxLevel[skill.getIndex()];
+        const startingLevel = Number.isFinite(this.skills.maxLevel[skillIndex])
+            ? Math.max(1, this.skills.maxLevel[skillIndex])
+            : 1;
+        this.skills.maxLevel[skillIndex] = startingLevel;
 
         // Add experience to the selected skill..
-        this.skills.experience[skill.getIndex()] = this.skills.experience[skill.getIndex()] + experience > SkillManager.MAX_EXPERIENCE
+        this.skills.experience[skillIndex] = this.skills.experience[skillIndex] + experience > SkillManager.MAX_EXPERIENCE
             ? SkillManager.MAX_EXPERIENCE
-            : this.skills.experience[skill.getIndex()] + experience;
+            : this.skills.experience[skillIndex] + experience;
 
         // Get the skill's new level after experience has been added..
-        let newLevel = SkillManager.getLevelForExperience(this.skills.experience[skill.getIndex()]);
+        let newLevel = SkillManager.getLevelForExperience(this.skills.experience[skillIndex]);
 
         // Handle level up..
         if (newLevel > startingLevel) {
@@ -338,6 +362,33 @@ export class SkillManager {
         let baselineXp = SkillManager.getExperienceForLevel(10);
         let updated = false;
 
+        for (const skill of Skill.values()) {
+            const idx = skill.getIndex();
+            const rawExp = Number(this.skills.experience[idx]);
+            const rawMax = Number(this.skills.maxLevel[idx]);
+            const rawLevel = Number(this.skills.level[idx]);
+
+            const exp = SkillManager.sanitizeExperienceValue(rawExp);
+            const levelFromExp = Math.max(1, SkillManager.getLevelForExperience(exp));
+            const max = Number.isFinite(rawMax)
+                ? Math.max(levelFromExp, Math.floor(rawMax))
+                : levelFromExp;
+            const level = Number.isFinite(rawLevel) ? Math.max(0, Math.floor(rawLevel)) : max;
+
+            if (exp !== rawExp) {
+                this.skills.experience[idx] = exp;
+                updated = true;
+            }
+            if (max !== rawMax) {
+                this.skills.maxLevel[idx] = max;
+                updated = true;
+            }
+            if (level !== rawLevel) {
+                this.skills.level[idx] = level;
+                updated = true;
+            }
+        }
+
         baselineXp = Math.max(baselineXp, 1184);
         this.applyMinimumSkill(Skill.HITPOINTS, 10, baselineXp);
 
@@ -383,7 +434,13 @@ export class SkillManager {
      * @return The skill's level.
      */
     public getCurrentLevel(skill: Skill): number {
-        return this.skills.level[skill.getIndex()];
+        const idx = skill.getIndex();
+        const value = Number(this.skills.level[idx]);
+        if (!Number.isFinite(value) || value < 0) {
+            this.skills.level[idx] = 0;
+            return 0;
+        }
+        return value;
     }
 
     /**
@@ -393,7 +450,15 @@ export class SkillManager {
      * @return The skill's maximum level.
      */
     public getMaxLevel(skill: Skill): number {
-        return this.skills.maxLevel[skill.getIndex()];
+        const idx = skill.getIndex();
+        const raw = Number(this.skills.maxLevel[idx]);
+        const fromArray = Number.isFinite(raw) ? Math.max(1, Math.floor(raw)) : 1;
+        const fromExp = Math.max(1, SkillManager.getLevelForExperience(this.getExperience(skill)));
+        const resolved = Math.max(fromArray, fromExp);
+        if (this.skills.maxLevel[idx] !== resolved) {
+            this.skills.maxLevel[idx] = resolved;
+        }
+        return resolved;
     }
 
     /**
@@ -413,7 +478,13 @@ export class SkillManager {
      * @return The experience in said skill.
      */
     public getExperience(skill: Skill): number {
-        return this.skills.experience[skill.getIndex()];
+        const idx = skill.getIndex();
+        const raw = Number(this.skills.experience[idx]);
+        const sanitized = SkillManager.sanitizeExperienceValue(raw);
+        if (this.skills.experience[idx] !== sanitized) {
+            this.skills.experience[idx] = sanitized;
+        }
+        return sanitized;
     }
 
     /**
@@ -443,7 +514,7 @@ export class SkillManager {
     }
 
     setExperiences(skill: Skill, experience: number, refresh = true) {
-        this.skills.experience[skill.getIndex()] = experience < 0 ? 0 : experience;
+        this.skills.experience[skill.getIndex()] = SkillManager.sanitizeExperienceValue(experience);
         if (refresh) {
             this.updateSkill(skill);
         }
@@ -538,7 +609,34 @@ export class SkillManager {
     }
 
     setSkills(skills: Skills) {
-        this.skills = skills;
+        if (!skills) {
+            return;
+        }
+
+        const next = new Skills();
+        const hpIndex = Skill.HITPOINTS.getIndex();
+        const hpMinXp = Math.max(0, SkillManager.getExperienceForLevel(10));
+
+        for (let i = 0; i < SkillManager.AMOUNT_OF_SKILLS; i++) {
+            const rawExp = Array.isArray(skills.experience) ? Number(skills.experience[i]) : NaN;
+            const rawMax = Array.isArray(skills.maxLevel) ? Number(skills.maxLevel[i]) : NaN;
+            const rawLevel = Array.isArray(skills.level) ? Number(skills.level[i]) : NaN;
+
+            const exp = SkillManager.sanitizeExperienceValue(rawExp);
+            const maxFromExp = Math.max(1, SkillManager.getLevelForExperience(exp));
+            const max = Number.isFinite(rawMax)
+                ? Math.max(maxFromExp, Math.floor(rawMax))
+                : maxFromExp;
+            const current = Number.isFinite(rawLevel)
+                ? Math.max(0, Math.floor(rawLevel))
+                : max;
+
+            next.experience[i] = (i === hpIndex) ? Math.max(exp, hpMinXp) : exp;
+            next.maxLevel[i] = (i === hpIndex) ? Math.max(max, 10) : max;
+            next.level[i] = (i === hpIndex) ? Math.max(current, 10) : current;
+        }
+
+        this.skills = next;
     }
 }
 
@@ -547,9 +645,12 @@ export class Skills {
     public maxLevel: number[];
     public experience: number[];
     constructor() {
-        this.level = new Array(SkillManager.AMOUNT_OF_SKILLS);
-        this.maxLevel = new Array(SkillManager.AMOUNT_OF_SKILLS);
-        this.experience = new Array(SkillManager.AMOUNT_OF_SKILLS);
+        this.level = new Array(SkillManager.AMOUNT_OF_SKILLS).fill(0);
+        this.maxLevel = new Array(SkillManager.AMOUNT_OF_SKILLS).fill(1);
+        this.experience = new Array(SkillManager.AMOUNT_OF_SKILLS).fill(0);
+        this.level[Skill.HITPOINTS.getIndex()] = 10;
+        this.maxLevel[Skill.HITPOINTS.getIndex()] = 10;
+        this.experience[Skill.HITPOINTS.getIndex()] = Math.max(0, SkillManager.getExperienceForLevel(10));
     }
 
     getLevels() {

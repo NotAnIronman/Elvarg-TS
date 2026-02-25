@@ -82,8 +82,14 @@ export class Server {
       Server.setupFileLogging();
       Server.installGlobalCrashHandlers();
 
-      if (args.length === 1) {
-        Server.PRODUCTION = parseInt(args[0], 10) === 1;
+      const productionArg = args.find((arg) => arg === "0" || arg === "1");
+      if (productionArg) {
+        Server.PRODUCTION = productionArg === "1";
+      }
+      const disablePlayerBots = args.includes("--disablePlayerBots");
+      if (disablePlayerBots) {
+        process.env.DISABLE_PLAYER_BOTS = "1";
+        console.info("[Server] --disablePlayerBots enabled");
       }
 
       PluginManager.loadFromDirectory(path.join(process.cwd(), "plugins"));
@@ -130,4 +136,4 @@ export class Server {
   }
 }
 
-Server.main(["1"]);
+Server.main(process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["1"]);

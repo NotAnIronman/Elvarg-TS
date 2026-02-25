@@ -140,9 +140,13 @@ export class Location {
     }
 
     getDistance(other: Location): number {
-        let deltaX = this.x - other.x;
-        let deltaY = this.y - other.y;
-        return Math.ceil(Math.sqrt(deltaX * deltaX + deltaY * deltaY));
+        if (this.z !== other.z) {
+            return Number.MAX_SAFE_INTEGER;
+        }
+        const deltaX = Math.abs(this.x - other.x);
+        const deltaY = Math.abs(this.y - other.y);
+        // Tile distance for movement/reach checks in RS-style grid logic.
+        return Math.max(deltaX, deltaY);
     }
 
     move(position: Location): Location {
@@ -165,10 +169,7 @@ export class Location {
     }
 
     calculateDistance(other: Location): number {
-        let xDiff = this.x - other.x;
-        let yDiff = this.y - other.y;
-        let distance = Math.sqrt(xDiff * xDiff + yDiff * yDiff);
-        return Math.floor(distance);
+        return this.getDistance(other);
     }
 
     static calculateDistance(tiles: Location[], otherTiles: Location[]): number {

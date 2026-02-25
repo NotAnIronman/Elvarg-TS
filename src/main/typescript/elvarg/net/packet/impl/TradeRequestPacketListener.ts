@@ -1,37 +1,42 @@
-// import { Player } from "../../../game/entity/impl/player/Player";
 import { PacketExecutor } from "../PacketExecutor";
 import { Packet } from "../Packet";
+import { World } from "../../../game/World";
+import { PlayerStatus } from "../../../game/model/PlayerStatus";
 import { PluginManager } from "../../../plugins/PluginManager";
-// import { World } from "../../../game/World";
-// import { PlayerStatus } from "../../../game/model/PlayerStatus";
 
 export class TradeRequestPacketListener implements PacketExecutor {
-  // execute(player: Player, packet: Packet) {
-  execute(player: any, packet: Packet) {
-    let index = packet.readLEShort();
+  execute(player: any, packet: Packet): void {
+    const index = packet.readLEShort();
 
-    // if (index > World.getPlayers().sizeReturn() || index < 0) {
-    //     return;
-    // }
+    if (index < 0 || index >= World.getPlayers().capacityReturn()) {
+      return;
+    }
 
-    // let target = World.getPlayers()[index];
+    const target = World.getPlayers().get(index);
+    if (!target) {
+      return;
+    }
 
-    // if (target == null) {
-    //     return;
-    // }
+    if (!target.getLocation().isWithinDistance(player.getLocation(), 20)) {
+      return;
+    }
 
-    // if (!target.getLocation().isWithinDistance(player.getLocation(), 20)) {
-    //     return;
-    // }
+    if (
+      player.getHitpoints() <= 0 ||
+      !player.isRegistered() ||
+      target.getHitpoints() <= 0 ||
+      !target.isRegistered()
+    ) {
+      return;
+    }
 
-    // if (player.getHitpoints() <= 0 || !player.isRegistered() || target.getHitpoints() <= 0 || !target.isRegistered()) {
-    //     return;
-    // }
-
-    // player.getMovementQueue().walkToEntity(target, () => TradeRequestPacketListener.sendRequest(player, target));
+    player
+      .getMovementQueue()
+      .walkToEntity(target, () =>
+        TradeRequestPacketListener.sendRequest(player, target)
+      );
   }
 
-  // static sendRequest(player: Player, target: Player) {
   static sendRequest(player: any, target: any) {
     if (player.busy()) {
       player.getPacketSender().sendMessage("You cannot do that right now.");
@@ -41,19 +46,24 @@ export class TradeRequestPacketListener implements PacketExecutor {
     if (target.busy()) {
       let msg = "That player is currently busy.";
 
-      // if (target.getStatus() == PlayerStatus.TRADING) {
-      //     msg = "That player is currently trading with someone else.";
-      // }
+      if (target.getStatus() === PlayerStatus.TRADING) {
+        msg = "That player is currently trading with someone else.";
+      }
 
       player.getPacketSender().sendMessage(msg);
       return;
     }
 
-    if (PluginManager.emitCanTrade(player, target) === false) {
+    const pluginCanTrade = PluginManager.emitCanTrade(player, target);
+    if (pluginCanTrade === false) {
       player.getPacketSender().sendMessage("You cannot trade here.");
       return;
     }
-    if (PluginManager.emitCanTrade(player, target) === null && player.getArea() != null && !player.getArea().canTrade(player, target)) {
+    if (
+      pluginCanTrade == null &&
+      player.getArea() != null &&
+      !player.getArea().canTrade(player, target)
+    ) {
       player.getPacketSender().sendMessage("You cannot trade here.");
       return;
     }

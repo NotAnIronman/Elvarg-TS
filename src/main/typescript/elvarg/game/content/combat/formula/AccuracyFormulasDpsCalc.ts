@@ -9,11 +9,18 @@ import { Mobile } from "../../../entity/impl/Mobile";
 import { BonusManager } from "../../../model/equipment/BonusManager";
 import { Skill } from "../../../model/Skill";
 import { CombatEquipment } from "../../combat/CombatEquipment";
-import { FightType } from '../FightType';
 import type { Player } from '../../../entity/impl/player/Player';
 
-const getPlayerCtor = () =>
-    require("../../../entity/impl/player/Player").Player as typeof import("../../../entity/impl/player/Player").Player;
+const getPlayerCombatSpecial = (player: Player): any | null => {
+    const accessor = (player as any)?.getCombatSpecial;
+    if (typeof accessor === "function") {
+        const resolved = accessor.call(player);
+        if (resolved) {
+            return resolved;
+        }
+    }
+    return (player as any)?.combatSpecial ?? null;
+};
 
 export class AccuracyFormulasDpsCalc {
     static randomFloat() {
@@ -87,7 +94,7 @@ export class AccuracyFormulasDpsCalc {
 
         att *= prayerBonus;
 
-        let fightStyle = FightType.getStyle();
+        let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.ACCURATE)
             att += 3;
         else if (fightStyle == FightStyle.CONTROLLED)
@@ -97,8 +104,9 @@ export class AccuracyFormulasDpsCalc {
             att = (att * 1.1);
 
         // Special attack
-        if (player.isSpecialActivated()) {
-            att *= getPlayerCtor().getCombatSpecial().getAccuracyMultiplier()
+        const special = getPlayerCombatSpecial(player);
+        if (player.isSpecialActivated() && special != null) {
+            att *= special.getAccuracyMultiplier();
         }
 
         return att;
@@ -119,7 +127,7 @@ export class AccuracyFormulasDpsCalc {
         let attSlash = player.getBonusManager().getAttackBonus()[BonusManager.ATTACK_SLASH];
         let attCrush = player.getBonusManager().getAttackBonus()[BonusManager.ATTACK_CRUSH];
 
-        switch (FightType.getBonusTypes()) {
+        switch (player.getFightType().getBonusType()) {
             case BonusManager.ATTACK_STAB:
                 attRoll *= attStab + 64;
                 break;
@@ -169,7 +177,7 @@ export class AccuracyFormulasDpsCalc {
 
         def *= prayerBonus;
 
-        let fightStyle = FightType.getStyle();
+        let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.DEFENSIVE)
             def += 3;
         else if (fightStyle == FightStyle.CONTROLLED)
@@ -183,7 +191,7 @@ export class AccuracyFormulasDpsCalc {
     }
 
     private static calcDefenseMeleeRoll(entity: Mobile, enemy: Mobile) {
-        let bonusType = (entity.isNpc() ? 3 /* Default case */ : FightType.getBonusType());
+        let bonusType = (entity.isNpc() ? 3 /* Default case */ : entity.getAsPlayer().getFightType().getBonusType());
 
         return AccuracyFormulasDpsCalc.defenseMeleeRoll(enemy, bonusType);
     }
@@ -253,7 +261,7 @@ export class AccuracyFormulasDpsCalc {
         }
         rngStrength = (rngStrength * prayerMod);
 
-        let fightStyle = FightType.getStyle();
+        let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.ACCURATE)
             rngStrength += 3;
 
@@ -303,7 +311,7 @@ export class AccuracyFormulasDpsCalc {
 
         mag *= prayerBonus;
 
-        let fightStyle = FightType.getStyle();
+        let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.ACCURATE)
             mag += 3;
         else if (fightStyle == FightStyle.DEFENSIVE)

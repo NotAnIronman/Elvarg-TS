@@ -223,6 +223,21 @@ export interface PluginNpcCombatMethodProvider {
   provide(npc: any): any | null;
 }
 
+export interface PluginCombatDamageProvider {
+  calculateMaxMeleeHit(entity: any): number;
+  calculateMaxRangedHit(entity: any): number;
+  calculateMagicMaxHit(entity: any): number;
+  getHitDamage(attacker: any, victim: any, combatType: any): any;
+  applyExtraHitRolls(
+    attacker: any,
+    target: any,
+    combatType: any,
+    damage: any,
+    accurate: boolean,
+    method: any
+  ): void;
+}
+
 export interface PluginApi {
   onPacketReceived(handler: (event: PluginPacketEvent) => void): void;
   onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
@@ -312,6 +327,7 @@ export interface PluginApi {
   setPlayerPersistence(persistence: PlayerPersistence): void;
   log(message: string, extra?: Record<string, unknown>): void;
   setCombatEngine(engine: PluginCombatEngine): void;
+  setCombatDamageProvider(provider: PluginCombatDamageProvider): void;
   registerCombatMethodResolver(resolver: PluginCombatMethodResolver): void;
   registerNpcCombatMethodProvider(
     provider: PluginNpcCombatMethodProvider

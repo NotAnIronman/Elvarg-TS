@@ -298,11 +298,13 @@ export class Player extends Mobile {
 
 
     public getAttackAnim(): number {
-        return FightType.getAnimation();
+        const fightType = FightType.resolve(this.getFightType()) ?? FightType.UNARMED_KICK;
+        return fightType.getAnimation();
     }
 
     public getAttackSound(): Sound {
-        return FightType.getAttackSound();
+        const fightType = FightType.resolve(this.getFightType()) ?? FightType.UNARMED_KICK;
+        return fightType.getAttackSound();
     }
 
     public getBlockAnim(): number {
@@ -1522,11 +1524,35 @@ export class Player extends Mobile {
     }
 
     public getFightType(): FightType {
+        const resolvedFightType = FightType.resolve(this.fightType);
+        if (resolvedFightType) {
+            this.fightType = resolvedFightType;
+            return resolvedFightType;
+        }
+
+        const equippedWeapon = this.getEquipment().getItems()[Equipment.WEAPON_SLOT];
+        if (equippedWeapon && equippedWeapon.getId() > 0) {
+            const weaponInterface = equippedWeapon.getDefinition()?.getWeaponInterface?.();
+            if (weaponInterface) {
+                const availableFightTypes = Object.values(weaponInterface.getFightType())
+                    .filter((type): type is FightType => type instanceof FightType);
+                if (availableFightTypes.length > 0) {
+                    this.fightType = availableFightTypes[0];
+                    return this.fightType;
+                }
+            }
+        }
+
+        this.fightType = FightType.UNARMED_KICK;
         return this.fightType;
     }
 
     public setFightType(fightType: FightType): void {
-        this.fightType = fightType;
+        const resolvedFightType = FightType.resolve(fightType);
+        if (!resolvedFightType) {
+            return;
+        }
+        this.fightType = resolvedFightType;
     }
 
     public autoRetaliateReturn(): boolean {
