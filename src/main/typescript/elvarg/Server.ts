@@ -6,65 +6,31 @@ if (typeof (global as any).navigator === "undefined") {
 }
 (global as any).Image = (global as any).Image ?? function () { return {}; };
 (global as any).HTMLCanvasElement = (global as any).HTMLCanvasElement ?? function () {};
-import * as fs from "fs";
 import * as path from "path";
-import * as util from "util";
 import { GameBuilder } from "./game/GameBuilder";
 // import { GameConstants } from "./game/GameConstants";
 import { NetworkBuilder } from "./net/NetworkBuilder";
 import { NetworkConstants } from "./net/NetworkConstants";
 import { PluginManager } from "./plugins/PluginManager";
 import { Flooder } from "./util/flood/Flooder";
+import { ServerLogger } from "./util/ServerLogger";
 
 export class Server {
   private static flooder: Flooder = new Flooder();
   public static PRODUCTION = false;
   private static DEBUG_LOGGING = false;
   private static logger = {
+    debug: (...args: any[]) => console.debug(...args),
     info: (...args: any[]) => console.info(...args),
     warn: (...args: any[]) => console.warn(...args),
     error: (...args: any[]) => console.error(...args),
   };
   private static updating = false;
-  private static logFile = path.join(process.cwd(), "logs", "server.log");
   private static consolePatched = false;
 
   private static setupFileLogging() {
     if (Server.consolePatched) return;
-    // Ensure log directory exists and append across restarts so crash evidence is preserved.
-    fs.mkdirSync(path.dirname(Server.logFile), { recursive: true });
-    fs.appendFileSync(
-      Server.logFile,
-      `${new Date().toISOString()} [INFO] ===== server_bootstrap pid=${process.pid} =====\n`,
-      { encoding: "utf8" }
-    );
-
-    const original = {
-      log: console.log,
-      info: console.info,
-      warn: console.warn,
-      error: console.error,
-    };
-
-    const makeWriter = (level: string, fn: (...args: any[]) => void) => {
-      return (...args: any[]) => {
-        const line = `${new Date().toISOString()} [${level}] ${util.format(
-          ...args
-        )}`;
-        try {
-          fs.appendFileSync(Server.logFile, line + "\n", { encoding: "utf8" });
-        } catch (e) {
-          // If file logging fails, still emit to stdout/stderr.
-        }
-        fn(...args);
-      };
-    };
-
-    console.log = makeWriter("INFO", original.log);
-    console.info = makeWriter("INFO", original.info);
-    console.warn = makeWriter("WARN", original.warn);
-    console.error = makeWriter("ERROR", original.error);
-
+    ServerLogger.install(path.join(process.cwd(), "logs", "server.log"));
     Server.consolePatched = true;
   }
 

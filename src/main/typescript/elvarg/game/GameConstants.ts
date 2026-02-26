@@ -20,7 +20,7 @@ export class GameConstants {
     // Disable regional NPC processing optimization to avoid visibility churn during login/debug.
     public static readonly ENABLE_REGION_BASED_NPC_PROCESSING: boolean = true;
     // Keep OSRS spawn source opt-in until client cache parity is confirmed for those ids.
-    public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = true;
+    public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = false;
     // Tick rate for the main game loop in milliseconds.
     // Java server runs at ~600ms per cycle; mirror that here.
     public static readonly GAME_ENGINE_PROCESSING_CYCLE_RATE: number = 600;
@@ -82,6 +82,10 @@ export class GameConstants {
 
     public static readonly PLAYER_BOT_PASSWORD: string = "wirfunerpro4n!1";
     public static readonly PLAYER_BOT_OVERRIDE: number[] = [PlayerRights.MODERATOR.getSpriteId(), PlayerRights.ADMINISTRATOR.getSpriteId(), PlayerRights.DEVELOPER.getSpriteId(), PlayerRights.OWNER.getSpriteId()];
+    // Centralized server logging controls (runtime mutable via admin commands).
+    public static SERVER_LOG_LEVELS: string[] = ["info", "warn", "error"];
+    public static SERVER_LOG_ENABLED_TYPES: string[] = [];
+    public static SERVER_LOG_DISABLED_TYPES: string[] = ["plugin", "npc.face"];
 
     public static setPlayerPersistence(playerPersistence: PlayerPersistence): void {
         if (!playerPersistence) {

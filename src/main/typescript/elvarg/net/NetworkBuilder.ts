@@ -19,6 +19,7 @@ import { World } from "../game/World";
 import { PluginManager } from "../plugins/PluginManager";
 import { GameConstants } from "../game/GameConstants";
 import { DonatorRights } from "../game/model/rights/DonatorRights";
+import { PlayerRights } from "../game/model/rights/PlayerRights";
 import { Skill } from "../game/model/Skill";
 import { ItemOnGroundManager } from "../game/entity/impl/grounditem/ItemOnGroundManager";
 import { ObjectManager } from "../game/entity/impl/object/ObjectManager";
@@ -324,26 +325,30 @@ class LoginSession {
     this.player = player;
 
     // Build game-layer player for packet listeners.
-    const session = new PlayerSession(this.socket as any, (meta) => {
-      const label = PACKET_GUIDE[meta.opcode]?.name;
-      this.recordRecentPacket(
-        "OUT",
-        meta.opcode,
-        meta.payloadLength,
-        label,
-        undefined,
-        meta.payloadPreview
-      );
-      PacketLogger.logOutgoing({
-        direction: "OUT",
-        opcode: meta.opcode,
-        stage: this.stage,
-        label,
-        player: this.player?.username,
-        payloadLength: meta.payloadLength,
-        payloadPreview: meta.payloadPreview,
-      });
-    });
+    const session = new PlayerSession(
+      this.socket as any,
+      (meta) => {
+        const label = PACKET_GUIDE[meta.opcode]?.name;
+        this.recordRecentPacket(
+          "OUT",
+          meta.opcode,
+          meta.payloadLength,
+          label,
+          undefined,
+          meta.payloadPreview
+        );
+        PacketLogger.logOutgoing({
+          direction: "OUT",
+          opcode: meta.opcode,
+          stage: this.stage,
+          label,
+          player: this.player?.username,
+          payloadLength: meta.payloadLength,
+          payloadPreview: meta.payloadPreview,
+        });
+      },
+      () => this.gamePlayer?.getRights?.() === PlayerRights.DEVELOPER
+    );
     if (this.encryptor) {
       session.setEncryptor(this.encryptor);
     }

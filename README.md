@@ -1,20 +1,77 @@
 ﻿# Elvarg Web Server
  
- This is an attempted port of the the Java Server. The ultimate end goal is to have this running in a web browser tab (using webTRC for networking with the game client).
+ This is a TypeScript port of the the Java Server. The ultimate end goal is to have this running in a web browser tab (using webTRC for networking with the game client).
+
+## Why TypeScript over Java
+
+The original server behavior comes from Java, but this project runs in a web-first stack and targets browser-adjacent networking/runtime.
+
+Primary reasons:
+
+1. Shared language/tooling with the web client  
+Using TypeScript across client and server reduces context switching and integration friction.
+
+2. Faster protocol iteration  
+Packet compatibility work and gameplay parity fixes are easier to ship quickly in the Node/TS workflow.
+
+3. Plugin-driven development  
+Most custom behavior in this repo is plugin-based; TS/JS keeps extension and experimentation lightweight.
+
+4. Long-term platform alignment  
+The goal is web-oriented deployment, so TypeScript keeps architecture aligned with that direction.
+
+Tradeoff:
+
+Java remains the behavior reference. The TS server prioritizes parity with Java mechanics while optimizing for faster web-focused development.
  
 ## Getting started
  
  Firstly, run
  
- ```npm install```
+ ```yarn install```
  
  Then, run
  
- ```npm run build```
- 
- Then, run
- 
-```npm run start```
+ ```yarn dev```
+
+## Logging
+
+Server logging is centralized and all `console.log/info/warn/error/debug` calls go through one logger.
+
+Logs are written to:
+
+`./logs/server.log`
+
+### Default behavior
+
+1. Enabled levels: `info,warn,error`
+2. Disabled type: `plugin` (plugin chatter is off by default)
+
+### Configure at startup (env vars)
+
+1. `LOG_LEVELS`  
+Example: `LOG_LEVELS=warn,error`
+2. `LOG_ENABLED_TYPES`  
+CSV allowlist. If set, only these types are emitted.
+3. `LOG_DISABLED_TYPES`  
+CSV denylist.
+
+Type is inferred from the first bracket tag in a message:
+
+1. `[plugin:Woodcutting] ...` -> `plugin`
+2. `[packet.out] ...` -> `packet.out`
+3. `[plugins] ...` -> `plugins`
+4. No bracket prefix -> `general`
+
+### Change logging at runtime (no restart)
+
+Developer-only in-game commands:
+
+1. `::logstatus`
+2. `::loglevels debug,info,warn,error`
+3. `::logtypeon plugin,packet.out,world`
+4. `::logtypeoff plugin,packet.out,world`
+5. `::logtypeclear [enabled|disabled|all]`
 
 ## Debugging connection state
 
@@ -52,20 +109,10 @@ Each plugin should export:
 
 `{ name: string, register(api) }`
 
-Available plugin API hooks:
+Plugin API hooks and contracts are documented in:
 
-1. `api.onPacketReceived((event) => {})`
-2. `api.onPlayerLogin((event) => {})`
-3. `api.onPlayerDisconnect((event) => {})`
-4. `api.onPathBlocked((event) => {})` when routeing fails (`PathFinder` no-route)
-5. `api.registerPacketListener(opcode, listener)` for opcode-specific handlers
+`src/main/typescript/elvarg/plugins/PluginTypes.ts`
 
-No default plugins are required for movement.
+Hook registration/guard behavior is implemented in:
 
-Pathing packet handling is in core server listeners (`PacketConstants.PACKETS`) to match the Java server flow:
-
-1. `MovementPacketListener` (`98`, `164`, `248`)
-2. `RegionChangePacketListener` (`210`)
-3. `FinalizedMapRegionChangePacketListener` (`121`)
-
-If you add plugins, place one plugin per file in `./plugins`.
+`src/main/typescript/elvarg/plugins/PluginManager.ts`

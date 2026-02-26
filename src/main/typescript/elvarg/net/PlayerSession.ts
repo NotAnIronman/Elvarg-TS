@@ -29,11 +29,17 @@ export class PlayerSession {
   private channel: Socket;
   private encryptor?: IsaacRandom;
   private outboundPacketObserver?: (meta: OutboundPacketMeta) => void;
+  private shouldLogPacketOut?: () => boolean;
   // public player: Player;
 
-  constructor(channel: any, outboundPacketObserver?: (meta: OutboundPacketMeta) => void) {
+  constructor(
+    channel: any,
+    outboundPacketObserver?: (meta: OutboundPacketMeta) => void,
+    shouldLogPacketOut?: () => boolean
+  ) {
     this.channel = channel;
     this.outboundPacketObserver = outboundPacketObserver;
+    this.shouldLogPacketOut = shouldLogPacketOut;
     // this.player = new Player(this);
   }
 
@@ -142,12 +148,14 @@ export class PlayerSession {
           }
         }
         // Log outgoing packets to help diagnose client desyncs.
-        try {
-          console.log(
-            `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length}`
-          );
-        } catch {
-          // best-effort logging; never throw here
+        if (!this.shouldLogPacketOut || this.shouldLogPacketOut()) {
+          try {
+            console.log(
+              `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length}`
+            );
+          } catch {
+            // best-effort logging; never throw here
+          }
         }
         let header: Buffer;
         switch (packet.getType()) {

@@ -26,6 +26,7 @@ const { ShopDefinitionLoader } = require("../../src/main/typescript/elvarg/game/
 const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
 const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
+const { ServerLogger } = require("../../src/main/typescript/elvarg/util/ServerLogger");
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
@@ -33,6 +34,15 @@ const MAX_NPC_COMMAND_SPAWNS = 20;
 function parseIntArg(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function parseCsvArgs(parts, start = 1) {
+  return parts
+    .slice(start)
+    .join(" ")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
 }
 
 function commandTail(raw, parts) {
@@ -735,6 +745,83 @@ module.exports = {
         return true;
       }
       player.getPacketSender().sendConsoleMessage("Reloaded npc defs.");
+      return true;
+    });
+
+    api.registerCommand("logstatus", ({ player }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const levels = ServerLogger.getEnabledLevels().join(",") || "(none)";
+      const enabledTypes = ServerLogger.getEnabledTypes().join(",") || "(none)";
+      const disabledTypes = ServerLogger.getDisabledTypes().join(",") || "(none)";
+      player.getPacketSender().sendMessage(`Log levels: ${levels}`);
+      player.getPacketSender().sendMessage(`Enabled types: ${enabledTypes}`);
+      player.getPacketSender().sendMessage(`Disabled types: ${disabledTypes}`);
+      return true;
+    });
+
+    api.registerCommand("loglevels", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const values = parseCsvArgs(parts, 1);
+      if (values.length === 0) {
+        player.getPacketSender().sendMessage("Usage: ::loglevels debug,info,warn,error");
+        return true;
+      }
+      const valid = values.filter((value) =>
+        value === "debug" || value === "info" || value === "warn" || value === "error"
+      );
+      ServerLogger.setEnabledLevels(valid);
+      player.getPacketSender().sendMessage(`Updated log levels: ${valid.join(",") || "(none)"}`);
+      return true;
+    });
+
+    api.registerCommand("logtypeon", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const values = parseCsvArgs(parts, 1);
+      if (values.length === 0) {
+        player.getPacketSender().sendMessage("Usage: ::logtypeon plugin,packet.out,world");
+        return true;
+      }
+      const merged = new Set([...(ServerLogger.getEnabledTypes() || []), ...values]);
+      ServerLogger.setEnabledTypes(Array.from(merged));
+      player.getPacketSender().sendMessage(`Enabled log types: ${Array.from(merged).join(",")}`);
+      return true;
+    });
+
+    api.registerCommand("logtypeoff", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const values = parseCsvArgs(parts, 1);
+      if (values.length === 0) {
+        player.getPacketSender().sendMessage("Usage: ::logtypeoff plugin,packet.out,world");
+        return true;
+      }
+      const merged = new Set([...(ServerLogger.getDisabledTypes() || []), ...values]);
+      ServerLogger.setDisabledTypes(Array.from(merged));
+      player.getPacketSender().sendMessage(`Disabled log types: ${Array.from(merged).join(",")}`);
+      return true;
+    });
+
+    api.registerCommand("logtypeclear", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const mode = String(parts[1] || "all").toLowerCase();
+      if (mode === "enabled" || mode === "all") {
+        ServerLogger.setEnabledTypes([]);
+      }
+      if (mode === "disabled" || mode === "all") {
+        ServerLogger.setDisabledTypes([]);
+      }
+      player.getPacketSender().sendMessage(
+        `Cleared log type filters (${mode}). Enabled: ${ServerLogger.getEnabledTypes().join(",") || "(none)"} Disabled: ${ServerLogger.getDisabledTypes().join(",") || "(none)"}`
+      );
       return true;
     });
 
