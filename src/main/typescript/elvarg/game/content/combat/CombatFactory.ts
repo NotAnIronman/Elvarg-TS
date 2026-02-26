@@ -494,11 +494,6 @@ export class CombatFactory {
             if (area != null && typeof area.onPlayerDealtDamage === "function") {
                 area.onPlayerDealtDamage(attacker.getAsPlayer(), target, qHit);
             }
-
-            // Check if the player should be skulled for making this attack..
-            if (target.isPlayer()) {
-                CombatFactory.handleSkull(attacker.getAsPlayer(), target.getAsPlayer());
-            }
         }
 
         // Add this hit to the target's hitQueue.
@@ -630,6 +625,9 @@ export class CombatFactory {
         // Auto retaliate, set under attack, and add damage in Java order.
         CombatFactory.handleRetaliation(attacker, target);
         target.getCombat().setUnderAttack(attacker);
+        if (attacker.isPlayer() && target.isPlayer()) {
+            CombatFactory.handleSkull(attacker.getAsPlayer(), target.getAsPlayer());
+        }
         target.getCombat().addDamage(attacker, damage);
 
         if (target.isPlayerBot()) {
@@ -771,28 +769,70 @@ export class CombatFactory {
     @param target
     */
     public static handleSkull(attacker: Player, target: Player) {
-
         if (attacker.isSkulled()) {
+            CombatFactory.logSkullEvent(attacker, target, "attacker_already_skulled");
             return;
         }
 
-        if (!Wilderness.isIn(attacker)) {
+        const attackerInWilderness = Wilderness.isIn(attacker);
+        const targetInWilderness = Wilderness.isIn(target);
+        if (!attackerInWilderness || !targetInWilderness) {
+            CombatFactory.logSkullEvent(
+                attacker,
+                target,
+                "outside_wilderness",
+                `attackerInWilderness=${attackerInWilderness} targetInWilderness=${targetInWilderness}`
+            );
             return;
         }
+
+        // Player bots should behave as players so we don't check them here...
 
         // We've probably already been skulled by this player.
-        if (target.getCombat().damageMapContains(attacker) || attacker.getCombat().damageMapContains(target)) {
+        const targetHasDamagedAttacker = target.getCombat().damageMapContains(attacker);
+        const attackerHasDamagedTarget = attacker.getCombat().damageMapContains(target);
+        if (targetHasDamagedAttacker || attackerHasDamagedTarget) {
+            CombatFactory.logSkullEvent(
+                attacker,
+                target,
+                "damage_map_contains",
+                `targetHasDamagedAttacker=${targetHasDamagedAttacker} attackerHasDamagedTarget=${attackerHasDamagedTarget}`
+            );
             return;
         }
 
-        if (target.getCombat().getAttacker() != null && target.getCombat().getAttacker() == attacker) {
-            return
-        }
-
-        if (attacker.getCombat().getAttacker() != null && attacker.getCombat().getAttacker() == target) {
+        if (
+            target.getCombat().getAttacker() != null &&
+            target.getCombat().getAttacker() == attacker
+        ) {
+            CombatFactory.logSkullEvent(
+                attacker,
+                target,
+                "target_already_attacking",
+                "target\'s attacker is the current attacker"
+            );
             return;
         }
 
+        if (
+            attacker.getCombat().getAttacker() != null &&
+            attacker.getCombat().getAttacker() == target
+        ) {
+            CombatFactory.logSkullEvent(
+                attacker,
+                target,
+                "attacker_already_attacked",
+                "attacker\'s attacker is the target"
+            );
+            return;
+        }
+
+        CombatFactory.logSkullEvent(
+            attacker,
+            target,
+            "skull_applied",
+            "type=white seconds=300"
+        );
         CombatFactory.skull(attacker, SkullType.WHITE_SKULL, 300);
     }
 
@@ -800,6 +840,7 @@ export class CombatFactory {
         player.setSkullType(type);
         player.setSkullTimer(Misc.getTicks(seconds));
         player.getUpdateFlag().flag(Flag.APPEARANCE);
+        CombatFactory.logSkullSet(player, type, seconds);
         if (type == SkullType.RED_SKULL) {
             player.getPacketSender().sendMessage(
                 "@bla@You have received a @red@red skull@bla@! You can no longer use the Protect item prayer!");
@@ -807,6 +848,42 @@ export class CombatFactory {
         } else if (type == SkullType.WHITE_SKULL) {
             player.getPacketSender().sendMessage("You've been skulled!");
         }
+    }
+
+    private static describePlayer(player: Player | null): string {
+        if (!player) {
+            return "unknown";
+        }
+        const username = player.getUsername ? player.getUsername() : "unknown";
+        const rightsId = player
+            .getRights?.()
+            ?.getId?.()
+            ?? -1;
+        return `${username}(rights=${rightsId})`;
+    }
+
+    private static logSkullEvent(
+        attacker: Player,
+        target: Player,
+        reason: string,
+        detail?: string
+    ): void {
+        const detailFragment = detail ? ` ${detail}` : "";
+        console.log(
+            `[Combat:skulling] reason=${reason} attacker=${CombatFactory.describePlayer(attacker)} target=${CombatFactory.describePlayer(target)}${detailFragment}`
+        );
+    }
+
+    private static logSkullSet(player: Player, type: SkullType, seconds: number): void {
+        const typeLabel =
+            type === SkullType.RED_SKULL
+                ? "red"
+                : type === SkullType.WHITE_SKULL
+                    ? "white"
+                    : "unknown";
+        console.log(
+            `[Combat:skulling] skull_set player=${CombatFactory.describePlayer(player)} type=${typeLabel} seconds=${seconds}`
+        );
     }
 
     static stun(character: Mobile, seconds: number, force: boolean) {

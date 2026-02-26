@@ -40,8 +40,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
   private static readonly LOGOUT: number = 2458;
   private static readonly TOGGLE_RUN_ENERGY_ORB: number = 1050;
   private static readonly TOGGLE_RUN_ENERGY_SETTINGS: number = 42507;
-  private static readonly OPEN_EQUIPMENT_SCREEN: number = 27653;
-  private static readonly OPEN_PRICE_CHECKER: number = 27651;
   private static readonly OPEN_ITEMS_KEPT_ON_DEATH_SCREEN: number = 27654;
   private static readonly TOGGLE_AUTO_RETALIATE_328: number = 24115;
   private static readonly TOGGLE_AUTO_RETALIATE_425: number = 24041;
@@ -53,8 +51,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
   private static readonly TOGGLE_AUTO_RETALIATE_5570: number = 24025;
   private static readonly DESTROY_ITEM: number = 14175;
   private static readonly CANCEL_DESTROY_ITEM: number = 14176;
-  private static readonly PRICE_CHECKER_WITHDRAW_ALL: number = 18255;
-  private static readonly PRICE_CHECKER_DEPOSIT_ALL: number = 18252;
   private static readonly TOGGLE_EXP_LOCK: number = 476;
   private static readonly OPEN_WORLD_MAP: number = 156;
 
@@ -218,33 +214,11 @@ export class ButtonClickPacketListener implements PacketExecutor {
         player.getPacketSender().sendInterface(53000);
         break;
 
-      case ButtonClickPacketListener.OPEN_EQUIPMENT_SCREEN:
-        if (player.busy()) {
-          player.getPacketSender().sendInterfaceRemoval();
-        }
-        // BonusManager.open(player);
-        break;
-
-      case ButtonClickPacketListener.OPEN_PRICE_CHECKER:
-        if (player.busy()) {
-          player.getPacketSender().sendInterfaceRemoval();
-        }
-        player.getPriceChecker().open();
-        break;
-
       case ButtonClickPacketListener.OPEN_ITEMS_KEPT_ON_DEATH_SCREEN:
         if (player.busy()) {
           player.getPacketSender().sendInterfaceRemoval();
         }
         // ItemsKeptOnDeath.open(player);
-        break;
-
-      case ButtonClickPacketListener.PRICE_CHECKER_WITHDRAW_ALL:
-        player.getPriceChecker().withdrawAll();
-        break;
-
-      case ButtonClickPacketListener.PRICE_CHECKER_DEPOSIT_ALL:
-        player.getPriceChecker().depositAll();
         break;
 
       case ButtonClickPacketListener.TRADE_ACCEPT_BUTTON_1:

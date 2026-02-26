@@ -273,6 +273,7 @@ module.exports = {
       if (!bot) {
         continue;
       }
+      bot.setPlayerBot?.(true);
 
       const state = createInitialState({
         x: botSpawn.getX(),
@@ -315,6 +316,7 @@ module.exports = {
       }, BOT_BEHAVIOR_MODE);
       botStatesByName.set(username, state);
       botmeUsernames.add(username);
+      player.setPlayerBot?.(true);
       addEntry(username, {
         player,
         state,
@@ -328,6 +330,7 @@ module.exports = {
       if (!player) {
         return false;
       }
+      player.setPlayerBot?.(false);
       const username = player.getUsername();
       const state = username ? botStatesByName.get(username) : null;
       clearFollowState(player, state);

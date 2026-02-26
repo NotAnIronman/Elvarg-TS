@@ -37,7 +37,6 @@ import { AreaManager } from "../../../model/areas/AreaManager";
 import { Bank } from "../../../model/container/impl/Bank";
 import { Equipment } from "../../../model/container/impl/Equipment";
 import { Inventory } from "../../../model/container/impl/Inventory";
-import { PriceChecker } from "../../../model/container/impl/PriceChecker"
 import { Shop } from "../../../model/container/shop/Shop";
 import { DialogueManager } from "../../../model/dialogues/DialogueManager"
 import { BonusManager } from "../../../model/equipment/BonusManager";
@@ -85,7 +84,6 @@ export class Player extends Mobile {
     public quickPrayers = new QuickPrayers(this);
     public inventory = new Inventory(this);
     public equipment = new Equipment(this);
-    private priceChecker = new PriceChecker(this);
     private clickDelay = new Stopwatch();
     private lastItemPickup = new Stopwatch();
     private yellDelay = new SecondsTimer();
@@ -127,6 +125,7 @@ export class Player extends Mobile {
     private walkableInterfaceId: number = -1
     private multiIcon: number;
     private isRunning = true;
+    private playerBot = false;
     private runEnergy = 100;
     private lastRunRecovery = new Stopwatch();
     private isDying: boolean;
@@ -1067,10 +1066,6 @@ export class Player extends Mobile {
         this.auguryUnlocked = auguryUnlocked;
     }
 
-    public getPriceChecker(): PriceChecker {
-        return this.priceChecker;
-    }
-
     public getCurrentClanChat(): ClanChat {
         return this.currentClanChat;
     }
@@ -1118,6 +1113,14 @@ export class Player extends Mobile {
 
     public setAmountDonated(amountDonated: number): void {
         this.amountDonated = amountDonated;
+    }
+
+    public isPlayerBot(): boolean {
+        return this.playerBot;
+    }
+
+    public setPlayerBot(playerBot: boolean): void {
+        this.playerBot = playerBot;
     }
 
     public incrementAmountDonated(amountDonated: number): void {
