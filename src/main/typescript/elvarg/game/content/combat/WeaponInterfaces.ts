@@ -44,29 +44,32 @@ export class WeaponInterfaces {
         CombatSpecial.assign(player);
         CombatSpecial.updateBar(player);
 
-        //Search for an attack style matching ours
-        /*  for (const type of weapon.getFightType()) {
-                if (type.getStyle() == player.getCombat().getFightType().getStyle()) {
-                    player.setFightType(type);
-                    player.getPacketSender().sendConfig(player.getCombat().getFightType().getParentId(), player.getCombat().getFightType().getChildId());
-                    return;
-                }
-            }*/
+        const availableFightTypes = Object.values(weapon.getFightType()).filter(
+            (type): type is FightType => type instanceof FightType
+        );
+
+        const currentFightType = FightType.resolve(player.getFightType());
+        if (currentFightType) {
+            const matchingFightType = availableFightTypes.find((type) => type === currentFightType);
+            if (matchingFightType) {
+                player.setFightType(matchingFightType);
+                player.getPacketSender().sendConfig(matchingFightType.getParentId(), matchingFightType.getChildId());
+                return;
+            }
+        }
 
         //Set default attack style to aggressive!
-        for (const type of Object.values(weapon.getFightType())) {
-            if (type instanceof FightType) {
-                if (type.getStyle() == FightStyle.AGGRESSIVE) {
-                    player.setFightType(type);
-                    player.getPacketSender().sendConfig(type.getParentId(), type.getChildId());
-                    return;
-                }
+        for (const type of availableFightTypes) {
+            if (type.getStyle() == FightStyle.AGGRESSIVE) {
+                player.setFightType(type);
+                player.getPacketSender().sendConfig(type.getParentId(), type.getChildId());
+                return;
             }
         }
 
         //Still no proper attack style.
         //Set it to the first one..
-        player.setFightType(player.getWeapon().getFightType()[0]);
+        player.setFightType(availableFightTypes[0]);
         player.getPacketSender().sendConfig(player.getFightType().getParentId(), player.getFightType().getChildId());
     }
 
@@ -855,8 +858,8 @@ export class WeaponInterfaces {
         this.nameLineId = nameLineId;
         this.speed = speed;
         this.fightType = fightType;
-        this.specialBar = specialBar;
-        this.specialMeter = specialMeter;
+        this.specialBar = specialBar ?? -1;
+        this.specialMeter = specialMeter ?? -1;
     }
 
     public getInterfaceId(): number {

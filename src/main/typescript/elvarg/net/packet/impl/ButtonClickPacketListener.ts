@@ -1,4 +1,8 @@
 import { PacketExecutor } from "../PacketExecutor";
+import { WeaponInterfaces } from "../../../game/content/combat/WeaponInterfaces";
+import { Autocasting } from "../../../game/content/combat/magic/Autocasting";
+import { BonusManager } from "../../../game/model/equipment/BonusManager";
+import { FightType } from "../../../game/content/combat/FightType";
 // import { Emotes } from '../../../game/content/Emotes';
 // import { ItemsKeptOnDeath } from '../../../game/content/ItemsKeptOnDeath';
 // import { PrayerHandler } from '../../../game/content/PrayerHandler';
@@ -126,6 +130,32 @@ export class ButtonClickPacketListener implements PacketExecutor {
       return;
     }
 
+    if (button === 5860 || button === 5861 || button === 5862) {
+      const fightType =
+        button === 5860
+          ? FightType.UNARMED_PUNCH
+          : button === 5861
+            ? FightType.UNARMED_BLOCK
+            : FightType.UNARMED_KICK;
+      player.setFightType(fightType);
+      player.getPacketSender().sendConfig(fightType.getParentId(), fightType.getChildId());
+      BonusManager.update(player);
+      return;
+    }
+
+    if (
+      Autocasting.handleWeaponInterface(player, button) ||
+      Autocasting.handleAutocastTab(player, button) ||
+      Autocasting.toggleAutocast(player, button)
+    ) {
+      return;
+    }
+
+    if (WeaponInterfaces.changeCombatSettings(player, button)) {
+      BonusManager.update(player);
+      return;
+    }
+
     if (
       PluginManager.emitButtonClick({
         player,
@@ -135,14 +165,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
     ) {
       return;
     }
-
-    // if (player.getRights() == PlayerRights.DEVELOPER) {
-    //   player.getPacketSender().sendMessage("Button clicked: " + button.toString() + ".");
-    // }
-
-    // if (ButtonClickPacketListener.handlers(player, button)) {
-    //   return;
-    // }
 
     switch (button) {
       case ButtonClickPacketListener.OPEN_PRESETS:

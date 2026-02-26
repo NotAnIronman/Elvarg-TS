@@ -578,6 +578,7 @@ export class Player extends Mobile {
         this.setResetMovementQueue(true);
         this.getCombat().reset();
         this.getSkillManager().ensureCombatBaseline();
+        WeaponInterfaces.assign(this);
 
         // Keep baseline right-click player interactions available outside wilderness/duel areas.
         this.getPacketSender().sendInteractionOption("Follow", 3, false);
@@ -845,8 +846,8 @@ export class Player extends Mobile {
         return this.lastItemPickup;
     }
 
-    public static getCombatSpecial(): CombatSpecial {
-        return this.getCombatSpecial();
+    public getCombatSpecial(): CombatSpecial {
+        return this.combatSpecial;
     }
 
     public setCombatSpecial(combatSpecial: CombatSpecial) {

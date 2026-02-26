@@ -119,7 +119,14 @@ export class Autocasting {
     }
 
     public static toggleAutocast(player: Player, actionButtonId: number) {
-        let cbSpell = CombatSpells.getCombatSpell(actionButtonId);
+        let cbSpell: CombatSpell | null = null;
+        try {
+            cbSpell = CombatSpells.getCombatSpell(actionButtonId);
+        } catch (_err) {
+            // Some legacy/incomplete spell definitions can throw while resolving by id.
+            // For unrelated interface buttons we should simply ignore and let other handlers run.
+            return false;
+        }
         if (!cbSpell) {
             return false;
         }

@@ -1,5 +1,3 @@
-// WeaponInterfaces import removed to avoid circular bootstrap.
-const WeaponInterfaces: any = {};
 import { Mobile } from "../../entity/impl/Mobile";
 import type { Player } from "../../entity/impl/player/Player";
 import { CombatFactory } from "./CombatFactory";
@@ -10,9 +8,6 @@ import { TaskManager } from "../../task/TaskManager";
 import { RestoreSpecialAttackTask } from '../../task/impl/RestoreSpecialAttackTask'
 import { Equipment } from "../../model/container/impl/Equipment";
 import { DuelRule } from "../Duelling";
-
-const getPlayerCtor = () =>
-    require("../../entity/impl/player/Player").Player as typeof import("../../entity/impl/player/Player").Player;
 
 class DummyCombatMethod extends CombatMethod {
     start(): void {}
@@ -44,7 +39,7 @@ export class CombatSpecial {
         1,
         1,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.WHIP
+        null
     )
     public static readonly BARRELSCHEST_ANCHOR = new CombatSpecial(
         [10887],
@@ -52,7 +47,7 @@ export class CombatSpecial {
         1.22,
         1.10,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.WARHAMMER
+        null
     )
     public static readonly DRAGON_SCIMITAR = new CombatSpecial(
         [4587],
@@ -60,7 +55,7 @@ export class CombatSpecial {
         1.00,
         1.25,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.SCIMITAR
+        null
     )
     public static readonly DRAGON_LONGSWORD = new CombatSpecial(
         [1305],
@@ -68,7 +63,7 @@ export class CombatSpecial {
         1.15,
         1.25,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.LONGSWORD
+        null
     )
     public static readonly DRAGON_MACE =  new CombatSpecial(
         [1434],
@@ -76,7 +71,7 @@ export class CombatSpecial {
         1.5,
         1.25,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.MACE
+        null
     )
     public static readonly DRAGON_WARHAMMER =  new CombatSpecial (
         [13576],
@@ -84,7 +79,7 @@ export class CombatSpecial {
         1.5,
         1.00,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.WARHAMMER
+        null
     )
     public static readonly SARADOMIN_SWORD = new CombatSpecial(
         [11838],
@@ -92,7 +87,7 @@ export class CombatSpecial {
         1.0,
         1.0,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.SARADOMIN_SWORD
+        null
     )
     public static readonly ARMADYL_GODSWORD = new CombatSpecial(
         [11802],
@@ -100,7 +95,7 @@ export class CombatSpecial {
         1.375,
         2,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.GODSWORD
+        null
     )
     public static readonly SARADOMIN_GODSWORD = new CombatSpecial(
         [11806],
@@ -108,7 +103,7 @@ export class CombatSpecial {
         1.1,
         1.5,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.GODSWORD
+        null
     )
     public static readonly BANDOS_GODSWORD = new CombatSpecial(
         [11804],
@@ -116,7 +111,7 @@ export class CombatSpecial {
         1.21,
         1.5,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.GODSWORD
+        null
     )
     public static readonly ZAMORAK_GODSWORD = new CombatSpecial(
         [11808],
@@ -124,7 +119,7 @@ export class CombatSpecial {
         1.1,
         1.5,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.GODSWORD
+        null
     )
     public static readonly ABYSSAL_BLUDGEON = new CombatSpecial(
         [13263],
@@ -132,7 +127,7 @@ export class CombatSpecial {
         1.20,
         1.0,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.ABYSSAL_BLUDGEON
+        null
     )
     public static readonly DRAGON_HALBERD = new CombatSpecial(
         [3204],
@@ -140,7 +135,7 @@ export class CombatSpecial {
         1.1,
         1.35,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.HALBERD
+        null
     )
     public static readonly DRAGON_DAGGER = new CombatSpecial(
         [1215, 1231, 5680, 5698],
@@ -148,7 +143,7 @@ export class CombatSpecial {
         1.15,
         1.20,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.DRAGON_DAGGER
+        null
     )
     public static readonly ABYSSAL_DAGGER = new CombatSpecial (
         [13271],
@@ -156,7 +151,7 @@ export class CombatSpecial {
         0.85,
         1.25,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.ABYSSAL_DAGGER
+        null
     )
     public static readonly GRANITE_MAUL = new CombatSpecial(
         [4153, 12848],
@@ -164,7 +159,7 @@ export class CombatSpecial {
         1,
         1,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.GRANITE_MAUL
+        null
     )
     public static readonly DRAGON_CLAWS = new CombatSpecial(
         [13652],
@@ -172,7 +167,7 @@ export class CombatSpecial {
         1,
         1.35,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.CLAWS
+        null
     )
     public static readonly MAGIC_SHORTBOW = new CombatSpecial(
         [861],
@@ -180,7 +175,7 @@ export class CombatSpecial {
         1,
         1,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.SHORTBOW
+        null
     )
     public static readonly DARK_BOW = new CombatSpecial(
         [11235],
@@ -188,7 +183,7 @@ export class CombatSpecial {
         1.5,
         1.35,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.DARK_BOW
+        null
     )
     public static readonly ARMADYL_CROSSBOW = new CombatSpecial(
         [11785],
@@ -196,7 +191,7 @@ export class CombatSpecial {
         1,
         2.0,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.CROSSBOW
+        null
     )
     public static readonly BALLISTA = new CombatSpecial(
         [19481],
@@ -204,7 +199,7 @@ export class CombatSpecial {
         1.25,
         1.45,
         DUMMY_COMBAT_METHOD,
-        WeaponInterfaces.BALLISTA
+        null
     )
 
     constructor(identifiers: any, drainAmount: number, strengthMultiplier: number, accuracyMultiplier: number, combatMethod: CombatMethod, weaponInterface: any){
@@ -213,7 +208,7 @@ export class CombatSpecial {
         this.strengthMultiplier = strengthMultiplier
         this.accuracyMultiplier = accuracyMultiplier
         this.combatMethod = combatMethod
-        this.weaponInterface = weaponInterface
+        this.weaponType = weaponInterface
     }
 
     SPECIAL_ATTACK_WEAPON_IDS = new Set(Object.values(CombatSpecial).flatMap((cs) => cs.identifiers));
@@ -223,14 +218,13 @@ export class CombatSpecial {
     private accuracyMultiplier: number;
     private combatMethod: any;
     private weaponType: any;
-    private weaponInterface: any
     private identifiers: [];
 
 
     public static checkSpecial(player: Player, special: CombatSpecial): boolean {
         return (
-            getPlayerCtor().getCombatSpecial() != null &&
-            getPlayerCtor().getCombatSpecial() == special &&
+            player.getCombatSpecial() != null &&
+            player.getCombatSpecial() == special &&
             player.isSpecialActivated() &&
             player.getSpecialPercentage() >= special.getDrainAmount()
         );
@@ -282,13 +276,15 @@ export class CombatSpecial {
             return;
         }
 
+        const equippedWeaponId = player.getEquipment().get(Equipment.WEAPON_SLOT).getId();
         for (let c of Object.values(CombatSpecial)) {
-            if (player.getWeapon() == c.getWeaponType()) {
-                if (c.identifiers.some(id => player.getEquipment().get(Equipment.WEAPON_SLOT).getId() == id)) {
-                    player.getPacketSender().sendInterfaceDisplayState(player.getWeapon().getSpecialBar(), false);
-                    player.setCombatSpecial(c);
-                    return;
-                }
+            if (!(c instanceof CombatSpecial)) {
+                continue;
+            }
+            if (c.identifiers.some(id => equippedWeaponId == id)) {
+                player.getPacketSender().sendInterfaceDisplayState(player.getWeapon().getSpecialBar(), false);
+                player.setCombatSpecial(c);
+                return;
             }
         }
 
@@ -299,7 +295,7 @@ export class CombatSpecial {
     }
 
     public static activate(player: Player) {
-        if (getPlayerCtor().getCombatSpecial() == null) {
+        if (player.getCombatSpecial() == null) {
             return;
         }
 
@@ -311,12 +307,12 @@ export class CombatSpecial {
             player.setSpecialActivated(false);
             CombatSpecial.updateBar(player);
         } else {
-            const spec = getPlayerCtor().getCombatSpecial();
+            const spec = player.getCombatSpecial();
             player.setSpecialActivated(true);
             CombatSpecial.updateBar(player);
 
             if (spec == CombatSpecial.GRANITE_MAUL) {
-                if (player.getSpecialPercentage() < getPlayerCtor().getCombatSpecial().getDrainAmount()) {
+                if (player.getSpecialPercentage() < player.getCombatSpecial().getDrainAmount()) {
                     player.getPacketSender().sendMessage("You do not have enough special attack energy left!");
                     player.setSpecialActivated(false);
                     CombatSpecial.updateBar(player);
