@@ -246,15 +246,16 @@ export class BountyHunter {
             // Reward player for the kill..
             let rewardAmount: number = 130 + (100 * enemyKillstreak) + (150 * killer.getKillstreak())
                 + (10 * killer.getWildernessLevel()) + additionalBloodMoneyFromBrokenItems;
-
-            if (killer.getInventory().contains(ItemIdentifiers.BLOOD_MONEY)
-                || killer.getInventory().getFreeSlots() > 0) {
+            if (rewardAmount > 0) {
+              if (killer.getInventory().contains(ItemIdentifiers.BLOOD_MONEY)
+                  || killer.getInventory().getFreeSlots() > 0) {
                 killer.getInventory().adds(ItemIdentifiers.BLOOD_MONEY, rewardAmount);
-            } else {
+              } else {
                 ItemOnGroundManager.registerNonGlobals(killer, new Item(ItemIdentifiers.BLOOD_MONEY, rewardAmount),
                     killed.getLocation());
+              }
+              killer.getPacketSender().sendMessage("You've received " + rewardAmount + " blood money for that kill!");
             }
-            killer.getPacketSender().sendMessage("You've received " + rewardAmount + " blood money for that kill!");
             // Check if the killstreak is their highest yet..
             if (killer.getKillstreak() > killer.getHighestKillstreak()) {
                 killer.setHighestKillstreak(killer.getKillstreak());
@@ -267,16 +268,16 @@ export class BountyHunter {
         } else {
             // Reward player for the kill..
             const rewardAmount = minBloodMoneyReward + Misc.getRandom(minBloodMoneyReward) + additionalBloodMoneyFromBrokenItems;
-
-            if (killer.getInventory().contains(ItemIdentifiers.BLOOD_MONEY)
-                || killer.getInventory().getFreeSlots() > 0) {
+            if (rewardAmount > 0) {
+              if (killer.getInventory().contains(ItemIdentifiers.BLOOD_MONEY)
+                  || killer.getInventory().getFreeSlots() > 0) {
                 killer.getInventory().adds(ItemIdentifiers.BLOOD_MONEY, rewardAmount);
-            } else {
+              } else {
                 ItemOnGroundManager.registerNonGlobals(killer, new Item(ItemIdentifiers.BLOOD_MONEY, rewardAmount),
                     killed.getLocation());
+              }
+              killer.getPacketSender().sendMessage("You've received " + rewardAmount + " blood money for that kill!");
             }
-
-            killer.getPacketSender().sendMessage("You've received " + rewardAmount + " blood money for that kill!");
         }
 
         // Update interfaces

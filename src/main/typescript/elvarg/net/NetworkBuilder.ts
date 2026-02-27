@@ -353,6 +353,7 @@ class LoginSession {
       session.setEncryptor(this.encryptor);
     }
     const gamePlayer = new Player(session, new Location(player.location.x, player.location.y, player.location.plane));
+    session.setPlayer(gamePlayer);
     gamePlayer.setUsername(username);
     gamePlayer.setLongUsername(Misc.stringToLongBigInt(username));
     gamePlayer.setHostAddress((this.socket as any)?._socket?.remoteAddress ?? "");
@@ -1169,7 +1170,7 @@ class LoginSession {
       }
 
       switch (opcode) {
-        case 0:
+        case PacketConstants.PLAYER_INACTIVE_OPCODE:
           // Client idle keepalive; consume without echo for Java parity.
           continue;
         case 11:

@@ -14,6 +14,7 @@ import { NetworkConstants } from "./NetworkConstants";
 import { Server, Socket } from "socket.io";
 import { PacketType } from "./packet/PacketType";
 import { IsaacRandom } from "./security/IsaacRandom";
+import type { Player } from "../game/entity/impl/player/Player";
 
 export interface OutboundPacketMeta {
   opcode: number;
@@ -30,7 +31,7 @@ export class PlayerSession {
   private encryptor?: IsaacRandom;
   private outboundPacketObserver?: (meta: OutboundPacketMeta) => void;
   private shouldLogPacketOut?: () => boolean;
-  // public player: Player;
+  private player?: Player;
 
   constructor(
     channel: any,
@@ -151,7 +152,7 @@ export class PlayerSession {
         if (!this.shouldLogPacketOut || this.shouldLogPacketOut()) {
           try {
             console.log(
-              `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length}`
+              `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length} player=${this.player?.getUsername?.() ?? "unknown"}`
             );
           } catch {
             // best-effort logging; never throw here
@@ -212,9 +213,9 @@ export class PlayerSession {
   //     return this.player;
   // }
 
-  // public setPlayer(player: Player) {
-  //     this.player = player;
-  // }
+  public setPlayer(player: Player) {
+    this.player = player;
+  }
 
   public getChannel(): Socket {
     return this.channel;

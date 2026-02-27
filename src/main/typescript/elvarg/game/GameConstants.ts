@@ -85,7 +85,7 @@ export class GameConstants {
     // Centralized server logging controls (runtime mutable via admin commands).
     public static SERVER_LOG_LEVELS: string[] = ["info", "warn", "error"];
     public static SERVER_LOG_ENABLED_TYPES: string[] = [];
-    public static SERVER_LOG_DISABLED_TYPES: string[] = ["plugin", "npc.face", "Combat:skulling"];
+    public static SERVER_LOG_DISABLED_TYPES: string[] = ["plugin", "npc.face", "Combat"];
 
     public static setPlayerPersistence(playerPersistence: PlayerPersistence): void {
         if (!playerPersistence) {
