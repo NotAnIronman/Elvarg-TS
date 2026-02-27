@@ -1,15 +1,13 @@
 import { BonusManager } from "../../../model/equipment/BonusManager";
 import { Skill } from "../../../model/Skill";
 import { PrayerHandler } from "../../PrayerHandler";
-import { CombatEquipment } from "../CombatEquipment";
 import { CombatFactory } from "../CombatFactory";
 import { CombatType } from "../CombatType";
 import { FightStyle } from "../FightStyle";
 import { Mobile } from "../../../entity/impl/Mobile";
 import type { Player } from "../../../entity/impl/player/Player";
 import type { NPC } from "../../../entity/impl/npc/NPC";
-import { Equipment } from "../../../model/container/impl/Equipment";
-import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
+import { applyMeleeHitModifiers } from "../EquipmentEffects";
 
 const getPlayerCombatSpecial = (player: Player): any | null => {
     const accessor = (player as any)?.getCombatSpecial;
@@ -50,12 +48,6 @@ export class DamageFormulas {
             str += 1;
         str += 8;
 
-        if (CombatEquipment.wearingVoid(player, CombatType.MELEE))
-            str = (str * 1.1);
-
-        if (CombatEquipment.wearingObsidian(player))
-            str = (str * 1.2); // obisidian bonuses stack
-
         return str;
     }
 
@@ -68,26 +60,15 @@ export class DamageFormulas {
             maxHit += 320;
             maxHit /= 640;
 
-            if (CombatFactory.fullDharoks(player)) {
-                let hp = player.getHitpoints();
-                let max = player.getSkillManager().getMaxLevel(Skill.HITPOINTS);
-                let mult = Math.max(0, ((max - hp) / max) * 100) + 100;
-                maxHit *= (mult / 100);
-            }
-
             const special = getPlayerCombatSpecial(player);
             if (player.isSpecialActivated() && special != null) {
                 maxHit *= special.getStrengthMultiplier();
             }
         } else {
             maxHit = entity.getAsNpc().getCurrentDefinition().getMaxHit();
-
-            if (CombatFactory.fullDharoks(entity)) {
-                let hitpoints = entity.getHitpoints();
-                maxHit += ((entity.getAsNpc().getDefinition().getHitpoints() - hitpoints) * 0.35);
-            }
         }
-        return Math.floor(maxHit);
+        const adjusted = applyMeleeHitModifiers(entity, maxHit);
+        return Math.floor(adjusted);
     }
 
     public static getMagicMaxhit(c: Mobile): number {
@@ -140,9 +121,6 @@ export class DamageFormulas {
             rngStrength += 3;
         rngStrength += 8;
 
-        if (CombatEquipment.wearingVoid(player, CombatType.RANGED)) {
-            rngStrength = (rngStrength * 1.125);
-        }
         // if (dragonHunter(input))
         // rngStrength = (int) (rngStrength * 1.3f);
         return rngStrength;

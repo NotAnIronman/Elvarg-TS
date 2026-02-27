@@ -8,7 +8,7 @@ import { Misc } from "../../../../util/Misc";
 import { Mobile } from "../../../entity/impl/Mobile";
 import { BonusManager } from "../../../model/equipment/BonusManager";
 import { Skill } from "../../../model/Skill";
-import { CombatEquipment } from "../../combat/CombatEquipment";
+import { applyMeleeAttackAccuracyModifiers, applyRangedAttackAccuracyModifiers, applyMagicAttackAccuracyModifiers, applyMeleeDefenseModifiers, applyRangedDefenseModifiers, applyMagicDefenseModifiers } from "../EquipmentEffects";
 import type { Player } from '../../../entity/impl/player/Player';
 
 const getPlayerCombatSpecial = (player: Player): any | null => {
@@ -100,8 +100,7 @@ export class AccuracyFormulasDpsCalc {
         else if (fightStyle == FightStyle.CONTROLLED)
             att += 1;
 
-        if (CombatEquipment.wearingVoid(player, CombatType.MELEE))
-            att = (att * 1.1);
+        att = applyMeleeAttackAccuracyModifiers(player, att);
 
         // Special attack
         const special = getPlayerCombatSpecial(player);
@@ -184,8 +183,7 @@ export class AccuracyFormulasDpsCalc {
             def += 1;
         def += 8;
 
-        if (CombatEquipment.wearingVoid(player, CombatType.MELEE))
-            def = (def * 1.1);
+        def = applyMeleeDefenseModifiers(player, def);
 
         return def;
     }
@@ -265,9 +263,7 @@ export class AccuracyFormulasDpsCalc {
         if (fightStyle == FightStyle.ACCURATE)
             rngStrength += 3;
 
-        if (CombatEquipment.wearingVoid(player, CombatType.RANGED)) {
-            rngStrength = (rngStrength * 1.125);
-        }
+        rngStrength = applyRangedAttackAccuracyModifiers(player, rngStrength);
 
         //    if (dragonHunter(input))
         //        rngStrength =
@@ -317,8 +313,7 @@ export class AccuracyFormulasDpsCalc {
         else if (fightStyle == FightStyle.DEFENSIVE)
             mag += 1;
 
-        if (CombatEquipment.wearingVoid(player, CombatType.MAGIC))
-            mag = (mag * 1.45);
+        mag = applyMagicAttackAccuracyModifiers(player, mag);
 
         return mag;
     }
