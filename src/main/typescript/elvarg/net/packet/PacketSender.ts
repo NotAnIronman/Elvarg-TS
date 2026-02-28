@@ -917,13 +917,29 @@ export class PacketSender {
     if (!position || typeof position.getX !== "function" || typeof position.getY !== "function") {
       return this;
     }
-    let other = this.player.getLastKnownRegion?.() ?? this.player.getLocation?.();
-    if (!other) {
+    const regionSource = this.player.getLastKnownRegion?.() ?? this.player.getLocation?.();
+    const playerLocation = this.player.getLocation?.();
+    if (!regionSource || !playerLocation) {
       return this;
     }
+
+    let localY = position.getY() - 8 * regionSource.getRegionY();
+    let localX = position.getX() - 8 * regionSource.getRegionX();
+
+    // If cached region drifts out of sync, fall back to current player region
+    // so region packets (e.g. projectiles) remain decodable client-side.
+    if (localX < 0 || localX > 103 || localY < 0 || localY > 103) {
+      localY = position.getY() - 8 * playerLocation.getRegionY();
+      localX = position.getX() - 8 * playerLocation.getRegionX();
+    }
+
+    // Client region packets operate on local scene tiles (0..103).
+    localX = Math.max(0, Math.min(103, localX));
+    localY = Math.max(0, Math.min(103, localY));
+
     let out = new PacketBuilder(85);
-    out.puts(position.getY() - 8 * other.getRegionY(), ValueType.C);
-    out.puts(position.getX() - 8 * other.getRegionX(), ValueType.C);
+    out.puts(localY, ValueType.C);
+    out.puts(localX, ValueType.C);
     this.player.getSession().write(out);
     return this;
   }
@@ -1094,7 +1110,64 @@ export class PacketSender {
     return this;
   }
 
-  sendProjectile(..._args: any[]): this {
+  sendProjectile(
+    start: any,
+    end: any,
+    offset: number,
+    speed: number,
+    projectileId: number,
+    startHeight: number,
+    endHeight: number,
+    lockon: any,
+    delay: number,
+    angle: number = 16,
+    distanceOffset: number = 64
+  ): this {
+    if (
+      !start ||
+      typeof start.getX !== "function" ||
+      typeof start.getY !== "function" ||
+      !end ||
+      typeof end.getX !== "function" ||
+      typeof end.getY !== "function"
+    ) {
+      return this;
+    }
+
+    this.sendPosition(start);
+
+    const out = new PacketBuilder(117);
+    out.put(offset);
+    out.put(end.getX() - start.getX());
+    out.put(end.getY() - start.getY());
+
+    if (lockon != null && typeof lockon.getIndex === "function" && typeof lockon.isPlayer === "function") {
+      out.putShort(lockon.isPlayer() ? -(lockon.getIndex() + 1) : lockon.getIndex() + 1);
+    } else {
+      out.putShort(0);
+    }
+
+    out.putShort(projectileId);
+    out.put(startHeight);
+    out.put(endHeight);
+    out.putShort(delay);
+    out.putShort(speed);
+    out.put(angle);
+    out.put(distanceOffset);
+    if (process.env.PROJECTILE_DEBUG === "1") {
+      try {
+        const targetIndex =
+          lockon != null && typeof lockon.getIndex === "function" && typeof lockon.isPlayer === "function"
+            ? (lockon.isPlayer() ? -(lockon.getIndex() + 1) : lockon.getIndex() + 1)
+            : 0;
+        console.log(
+          `[projectile.out] id=${projectileId} start=(${start.getX()},${start.getY()},${start.getZ?.() ?? 0}) end=(${end.getX()},${end.getY()},${end.getZ?.() ?? 0}) d=(${end.getX() - start.getX()},${end.getY() - start.getY()}) lockon=${targetIndex} delay=${delay} speed=${speed}`
+        );
+      } catch {
+        // debug logging must never affect packet delivery
+      }
+    }
+    this.player.getSession().write(out);
     return this;
   }
 

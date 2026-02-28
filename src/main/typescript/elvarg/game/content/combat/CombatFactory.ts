@@ -90,10 +90,18 @@ export class CombatFactory {
     static getMethod(attacker: Mobile) {
         if (attacker.isPlayer()) {
             const player = attacker.getAsPlayer();
+            const weaponId = player.getEquipment().getItems()[Equipment.WEAPON_SLOT]?.getId?.() ?? -1;
 
             // Update ranged data before selecting the combat method.
             player.getCombat().setAmmunition(Ammunition.getFor(player));
             player.getCombat().setRangedWeapon(RangedWeapon.getFor(player));
+            if ((player.getUsername?.() ?? "") === "Happysham31") {
+                const rw = player.getCombat().getRangedWeapon();
+                const ammo = player.getCombat().getAmmunition();
+                console.log(
+                    `[combat.method.resolve_v2] player=${player.getUsername?.() ?? "unknown"} weapon=${weaponId} rangedWeapon=${rw != null ? "set" : "null"} ammo=${ammo?.getItemId?.() ?? -1} mapWeapons=${(RangedWeapon as any).rangedWeapons?.size ?? -1} mapHas861=${(RangedWeapon as any).rangedWeapons?.has?.(861) ?? false} mapAmmo=${(Ammunition as any).rangedAmmunition?.size ?? -1}`
+                );
+            }
 
             if (
                 player.getCombat().getCastSpell() != null ||

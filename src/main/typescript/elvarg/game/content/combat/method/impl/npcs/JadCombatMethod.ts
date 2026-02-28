@@ -32,7 +32,15 @@ export class JadCombatMethod extends CombatMethod {
                 break;
             case CombatType.MAGIC:
                 character.performAnimation(JadCombatMethod.MAGIC_ATTACK_ANIM);
-                const projectile2 = Projectile.createProjectile(character, target, 395, 25, 100, 110, 33);
+                const projectile2 = Projectile.createProjectile(
+                    character,
+                    target,
+                    JadCombatMethod.MAGIC_ATTACK_PROJECTILE,
+                    25,
+                    100,
+                    110,
+                    33
+                );
                 projectile2.sendProjectile();
                 break;
             default:

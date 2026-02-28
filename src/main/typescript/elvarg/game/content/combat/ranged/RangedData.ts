@@ -29,7 +29,7 @@ export class RangedData {
         // Todo: ENCHANTED_RUBY_BOLT
         switch (p.getCombat().getAmmunition()) {
             case Ammunition.ENCHANTED_DIAMOND_BOLT:
-                target.performGraphic(new Graphic(758, GraphicHeight.MIDDLE));
+                target.performGraphic(new Graphic(758, 0, GraphicHeight.MIDDLE));
                 multiplier = 1.15;
                 break;
 
@@ -122,87 +122,89 @@ export class RangedData {
 }
 
 export class Ammunition {
-    public static readonly BRONZE_ARROW = new Ammunition(882, new Graphic(19, GraphicHeight.HIGH), 10, 7)
-    public static readonly IRON_ARROW = new Ammunition(884, new Graphic(18, GraphicHeight.HIGH), 9, 10)
-    public static readonly STEEL_ARROW = new Ammunition(886, new Graphic(20, GraphicHeight.HIGH), 11, 16)
-    public static readonly MITHRIL_ARROW = new Ammunition(888, new Graphic(21, GraphicHeight.HIGH), 12, 22)
-    public static readonly ADAMANT_ARROW = new Ammunition(890, new Graphic(22, GraphicHeight.HIGH), 13, 31)
-    public static readonly RUNE_ARROW = new Ammunition(892, new Graphic(24, GraphicHeight.HIGH), 15, 50)
-    public static readonly ICE_ARROW = new Ammunition(78, new Graphic(25, GraphicHeight.HIGH), 16, 58)
-    public static readonly BROAD_ARROW = new Ammunition(4160, new Graphic(20, GraphicHeight.HIGH), 11, 58)
-    public static readonly DRAGON_ARROW = new Ammunition(11212, new Graphic(1111, GraphicHeight.HIGH), 1120, 65)
+    private static rangedAmmunition: Map<number, Ammunition> = new Map<number, Ammunition>();
 
-    public static readonly BRONZE_BOLT = new Ammunition(877, new Graphic(955, GraphicHeight.HIGH), 27, 13)
-    public static readonly OPAL_BOLT = new Ammunition(879, new Graphic(955, GraphicHeight.HIGH), 27, 20)
-    public static readonly ENCHANTED_OPAL_BOLT = new Ammunition(9236, new Graphic(955, GraphicHeight.HIGH), 27, 20)
-    public static readonly IRON_BOLT = new Ammunition(9140, new Graphic(955, GraphicHeight.HIGH), 27, 28)
-    public static readonly JADE_BOLT = new Ammunition(9335, new Graphic(955, GraphicHeight.HIGH), 27, 31)
-    public static readonly ENCHANTED_JADE_BOLT = new Ammunition(9237, new Graphic(955, GraphicHeight.HIGH), 27, 31)
-    public static readonly STEEL_BOLT = new Ammunition(9141, new Graphic(955, GraphicHeight.HIGH), 27, 35)
-    public static readonly PEARL_BOLT = new Ammunition(880, new Graphic(955, GraphicHeight.HIGH), 27, 38)
-    public static readonly ENCHANTED_PEARL_BOLT = new Ammunition(9238, new Graphic(955, GraphicHeight.HIGH), 27, 38)
-    public static readonly MITHRIL_BOLT = new Ammunition(9142, new Graphic(955, GraphicHeight.HIGH), 27, 40)
-    public static readonly TOPAZ_BOLT = new Ammunition(9336, new Graphic(955, GraphicHeight.HIGH), 27, 50)
-    public static readonly ENCHANTED_TOPAZ_BOLT = new Ammunition(9239, new Graphic(955, GraphicHeight.HIGH), 27, 50)
-    public static readonly ADAMANT_BOLT = new Ammunition(9143, new Graphic(955, GraphicHeight.HIGH), 27, 60)
-    public static readonly SAPPHIRE_BOLT = new Ammunition(9337, new Graphic(955, GraphicHeight.HIGH), 27, 65)
-    public static readonly ENCHANTED_SAPPHIRE_BOLT = new Ammunition(9240, new Graphic(955, GraphicHeight.HIGH), 27, 65)
-    public static readonly EMERALD_BOLT = new Ammunition(9338, new Graphic(955, GraphicHeight.HIGH), 27, 70)
-    public static readonly ENCHANTED_EMERALD_BOLT = new Ammunition(9241, new Graphic(955, GraphicHeight.HIGH), 27, 70)
-    public static readonly RUBY_BOLT = new Ammunition(9339, new Graphic(955, GraphicHeight.HIGH), 27, 75)
-    public static readonly ENCHANTED_RUBY_BOLT = new Ammunition(9242, new Graphic(955, GraphicHeight.HIGH), 27, 75)
-    public static readonly BROAD_BOLT = new Ammunition(13280, new Graphic(955, GraphicHeight.HIGH), 27, 100)
-    public static readonly RUNITE_BOLT = new Ammunition(9144, new Graphic(955, GraphicHeight.HIGH), 27, 115)
-    public static readonly DIAMOND_BOLT = new Ammunition(9340, new Graphic(955, GraphicHeight.HIGH), 27, 105)
-    public static readonly ENCHANTED_DIAMOND_BOLT = new Ammunition(9243, new Graphic(955, GraphicHeight.HIGH), 27, 105)
-    public static readonly DRAGON_BOLT = new Ammunition(9341, new Graphic(955, GraphicHeight.HIGH), 27, 117)
-    public static readonly ENCHANTED_DRAGON_BOLT = new Ammunition(9244, new Graphic(955, GraphicHeight.HIGH), 27, 117)
-    public static readonly ONYX_BOLT = new Ammunition(9342, new Graphic(955, GraphicHeight.HIGH), 27, 120)
-    public static readonly ENCHANTED_ONYX_BOLT = new Ammunition(9245, new Graphic(955, GraphicHeight.HIGH), 27, 120)
-    public static readonly ENCHANTED_DRAGONSTONE_DRAGON_BOLT = new Ammunition(ItemIdentifiers.DRAGONSTONE_DRAGON_BOLTS_E_, new Graphic(955, GraphicHeight.HIGH), 27, 122)
+    public static readonly BRONZE_ARROW = new Ammunition(882, new Graphic(19, 0, GraphicHeight.HIGH), 10, 7)
+    public static readonly IRON_ARROW = new Ammunition(884, new Graphic(18, 0, GraphicHeight.HIGH), 9, 10)
+    public static readonly STEEL_ARROW = new Ammunition(886, new Graphic(20, 0, GraphicHeight.HIGH), 11, 16)
+    public static readonly MITHRIL_ARROW = new Ammunition(888, new Graphic(21, 0, GraphicHeight.HIGH), 12, 22)
+    public static readonly ADAMANT_ARROW = new Ammunition(890, new Graphic(22, 0, GraphicHeight.HIGH), 13, 31)
+    public static readonly RUNE_ARROW = new Ammunition(892, new Graphic(24, 0, GraphicHeight.HIGH), 15, 50)
+    public static readonly ICE_ARROW = new Ammunition(78, new Graphic(25, 0, GraphicHeight.HIGH), 16, 58)
+    public static readonly BROAD_ARROW = new Ammunition(4160, new Graphic(20, 0, GraphicHeight.HIGH), 11, 58)
+    public static readonly DRAGON_ARROW = new Ammunition(11212, new Graphic(1111, 0, GraphicHeight.HIGH), 1120, 65)
 
-    public static readonly BRONZE_DART = new Ammunition(806, new Graphic(232, GraphicHeight.HIGH), 226, 1)
-    public static readonly IRON_DART = new Ammunition(807, new Graphic(233, GraphicHeight.HIGH), 227, 4)
-    public static readonly STEEL_DART = new Ammunition(808, new Graphic(234, GraphicHeight.HIGH), 228, 6)
-    public static readonly MITHRIL_DART = new Ammunition(809, new Graphic(235, GraphicHeight.HIGH), 229, 8)
-    public static readonly ADAMANT_DART = new Ammunition(810, new Graphic(236, GraphicHeight.HIGH), 230, 13)
-    public static readonly RUNE_DART = new Ammunition(811, new Graphic(237, GraphicHeight.HIGH), 231, 17)
-    public static readonly DRAGON_DART = new Ammunition(11230, new Graphic(1123, GraphicHeight.HIGH), 226, 24)
+    public static readonly BRONZE_BOLT = new Ammunition(877, new Graphic(955, 0, GraphicHeight.HIGH), 27, 13)
+    public static readonly OPAL_BOLT = new Ammunition(879, new Graphic(955, 0, GraphicHeight.HIGH), 27, 20)
+    public static readonly ENCHANTED_OPAL_BOLT = new Ammunition(9236, new Graphic(955, 0, GraphicHeight.HIGH), 27, 20)
+    public static readonly IRON_BOLT = new Ammunition(9140, new Graphic(955, 0, GraphicHeight.HIGH), 27, 28)
+    public static readonly JADE_BOLT = new Ammunition(9335, new Graphic(955, 0, GraphicHeight.HIGH), 27, 31)
+    public static readonly ENCHANTED_JADE_BOLT = new Ammunition(9237, new Graphic(955, 0, GraphicHeight.HIGH), 27, 31)
+    public static readonly STEEL_BOLT = new Ammunition(9141, new Graphic(955, 0, GraphicHeight.HIGH), 27, 35)
+    public static readonly PEARL_BOLT = new Ammunition(880, new Graphic(955, 0, GraphicHeight.HIGH), 27, 38)
+    public static readonly ENCHANTED_PEARL_BOLT = new Ammunition(9238, new Graphic(955, 0, GraphicHeight.HIGH), 27, 38)
+    public static readonly MITHRIL_BOLT = new Ammunition(9142, new Graphic(955, 0, GraphicHeight.HIGH), 27, 40)
+    public static readonly TOPAZ_BOLT = new Ammunition(9336, new Graphic(955, 0, GraphicHeight.HIGH), 27, 50)
+    public static readonly ENCHANTED_TOPAZ_BOLT = new Ammunition(9239, new Graphic(955, 0, GraphicHeight.HIGH), 27, 50)
+    public static readonly ADAMANT_BOLT = new Ammunition(9143, new Graphic(955, 0, GraphicHeight.HIGH), 27, 60)
+    public static readonly SAPPHIRE_BOLT = new Ammunition(9337, new Graphic(955, 0, GraphicHeight.HIGH), 27, 65)
+    public static readonly ENCHANTED_SAPPHIRE_BOLT = new Ammunition(9240, new Graphic(955, 0, GraphicHeight.HIGH), 27, 65)
+    public static readonly EMERALD_BOLT = new Ammunition(9338, new Graphic(955, 0, GraphicHeight.HIGH), 27, 70)
+    public static readonly ENCHANTED_EMERALD_BOLT = new Ammunition(9241, new Graphic(955, 0, GraphicHeight.HIGH), 27, 70)
+    public static readonly RUBY_BOLT = new Ammunition(9339, new Graphic(955, 0, GraphicHeight.HIGH), 27, 75)
+    public static readonly ENCHANTED_RUBY_BOLT = new Ammunition(9242, new Graphic(955, 0, GraphicHeight.HIGH), 27, 75)
+    public static readonly BROAD_BOLT = new Ammunition(13280, new Graphic(955, 0, GraphicHeight.HIGH), 27, 100)
+    public static readonly RUNITE_BOLT = new Ammunition(9144, new Graphic(955, 0, GraphicHeight.HIGH), 27, 115)
+    public static readonly DIAMOND_BOLT = new Ammunition(9340, new Graphic(955, 0, GraphicHeight.HIGH), 27, 105)
+    public static readonly ENCHANTED_DIAMOND_BOLT = new Ammunition(9243, new Graphic(955, 0, GraphicHeight.HIGH), 27, 105)
+    public static readonly DRAGON_BOLT = new Ammunition(9341, new Graphic(955, 0, GraphicHeight.HIGH), 27, 117)
+    public static readonly ENCHANTED_DRAGON_BOLT = new Ammunition(9244, new Graphic(955, 0, GraphicHeight.HIGH), 27, 117)
+    public static readonly ONYX_BOLT = new Ammunition(9342, new Graphic(955, 0, GraphicHeight.HIGH), 27, 120)
+    public static readonly ENCHANTED_ONYX_BOLT = new Ammunition(9245, new Graphic(955, 0, GraphicHeight.HIGH), 27, 120)
+    public static readonly ENCHANTED_DRAGONSTONE_DRAGON_BOLT = new Ammunition(ItemIdentifiers.DRAGONSTONE_DRAGON_BOLTS_E_, new Graphic(955, 0, GraphicHeight.HIGH), 27, 122)
 
-    public static readonly BRONZE_KNIFE = new Ammunition(864, new Graphic(219, GraphicHeight.HIGH), 212, 3)
-    public static readonly BRONZE_KNIFE_P1 = new Ammunition(870, new Graphic(219, GraphicHeight.HIGH), 212, 3)
-    public static readonly BRONZE_KNIFE_P2 = new Ammunition(5654, new Graphic(219, GraphicHeight.HIGH), 212, 3)
-    public static readonly BRONZE_KNIFE_P3 = new Ammunition(5661, new Graphic(219, GraphicHeight.HIGH), 212, 3)
+    public static readonly BRONZE_DART = new Ammunition(806, new Graphic(232, 0, GraphicHeight.HIGH), 226, 1)
+    public static readonly IRON_DART = new Ammunition(807, new Graphic(233, 0, GraphicHeight.HIGH), 227, 4)
+    public static readonly STEEL_DART = new Ammunition(808, new Graphic(234, 0, GraphicHeight.HIGH), 228, 6)
+    public static readonly MITHRIL_DART = new Ammunition(809, new Graphic(235, 0, GraphicHeight.HIGH), 229, 8)
+    public static readonly ADAMANT_DART = new Ammunition(810, new Graphic(236, 0, GraphicHeight.HIGH), 230, 13)
+    public static readonly RUNE_DART = new Ammunition(811, new Graphic(237, 0, GraphicHeight.HIGH), 231, 17)
+    public static readonly DRAGON_DART = new Ammunition(11230, new Graphic(1123, 0, GraphicHeight.HIGH), 226, 24)
 
-    public static readonly IRON_KNIFE = new Ammunition(863, new Graphic(220, GraphicHeight.HIGH), 213, 4)
-    public static readonly IRON_KNIFE_P1 = new Ammunition(871, new Graphic(220, GraphicHeight.HIGH), 213, 4)
-    public static readonly IRON_KNIFE_P2 = new Ammunition(5655, new Graphic(220, GraphicHeight.HIGH), 213, 4)
-    public static readonly IRON_KNIFE_P3 = new Ammunition(5662, new Graphic(220, GraphicHeight.HIGH), 213, 4)
+    public static readonly BRONZE_KNIFE = new Ammunition(864, new Graphic(219, 0, GraphicHeight.HIGH), 212, 3)
+    public static readonly BRONZE_KNIFE_P1 = new Ammunition(870, new Graphic(219, 0, GraphicHeight.HIGH), 212, 3)
+    public static readonly BRONZE_KNIFE_P2 = new Ammunition(5654, new Graphic(219, 0, GraphicHeight.HIGH), 212, 3)
+    public static readonly BRONZE_KNIFE_P3 = new Ammunition(5661, new Graphic(219, 0, GraphicHeight.HIGH), 212, 3)
 
-    public static readonly STEEL_KNIFE = new Ammunition(865, new Graphic(221, GraphicHeight.HIGH), 214, 7)
-    public static readonly STEEL_KNIFE_P1 = new Ammunition(872, new Graphic(221, GraphicHeight.HIGH), 214, 7)
-    public static readonly STEEL_KNIFE_P2 = new Ammunition(5656, new Graphic(221, GraphicHeight.HIGH), 214, 7)
-    public static readonly STEEL_KNIFE_P3 = new Ammunition(5663, new Graphic(221, GraphicHeight.HIGH), 214, 7)
+    public static readonly IRON_KNIFE = new Ammunition(863, new Graphic(220, 0, GraphicHeight.HIGH), 213, 4)
+    public static readonly IRON_KNIFE_P1 = new Ammunition(871, new Graphic(220, 0, GraphicHeight.HIGH), 213, 4)
+    public static readonly IRON_KNIFE_P2 = new Ammunition(5655, new Graphic(220, 0, GraphicHeight.HIGH), 213, 4)
+    public static readonly IRON_KNIFE_P3 = new Ammunition(5662, new Graphic(220, 0, GraphicHeight.HIGH), 213, 4)
 
-    public static readonly BLACK_KNIFE = new Ammunition(869, new Graphic(222, GraphicHeight.HIGH), 215, 8)
-    public static readonly BLACK_KNIFE_P1 = new Ammunition(874, new Graphic(222, GraphicHeight.HIGH), 215, 8)
-    public static readonly BLACK_KNIFE_P2 = new Ammunition(5658, new Graphic(222, GraphicHeight.HIGH), 215, 8)
-    public static readonly BLACK_KNIFE_P3 = new Ammunition(5665, new Graphic(222, GraphicHeight.HIGH), 215, 8)
+    public static readonly STEEL_KNIFE = new Ammunition(865, new Graphic(221, 0, GraphicHeight.HIGH), 214, 7)
+    public static readonly STEEL_KNIFE_P1 = new Ammunition(872, new Graphic(221, 0, GraphicHeight.HIGH), 214, 7)
+    public static readonly STEEL_KNIFE_P2 = new Ammunition(5656, new Graphic(221, 0, GraphicHeight.HIGH), 214, 7)
+    public static readonly STEEL_KNIFE_P3 = new Ammunition(5663, new Graphic(221, 0, GraphicHeight.HIGH), 214, 7)
 
-    public static readonly MITHRIL_KNIFE = new Ammunition(866, new Graphic(223, GraphicHeight.HIGH), 215, 10)
-    public static readonly MITHRIL_KNIFE_P1 = new Ammunition(873, new Graphic(223, GraphicHeight.HIGH), 215, 10)
-    public static readonly MITHRIL_KNIFE_P2 = new Ammunition(5657, new Graphic(223, GraphicHeight.HIGH), 215, 10)
-    public static readonly MITHRIL_KNIFE_P3 = new Ammunition(5664, new Graphic(223, GraphicHeight.HIGH), 215, 10)
+    public static readonly BLACK_KNIFE = new Ammunition(869, new Graphic(222, 0, GraphicHeight.HIGH), 215, 8)
+    public static readonly BLACK_KNIFE_P1 = new Ammunition(874, new Graphic(222, 0, GraphicHeight.HIGH), 215, 8)
+    public static readonly BLACK_KNIFE_P2 = new Ammunition(5658, new Graphic(222, 0, GraphicHeight.HIGH), 215, 8)
+    public static readonly BLACK_KNIFE_P3 = new Ammunition(5665, new Graphic(222, 0, GraphicHeight.HIGH), 215, 8)
 
-    public static readonly ADAMANT_KNIFE = new Ammunition(867, new Graphic(224, GraphicHeight.HIGH), 217, 14)
-    public static readonly ADAMANT_KNIFE_P1 = new Ammunition(875, new Graphic(224, GraphicHeight.HIGH), 217, 14)
-    public static readonly ADAMANT_KNIFE_P2 = new Ammunition(5659, new Graphic(224, GraphicHeight.HIGH), 217, 14)
-    public static readonly ADAMANT_KNIFE_P3 = new Ammunition(5666, new Graphic(224, GraphicHeight.HIGH), 217, 14)
+    public static readonly MITHRIL_KNIFE = new Ammunition(866, new Graphic(223, 0, GraphicHeight.HIGH), 215, 10)
+    public static readonly MITHRIL_KNIFE_P1 = new Ammunition(873, new Graphic(223, 0, GraphicHeight.HIGH), 215, 10)
+    public static readonly MITHRIL_KNIFE_P2 = new Ammunition(5657, new Graphic(223, 0, GraphicHeight.HIGH), 215, 10)
+    public static readonly MITHRIL_KNIFE_P3 = new Ammunition(5664, new Graphic(223, 0, GraphicHeight.HIGH), 215, 10)
 
-    public static readonly RUNE_KNIFE = new Ammunition(868, new Graphic(225, GraphicHeight.HIGH), 218, 24)
-    public static readonly RUNE_KNIFE_P1 = new Ammunition(876, new Graphic(225, GraphicHeight.HIGH), 218, 24)
-    public static readonly RUNE_KNIFE_P2 = new Ammunition(5660, new Graphic(225, GraphicHeight.HIGH), 218, 24)
-    public static readonly RUNE_KNIFE_P3 = new Ammunition(5667, new Graphic(225, GraphicHeight.HIGH), 218, 24)
+    public static readonly ADAMANT_KNIFE = new Ammunition(867, new Graphic(224, 0, GraphicHeight.HIGH), 217, 14)
+    public static readonly ADAMANT_KNIFE_P1 = new Ammunition(875, new Graphic(224, 0, GraphicHeight.HIGH), 217, 14)
+    public static readonly ADAMANT_KNIFE_P2 = new Ammunition(5659, new Graphic(224, 0, GraphicHeight.HIGH), 217, 14)
+    public static readonly ADAMANT_KNIFE_P3 = new Ammunition(5666, new Graphic(224, 0, GraphicHeight.HIGH), 217, 14)
+
+    public static readonly RUNE_KNIFE = new Ammunition(868, new Graphic(225, 0, GraphicHeight.HIGH), 218, 24)
+    public static readonly RUNE_KNIFE_P1 = new Ammunition(876, new Graphic(225, 0, GraphicHeight.HIGH), 218, 24)
+    public static readonly RUNE_KNIFE_P2 = new Ammunition(5660, new Graphic(225, 0, GraphicHeight.HIGH), 218, 24)
+    public static readonly RUNE_KNIFE_P3 = new Ammunition(5667, new Graphic(225, 0, GraphicHeight.HIGH), 218, 24)
 
     public static readonly BRONZE_JAVELIN = new Ammunition(825, null, 200, 25)
     public static readonly IRON_JAVELIN = new Ammunition(826, null, 201, 42)
@@ -225,23 +227,23 @@ export class Ammunition {
         Ammunition.DRAGON_JAVELIN
     ]);
 
-    private static startGfx: Graphic;
-    private static itemId: number;
-    private static projectileId: number;
-    private static strength: number;
-    private static rangedAmmunition: Map<number, Ammunition> = new Map<number, Ammunition>();
+    private readonly startGfx: Graphic;
+    private readonly itemId: number;
+    private readonly projectileId: number;
+    private readonly strength: number;
 
 
     constructor(itemId: number, startGfx: Graphic, projectileId: number, strength: number) {
-        Ammunition.itemId = itemId;
-        Ammunition.startGfx = startGfx;
-        Ammunition.projectileId = projectileId;
-        Ammunition.strength = strength;
+        this.itemId = itemId;
+        this.startGfx = startGfx;
+        this.projectileId = projectileId;
+        this.strength = strength;
+        Ammunition.rangedAmmunition.set(itemId, this);
     }
 
     public static getFor(p: Player): Ammunition {
         // First try to get a throw weapon as ammo
-        const weapon = p.getEquipment().getItems()[Equipment.WEAPON_SLOT].getId();
+        const weapon = Number(p.getEquipment().getItems()[Equipment.WEAPON_SLOT].getId());
         const throwWeapon = Ammunition.rangedAmmunition.get(weapon);
 
         // Toxic blowpipe should always fire dragon darts.
@@ -251,13 +253,15 @@ export class Ammunition {
 
         // Didn't find one. Try arrows
         if (throwWeapon == null) {
-            return Ammunition.rangedAmmunition.get(p.getEquipment().getItems()[Equipment.AMMUNITION_SLOT].getId());
+            const ammoId = Number(p.getEquipment().getItems()[Equipment.AMMUNITION_SLOT].getId());
+            return Ammunition.rangedAmmunition.get(ammoId);
         }
 
         return throwWeapon;
     }
 
     public static getForItem(item: number): Ammunition {
+        item = Number(item);
         // First try to get a throw weapon as ammo
         const throwWeapon = Ammunition.rangedAmmunition.get(item);
 
@@ -270,25 +274,24 @@ export class Ammunition {
     }
 
     public getItemId(): number {
-        return Ammunition.itemId;
+        return this.itemId;
     }
 
     public getStartGraphic(): Graphic {
-        return Ammunition.startGfx;
+        return this.startGfx;
     }
 
     public getProjectileId(): number {
-        return Ammunition.projectileId;
+        return this.projectileId;
     }
 
     public getStrength(): number {
-        return Ammunition.strength;
+        return this.strength;
     }
 
     public dropOnFloor(): boolean {
-        return !Ammunition.NO_GROUND_DROP.add(this);
+        return !Ammunition.NO_GROUND_DROP.has(this);
     }
-
 }
 
 export class RangedWeaponType {
@@ -326,6 +329,8 @@ export class RangedWeaponType {
 }
 
 export class RangedWeapon {
+    private static rangedWeapons: Map<number, RangedWeapon> = new Map<number, RangedWeapon>();
+
     public static readonly LONGBOW = new RangedWeapon([839], [Ammunition.BRONZE_ARROW], RangedWeaponType.LONGBOW)
     public static readonly SHORTBOW = new RangedWeapon([841], [Ammunition.BRONZE_ARROW], RangedWeaponType.SHORTBOW)
     public static readonly OAK_LONGBOW = new RangedWeapon([845], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW], RangedWeaponType.LONGBOW)
@@ -337,7 +342,7 @@ export class RangedWeapon {
     public static readonly YEW_LONGBOW = new RangedWeapon([855], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW], RangedWeaponType.LONGBOW)
     public static readonly YEW_SHORTBOW = new RangedWeapon([857], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW], RangedWeaponType.SHORTBOW)
     public static readonly MAGIC_LONGBOW = new RangedWeapon([859], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW, Ammunition.BROAD_ARROW], RangedWeaponType.LONGBOW)
-    public static readonly MAGIC_SHORTBOW = new RangedWeapon([861, 6724], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW, Ammunition.BROAD_ARROW], RangedWeaponType.SHORTBOW)
+    public static readonly MAGIC_SHORTBOW = new RangedWeapon([861, ItemIdentifiers.MAGIC_SHORTBOW_I_, ItemIdentifiers.MAGIC_SHORTBOW_3], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW, Ammunition.BROAD_ARROW], RangedWeaponType.SHORTBOW)
     public static readonly GODBOW = new RangedWeapon([19143, 19149, 19146], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.BROAD_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.SHORTBOW)
     public static readonly ZARYTE_BOW = new RangedWeapon([20171], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.BROAD_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.SHORTBOW)
 
@@ -382,17 +387,19 @@ export class RangedWeapon {
     private weaponIds: number[];
     private ammunitionData: Ammunition[];
     private type: RangedWeaponType;
-    private static rangedWeapons: Map<number, RangedWeapon> = new Map<number, RangedWeapon>();
 
 
     constructor(weaponIds: number[], ammunitionData: Ammunition[], type: RangedWeaponType) {
         this.weaponIds = weaponIds;
         this.ammunitionData = ammunitionData;
         this.type = type;
+        for (const weaponId of weaponIds) {
+            RangedWeapon.rangedWeapons.set(weaponId, this);
+        }
     }
 
     public static getFor(p: Player): RangedWeapon {
-        const weapon = p.getEquipment().getItems()[Equipment.WEAPON_SLOT].getId();
+        const weapon = Number(p.getEquipment().getItems()[Equipment.WEAPON_SLOT].getId());
         return RangedWeapon.rangedWeapons.get(weapon);
     }
 

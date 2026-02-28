@@ -8,6 +8,7 @@ import { TaskManager } from "../../task/TaskManager";
 import { RestoreSpecialAttackTask } from '../../task/impl/RestoreSpecialAttackTask'
 import { Equipment } from "../../model/container/impl/Equipment";
 import { DuelRule } from "../Duelling";
+import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 
 class DummyCombatMethod extends CombatMethod {
     start(): void {}
@@ -170,7 +171,7 @@ export class CombatSpecial {
         null
     )
     public static readonly MAGIC_SHORTBOW = new CombatSpecial(
-        [861],
+        [ItemIdentifiers.MAGIC_SHORTBOW, ItemIdentifiers.MAGIC_SHORTBOW_I_, ItemIdentifiers.MAGIC_SHORTBOW_3],
         55,
         1,
         1,

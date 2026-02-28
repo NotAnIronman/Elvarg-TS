@@ -1,7 +1,7 @@
 // import { Player } from "../../../game/entity/impl/player/Player";
 // import { WildernessArea } from "../../../game/model/areas/impl/WildernessArea";
 // import { GameConstants } from "../../../game/GameConstants";
-// import { ItemDefinition } from "../../../game/definition/ItemDefinition";
+import { ItemDefinition } from "../../../game/definition/ItemDefinition";
 // import { Bank } from "../../../game/model/container/impl/Bank";
 import { Packet } from "../Packet";
 // import { EnteredAmountAction } from "../../../game/model/EnteredAmountAction";
@@ -30,16 +30,26 @@ export class SpawnItemPacketListener {
     if (toBank) {
       // player.getBank(Bank.getTabForItem(player, item)).adds(item, amount);
     } else {
-      if (amount > player.getInventory().getFreeSlots()) {
-        amount = player.getInventory().getFreeSlots();
+      const inventory = player.getInventory();
+      const isStackable = ItemDefinition.forId(item).isStackable();
+
+      if (isStackable) {
+        // Stackables need one free slot only when creating a new stack.
+        const hasExistingStack = inventory.containsNumber(item);
+        if (!hasExistingStack && inventory.getFreeSlots() <= 0) {
+          inventory.full();
+          return;
+        }
+      } else if (amount > inventory.getFreeSlots()) {
+        amount = inventory.getFreeSlots();
       }
 
       if (amount <= 0) {
-        player.getInventory().full();
+        inventory.full();
         return;
       }
 
-      player.getInventory().adds(item, amount);
+      inventory.adds(item, amount);
     }
 
     player.getPacketSender().sendMessage(
@@ -78,6 +88,6 @@ export class SpawnItemPacketListener {
 class SpawnEntered {
   constructor(private readonly execFunc: Function) {}
   execute(amount: number): void {
-    this.execFunc();
+    this.execFunc(amount);
   }
 }
