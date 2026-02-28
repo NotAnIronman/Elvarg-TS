@@ -253,6 +253,7 @@ function createInitialState(home, behaviorMode) {
     followTargetUsername: null,
     followUntilMs: 0,
     nextFollowRepathAt: 0,
+    deathResetApplied: false,
     awaitingDitchTransition: null,
     nextDitchAttemptAt: 0,
   };

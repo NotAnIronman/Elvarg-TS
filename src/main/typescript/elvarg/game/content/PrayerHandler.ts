@@ -74,24 +74,25 @@ export class PrayerHandler {
      * @param buttonId The button the player is clicking.
      */
     public static togglePrayer(player: Player, buttonId: number): boolean {
-        let prayerData = PrayerData.actionButton.get(buttonId);
-        if (prayerData != null) {
-            if (!player.getPrayerActive()[prayerData.hint])
-                PrayerHandler.activatePrayer(player, prayerData);
-            else
-                PrayerHandler.deactivatePrayer(player, prayerData.configId);
-            return true;
+        const prayerData = PrayerData.actionButton.get(buttonId);
+        if (prayerData == null) {
+            return false;
         }
-        return false;
-    }
-
-    public static activatePrayer(character: Mobile, pd: PrayerData) {
-        PrayerHandler.activatePrayer(character, pd);
+        const prayerId = prayerData.prayerId;
+        if (prayerId < 0) {
+            return false;
+        }
+        if (!player.getPrayerActive()[prayerId]) {
+            PrayerHandler.activatePrayerPrayerId(player, prayerId);
+        } else {
+            PrayerHandler.deactivatePrayer(player, prayerId);
+        }
+        return true;
     }
 
     public static activatePrayerPrayerId(character: Mobile, prayerId: number) {
         // Get the prayer data
-        const pd = PrayerData.actionButton.get(prayerId);
+        const pd = PrayerData.prayerData.get(prayerId);
 
         // Check if it's available
         if (!pd) {
@@ -490,6 +491,7 @@ export class PrayerData {
      * Contains the PrayerData with their corresponding buttonId.
      */
     public static actionButton: Map<number, PrayerData> = new Map<number, PrayerData>();
+    private static initialized = false;
 
     /**
      * The prayer's level requirement for player to be able to activate it.
@@ -513,6 +515,7 @@ export class PrayerData {
      * The prayer's head icon hint index.
      */
     public hint: number = -1;
+    public prayerId: number = -1;
     /**
      * The prayer's formatted name.
      */
@@ -570,7 +573,23 @@ export class PrayerData {
         yield PrayerData.AUGURY
       }
 
+    public static initializeMaps(): void {
+        if (this.initialized) {
+            return;
+        }
+        let prayerId = 0;
+        for (const pd of PrayerData.values()) {
+            pd.prayerId = prayerId;
+            this.prayerData.set(prayerId, pd);
+            this.actionButton.set(pd.buttonId, pd);
+            prayerId++;
+        }
+        this.initialized = true;
+    }
+
 }
+
+PrayerData.initializeMaps();
 
 class PlayerHandlerTask extends Task{
     constructor(p: Player,private readonly execFunc: Function){

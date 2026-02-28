@@ -3,7 +3,6 @@ import { CastleWars } from "../../../../content/minigames/impl/CastleWars";
 import { Misc } from "../../../../../util/Misc";
 import { Mobile } from "../../../../entity/impl/Mobile";
 import { Player } from "../../../../entity/impl/player/Player";
-import { PlayerBot } from "../../../../entity/impl/playerbot/PlayerBot";
 import { Area } from "../../Area";
 import { Boundary } from "../../../Boundary";
 import { PolygonalBoundary } from "../../../PolygonalBoundary";
@@ -95,11 +94,6 @@ export class CastleWarsGameArea extends Area {
         // Remove the interface
         player.getPacketSender().sendWalkableInterface(-1);
         player.getPacketSender().sendEntityHintRemoval(true);
-    }
-
-    public canPlayerBotIdle(playerBot: PlayerBot): boolean {
-        // Allow Player Bots to idle here
-        return true;
     }
 
     public canEquipItem(player: Player, slot: number, item: Item): boolean {

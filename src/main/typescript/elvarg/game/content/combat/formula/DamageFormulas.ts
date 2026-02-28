@@ -8,6 +8,8 @@ import { Mobile } from "../../../entity/impl/Mobile";
 import type { Player } from "../../../entity/impl/player/Player";
 import type { NPC } from "../../../entity/impl/npc/NPC";
 import { applyMeleeHitModifiers } from "../EquipmentEffects";
+import { Equipment } from "../../../model/container/impl/Equipment";
+import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
 
 const getPlayerCombatSpecial = (player: Player): any | null => {
     const accessor = (player as any)?.getCombatSpecial;
@@ -71,6 +73,7 @@ export class DamageFormulas {
         return Math.floor(adjusted);
     }
 
+    // TODO: Refactor this to item effects plugin and remove the hardcoded item checks
     public static getMagicMaxhit(c: Mobile): number {
         let maxHit = 0;
         const spell = c.getCombat().getSelectedSpell();

@@ -1,7 +1,6 @@
 import {World} from '../../World'
 import {ItemDefinition} from '../../definition/ItemDefinition'
 import {Player} from '../impl/player/Player'
-import {PlayerBot} from '../impl/playerbot/PlayerBot'
 import {Equipment} from '../../model/container/impl/Equipment'
 import { PacketType } from '../../../net/packet/PacketType'
 import { PacketBuilder, AccessType, ValueType } from '../../../net/packet/PacketBuilder'
@@ -541,10 +540,6 @@ export class PlayerUpdating {
         builder.puts(bytes.length, ValueType.C);
         for (let ptr = bytes.length - 1; ptr >= 0; ptr--) {
             builder.put(bytes[ptr]);
-        }
-        if (receiver instanceof PlayerBot && !(target instanceof PlayerBot)) {
-            // Player Bots: Automatically listen to chat messages
-            (receiver as PlayerBot).chatInteraction.heard(message, target);
         }
     }
     private static updateForcedChat(builder: PacketBuilder, target: Player) {

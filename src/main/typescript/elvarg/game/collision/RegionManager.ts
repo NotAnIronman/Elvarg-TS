@@ -400,9 +400,19 @@ export class RegionManager {
         }
     }
 
-    public static addClipping(x: number, y: number, height: number, shift: number, privateArea: PrivateArea, region?: Region) {
-        if (privateArea) {
-            privateArea.setClip(new Location(x, y), shift);
+    private static applyPrivateClipping(privateArea: PrivateArea | null, fn: (clipArea: PrivateArea) => void) {
+        if (!privateArea) {
+            return false;
+        }
+        if (typeof privateArea.getClip !== "function") {
+            return false;
+        }
+        fn(privateArea);
+        return true;
+    }
+
+    public static addClipping(x: number, y: number, height: number, shift: number, privateArea: PrivateArea | null, region?: Region) {
+        if (RegionManager.applyPrivateClipping(privateArea, (area) => area.setClip(new Location(x, y), shift))) {
             return;
         }
         const r = region ?? RegionManager.getRegion(x, y);
@@ -412,8 +422,7 @@ export class RegionManager {
     }
 
     public static removeClipping(x: number, y: number, height: number, shift: number, privateArea: PrivateArea) {
-        if (privateArea) {
-            privateArea.removeClip(new Location(x, y, height));
+        if (RegionManager.applyPrivateClipping(privateArea, (area) => area.removeClip(new Location(x, y, height)))) {
             return;
         }
         const r = RegionManager.getRegion(x, y);
@@ -422,8 +431,11 @@ export class RegionManager {
         }
     }
 
-    public static getClipping(x: number, y: number, height: number, privateArea: PrivateArea) {
-        if (privateArea) {
+    public static getClipping(x: number, y: number, height: number, privateArea: PrivateArea | null) {
+        if (
+            privateArea &&
+            typeof privateArea.getClip === "function"
+        ) {
             const privateClip = privateArea.getClip(new Location(x, y));
             if (privateClip !== 0) {
                 return privateClip;

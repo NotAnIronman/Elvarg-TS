@@ -3,8 +3,7 @@ import { GameConstants } from "../../GameConstants";
 import { Presetable } from "./Presetable";
 import { Skill } from "../../model/Skill";
 import { CombatFactory } from "../combat/CombatFactory";
-import { PredefinedPresets } from './PredefinedPresets'
-import { F2PMeleeFighterPreset } from "../../entity/impl/playerbot/fightstyle/impl/F2PMeleeFighterPreset";
+import { PredefinedPresets } from './PredefinedPresets';
 import { PlayerRights } from "../../model/rights/PlayerRights";
 import { Bank } from "../../model/container/impl/Bank";
 import { Item } from "../../model/Item";
@@ -48,7 +47,6 @@ export class Presetables {
         PredefinedPresets.DDS_PURE_M_73,
         PredefinedPresets.DDS_PURE_R_73,
         PredefinedPresets.NH_PURE_83,
-        F2PMeleeFighterPreset.PRESETABLE,
         PredefinedPresets.ATT_70_ZERKER_97,
         PredefinedPresets.MAIN_RUNE_126,
         PredefinedPresets.MAIN_HYBRID_126,

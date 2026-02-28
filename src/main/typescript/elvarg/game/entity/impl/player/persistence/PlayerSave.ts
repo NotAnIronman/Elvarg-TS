@@ -767,7 +767,7 @@ export class PlayerSave {
         playerSave.specialAttackRestoreTimer = player.getSpecialAttackRestore().secondsRemaining();
 
         playerSave.skullTimer = player.getSkullTimer();
-        playerSave.skullType = player.getSkullTimer();
+        playerSave.skullType = player.getSkullType();
 
         playerSave.totalKills = player.getTotalKills();
         playerSave.targetKills = player.getTargetKills();

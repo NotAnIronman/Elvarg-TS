@@ -2,9 +2,9 @@ import { Location } from "../../../model/Location";
 import { World } from "../../../World";
 import { TaskManager } from "../../../task/TaskManager";
 import { FightCavesArea } from "../../../model/areas/impl/FightCavesArea";
-import { TztokJad } from "../../../entity/impl/npc/impl/TztokJad";
 import { Player } from "../../../entity/impl/player/Player";
 import { Task } from "../../../task/Task";
+import {NPC} from "../../../entity/impl/npc/NPC";
 
 class FightCavesTask extends Task{
 
@@ -32,7 +32,7 @@ export class FightCaves {
                 if (area.isDestroyed()) {
                     return;
                 }
-                World.getAddNPCQueue().push(new TztokJad(player, area, FightCaves.JAD_NPC_ID, FightCaves.JAD_SPAWN_POS.clone()));
+                World.getAddNPCQueue().push(new NPC(FightCaves.JAD_NPC_ID, location ?? FightCaves.JAD_SPAWN_POS.clone()));
             };
         }));
     }

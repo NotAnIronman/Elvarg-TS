@@ -1,8 +1,6 @@
 import {CastleWars} from '../../../../content/minigames/impl/CastleWars';
 import {Lanthus} from '../../../../entity/impl/npc/impl/Lanthus';
 import {Player} from '../../../../entity/impl/player/Player'
-import {PlayerBot} from '../../../../entity/impl/playerbot/PlayerBot'
-
 import {Boundary} from '../../../../model/Boundary';
 import {Area} from '../../../../model/areas/Area';
 import {ObjectIdentifiers} from  '../../../../../util/ObjectIdentifiers';
@@ -47,11 +45,6 @@ export class CastleWarsLobbyArea extends Area {
         }
 
         return false;
-    }
-
-    public canPlayerBotIdle(playerBot: PlayerBot): boolean {
-        // Allow Player Bots to idle here
-        return true;
     }
 
     public getLanthus(): Lanthus {

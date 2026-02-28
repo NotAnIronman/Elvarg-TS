@@ -44,7 +44,6 @@ import { CreationMenu } from "../../../model/menu/CreationMenu"
 import { MovementQueue } from "../../../model/movement/MovementQueue";
 import { DonatorRights } from "../../../model/rights/DonatorRights"
 import { PlayerRights } from "../../../model/rights/PlayerRights";
-import { TeleportButton } from "../../../model/teleportation/TeleportButton"
 import { TaskManager } from "../../../task/TaskManager";
 import { CombatPoisonEffect } from "../../../task/impl/CombatPoisonEffect";
 import { PlayerDeathTask } from "../../../task/impl/PlayerDeath"
@@ -137,8 +136,6 @@ export class Player extends Mobile {
     private drainingPrayer: boolean;
     private prayerPointDrain: number;
     private spellbook: MagicSpellbook;
-    private previousTeleports = new Map<TeleportButton, Location>();
-    private teleportInterfaceOpen: boolean;
     private destroyItem = -1;
     private updateInventory: boolean; // Updates inventory on next tick
     private newPlayer: boolean;
@@ -1422,18 +1419,6 @@ export class Player extends Mobile {
         const packed = Misc.textPack(message);
         this.getChatMessageQueue().push(new ChatMessage(colour, effect, packed));
         this.getUpdateFlag().flag(Flag.CHAT);
-    }
-
-    public getPreviousTeleports(): Map<TeleportButton, Location> {
-        return this.previousTeleports;
-    }
-
-    public isTeleportInterfaceOpen(): boolean {
-        return this.teleportInterfaceOpen;
-    }
-
-    public setTeleportInterfaceOpen(teleportInterfaceOpen: boolean): void {
-        this.teleportInterfaceOpen = teleportInterfaceOpen;
     }
 
     public manipulateHit(hit: PendingHit): PendingHit {

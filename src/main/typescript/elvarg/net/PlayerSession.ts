@@ -14,6 +14,10 @@ import { NetworkConstants } from "./NetworkConstants";
 import { Server, Socket } from "socket.io";
 import { PacketType } from "./packet/PacketType";
 import { IsaacRandom } from "./security/IsaacRandom";
+import {
+  getExpectedOutboundPacketSize,
+  getExpectedOutboundPacketType,
+} from "./OutboundPacketProfile";
 import type { Player } from "../game/entity/impl/player/Player";
 
 export interface OutboundPacketMeta {
@@ -130,6 +134,24 @@ export class PlayerSession {
           return;
         }
         const payload = packet.getBuffer();
+        const expectedPacketType = getExpectedOutboundPacketType(opcode);
+        const expectedPacketSize = getExpectedOutboundPacketSize(opcode);
+        const packetType = expectedPacketType ?? packet.getType();
+        if (
+          expectedPacketSize != null &&
+          expectedPacketSize >= 0 &&
+          payload.length !== expectedPacketSize
+        ) {
+          console.error(
+            `[PlayerSession.write] dropping malformed fixed packet opcode=${opcode} expectedLen=${expectedPacketSize} actualLen=${payload.length}`
+          );
+          return;
+        }
+        if (expectedPacketType != null && expectedPacketType !== packet.getType()) {
+          console.warn(
+            `[PlayerSession.write] correcting packet type opcode=${opcode} expected=${expectedPacketType} actual=${packet.getType()}`
+          );
+        }
         const encOpcode =
           this.encryptor != null ? (opcode + this.encryptor.nextInt()) & 0xff : opcode;
         const payloadPreview = payload
@@ -141,7 +163,7 @@ export class PlayerSession {
               opcode,
               encOpcode,
               payloadLength: payload.length,
-              packetType: packet.getType(),
+              packetType,
               payloadPreview,
             });
           } catch {
@@ -152,15 +174,22 @@ export class PlayerSession {
         if (!this.shouldLogPacketOut || this.shouldLogPacketOut()) {
           try {
             console.log(
-              `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packet.getType()} len=${payload.length} player=${this.player?.getUsername?.() ?? "unknown"}`
+              `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packetType} len=${payload.length} player=${this.player?.getUsername?.() ?? "unknown"}`
             );
           } catch {
             // best-effort logging; never throw here
           }
         }
         let header: Buffer;
-        switch (packet.getType()) {
+        switch (packetType) {
           case PacketType.VARIABLE:
+          case PacketType.VARIABLE_BYTE:
+            if (payload.length > 0xff) {
+              console.error(
+                `[PlayerSession.write] dropping oversized variable packet opcode=${opcode} len=${payload.length}`
+              );
+              return;
+            }
             header = Buffer.alloc(2);
             header.writeUInt8(encOpcode, 0);
             header.writeUInt8(payload.length, 1);

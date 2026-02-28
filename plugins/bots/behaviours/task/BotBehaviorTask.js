@@ -324,6 +324,29 @@ class BotBehaviorTask extends Task {
     const player = entry.player;
     const state = entry.state;
     const autonomy = this.ensureAutonomyState(state);
+    const deadOrDying =
+      (player.getHitpoints?.() ?? 0) <= 0 ||
+      player.isDyingReturn?.() === true;
+
+    // Ensure bot-specific temporary modes (follow-back/sparring/return-home)
+    // are cleared after death so the bot resumes normal autonomous behavior.
+    if (deadOrDying) {
+      if (!state.deathResetApplied) {
+        setModeRoaming(player, state, this.behaviorMode);
+        autonomy.modeEndsAt = 0;
+        autonomy.nextDecisionAt = 0;
+        state.deathResetApplied = true;
+        this.api?.log?.("bot_post_death_reset", {
+          username: player.getUsername?.(),
+        });
+      }
+      return;
+    }
+
+    if (state.deathResetApplied) {
+      state.deathResetApplied = false;
+      this.scheduleNextDecision(state, nowMs);
+    }
 
     if (
       state.mode === this.behaviorMode.FOLLOW_BACK ||

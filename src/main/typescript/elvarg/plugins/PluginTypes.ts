@@ -222,6 +222,16 @@ export interface PluginCombatMethodResolver {
 export interface PluginNpcCombatMethodProvider {
   provide(npc: any): any | null;
 }
+export interface PluginNpcCombatMethodProviderEntry {
+  pluginName: string;
+  provider: PluginNpcCombatMethodProvider;
+  npcIds: Set<number>;
+}
+export interface PluginRegisteredNpcCombatMethodProvider {
+  pluginName: string;
+  provider: PluginNpcCombatMethodProvider;
+  npcIds: Set<number>;
+}
 
 export interface PluginCombatDamageProvider {
   calculateMaxMeleeHit(entity: any): number;
@@ -329,8 +339,16 @@ export interface PluginApi {
   setCombatEngine(engine: PluginCombatEngine): void;
   setCombatDamageProvider(provider: PluginCombatDamageProvider): void;
   registerCombatMethodResolver(resolver: PluginCombatMethodResolver): void;
+  /**
+   * Registers a combat method provider for one or more NPC IDs.
+   * @param npcIds identifiers to bring under this method
+   * @param methodCtor constructor for the combat method to instantiate
+   * @param options optional overrides (default to a singleton instance)
+   */
   registerNpcCombatMethodProvider(
-    provider: PluginNpcCombatMethodProvider
+    npcIds: number | number[],
+    methodCtor: new () => any,
+    options?: { singleton?: boolean }
   ): void;
 }
 

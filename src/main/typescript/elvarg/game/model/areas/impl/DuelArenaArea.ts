@@ -3,7 +3,6 @@ import { Area, BasicAttackResponse } from '../Area';
 import { Boundary } from '../../Boundary';
 import { Mobile } from '../../../entity/impl/Mobile';
 import { Player } from '../../../entity/impl/player/Player';
-import { PlayerBot } from '../../../entity/impl/playerbot/PlayerBot';
 import { DuelState, DuelRule } from '../../../content/Duelling'
 import { GameObject } from '../../../entity/impl/object/GameObject';
 
@@ -19,11 +18,6 @@ export class DuelArenaArea extends Area {
             player.getPacketSender().sendInteractionOption("Challenge", 1, false);
             player.getPacketSender().sendInteractionOption("null", 2, true);
         }
-
-        if (character.isPlayerBot() && this.getPlayers().length == 0) {
-            // Allow this PlayerBot to wait for players for 5 minutes
-            character.getAsPlayerBot().getTimers().registerTimerKey(TimerKey.BOT_WAIT_FOR_PLAYERS);
-            }
     }
 
     public postLeave(character: Mobile, logout: boolean) {
@@ -34,11 +28,6 @@ export class DuelArenaArea extends Area {
             }
             player.getPacketSender().sendInteractionOption("null", 2, true);
             player.getPacketSender().sendInteractionOption("null", 1, false);
-
-            if (this.getPlayers().length == 0 && this.getPlayerBots().length > 0) {
-                // Last player has left duel arena and there are bots
-                this.getPlayerBots().forEach(pb => pb.getTimers().registerTimerKey(TimerKey.BOT_WAIT_FOR_PLAYERS));
-            }
         }
     }
 
@@ -126,20 +115,6 @@ export class DuelArenaArea extends Area {
     }
 
     handleObjectClick(player: Player, objectId: GameObject, type: number): boolean {
-        return false;
-    }
-
-    canPlayerBotIdle(playerBot: PlayerBot): boolean {
-        if (this.getPlayers().length > 0) {
-            // Player bots can idle here if there are any real players here
-            return true;
-        }
-
-        if (playerBot.getTimers().has(TimerKey.BOT_WAIT_FOR_PLAYERS)) {
-            // Player bot can idle here while waiting for players
-            return true;
-        }
-
         return false;
     }
 }

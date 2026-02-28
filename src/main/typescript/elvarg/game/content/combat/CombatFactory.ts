@@ -494,6 +494,12 @@ export class CombatFactory {
             if (area != null && typeof area.onPlayerDealtDamage === "function") {
                 area.onPlayerDealtDamage(attacker.getAsPlayer(), target, qHit);
             }
+
+            // Java parity: apply skull at hit-queue time, before executeHit mutates
+            // attacker/retaliation state (which can otherwise suppress skulling).
+            if (target.isPlayer()) {
+                CombatFactory.handleSkull(attacker.getAsPlayer(), target.getAsPlayer());
+            }
         }
 
         // Add this hit to the target's hitQueue.
@@ -622,12 +628,11 @@ export class CombatFactory {
             }
         }
 
-        // Auto retaliate, set under attack, and add damage in Java order.
-        CombatFactory.handleRetaliation(attacker, target);
+        // Mark under-attack before retaliation scheduling so retaliatory attacks
+        // can correctly detect "already attacked by this target" and avoid
+        // incorrectly applying skulls to the defender.
         target.getCombat().setUnderAttack(attacker);
-        if (attacker.isPlayer() && target.isPlayer()) {
-            CombatFactory.handleSkull(attacker.getAsPlayer(), target.getAsPlayer());
-        }
+        CombatFactory.handleRetaliation(attacker, target);
         target.getCombat().addDamage(attacker, damage);
 
         if (target.isPlayerBot()) {

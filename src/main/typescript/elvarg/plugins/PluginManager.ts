@@ -36,6 +36,7 @@ import {
   PluginButtonClickEvent,
   PluginInterfaceActionClickEvent,
   PluginNpcCombatMethodProvider,
+  PluginNpcCombatMethodProviderEntry,
   PluginPlayerLogoutEvent,
 } from "./PluginTypes";
 
@@ -96,7 +97,7 @@ export class PluginManager {
   private static combatDamageProvider: PluginCombatDamageProvider | null = null;
   private static combatDamageProviderOwner: string | null = null;
   private static combatMethodResolvers: PluginCombatMethodResolver[] = [];
-  private static npcCombatMethodProviders: PluginNpcCombatMethodProvider[] = [];
+  private static npcCombatMethodProviders: PluginNpcCombatMethodProviderEntry[] = [];
 
   public static loadFromDirectory(
     pluginDirectory = path.join(process.cwd(), "plugins")
@@ -1586,14 +1587,41 @@ export class PluginManager {
         }
         PluginManager.registerCombatMethodResolverInternal(pluginName, resolver);
       },
-      registerNpcCombatMethodProvider: (provider) => {
-        if (!provider || typeof provider.provide !== "function") {
+      registerNpcCombatMethodProvider: (npcIds, methodCtor, options) => {
+        const normalized = Array.isArray(npcIds) ? npcIds : [npcIds];
+        if (
+          !normalized.length ||
+          normalized.some((id) => !Number.isInteger(id))
+        ) {
           console.warn(
-            `[plugins] ${pluginName} attempted invalid NPC combat method provider registration`
+            `[plugins] ${pluginName} provided invalid npc ids for combat method registration`
           );
           return;
         }
-        PluginManager.registerNpcCombatMethodProviderInternal(pluginName, provider);
+        if (!methodCtor || typeof methodCtor !== "function") {
+          console.warn(
+            `[plugins] ${pluginName} provided invalid combat method constructor`
+          );
+          return;
+        }
+        const singleton = options?.singleton ?? true;
+        let instance: any | null = null;
+        const provider = {
+          provide: (npc) => {
+            if (singleton) {
+              if (!instance) {
+                instance = new methodCtor();
+              }
+              return instance;
+            }
+            return new methodCtor();
+          },
+        };
+        PluginManager.registerNpcCombatMethodProviderInternal(
+          pluginName,
+          provider,
+          normalized
+        );
       },
       log: (message, extra) => {
 
@@ -1618,7 +1646,7 @@ export class PluginManager {
     return PluginManager.combatMethodResolvers.slice();
   }
 
-  public static getNpcCombatMethodProviders(): PluginNpcCombatMethodProvider[] {
+  public static getNpcCombatMethodProviders(): PluginNpcCombatMethodProviderEntry[] {
     return PluginManager.npcCombatMethodProviders.slice();
   }
 
@@ -1663,8 +1691,13 @@ export class PluginManager {
 
   private static registerNpcCombatMethodProviderInternal(
     pluginName: string,
-    provider: PluginNpcCombatMethodProvider
+    provider: PluginNpcCombatMethodProvider,
+    npcIds: number[]
   ): void {
-    PluginManager.npcCombatMethodProviders.push(provider);
+    PluginManager.npcCombatMethodProviders.push({
+      pluginName,
+      provider,
+      npcIds: new Set(npcIds),
+    });
   }
 }

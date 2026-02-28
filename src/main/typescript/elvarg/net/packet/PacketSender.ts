@@ -7,7 +7,6 @@ import { PacketType } from "./PacketType";
 import { PlayerStatus } from "../../game/model/PlayerStatus";
 // import { Skill } from "../../game/model/Skill";
 // import { GameConstants } from "../../game/GameConstants";
-// import { PlayerBot } from "../../game/entity/impl/playerbot/PlayerBot";
 // import { PlayerStatus } from "../../game/model/PlayerStatus";
 // import { Bank } from "../../game/model/container/impl/Bank";
 // import { PlayerInteractingOptions, PlayerInteractingOption } from "../../game/model/PlayerInteractingOption";

@@ -1,6 +1,6 @@
-const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
-const { CombatFactory } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
-const { registerMeleeHitModifier } = require("../../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
+const { Skill } = require("../../../src/main/typescript/elvarg/game/model/Skill");
+const { CombatFactory } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
+const { registerMeleeHitModifier } = require("../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
 
 const DHAROK_VETERAN_MULTIPLIER = 0.35;
 

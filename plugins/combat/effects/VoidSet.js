@@ -1,5 +1,5 @@
-const { CombatEquipment } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
-const { CombatType } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatType");
+const { CombatEquipment } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
+const { CombatType } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const {
   registerMeleeHitModifier,
   registerMeleeAttackAccuracyModifier,
@@ -8,7 +8,7 @@ const {
   registerRangedAttackAccuracyModifier,
   registerMagicHitModifier,
   registerMagicAttackAccuracyModifier,
-} = require("../../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
+} = require("../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
 
 const VOID_BONUS = 0.10;
 const VOID_MAGIC_MULTIPLIER = 1.45;

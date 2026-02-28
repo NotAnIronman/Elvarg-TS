@@ -70,10 +70,6 @@ export abstract class Area {
         return BasicAttackResponse.CAN_ATTACK;
     }
 
-    public canPlayerBotIdle(playerBot: any): boolean {
-        return false;
-    }
-
     public defeated(player: Player, character: Mobile): void {
         // By default, do nothing when a player is defeated.
     }

@@ -3,6 +3,7 @@ import { WeaponInterfaces } from "../../../game/content/combat/WeaponInterfaces"
 import { Autocasting } from "../../../game/content/combat/magic/Autocasting";
 import { BonusManager } from "../../../game/model/equipment/BonusManager";
 import { FightType } from "../../../game/content/combat/FightType";
+import { PrayerHandler } from "../../../game/content/PrayerHandler";
 // import { Emotes } from '../../../game/content/Emotes';
 // import { ItemsKeptOnDeath } from '../../../game/content/ItemsKeptOnDeath';
 // import { PrayerHandler } from '../../../game/content/PrayerHandler';
@@ -136,6 +137,14 @@ export class ButtonClickPacketListener implements PacketExecutor {
       player.setFightType(fightType);
       player.getPacketSender().sendConfig(fightType.getParentId(), fightType.getChildId());
       BonusManager.update(player);
+      return;
+    }
+
+    if (PrayerHandler.togglePrayer(player, button)) {
+      return;
+    }
+
+    if (player.getQuickPrayers?.()?.handleButton?.(button)) {
       return;
     }
 

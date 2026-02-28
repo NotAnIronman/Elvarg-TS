@@ -1,4 +1,3 @@
-import { PlayerBotDefinition } from "./definition/PlayerBotDefinition";
 import { NullPlayerPersistence } from "./entity/impl/player/persistence/NullPlayerPersistence";
 import { PlayerPersistence } from "./entity/impl/player/persistence/PlayerPersistence";
 import { Location } from "./model/Location"
@@ -39,6 +38,7 @@ export class GameConstants {
     public static readonly DEBUG_NPC_FACE_POSITION_CHANGES: boolean = true;
     public static readonly TAB_INTERFACES: number[] = [2423, 3917, 31000, 3213, 1644, 5608, -1, 37128, 5065, 5715, 2449,
         42500, 147, 32000];
+    public static readonly TELEPORT_INTERFACE_ENABLED: boolean = false;
 
     public static ALLOWED_SPAWNS = new Set([
         13441, 3144, 391, 397, 385, 7946, 2436, 145, 147, 149, 2440, 157, 159, 161,
@@ -76,9 +76,6 @@ export class GameConstants {
         4113, 4115, 4117, 7400, 7399, 7398, 6918, 6916, 6924, 6922, 6920, 6109, 6107, 6108, 6110, 6106, 3105, 6111,
         544, 542, 1035, 1033, 579, 577, 1011, 554, 555, 556, 557, 558, 559, 561, 563, 562, 560, 565, 566, 9075,
         1704, 1731, 1725, 1727, 1729]);
-
-    // TODO: Re-enable player bot presets when bot support is required again.
-    public static readonly PLAYER_BOTS: PlayerBotDefinition[] = [];
 
     public static readonly PLAYER_BOT_PASSWORD: string = "wirfunerpro4n!1";
     public static readonly PLAYER_BOT_OVERRIDE: number[] = [PlayerRights.MODERATOR.getSpriteId(), PlayerRights.ADMINISTRATOR.getSpriteId(), PlayerRights.DEVELOPER.getSpriteId(), PlayerRights.OWNER.getSpriteId()];

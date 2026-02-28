@@ -1,5 +1,5 @@
-const { CombatEquipment } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
-const { registerMeleeHitModifier } = require("../../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
+const { CombatEquipment } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
+const { registerMeleeHitModifier } = require("../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
 
 const OBSIDIAN_MULTIPLIER = 1.20;
 

@@ -23,38 +23,11 @@ import { PlayerRights } from "../game/model/rights/PlayerRights";
 import { Skill } from "../game/model/Skill";
 import { ItemOnGroundManager } from "../game/entity/impl/grounditem/ItemOnGroundManager";
 import { ObjectManager } from "../game/entity/impl/object/ObjectManager";
-
-// Copied from Java PacketDecoder.PACKET_SIZES (index = opcode).
-const PACKET_SIZES: number[] = [
-  0, 0, 6, 1, -1, -1, 2, 4, 4, 4, // 0
-  4, 13, -1, -1, 8, 0, 6, 2, 2, 0, // 10
-  0, 2, 0, 6, 0, 12, 0, 0, 0, 0, // 20
-  9, 0, 0, 0, 0, 8, 4, 0, 0, 2, // 30
-  2, 6, 0, 8, 0, -1, 0, 0, 0, 1, // 40
-  0, 0, 0, 12, 0, 0, 0, 8, 0, 0, // 50
-  -1, 8, 0, 0, 0, 0, 0, 0, 0, 0, // 60
-  // Web client uses compact object-interaction packets (6-byte object clicks / 12-byte item-on-object)
-  // where Java decoder tables often list 8/14. Keep these values in sync with web PacketSender payloads.
-  6, 0, 2, 2, 8, 6, 0, -1, 0, 6, // 70
-  -1, 0, 0, 0, 0, 1, 4, 6, 0, 0, // 80
-  0, 0, 0, 0, 0, 3, 0, 0, -1, 0, // 90
-  0, 13, 0, -1, -1, 0, 0, 0, 0, 0, // 100
-  0, 0, 0, 0, 0, 0, 0, 8, 0, 0, // 110
-  1, 0, 6, 0, 0, 0, -1, 0, 2, 8, // 120
-  0, 4, 6, 8, 0, 8, 0, 0, 6, 2, // 130
-  0, 0, 0, 0, 0, 8, 0, 0, 0, 0, // 140
-  0, 0, 1, 2, 0, 2, 6, 0, 0, 0, // 150
-  0, 0, 0, 0, 5, -1, 5, 0, 0, 0, // 160
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 170
-  0, 8, 0, 2, 4, 4, 5, 6, 8, 1, // 180
-  0, 0, 12, 0, 0, 0, 0, 0, 0, 0, // 190
-  2, 0, 0, 0, 2, 0, 0, 0, 4, 0, // 200
-  4, 0, 0, 0, 9, 8, 8, 0, 10, 0, // 210
-  0, 0, 3, 2, 0, 0, -1, 0, 6, 1, // 220
-  1, 0, 0, 0, 6, 6, 6, 8, 1, 1, // 230
-  0, 4, 0, 0, 0, 0, -1, 0, -1, 4, // 240
-  0, 0, 6, 6, 0, 0 // 250
-];
+import {
+  getExpectedOutboundPacketSize,
+  getExpectedOutboundPacketType,
+} from "./OutboundPacketProfile";
+import { getInboundPacketSizeOrUndefined } from "./InboundPacketProfile";
 
 type LoginStage = "HANDSHAKE" | "LOGIN" | "ESTABLISHED";
 
@@ -525,9 +498,15 @@ class LoginSession {
     let header: Buffer;
     switch (type) {
       case PacketType.VARIABLE:
+      case PacketType.VARIABLE_BYTE:
+        if (payload.length > 0xff) {
+          throw new Error(
+            `Variable packet payload too large for opcode=${opcode} len=${payload.length}`
+          );
+        }
         header = Buffer.alloc(2);
         header.writeUInt8(encOpcode, 0);
-        header.writeUInt8(payload.length & 0xff, 1); // guard against overflow
+        header.writeUInt8(payload.length, 1);
         break;
       case PacketType.VARIABLE_SHORT:
         header = Buffer.alloc(3);
@@ -541,6 +520,30 @@ class LoginSession {
   }
 
   private sendPacket(opcode: number, payload: Buffer, type: PacketType = PacketType.FIXED, label?: string) {
+    const expectedPacketType = getExpectedOutboundPacketType(opcode);
+    const expectedPacketSize = getExpectedOutboundPacketSize(opcode);
+    if (
+      expectedPacketSize != null &&
+      expectedPacketSize >= 0 &&
+      payload.length !== expectedPacketSize
+    ) {
+      this.log("send_packet_drop_bad_length", {
+        opcode,
+        label: label ?? PACKET_GUIDE[opcode]?.name,
+        expectedLength: expectedPacketSize,
+        actualLength: payload.length,
+      });
+      return;
+    }
+    if (expectedPacketType != null && expectedPacketType !== type) {
+      this.log("send_packet_type_corrected", {
+        opcode,
+        label: label ?? PACKET_GUIDE[opcode]?.name,
+        expectedType: expectedPacketType,
+        actualType: type,
+      });
+      type = expectedPacketType;
+    }
     const guide = PACKET_GUIDE[opcode];
     this.log("send_packet", {
       opcode,
@@ -811,8 +814,13 @@ class LoginSession {
 
     // Gender and icons
     putByte(appearance.gender); // 0 male, 1 female
-    putByte(0xff); // head icon
-    putByte(0xff); // skull icon
+    const headIcon = this.gamePlayer?.getAppearance?.()?.getHeadHint?.() ?? -1;
+    const skullIcon =
+      this.gamePlayer?.isSkulled?.() && this.gamePlayer?.getSkullType?.()
+        ? this.gamePlayer.getSkullType().getIconId()
+        : -1;
+    putByte(headIcon); // prayer/head icon
+    putByte(skullIcon); // skull icon
     putByte(0); // hint/arrow
 
     // Equipment/looks (mirror Java ordering; empty slots use a single 0 byte)
@@ -860,7 +868,7 @@ class LoginSession {
     // Name as long
     putLong(Misc.stringToLongBigInt(username));
     // Combat level
-    putByte(3);
+    putByte(this.gamePlayer?.getSkillManager?.()?.getCombatLevel?.() ?? 3);
     // Rights (PLAYER_RIGHTS ordinal)
     putByte(this.gamePlayer?.getRights()?.getId?.() ?? 0);
     // Loyalty title (empty string, terminator only)
@@ -1055,7 +1063,7 @@ class LoginSession {
         rand = this.decryptor.nextInt() & 0xff;
         opcode = (encOpcode - rand) & 0xff;
         headerSize = 1;
-        const mappedSize = PACKET_SIZES[opcode];
+        const mappedSize = getInboundPacketSizeOrUndefined(opcode);
         if (mappedSize === undefined) {
           this.log("packet_unknown_size", { opcode, encOpcode, rand });
           continue;

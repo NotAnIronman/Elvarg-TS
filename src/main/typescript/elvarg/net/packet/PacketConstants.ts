@@ -32,12 +32,10 @@ import { ItemActionPacketListener } from "../../net/packet/impl/ItemActionPacket
 import { UseItemPacketListener } from "../../net/packet/impl/UseItemPacketListener";
 import { TradeRequestPacketListener } from "../../net/packet/impl/TradeRequestPacketListener";
 import { CreationMenuPacketListener } from "../../net/packet/impl/CreationMenuPacketListener";
-import { TeleportPacketListener } from "../../net/packet/impl/TeleportPacketListener";
 import { ItemContainerActionPacketListener } from "../../net/packet/impl/ItemContainerActionPacketListener";
 import { NOPPacketListener } from "../../net/packet/impl/NOPPacketListener";
 
 export class PacketConstants {
-  public static readonly TELEPORT_OPCODE = 183;
   public static readonly SPECIAL_ATTACK_OPCODE = 184;
   public static readonly BUTTON_CLICK_OPCODE = 185;
   public static readonly INTERFACE_ACTION_CLICK_OPCODE = 186;
@@ -111,7 +109,6 @@ export class PacketConstants {
   public static readonly ITEM_ON_GROUND_ITEM = 25;
   public static readonly ITEM_ON_PLAYER = 14;
   public static PACKETS = new Map<number, any>([
-    [PacketConstants.TELEPORT_OPCODE, new TeleportPacketListener()],
     [PacketConstants.SPECIAL_ATTACK_OPCODE, new SpecialAttackPacketListener()],
     [PacketConstants.BUTTON_CLICK_OPCODE, new ButtonClickPacketListener()],
     [PacketConstants.INTERFACE_ACTION_CLICK_OPCODE, new InterfaceActionClickOpcode()],

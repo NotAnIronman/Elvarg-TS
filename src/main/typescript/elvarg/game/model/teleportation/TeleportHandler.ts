@@ -1,11 +1,9 @@
 
 import { Player } from "../../entity/impl/player/Player";
 import { TeleportType } from "./TeleportType";
-import { GameConstants } from "../../GameConstants";
 import { Task } from "../../task/Task";
 import { TaskManager } from "../../task/TaskManager";
 import { EffectTimer } from "../EffectTimer";
-import { TeleportButton } from './TeleportButton'
 import { Sound } from "../../Sound";
 import { Sounds } from "../../Sounds";
 import { Location } from "../Location";
@@ -130,38 +128,4 @@ export class TeleportHandler {
         return true;
     }
 
-    public static handleButton(player: Player, buttonId: number, menuId: number): boolean {
-        const teleportButton = TeleportButton.get(buttonId);
-        if (teleportButton != null) {
-            if (player.getWildernessLevel() > 0) {
-                player.getPacketSender().sendMessage("You can only use tablet to teleport out from wilderness.");
-                return true;
-            }
-            switch (menuId) {
-                case 0: // Click to teleport
-                    if (teleportButton == TeleportButton.HOME) {
-                        if (TeleportHandler.checkReqs(player, GameConstants.DEFAULT_LOCATION)) {
-                            TeleportHandler.teleport(player, GameConstants.DEFAULT_LOCATION,
-                                player.getSpellbook().getTeleportType(), false);
-                            player.getPreviousTeleports().get(teleportButton);
-                        }
-                        return true;
-                    }
-                    player.getPacketSender().sendTeleportInterface(teleportButton.menu);
-                    return true;
-                case 1: // Previous option on teleport
-                    if (player.getPreviousTeleports().get(teleportButton)) {
-                        const tele = player.getPreviousTeleports().get(teleportButton);
-                        if (TeleportHandler.checkReqs(player, tele)) {
-                            TeleportHandler.teleport(player, tele, player.getSpellbook().getTeleportType(), true);
-                        }
-                    } else {
-                        player.getPacketSender().sendMessage("Unable to find a previous teleport.");
-                    }
-                    player.getPacketSender().sendInterfaceRemoval();
-                    return true;
-            }
-        }
-        return false;
-    }
 }

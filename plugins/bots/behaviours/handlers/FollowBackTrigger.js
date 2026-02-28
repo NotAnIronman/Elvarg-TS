@@ -108,14 +108,19 @@ class FollowBackTrigger {
     }
 
     const botCombat = followed.getCombat?.();
-    if (
-      botCombat &&
-      followed.getHitpoints?.() > 0 &&
-      player.getHitpoints?.() > 0 &&
-      botCombat.getTarget?.() !== player
-    ) {
-      followed.getMovementQueue?.().reset?.();
-      botCombat.attack(player);
+    if (botCombat && followed.getHitpoints?.() > 0 && player.getHitpoints?.() > 0) {
+      // Avoid pre-emptive attack on raw ATTACK_PLAYER packet.
+      // Let normal combat state establish first (under-attack / queued hit),
+      // otherwise bots can be treated as initiators and get incorrectly skulled.
+      const alreadyUnderAttackByPlayer = botCombat.getAttacker?.() === player;
+      const alreadyHasDamageFromPlayer = botCombat.damageMapContains?.(player) === true;
+      if (
+        (alreadyUnderAttackByPlayer || alreadyHasDamageFromPlayer) &&
+        botCombat.getTarget?.() !== player
+      ) {
+        followed.getMovementQueue?.().reset?.();
+        botCombat.attack(player);
+      }
     }
 
     this.api.log("follow_back_started_by_attack", {

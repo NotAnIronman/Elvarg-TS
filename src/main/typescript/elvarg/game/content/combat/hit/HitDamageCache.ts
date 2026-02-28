@@ -1,10 +1,12 @@
+import { Stopwatch } from "../../../../util/Stopwatch";
+
 export class HitDamageCache {
-    private startTime: any;
-    private endTime: any;
+    private stopwatch: Stopwatch;
     private damage: number;
 
     constructor(damage: number) {
         this.damage = damage;
+        this.stopwatch = new Stopwatch().reset();
     }
 
     public getDamage(): number {
@@ -12,12 +14,11 @@ export class HitDamageCache {
     }
 
     public incrementDamage(damage: number): void {
-        this.startTime = performance.now();
         this.damage += damage;
-        this.endTime = performance.now();
+        this.stopwatch.reset();
     }
 
     public getStopwatch(): number {
-        return this.endTime - this.startTime;
+        return this.stopwatch.elapsed();
     }
 }

@@ -1,4 +1,3 @@
-import {PlayerBot} from '../../../../entity/impl/playerbot/PlayerBot';
 import {Player} from '../../../../entity/impl/player/Player'
 import {Mobile} from '../../../../entity/impl/Mobile'
 import {Boundary} from '../../../../model/Boundary';
@@ -119,11 +118,6 @@ export class CastleWarsSaradominWaitingArea extends Area {
     }
 
     return true;
-    }
-
-    public canPlayerBotIdle(playerBot: PlayerBot): boolean {
-    // Allow the player bot to wait here if there are players in the other team
-    return CastleWars.ZAMORAK_WAITING_AREA.getPlayers().length > 0;
     }
 }
 
