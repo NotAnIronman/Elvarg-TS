@@ -390,6 +390,68 @@ function canSummonPetHere(player, reward) {
   return area.allowSummonPet(player) !== false;
 }
 
+function findOwnedPetItemSource(player) {
+  if (!player) {
+    return null;
+  }
+
+  const petItems = Array.from(PET_BY_ITEM_ID.values()).filter(
+    (pet) => Number.isInteger(pet?.itemId) && pet.itemId > 0
+  );
+
+  const inventory = player.getInventory?.();
+  for (const pet of petItems) {
+    if (inventory?.contains?.(pet.itemId)) {
+      return { itemId: pet.itemId, source: "inventory", bankTab: -1 };
+    }
+  }
+
+  const banks = player.getBanks?.() ?? [];
+  for (let tab = 0; tab < Bank.TOTAL_BANK_TABS; tab++) {
+    if (tab === Bank.BANK_SEARCH_TAB_INDEX) {
+      continue;
+    }
+    const bank = banks[tab];
+    if (!bank) {
+      continue;
+    }
+    for (const pet of petItems) {
+      if (bank.contains?.(pet.itemId)) {
+        return { itemId: pet.itemId, source: "bank", bankTab: tab };
+      }
+    }
+  }
+
+  return null;
+}
+
+function summonOwnedPetOnBotLogin(player) {
+  if (!player?.isPlayerBot?.() || !player.isPlayerBot()) {
+    return false;
+  }
+  if (player.getCurrentPet?.()) {
+    return false;
+  }
+
+  const ownedPet = findOwnedPetItemSource(player);
+  if (!ownedPet) {
+    return false;
+  }
+
+  // Use reward summon path to avoid interaction-side effects while auto-restoring bots.
+  const summoned = drop(player, ownedPet.itemId, true);
+  if (!summoned) {
+    return false;
+  }
+
+  if (ownedPet.source === "inventory") {
+    player.getInventory().deleteNumber(ownedPet.itemId, 1);
+  } else {
+    player.getBank(ownedPet.bankTab).deleteNumber(ownedPet.itemId, 1);
+  }
+  return true;
+}
+
 function spawnPetNpc(npc) {
   if (World.getNpcs().add(npc)) {
     return {
@@ -706,6 +768,20 @@ module.exports = {
         return;
       }
       pickup(player, player.getCurrentPet?.());
+    });
+
+    api.onPlayerLogin(({ player }) => {
+      if (!player) {
+        return;
+      }
+      summonOwnedPetOnBotLogin(player);
+    });
+
+    api.onPlayerProcess(({ player }) => {
+      if (!player) {
+        return;
+      }
+      summonOwnedPetOnBotLogin(player);
     });
 
     api.log("registered", {

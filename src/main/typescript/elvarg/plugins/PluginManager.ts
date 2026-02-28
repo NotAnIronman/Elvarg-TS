@@ -9,6 +9,7 @@ import {
   PluginCanEatEvent,
   PluginCanEquipEvent,
   PluginCanTeleportEvent,
+  PluginGroundItemInteractionEvent,
   PluginItemActionEvent,
   PluginModule,
   PluginItemOnGroundItemEvent,
@@ -76,6 +77,8 @@ export class PluginManager {
   private static itemOnObjectHooks: PluginHook<PluginItemOnObjectEvent>[] = [];
   private static itemOnItemHooks: PluginHook<PluginItemOnItemEvent>[] = [];
   private static itemOnGroundItemHooks: PluginHook<PluginItemOnGroundItemEvent>[] =
+    [];
+  private static groundItemInteractionHooks: PluginHook<PluginGroundItemInteractionEvent>[] =
     [];
   private static itemActionHooks: PluginHook<PluginItemActionEvent>[] = [];
   private static itemDropHooks: PluginHook<PluginItemDropEvent>[] = [];
@@ -544,6 +547,29 @@ export class PluginManager {
     return event.handled === true;
   }
 
+  public static emitGroundItemInteraction(
+    event: PluginGroundItemInteractionEvent
+  ): boolean {
+    if (!event || !event.player || !event.groundItem || event.handled) {
+      return false;
+    }
+
+    for (const hook of PluginManager.groundItemInteractionHooks) {
+      if (event.handled) {
+        break;
+      }
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] ground_item_interaction hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
+  }
+
   public static emitItemAction(event: PluginItemActionEvent): boolean {
     for (const hook of PluginManager.itemActionHooks) {
       try {
@@ -790,6 +816,50 @@ export class PluginManager {
             return;
           }
           if (!objectIdSet.has(event.objectId)) {
+            return;
+          }
+
+          const result = handler(event);
+          if (result !== false) {
+            event.handled = true;
+          }
+        },
+      });
+    };
+
+    const registerGroundItemClickHook = (
+      clickType: number,
+      itemIds: number | number[],
+      handler: (event: PluginGroundItemInteractionEvent) => void | boolean,
+      label = "ground-item"
+    ): void => {
+      const normalized = Array.isArray(itemIds) ? itemIds : [itemIds];
+      if (!normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} click hook registration itemIds=[]`
+        );
+        return;
+      }
+
+      const validIds = normalized.filter(
+        (id) => Number.isInteger(id) && id >= 0
+      ) as number[];
+      if (validIds.length !== normalized.length || typeof handler !== "function") {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} click hook registration itemIds=${JSON.stringify(itemIds)}`
+        );
+        return;
+      }
+
+      const itemIdSet = new Set(validIds);
+
+      PluginManager.groundItemInteractionHooks.push({
+        pluginName,
+        handler: (event) => {
+          if (!event || event.handled || event.clickType !== clickType) {
+            return;
+          }
+          if (!itemIdSet.has(event.groundItemId)) {
             return;
           }
 
@@ -1256,6 +1326,19 @@ export class PluginManager {
             }
           },
         });
+      },
+      onGroundItemClick: (itemIds, clickType, handler) => {
+        if (!Number.isInteger(clickType) || clickType < 1 || clickType > 5) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid ground-item click hook registration itemIds=${JSON.stringify(itemIds)} clickType=${clickType}`
+          );
+          return;
+        }
+
+        registerGroundItemClickHook(clickType, itemIds, handler, "ground-item");
+      },
+      onGroundItemSecondClick: (itemIds, handler) => {
+        registerGroundItemClickHook(2, itemIds, handler, "ground-item-second");
       },
       onItemOnObject: (handler) => {
         if (typeof handler !== "function") {

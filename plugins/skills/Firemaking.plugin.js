@@ -477,6 +477,39 @@ function handleItemOnGroundItem(event, activeSessions) {
   });
 }
 
+function handleGroundItemSecondClick(event, activeSessions) {
+  const { player, groundItemId, location } = event;
+  const log = LIGHTABLE_LOGS_BY_ID.get(groundItemId);
+  if (!log) {
+    return;
+  }
+
+  const position = new Location(location.x, location.y, location.z);
+  const groundItem = ItemOnGroundManager.getGroundItem(
+    player.getUsername(),
+    groundItemId,
+    position
+  );
+  if (!groundItem) {
+    return;
+  }
+
+  player.setPositionToFace(position);
+  const started = startFiremakingAttempt(
+    player,
+    log,
+    {
+      mode: SESSION_MODE.GROUND,
+      location: position,
+      privateArea: player.getPrivateArea(),
+    },
+    activeSessions
+  );
+  if (started) {
+    event.handled = true;
+  }
+}
+
 function handleItemOnObject(event, activeSessions) {
   const { player, object, objectId, itemId } = event;
   if (objectId !== FIRE_OBJECT_ID || !object) {
@@ -537,13 +570,25 @@ module.exports = {
       handleItemOnGroundItem(event, activeSessions);
     });
 
+    api.onGroundItemSecondClick(
+      LIGHTABLE_LOGS.map((log) => log.itemId),
+      (event) => {
+        handleGroundItemSecondClick(event, activeSessions);
+      }
+    );
+
     api.onItemOnObject((event) => {
       handleItemOnObject(event, activeSessions);
     });
 
     api.log("registered", {
       lightableLogs: LIGHTABLE_LOGS.length,
-      hooks: ["item_on_item", "item_on_ground_item", "item_on_object"],
+      hooks: [
+        "item_on_item",
+        "item_on_ground_item",
+        "ground_item_second_click",
+        "item_on_object",
+      ],
     });
   },
 };

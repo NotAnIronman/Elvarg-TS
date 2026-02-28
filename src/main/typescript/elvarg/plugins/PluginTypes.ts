@@ -167,6 +167,15 @@ export interface PluginItemOnGroundItemEvent {
   handled: boolean;
 }
 
+export interface PluginGroundItemInteractionEvent {
+  player: any;
+  groundItem: any;
+  groundItemId: number;
+  clickType: number;
+  location: { x: number; y: number; z: number };
+  handled: boolean;
+}
+
 export interface PluginItemActionEvent {
   player: any;
   interfaceId: number;
@@ -281,6 +290,15 @@ export interface PluginApi {
   onNpcSecondClick(
     npcId: number,
     handler: (event: PluginNpcInteractionEvent) => void | boolean
+  ): void;
+  onGroundItemClick(
+    itemIds: number | number[],
+    clickType: number,
+    handler: (event: PluginGroundItemInteractionEvent) => void | boolean
+  ): void;
+  onGroundItemSecondClick(
+    itemIds: number | number[],
+    handler: (event: PluginGroundItemInteractionEvent) => void | boolean
   ): void;
   onItemOnObject(handler: (event: PluginItemOnObjectEvent) => void): void;
   onItemOnItem(handler: (event: PluginItemOnItemEvent) => void): void;

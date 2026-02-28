@@ -3,6 +3,7 @@ const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag
 const { Appearance } = require("../../../../src/main/typescript/elvarg/game/model/Appearance");
 const { Player } = require("../../../../src/main/typescript/elvarg/game/entity/impl/player/Player");
 const { BotPlayerSession } = require("../../../../src/main/typescript/elvarg/net/BotPlayerSession");
+const { GameConstants } = require("../../../../src/main/typescript/elvarg/game/GameConstants");
 const { Misc } = require("../../../../src/main/typescript/elvarg/util/Misc");
 
 const COLOR_RANGES = [
@@ -80,7 +81,39 @@ function createBotPlayer(username, spawn) {
   bot.setRunning(false);
   bot.setLastKnownRegion(spawn.clone());
   bot.setRegionHeight(spawn.getZ());
-  bot.getAppearance().setLookArray(buildRandomAppearanceLook());
+
+  let appliedPersistence = false;
+  let hasValidSavedAppearance = false;
+  try {
+    const persistence = GameConstants.PLAYER_PERSISTENCE;
+    const playerSave = persistence?.load?.(username);
+    if (playerSave && typeof playerSave.applyToPlayer === "function") {
+      const rawAppearance =
+        typeof playerSave.getAppearance === "function"
+          ? playerSave.getAppearance()
+          : playerSave?.appearance;
+      hasValidSavedAppearance =
+        Array.isArray(rawAppearance) && rawAppearance.length >= 13;
+      playerSave.applyToPlayer(bot);
+      appliedPersistence = true;
+    }
+  } catch (err) {
+    console.error(`[PlayerBots] Failed to load persistence for ${username}`, err);
+  }
+
+  // Older bot saves often have empty/missing appearance arrays; randomize once
+  // so bots don't collapse to the same default look.
+  if (!appliedPersistence || !hasValidSavedAppearance) {
+    bot.getAppearance().setLookArray(buildRandomAppearanceLook());
+    try {
+      GameConstants.PLAYER_PERSISTENCE?.save?.(bot);
+    } catch (err) {
+      console.error(`[PlayerBots] Failed to save randomized appearance for ${username}`, err);
+    }
+  }
+
+  bot.setLastKnownRegion(bot.getLocation().clone());
+  bot.setRegionHeight(bot.getLocation().getZ());
   bot.getUpdateFlag().flag(Flag.APPEARANCE);
   World.getAddPlayerQueue().push(bot);
   return bot;

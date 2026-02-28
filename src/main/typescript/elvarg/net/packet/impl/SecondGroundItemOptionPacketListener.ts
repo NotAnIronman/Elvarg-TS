@@ -1,19 +1,19 @@
-// import { Player } from '../../../game/entity/impl/player/Player';
+import { ItemOnGroundManager } from "../../../game/entity/impl/grounditem/ItemOnGroundManager";
+import { Location } from "../../../game/model/Location";
+import { PluginManager } from "../../../plugins/PluginManager";
 import { Packet } from "../Packet";
 import { PacketExecutor } from "../PacketExecutor";
-// import { ItemOnGroundManager } from '../../../game/entity/impl/grounditem/ItemOnGroundManager';
-// import { Location } from '../../../game/model/Location';
 
 export class SecondGroundItemOptionPacketListener implements PacketExecutor {
-  // execute(player: Player, packet: Packet) {
   execute(player: any, packet: Packet) {
     const y = packet.readLEShort();
     const itemId = packet.readShort();
     const x = packet.readLEShort();
-    // const position = new Location(x, y, player.getLocation().getZ());
+
     if (!player || player.getHitpoints() <= 0) {
       return;
     }
+    const position = new Location(x, y, player.getLocation().getZ());
 
     player.getSkillManager().stopSkillable();
 
@@ -27,14 +27,35 @@ export class SecondGroundItemOptionPacketListener implements PacketExecutor {
       player.getMovementQueue().reset();
       return;
     }
-    // player.getMovementQueue().walkToGroundItem(position, () => {
-    //     const item = ItemOnGroundManager.getGroundItem(player.getUsername(), itemId, position);
-    //     if (item) {
-    //         const log = LightableLog.getForItem(item.getItem().getId());
-    //         if (log) {
-    //             player.getSkillManager().startSkillable(new Firemaking(LightableLog.getForItem(0)));
-    //         }
-    //     }
-    // });
+
+    player.getMovementQueue().walkToGroundItem(position, () => {
+      const groundItem = ItemOnGroundManager.getGroundItem(
+        player.getUsername(),
+        itemId,
+        position
+      );
+      if (!groundItem) {
+        return;
+      }
+
+      player.setPositionToFace(position);
+
+      const handled = PluginManager.emitGroundItemInteraction({
+        player,
+        groundItem,
+        groundItemId: itemId,
+        clickType: 2,
+        location: {
+          x: position.getX(),
+          y: position.getY(),
+          z: position.getZ(),
+        },
+        handled: false,
+      });
+
+      if (!handled) {
+        player.getPacketSender().sendMessage("Nothing interesting happens.");
+      }
+    });
   }
 }

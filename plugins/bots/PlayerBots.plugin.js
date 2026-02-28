@@ -186,6 +186,7 @@ module.exports = {
     );
 
     let spawned = 0;
+    let behaviorTaskStarted = false;
 
     const createController = (player, location, initialDelayMs) =>
       new BotController(
@@ -195,6 +196,33 @@ module.exports = {
         location.getZ(),
         treeFactory.create(randomizedCooldownMs(), initialDelayMs)
       );
+
+    const ensureBehaviorTaskStarted = () => {
+      if (behaviorTaskStarted || entries.length === 0) {
+        return;
+      }
+      TaskManager.submit(
+        new BotBehaviorTask(entries, traversalService, BOT_DECISION_TICKS, {
+          api,
+          behaviorMode: BOT_BEHAVIOR_MODE,
+          roamWeight: AUTO_MODE_ROAM_WEIGHT,
+          woodcuttingWeight: AUTO_MODE_WOODCUTTING_WEIGHT,
+          sparringWeight: AUTO_MODE_SPARRING_WEIGHT,
+          decisionDelayMinMs: AUTO_MODE_DECISION_MIN_MS,
+          decisionDelayMaxMs: AUTO_MODE_DECISION_MAX_MS,
+          roamingMinMs: AUTO_MODE_ROAMING_MIN_MS,
+          roamingMaxMs: AUTO_MODE_ROAMING_MAX_MS,
+          woodcuttingMinMs: AUTO_MODE_WOODCUTTING_MIN_MS,
+          woodcuttingMaxMs: AUTO_MODE_WOODCUTTING_MAX_MS,
+          sparringMinMs: AUTO_MODE_SPARRING_MIN_MS,
+          sparringMaxMs: AUTO_MODE_SPARRING_MAX_MS,
+          postSparringCooldownMinMs: AUTO_MODE_POST_SPARRING_COOLDOWN_MIN_MS,
+          postSparringCooldownMaxMs: AUTO_MODE_POST_SPARRING_COOLDOWN_MAX_MS,
+          sparringMaxDistanceTiles: AUTO_MODE_SPARRING_MAX_DISTANCE_TILES,
+        })
+      );
+      behaviorTaskStarted = true;
+    };
 
     function hasControllerForUsername(username) {
       return !!username && entriesByUsername.has(username);
@@ -266,34 +294,46 @@ module.exports = {
       return null;
     }
 
-    for (let i = 1; i <= BOT_COUNT; i++) {
-      const username = `PlayerBot${i}`;
-      const botSpawn = spawnLocationForIndex(spawn, spawnOffsets, i - 1);
-      const bot = createBotPlayer(username, botSpawn);
-      if (!bot) {
-        continue;
+    const spawnConfiguredBots = () => {
+      for (let i = 1; i <= BOT_COUNT; i++) {
+        const username = `PlayerBot${i}`;
+        const botSpawn = spawnLocationForIndex(spawn, spawnOffsets, i - 1);
+        const bot = createBotPlayer(username, botSpawn);
+        if (!bot) {
+          continue;
+        }
+        bot.setPlayerBot?.(true);
+
+        const state = createInitialState({
+          x: botSpawn.getX(),
+          y: botSpawn.getY(),
+          z: botSpawn.getZ(),
+        }, BOT_BEHAVIOR_MODE);
+        botStatesByName.set(username, state);
+        playerBotUsernames.add(username);
+
+        addEntry(username, {
+          player: bot,
+          state,
+          controller: createController(
+            bot,
+            botSpawn,
+            randomInRange(0, BOT_BASE_COOLDOWN_MS)
+          ),
+        });
+        PluginManager.emitPlayerLogin({
+          player: bot,
+          username,
+        });
+        spawned++;
       }
-      bot.setPlayerBot?.(true);
 
-      const state = createInitialState({
-        x: botSpawn.getX(),
-        y: botSpawn.getY(),
-        z: botSpawn.getZ(),
-      }, BOT_BEHAVIOR_MODE);
-      botStatesByName.set(username, state);
-      playerBotUsernames.add(username);
+      api.log("spawn_complete", { spawned, configured: BOT_COUNT });
+      ensureBehaviorTaskStarted();
+    };
 
-      addEntry(username, {
-        player: bot,
-        state,
-        controller: createController(
-          bot,
-          botSpawn,
-          randomInRange(0, BOT_BASE_COOLDOWN_MS)
-        ),
-      });
-      spawned++;
-    }
+    // Defer spawn until all plugins (including persistence provider) have registered.
+    setTimeout(spawnConfiguredBots, 0);
 
     function enableControllerForPlayer(player) {
       if (!player || !player.isRegistered()) {
@@ -323,6 +363,7 @@ module.exports = {
         controller: createController(player, location, 0),
       });
       resetMovementState(player);
+      ensureBehaviorTaskStarted();
       return { ok: true };
     }
 
@@ -472,7 +513,17 @@ module.exports = {
       return true;
     });
 
-    api.onPlayerDisconnect(({ username }) => {
+    api.onPlayerDisconnect(({ player, username }) => {
+      if (player && player.isPlayerBot?.()) {
+        try {
+          GameConstants.PLAYER_PERSISTENCE.save(player);
+        } catch (err) {
+          api.log("bot_persistence_save_failed_disconnect", {
+            username,
+            error: String(err?.message ?? err),
+          });
+        }
+      }
       const removed = removeEntryByUsername(username);
       botStatesByName.delete(username);
       botmeUsernames.delete(username);
@@ -505,29 +556,6 @@ module.exports = {
         .sendMessage("botme auto-disabled due to manual input.");
       api.log("botme_auto_disabled_manual_input", { username, opcode });
     });
-
-    if (entries.length > 0) {
-      TaskManager.submit(
-        new BotBehaviorTask(entries, traversalService, BOT_DECISION_TICKS, {
-          api,
-          behaviorMode: BOT_BEHAVIOR_MODE,
-          roamWeight: AUTO_MODE_ROAM_WEIGHT,
-          woodcuttingWeight: AUTO_MODE_WOODCUTTING_WEIGHT,
-          sparringWeight: AUTO_MODE_SPARRING_WEIGHT,
-          decisionDelayMinMs: AUTO_MODE_DECISION_MIN_MS,
-          decisionDelayMaxMs: AUTO_MODE_DECISION_MAX_MS,
-          roamingMinMs: AUTO_MODE_ROAMING_MIN_MS,
-          roamingMaxMs: AUTO_MODE_ROAMING_MAX_MS,
-          woodcuttingMinMs: AUTO_MODE_WOODCUTTING_MIN_MS,
-          woodcuttingMaxMs: AUTO_MODE_WOODCUTTING_MAX_MS,
-          sparringMinMs: AUTO_MODE_SPARRING_MIN_MS,
-          sparringMaxMs: AUTO_MODE_SPARRING_MAX_MS,
-          postSparringCooldownMinMs: AUTO_MODE_POST_SPARRING_COOLDOWN_MIN_MS,
-          postSparringCooldownMaxMs: AUTO_MODE_POST_SPARRING_COOLDOWN_MAX_MS,
-          sparringMaxDistanceTiles: AUTO_MODE_SPARRING_MAX_DISTANCE_TILES,
-        })
-      );
-    }
 
     api.onPlayerPathBlocked((event) => {
       pathBlockedHandler.handle(event, Date.now());

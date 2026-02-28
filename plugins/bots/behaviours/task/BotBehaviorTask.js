@@ -1,4 +1,5 @@
 const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task");
+const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { randomInRange } = require("../navigation/BotNavigation");
 const {
   setModeRoaming,
@@ -148,6 +149,9 @@ class BotBehaviorTask extends Task {
     if ((candidatePlayer.getHitpoints?.() ?? 0) <= 0) {
       return false;
     }
+    if (!Wilderness.isIn(candidatePlayer)) {
+      return false;
+    }
     if (sourcePlayer.getPrivateArea?.() !== candidatePlayer.getPrivateArea?.()) {
       return false;
     }
@@ -212,6 +216,9 @@ class BotBehaviorTask extends Task {
     const sourcePlayer = entry?.player;
     const sourceState = entry?.state;
     if (!sourcePlayer || !sourceState) {
+      return false;
+    }
+    if (!Wilderness.isIn(sourcePlayer)) {
       return false;
     }
     const sourceAutonomy = this.ensureAutonomyState(sourceState);
@@ -311,6 +318,9 @@ class BotBehaviorTask extends Task {
     if ((player.getHitpoints?.() ?? 0) <= 0 || (opponent.getHitpoints?.() ?? 0) <= 0) {
       return false;
     }
+    if (!Wilderness.isIn(player) || !Wilderness.isIn(opponent)) {
+      return false;
+    }
     if (player.getPrivateArea?.() !== opponent.getPrivateArea?.()) {
       return false;
     }
@@ -376,13 +386,15 @@ class BotBehaviorTask extends Task {
     }
 
     const roll = Math.random();
+    const canAttemptSparring = Wilderness.isIn(player);
     const totalWeight = Math.max(
       this.autonomy.roamWeight +
         this.autonomy.woodcuttingWeight +
-        this.autonomy.sparringWeight,
+        (canAttemptSparring ? this.autonomy.sparringWeight : 0),
       0.0001
     );
-    const sparringThreshold = this.autonomy.sparringWeight / totalWeight;
+    const sparringWeight = canAttemptSparring ? this.autonomy.sparringWeight : 0;
+    const sparringThreshold = sparringWeight / totalWeight;
     const woodcuttingThreshold =
       sparringThreshold + this.autonomy.woodcuttingWeight / totalWeight;
 
