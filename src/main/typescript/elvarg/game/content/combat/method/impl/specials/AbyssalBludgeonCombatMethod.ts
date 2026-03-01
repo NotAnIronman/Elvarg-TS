@@ -6,6 +6,7 @@ import { Skill } from "../../../../../model/Skill";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { PendingHit } from '../../../hit/PendingHit';
 import { CombatSpecial } from '../../../CombatSpecial';
+import { Sounds } from "../../../../../Sounds";
 
 export class AbyssalBludgeonCombatMethod extends MeleeCombatMethod {
     private static readonly ANIMATION = new Animation(3299);
@@ -27,6 +28,7 @@ export class AbyssalBludgeonCombatMethod extends MeleeCombatMethod {
     start(character: Mobile, target: Mobile) {
         CombatSpecial.drain(character, CombatSpecial.ABYSSAL_DAGGER.getDrainAmount());
         character.performAnimation(AbyssalBludgeonCombatMethod.ANIMATION);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit) {

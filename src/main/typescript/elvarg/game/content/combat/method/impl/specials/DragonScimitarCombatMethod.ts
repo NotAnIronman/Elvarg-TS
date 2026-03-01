@@ -7,6 +7,7 @@ import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { PendingHit } from "../../../hit/PendingHit";
 import { CombatFactory } from "../../../CombatFactory";
+import { Sounds } from "../../../../../Sounds";
 
 export class DragonScimitarCombatMethod extends MeleeCombatMethod {
     private static ANIMATION = new Animation(1872);
@@ -16,6 +17,7 @@ export class DragonScimitarCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.DRAGON_SCIMITAR.getDrainAmount());
         character.performAnimation(DragonScimitarCombatMethod.ANIMATION);
         character.performGraphic(DragonScimitarCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit) {

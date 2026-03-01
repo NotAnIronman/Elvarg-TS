@@ -6,6 +6,7 @@ import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { PendingHit } from "../../../hit/PendingHit";
 import { CombatFactory } from "../../../CombatFactory";
+import { Sounds } from "../../../../../Sounds";
 
 export class ZamorakGodswordCombatMethod extends MeleeCombatMethod {
     private static ANIMATION = new Animation(7638);
@@ -14,6 +15,7 @@ export class ZamorakGodswordCombatMethod extends MeleeCombatMethod {
     start(character: Mobile, target: Mobile) {
         CombatSpecial.drain(character, CombatSpecial.ZAMORAK_GODSWORD.getDrainAmount());
         character.performAnimation(ZamorakGodswordCombatMethod.ANIMATION);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit) {

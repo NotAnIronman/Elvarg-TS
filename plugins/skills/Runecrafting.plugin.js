@@ -4,6 +4,8 @@ const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { TeleportHandler } = require("../../src/main/typescript/elvarg/game/model/teleportation/TeleportHandler");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
 
@@ -245,6 +247,8 @@ module.exports = {
       if (craftedEssence > 0) {
         player.performGraphic(CRAFT_RUNES_GRAPHIC);
         player.performAnimation(CRAFT_RUNES_ANIMATION);
+        Sounds.sendSound(player, Sound.CRAFT_RUNES);
+        Sounds.sendSound(player, Sound.RUNECRAFTING);
         player
           .getSkillManager()
           .addExperiences(Skill.RUNECRAFTING, craftedEssence * runeData.xp);

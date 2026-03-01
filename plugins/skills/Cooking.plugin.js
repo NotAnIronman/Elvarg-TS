@@ -5,6 +5,8 @@ const { Animation } = require("../../src/main/typescript/elvarg/game/model/Anima
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const COOK_ANIMATION = new Animation(896);
@@ -83,6 +85,7 @@ function startCooking(player, object, cookable, activeSessions) {
     nextCookTick: 0,
   });
 
+  Sounds.sendSound(player, Sound.COOKING_COOK);
   player.performAnimation(COOK_ANIMATION);
   return true;
 }
@@ -132,11 +135,13 @@ class CookingTask extends Task {
         continue;
       }
       session.nextCookTick = this.cycle + COOK_INTERVAL_TICKS;
+      Sounds.sendSound(player, Sound.COOKING_COOK);
       player.performAnimation(COOK_ANIMATION);
 
       player.getInventory().deleteNumber(session.cookable.raw, 1);
       if (isSuccess(player, session.cookable)) {
         player.getInventory().addItem(new Item(session.cookable.cooked, 1));
+        Sounds.sendSound(player, Sound.COOKING_FOOD);
         player.getPacketSender().sendMessage(`You cook the ${session.cookable.name}.`);
         const levelBefore = player
           .getSkillManager()
@@ -151,6 +156,7 @@ class CookingTask extends Task {
         }
       } else {
         player.getInventory().addItem(new Item(session.cookable.burnt, 1));
+        Sounds.sendSound(player, Sound.COOKING_BURN);
         const rawName =
           ItemDefinition.forId(session.cookable.raw)?.getName?.()?.toLowerCase?.() ||
           session.cookable.name;

@@ -1,6 +1,8 @@
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const HERB_CLEAN_DELAY_MS = 150;
@@ -108,6 +110,7 @@ module.exports = {
         }
 
         player.performAnimation(HERBLORE_ANIM);
+        Sounds.sendSound(player, Sound.POTION_MIX);
         player.getInventory().deleteNumber(ItemIds.VIAL_OF_WATER, 1);
         player.getInventory().deleteNumber(herbId, 1);
         player.getInventory().addItem(new Item(unfinished.potion, 1));
@@ -134,6 +137,7 @@ module.exports = {
       }
 
       player.performAnimation(HERBLORE_ANIM);
+      Sounds.sendSound(player, Sound.POTION_MIX);
       player.getInventory().deleteNumber(usedItemId, 1);
       player.getInventory().deleteNumber(usedWithItemId, 1);
       player.getInventory().addItem(new Item(finished.potion, 1));

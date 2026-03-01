@@ -9,6 +9,8 @@ import { Projectile } from "../../../../../model/Projectile";
 import { Graphic } from "../../../../../model/Graphic";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { Mobile } from "../../../../../entity/impl/Mobile";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 
 export class DarkBowCombatMethod extends RangedCombatMethod {
 
@@ -35,6 +37,7 @@ export class DarkBowCombatMethod extends RangedCombatMethod {
         let player = character.getAsPlayer();
         CombatSpecial.drain(player, CombatSpecial.DARK_BOW.getDrainAmount());
         player.performAnimation(DarkBowCombatMethod.ANIMATION);
+        Sounds.sendSound(character, Sound.SHOOT_BOW_QUIET);
         let projectileId = 1099;
         if (player.getCombat().getAmmunition() != Ammunition.DRAGON_ARROW) {
             projectileId = 1101;

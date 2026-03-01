@@ -1,6 +1,8 @@
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const BURY_ANIMATION = new Animation(827);
@@ -43,6 +45,7 @@ module.exports = {
       player.getSkillManager().stopSkillable();
       player.getPacketSender().sendInterfaceRemoval();
       player.performAnimation(BURY_ANIMATION);
+      Sounds.sendSound(player, Sound.BURY_BONES);
       player.getPacketSender().sendMessage("You dig a hole in the ground..");
       player.getInventory().deleteNumber(itemId, 1);
       setTimeout(() => {

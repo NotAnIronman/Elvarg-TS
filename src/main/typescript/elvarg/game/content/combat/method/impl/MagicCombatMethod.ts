@@ -20,6 +20,8 @@ export class MagicCombatMethod extends CombatMethod {
     private static readonly MAGIC_CAST_DEBUG =
         process.env.MAGIC_CAST_DEBUG === "1" ||
         process.env.MAGIC_CAST_DEBUG === "true";
+    private static readonly BLOOD_BLITZ_SPELL_ID = 12911;
+    private static readonly ICE_BLITZ_SPELL_ID = 12871;
 
     public type(): CombatType {
         return CombatType.MAGIC;
@@ -91,6 +93,10 @@ export class MagicCombatMethod extends CombatMethod {
         const spell = character.getCombat().getSelectedSpell();
 
         if (spell != null) {
+            const castSound = MagicCombatMethod.resolveCastSound(spell.spellId());
+            if (castSound != null) {
+                Sounds.sendSound(character, castSound);
+            }
             if (MagicCombatMethod.MAGIC_CAST_DEBUG) {
                 const casterName = character.isPlayer()
                     ? character.getAsPlayer()?.getUsername?.() ?? "unknown-player"
@@ -104,6 +110,17 @@ export class MagicCombatMethod extends CombatMethod {
                 );
             }
             spell.startCast(character, target);
+        }
+    }
+
+    private static resolveCastSound(spellId: number): Sound | null {
+        switch (spellId) {
+            case MagicCombatMethod.BLOOD_BLITZ_SPELL_ID:
+                return Sound.BLOOD_BLITZ_CAST;
+            case MagicCombatMethod.ICE_BLITZ_SPELL_ID:
+                return Sound.ICE_BLITZ_CAST;
+            default:
+                return null;
         }
     }
 
@@ -149,11 +166,11 @@ export class MagicCombatMethod extends CombatMethod {
             if (accurate) {
                 const endGraphic = previousSpell.endGraphic();
                 target.performGraphic(endGraphic);
-                Sounds.sendSound(target.getAsPlayer(), previousSpell.impactSound());
+                Sounds.sendSound(target, previousSpell.impactSound());
               } else {
                 // Send splash graphics for the spell because it wasn't accurate
                 target.performGraphic(MagicCombatMethod.SPLASH_GRAPHIC);
-                Sounds.sendSound(attacker.getAsPlayer(), Sound.SPELL_FAIL_SPLASH);
+                Sounds.sendSound(attacker, Sound.SPELL_FAIL_SPLASH);
             }
             previousSpell.finishCast(attacker, target, accurate, damage);
         }

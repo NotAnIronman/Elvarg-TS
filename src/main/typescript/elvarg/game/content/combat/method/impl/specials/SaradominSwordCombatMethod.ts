@@ -5,6 +5,7 @@ import { Priority } from "../../../../../model/Priority";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { PendingHit } from "../../../hit/PendingHit";
+import { Sounds } from "../../../../../Sounds";
 
 export class SaradominSwordCombatMethod extends MeleeCombatMethod {
     private static ENEMY_GRAPHIC = new Graphic(1196);
@@ -22,6 +23,7 @@ export class SaradominSwordCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.SARADOMIN_SWORD.getDrainAmount());
         character.performAnimation(SaradominSwordCombatMethod.ANIMATION);
         character.performGraphic(SaradominSwordCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit) {

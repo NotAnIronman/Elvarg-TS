@@ -6,6 +6,8 @@ import { PendingHit } from "../../../hit/PendingHit";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 import { Player } from '../../../../../entity/impl/player/Player';
 export class AbyssalWhipCombatMethod extends MeleeCombatMethod {
     private static readonly ANIMATION = new Animation(1658);
@@ -14,6 +16,7 @@ export class AbyssalWhipCombatMethod extends MeleeCombatMethod {
     start(character: Mobile, target: Mobile) {
         CombatSpecial.drain(character, CombatSpecial.ABYSSAL_WHIP.getDrainAmount());
         character.performAnimation(AbyssalWhipCombatMethod.ANIMATION);
+        Sounds.sendSound(character, Sound.WHIP_SPECIAL);
     }
 
     handleAfterHitEffects(hit: PendingHit) {

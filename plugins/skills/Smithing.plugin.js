@@ -1,6 +1,8 @@
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const SMELT_ANIMATION = new Animation(899);
@@ -157,6 +159,7 @@ module.exports = {
         }
 
         consumeIngredients(inventory, recipe);
+        Sounds.sendSound(player, Sound.SMELTING);
         player.performAnimation(SMELT_ANIMATION);
 
         const successChance = recipe.successChance ?? 1;
@@ -199,6 +202,7 @@ module.exports = {
         inventory.deleteNumber(itemId, 1);
         inventory.addItem(new Item(recipe.productId, 1));
         player.performAnimation(SMITH_ANIMATION);
+        Sounds.sendSound(player, Sound.SMITHING);
         player.getSkillManager().addExperiences(Skill.SMITHING, recipe.xp);
         player.getPacketSender().sendMessage("You hammer the metal and shape an item.");
         event.handled = true;

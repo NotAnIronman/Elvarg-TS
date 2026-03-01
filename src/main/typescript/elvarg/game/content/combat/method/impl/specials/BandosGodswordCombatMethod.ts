@@ -7,6 +7,7 @@ import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { Skill } from "../../../../../model/Skill";
 import { Misc } from "../../../../../../util/Misc";
+import { Sounds } from "../../../../../Sounds";
 
 export class BandosGodswordCombatMethod extends MeleeCombatMethod {
 
@@ -17,6 +18,7 @@ export class BandosGodswordCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.BANDOS_GODSWORD.getDrainAmount());
         character.performAnimation(BandosGodswordCombatMethod.ANIMATION);
         character.performGraphic(BandosGodswordCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit) {

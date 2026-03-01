@@ -9,6 +9,8 @@ import { Location } from "../../../game/model/Location";
 import { MagicSpellbook } from "../../../game/model/MagicSpellbook";
 import { Projectile } from "../../../game/model/Projectile";
 import { Skill } from "../../../game/model/Skill";
+import { Sound } from "../../../game/Sound";
+import { Sounds } from "../../../game/Sounds";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 import { World } from "../../../game/World";
 import { Packet } from "../Packet";
@@ -131,6 +133,7 @@ export class MagicOnItemPacketListener {
       31,
       player.getPrivateArea()
     ).sendProjectile();
+    Sounds.sendSound(player, Sound.TELEKINETIC_GRAB);
 
     ItemOnGroundManager.deregister(groundItem);
     player.getInventory().addItem(groundItem.getItem().clone());
@@ -194,6 +197,7 @@ export class MagicOnItemPacketListener {
     }
 
     player.performAnimation(new Animation(712));
+    Sounds.sendSound(player, isHighAlch ? Sound.HIGH_ALCHEMY : Sound.LOW_ALCHEMY);
     if (isHighAlch) {
       inventory.adds(ItemIdentifiers.COINS, definition.getHighAlchValue());
     } else {

@@ -7,6 +7,8 @@ import { CombatSpecial } from "../../../CombatSpecial";
 import { RangedWeapon } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 
 export class ArmadylCrossbowCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(4230);
@@ -29,6 +31,7 @@ export class ArmadylCrossbowCombatMethod extends RangedCombatMethod {
         const player = character.getAsPlayer();
         CombatSpecial.drain(player, CombatSpecial.ARMADYL_CROSSBOW.getDrainAmount());
         player.performAnimation(ArmadylCrossbowCombatMethod.ANIMATION);
+        Sounds.sendSound(character, Sound.SHOOT_CROSSBOW);
         Projectile.createProjectile(character, target, 301, 50, 70, 44, 35).sendProjectile();
         CombatFactory.decrementAmmo(player, target.getLocation(), 1);
     }

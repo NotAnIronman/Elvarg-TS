@@ -1,6 +1,8 @@
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const GEM_CUT_ANIMATION = new Animation(886);
@@ -52,6 +54,7 @@ module.exports = {
       }
 
       player.performAnimation(GEM_CUT_ANIMATION);
+      Sounds.sendSound(player, Sound.GEM_CUTTING);
       player.getInventory().deleteNumber(uncutId, 1);
       player.getInventory().addItem(new Item(gem.cut, 1));
       player.getSkillManager().addExperiences(Skill.CRAFTING, gem.xp);

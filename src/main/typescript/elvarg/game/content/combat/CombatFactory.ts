@@ -551,7 +551,14 @@ export class CombatFactory {
         // Target-side player effects.
         if (target.isPlayer()) {
             const playerTarget = target.getAsPlayer();
-            Sounds.sendSound(playerTarget, Sound.FEMALE_GETTING_HIT);
+            if (resolvedHit.isAccurate() && damage > 0) {
+                const hitSound = playerTarget.getAppearance()?.isMale?.()
+                    ? Sound.MALE_GETTING_HIT
+                    : Sound.FEMALE_GETTING_HIT;
+                Sounds.sendSound(playerTarget, hitSound);
+            } else {
+                Sounds.sendSound(playerTarget, Sound.DEFENCE_BLOCK);
+            }
 
             // Close interfaces while being hit (except developer rights).
             if (playerTarget.getRights() != PlayerRights.DEVELOPER && playerTarget.busy()) {

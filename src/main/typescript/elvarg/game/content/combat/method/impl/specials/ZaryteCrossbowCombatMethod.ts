@@ -6,6 +6,8 @@ import { CombatSpecial } from "../../../CombatSpecial";
 import { RangedWeapon } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 
 export class ZaryteCrossbowCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(9166);
@@ -29,6 +31,7 @@ export class ZaryteCrossbowCombatMethod extends RangedCombatMethod {
         const player = character.getAsPlayer();
         CombatSpecial.drain(player, CombatSpecial.ZARYTE_CROSSBOW.getDrainAmount());
         player.performAnimation(ZaryteCrossbowCombatMethod.ANIMATION);
+        Sounds.sendSound(character, Sound.SHOOT_CROSSBOW);
         Projectile.createProjectile(character, target, 301, 44, 35, 50, 70).sendProjectile();
         CombatFactory.decrementAmmo(player, target.getLocation(), 1);
     }

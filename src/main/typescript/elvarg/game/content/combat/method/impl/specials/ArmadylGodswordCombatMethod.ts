@@ -4,6 +4,7 @@ import { Graphic } from "../../../../../model/Graphic";
 import { Priority } from "../../../../../model/Priority";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
+import { Sounds } from "../../../../../Sounds";
 
 export class ArmadylGodswordCombatMethod extends MeleeCombatMethod {
 
@@ -14,5 +15,6 @@ export class ArmadylGodswordCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.ARMADYL_GODSWORD.getDrainAmount());
         character.performAnimation(ArmadylGodswordCombatMethod.ANIMATION);
         character.performGraphic(ArmadylGodswordCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 }

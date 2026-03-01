@@ -6,6 +6,7 @@ import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { PendingHit } from "../../../hit/PendingHit";
 import { Skill } from "../../../../../model/Skill";
+import { Sounds } from "../../../../../Sounds";
 
 export class SaradominGodswordCombatMethod extends MeleeCombatMethod {
     private static ANIMATION = new Animation(7640);
@@ -15,6 +16,7 @@ export class SaradominGodswordCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.SARADOMIN_GODSWORD.getDrainAmount());
         character.performAnimation(SaradominGodswordCombatMethod.ANIMATION);
         character.performGraphic(SaradominGodswordCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit) {

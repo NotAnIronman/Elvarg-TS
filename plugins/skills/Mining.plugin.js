@@ -6,6 +6,8 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
 
@@ -153,6 +155,7 @@ function startMining(player, rockObject, rock, activeSessions) {
   });
 
   player.getPacketSender().sendMessage("You swing your pickaxe at the rock..");
+  Sounds.sendSound(player, Sound.MINING_MINE);
   player.performAnimation(pickaxe.animation);
   return true;
 }
@@ -206,6 +209,7 @@ class MiningTask extends Task {
       }
 
       if (this.cycle >= state.nextAnimationTick) {
+        Sounds.sendSound(player, Sound.MINING_MINE);
         player.performAnimation(state.pickaxe.animation);
         state.nextAnimationTick = this.cycle + MINING_ANIMATION_INTERVAL_TICKS;
       }
@@ -219,6 +223,7 @@ class MiningTask extends Task {
       player.getPacketSender().sendMessage("You get some ores.");
       player.getSkillManager().addExperiences(Skill.MINING, state.rock.xp);
       Pets.onSkill(player, Skill.MINING);
+      Sounds.sendSound(player, Sound.MINING_ROCK_GONE);
       depleteRock(rockObject, state.rock);
       stopMining(this.activeSessions, player);
     }

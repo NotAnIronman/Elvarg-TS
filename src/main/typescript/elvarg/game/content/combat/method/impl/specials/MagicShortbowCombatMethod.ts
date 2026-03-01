@@ -9,6 +9,8 @@ import { Projectile } from "../../../../../model/Projectile";
 import { Graphic } from "../../../../../model/Graphic";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { Mobile } from "../../../../../entity/impl/Mobile";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 
 export class MagicShortbowCombatMethod extends RangedCombatMethod {
     private static ANIMATION = new Animation(1074);
@@ -34,6 +36,7 @@ export class MagicShortbowCombatMethod extends RangedCombatMethod {
         CombatSpecial.drain(player, CombatSpecial.MAGIC_SHORTBOW.getDrainAmount());
         player.performAnimation(MagicShortbowCombatMethod.ANIMATION);
         player.performGraphic(MagicShortbowCombatMethod.GRAPHIC);
+        Sounds.sendSound(player, Sound.MAGIC_SHORTBOW_SPECIAL);
         Projectile.createProjectile(player, target, 249, 40, 57, 43, 31).sendProjectile();
         Projectile.createProjectile(character, target, 249, 33, 57, 48, 31).sendProjectile();
         CombatFactory.decrementAmmo(player, target.getLocation(), 2);

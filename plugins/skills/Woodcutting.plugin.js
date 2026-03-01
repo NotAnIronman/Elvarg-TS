@@ -478,6 +478,7 @@ function startWoodcutting(player, treeObject, tree, activeSessions) {
   });
 
   player.getPacketSender().sendMessage("You swing your axe at the tree..");
+  Sounds.sendSound(player, Sound.WOODCUTTING_START);
   Sounds.sendSound(player, Sound.WOODCUTTING_CHOP);
   player.performAnimation(new Animation(axe.animationId));
   return true;
@@ -577,6 +578,7 @@ function processWoodcuttingTick(activeSessions, currentTick) {
     maybeDropBirdNest(player);
 
     if (shouldDepleteTree(state.tree)) {
+      Sounds.sendSound(player, Sound.WOODCUTTING_TREE_DOWN);
       depleteTree(activeTree, state.tree);
       stopWoodcutting(activeSessions, player);
       continue;

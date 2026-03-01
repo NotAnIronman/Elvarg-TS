@@ -10,6 +10,8 @@ const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/imp
 const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
 
@@ -271,9 +273,11 @@ function startFiremakingAttempt(player, log, source, activeSessions) {
 
   if (source.mode === SESSION_MODE.BONFIRE) {
     player.getPacketSender().sendMessage("You attempt to add the logs to the fire.");
+    Sounds.sendSound(player, Sound.FIRE_LIGHT);
     player.performAnimation(BONFIRE_ANIMATION);
   } else {
     player.getPacketSender().sendMessage("You attempt to light the logs..");
+    Sounds.sendSound(player, Sound.FIRE_LIGHT);
     player.performAnimation(LIGHT_FIRE_ANIMATION);
   }
 
@@ -306,6 +310,7 @@ function completeInventoryOrGroundFire(player, state) {
   spawnFire(player, state.location, state.log.respawnTicks);
   player.getSkillManager().addExperiences(Skill.FIREMAKING, state.log.xpReward);
   Pets.onSkill(player, Skill.FIREMAKING);
+  Sounds.sendSound(player, Sound.FIRE_SUCCESSFUL);
   player.getPacketSender().sendMessage("The logs catch fire and begin to burn.");
   return true;
 }
@@ -323,6 +328,7 @@ function completeBonfire(player, state) {
   player.getInventory().deleteNumber(state.log.itemId, 1);
   player.getSkillManager().addExperiences(Skill.FIREMAKING, state.log.xpReward);
   Pets.onSkill(player, Skill.FIREMAKING);
+  Sounds.sendSound(player, Sound.FIRE_SUCCESSFUL);
   player.getPacketSender().sendMessage("You add a log to the fire.");
   return true;
 }

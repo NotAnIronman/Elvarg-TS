@@ -9,6 +9,8 @@ import { Equipment } from "../../../../../model/container/impl/Equipment";
 import { Item } from "../../../../../model/Item";
 import { WeaponInterfaces } from "../../../WeaponInterfaces";
 import { Flag } from "../../../../../model/Flag";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 
 export class DragonKnifeCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(8292);
@@ -37,6 +39,7 @@ export class DragonKnifeCombatMethod extends RangedCombatMethod {
         const player = character.getAsPlayer();
         CombatSpecial.drain(player, CombatSpecial.DRAGON_KNIFE.getDrainAmount());
         player.performAnimation(DragonKnifeCombatMethod.ANIMATION);
+        Sounds.sendSound(character, Sound.THROW_DART);
         Projectile.createProjectile(character, target, 1629, 30, 60, 40, 36).sendProjectile();
         DragonKnifeCombatMethod.decrementThrownWeapon(player, 1);
     }

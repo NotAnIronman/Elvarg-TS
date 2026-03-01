@@ -15,6 +15,7 @@ import { BrokenItem } from "../../model/BrokenItem";
 import { Animation } from "../../model/Animation";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { TaskManager } from "../TaskManager";
+import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 
 export class PlayerDeathTask extends Task {
     private static readonly OPEN_PRESETS_DELAY_TICKS = 2;
@@ -46,11 +47,18 @@ export class PlayerDeathTask extends Task {
                         this.loseItems = this.player.getArea().dropItemsOnDeath(this.player, this.killer);
                     }
                     const droppedItems: Item[] = [];
+                    const deathPosition = this.player.getLocation();
+                    // Always drop player bones on death.
+                    ItemOnGroundManager.registerLocation(
+                        this.killer ? this.killer : this.player,
+                        new Item(ItemIdentifiers.BONES),
+                        deathPosition
+                    );
                     if (this.loseItems) {
                         const itemsToKeep = PlayerDeathTask.getItemsToKeep(this.player);
                         this.itemsToKeep = Array.isArray(itemsToKeep) ? itemsToKeep : [];
                         const playerItems = this.player.getInventory().getValidItems().concat(this.player.getEquipment().getValidItems());
-                        const position = this.player.getLocation();
+                        const position = deathPosition;
                         let dropped = false;
 
                         for (let item of playerItems) {

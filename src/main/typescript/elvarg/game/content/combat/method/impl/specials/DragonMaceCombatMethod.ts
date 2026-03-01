@@ -4,6 +4,8 @@ import { Graphic } from "../../../../../model/Graphic";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { Priority } from "../../../../../model/Priority";
 import { Mobile } from "../../../../../entity/impl/Mobile";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 import { CombatSpecial } from "../../../CombatSpecial";
 
 export class DragonMaceCombatMethod extends MeleeCombatMethod {
@@ -14,5 +16,6 @@ export class DragonMaceCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.DRAGON_MACE.getDrainAmount());
         character.performAnimation(DragonMaceCombatMethod.ANIMATION);
         character.performGraphic(DragonMaceCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, Sound.DRAGON_MACE_SPECIAL);
     }
 }

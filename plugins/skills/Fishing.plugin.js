@@ -6,6 +6,8 @@ const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Chance } = require("../../src/main/typescript/elvarg/util/Chance");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, NpcIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
 
@@ -178,6 +180,7 @@ function startFishing(player, npc, clickType, activeSessions) {
   });
 
   player.getPacketSender().sendMessage("You begin to fish..");
+  Sounds.sendSound(player, Sound.FISHING_FISH);
   player.performAnimation(new Animation(tool.animationId));
   return true;
 }
@@ -226,6 +229,7 @@ class FishingTask extends Task {
       }
 
       if (this.cycle >= session.nextAnimationTick) {
+        Sounds.sendSound(player, Sound.FISHING_FISH);
         player.performAnimation(new Animation(session.tool.animationId));
         session.nextAnimationTick = this.cycle + FISHING_ANIMATION_INTERVAL_TICKS;
       }

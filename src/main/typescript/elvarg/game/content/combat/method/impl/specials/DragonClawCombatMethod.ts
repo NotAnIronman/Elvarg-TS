@@ -5,6 +5,7 @@ import { Priority } from "../../../../../model/Priority";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { PendingHit } from "../../../hit/PendingHit";
+import { Sounds } from "../../../../../Sounds";
 
 export class DragonClawCombatMethod extends MeleeCombatMethod {
 
@@ -30,5 +31,6 @@ export class DragonClawCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.DRAGON_CLAWS.getDrainAmount());
         character.performAnimation(DragonClawCombatMethod.ANIMATION);
         character.performGraphic(DragonClawCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 }

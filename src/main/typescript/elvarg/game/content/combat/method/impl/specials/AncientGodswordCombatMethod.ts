@@ -9,6 +9,7 @@ import { HitDamage } from "../../../hit/HitDamage";
 import { HitMask } from "../../../hit/HitMask";
 import { Task } from "../../../../../task/Task";
 import { TaskManager } from "../../../../../task/TaskManager";
+import { Sounds } from "../../../../../Sounds";
 
 export class AncientGodswordCombatMethod extends MeleeCombatMethod {
     private static readonly ANIMATION = new Animation(9171);
@@ -18,6 +19,7 @@ export class AncientGodswordCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.ANCIENT_GODSWORD.getDrainAmount());
         character.performAnimation(AncientGodswordCombatMethod.ANIMATION);
         character.performGraphic(AncientGodswordCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit): void {

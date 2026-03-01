@@ -9,6 +9,7 @@ import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { CombatFactory } from "../../../CombatFactory";
 import { Misc } from "../../../../../../util/Misc";
 import { PoisonType } from "../../../../../task/impl/CombatPoisonEffect";
+import { Sounds } from "../../../../../Sounds";
 
 export class AbyssalTentacleCombatMethod extends MeleeCombatMethod {
     private static readonly ANIMATION = new Animation(1658);
@@ -17,6 +18,7 @@ export class AbyssalTentacleCombatMethod extends MeleeCombatMethod {
     start(character: Mobile, target: Mobile) {
         CombatSpecial.drain(character, CombatSpecial.ABYSSAL_TENTACLE.getDrainAmount());
         character.performAnimation(AbyssalTentacleCombatMethod.ANIMATION);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit) {

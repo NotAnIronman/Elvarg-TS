@@ -238,6 +238,7 @@ export class PotionConsumable {
         const maxLevel = player.getSkillManager().getMaxLevel(Skill.PRAYER);
         const min = Math.floor((restorePotion ? 8 : 7) + (maxLevel / 4));
         player.getSkillManager().increaseCurrentLevel(Skill.PRAYER, min, maxLevel);
+        Sounds.sendSound(player, Sound.PRAYER_RECHARGE);
     }
 
     private static onRestoreEffect(player: Player) {

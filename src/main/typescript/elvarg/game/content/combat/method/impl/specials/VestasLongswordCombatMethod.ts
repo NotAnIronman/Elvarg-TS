@@ -5,6 +5,7 @@ import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { DamageFormulas } from "../../../formula/DamageFormulas";
 import { Misc } from "../../../../../../util/Misc";
+import { Sounds } from "../../../../../Sounds";
 
 export class VestasLongswordCombatMethod extends MeleeCombatMethod {
     private static readonly ANIMATION = new Animation(8145);
@@ -23,5 +24,6 @@ export class VestasLongswordCombatMethod extends MeleeCombatMethod {
     start(character: Mobile, target: Mobile): void {
         CombatSpecial.drain(character, CombatSpecial.VESTAS_LONGSWORD.getDrainAmount());
         character.performAnimation(VestasLongswordCombatMethod.ANIMATION);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 }

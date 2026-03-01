@@ -107,7 +107,7 @@ export class Barricades {
         player.getInventory().deleteNumber(this.ITEM_ID, 1);
         this.barricades.push(tile);
         World.getAddNPCQueue().push(new NPC(this.NPC_ID, tile.clone()));
-        Sounds.sendSound(player, Sound.PICK_UP_ITEM);
+        Sounds.sendSound(player, Sound.SET_UP_BARRICADE);
     }
 
     public static handleInteractiveOptions(player: Player, npc: NPC, opcode: number): boolean {

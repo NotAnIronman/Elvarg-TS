@@ -23,6 +23,6 @@ export class DragonDaggerCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.DRAGON_DAGGER.getDrainAmount());
         character.performAnimation(DragonDaggerCombatMethod.ANIMATION);
         character.performGraphic(DragonDaggerCombatMethod.GRAPHIC);
-        Sounds.sendSound(character.getAsPlayer(), Sound.DRAGON_DAGGER_SPECIAL);
+        Sounds.sendSound(character, Sound.DRAGON_DAGGER_SPECIAL);
     }
 }

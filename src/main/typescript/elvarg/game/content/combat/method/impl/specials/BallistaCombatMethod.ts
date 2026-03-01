@@ -7,6 +7,8 @@ import { CombatSpecial } from "../../../CombatSpecial";
 import { RangedWeapon } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 
 export class BallistaCombatMethod extends RangedCombatMethod {
 
@@ -34,6 +36,7 @@ export class BallistaCombatMethod extends RangedCombatMethod {
         const player = character.getAsPlayer();
         CombatSpecial.drain(player, CombatSpecial.BALLISTA.getDrainAmount());
         character.performAnimation(BallistaCombatMethod.ANIMATION);
+        Sounds.sendSound(character, Sound.SHOOT_CROSSBOW);
         Projectile.createProjectile(player, target, 1301, 70, 30, 43, 31).sendProjectile();
         CombatFactory.decrementAmmo(player, target.getLocation(), 1);
     }

@@ -9,6 +9,8 @@ import { BonusManager } from "../model/equipment/BonusManager";
 import { PlayerRights } from "../model/rights/PlayerRights";
 import { Task } from "../task/Task";
 import { TaskManager } from "../task/TaskManager";
+import { Sound } from "../Sound";
+import { Sounds } from "../Sounds";
 import { Misc } from "../../util/Misc";
 
 export class PrayerHandler {
@@ -49,6 +51,26 @@ export class PrayerHandler {
     public static MAGIC_PRAYERS: number[] = [PrayerHandler.MYSTIC_WILL, PrayerHandler.MYSTIC_LORE, PrayerHandler.MYSTIC_MIGHT, PrayerHandler.AUGURY];
     public static OVERHEAD_PRAYERS: number[] = [PrayerHandler.PROTECT_FROM_MAGIC, PrayerHandler.PROTECT_FROM_MISSILES, PrayerHandler.PROTECT_FROM_MELEE, PrayerHandler.RETRIBUTION, PrayerHandler.REDEMPTION, PrayerHandler.SMITE];
     public static PROTECTION_PRAYERS: number[] = [PrayerHandler.PROTECT_FROM_MAGIC, PrayerHandler.PROTECT_FROM_MISSILES, PrayerHandler.PROTECT_FROM_MELEE];
+
+    private static getActivationSound(prayerId: number): Sound | null {
+        switch (prayerId) {
+            case PrayerHandler.THICK_SKIN: return Sound.PRAYER_THICK_SKIN;
+            case PrayerHandler.BURST_OF_STRENGTH: return Sound.PRAYER_BURST_OF_STRENGTH;
+            case PrayerHandler.CLARITY_OF_THOUGHT: return Sound.PRAYER_CLARITY_OF_THOUGHT;
+            case PrayerHandler.ROCK_SKIN: return Sound.PRAYER_ROCK_SKIN;
+            case PrayerHandler.SUPERHUMAN_STRENGTH: return Sound.PRAYER_SUPERHUMAN_STRENGTH;
+            case PrayerHandler.IMPROVED_REFLEXES: return Sound.PRAYER_IMPROVED_REFLEXES;
+            case PrayerHandler.RAPID_RESTORE: return Sound.PRAYER_RAPID_RESTORE;
+            case PrayerHandler.RAPID_HEAL: return Sound.PRAYER_RAPID_HEAL;
+            case PrayerHandler.STEEL_SKIN: return Sound.PRAYER_STEEL_SKIN;
+            case PrayerHandler.ULTIMATE_STRENGTH: return Sound.PRAYER_ULTIMATE_STRENGTH;
+            case PrayerHandler.INCREDIBLE_REFLEXES: return Sound.PRAYER_INCREDIBLE_REFLEXES;
+            case PrayerHandler.PROTECT_FROM_MAGIC: return Sound.PRAYER_PROTECT_MAGIC;
+            case PrayerHandler.PROTECT_FROM_MISSILES: return Sound.PRAYER_PROTECT_RANGE;
+            case PrayerHandler.PROTECT_FROM_MELEE: return Sound.PRAYER_PROTECT_MELEE;
+            default: return null;
+        }
+    }
 
     public static getProtectingPrayer(type: CombatType): number {
         switch (type) {
@@ -121,6 +143,7 @@ export class PrayerHandler {
             if (player.getSkillManager().getCurrentLevel(Skill.PRAYER) <= 0) {
                 player.getPacketSender().sendConfig(pd.configId, 0);
                 player.getPacketSender().sendMessage("You do not have enough Prayer points.");
+                Sounds.sendSound(player, Sound.PRAYER_INSUFFICIENT);
                 return;
             }
             if (!PrayerHandler.canUse(player, pd, true)) {
@@ -186,6 +209,10 @@ export class PrayerHandler {
         if (character.isPlayer()) {
             const player = character.getAsPlayer();
             player.getPacketSender().sendConfig(pd.configId, 1);
+            const activationSound = PrayerHandler.getActivationSound(prayerId);
+            if (activationSound != null) {
+                Sounds.sendSound(player, activationSound);
+            }
             PrayerHandler.startDrain(player);
             if (pd.hint !== -1) {
                 const hintId = PrayerHandler.getHeadHint(character);
@@ -294,6 +321,7 @@ export class PrayerHandler {
         if (c.isPlayer()) {
             const player = c.getAsPlayer();
             player.getPacketSender().sendConfig(pd.configId, 0);
+            Sounds.sendSound(player, Sound.PRAYER_TURN_OFF);
             if (pd.hint !== -1) {
                 const hintId = this.getHeadHint(c);
                 player.getAppearance().setHeadHint(hintId);
@@ -399,6 +427,7 @@ export class PrayerHandler {
                 if (player.getSkillManager().getCurrentLevel(Skill.PRAYER) <= 0) {
                     PrayerHandler.deactivatePrayers(player);
                     player.getPacketSender().sendMessage("You have run out of Prayer points!");
+                    Sounds.sendSound(player, Sound.PRAYER_DEPLETED);
                     stop();
                     return;
                 }

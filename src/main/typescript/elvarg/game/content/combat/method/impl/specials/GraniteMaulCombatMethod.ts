@@ -5,6 +5,7 @@ import { Priority } from "../../../../../model/Priority";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
+import { Sounds } from "../../../../../Sounds";
 
 export class GraniteMaulCombatMethod extends MeleeCombatMethod {
     private static ANIMATION = new Animation(1667);
@@ -13,6 +14,7 @@ export class GraniteMaulCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.GRANITE_MAUL.getDrainAmount());
         character.performAnimation(GraniteMaulCombatMethod.ANIMATION);
         character.performGraphic(GraniteMaulCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 }
     

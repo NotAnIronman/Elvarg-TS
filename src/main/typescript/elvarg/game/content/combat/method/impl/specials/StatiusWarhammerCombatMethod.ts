@@ -6,6 +6,7 @@ import { CombatSpecial } from "../../../CombatSpecial";
 import { Skill } from "../../../../../model/Skill";
 import { DamageFormulas } from "../../../formula/DamageFormulas";
 import { Misc } from "../../../../../../util/Misc";
+import { Sounds } from "../../../../../Sounds";
 
 export class StatiusWarhammerCombatMethod extends MeleeCombatMethod {
     private static readonly ANIMATION = new Animation(1378);
@@ -24,6 +25,7 @@ export class StatiusWarhammerCombatMethod extends MeleeCombatMethod {
     start(character: Mobile, target: Mobile): void {
         CombatSpecial.drain(character, CombatSpecial.STATIUS_WARHAMMER.getDrainAmount());
         character.performAnimation(StatiusWarhammerCombatMethod.ANIMATION);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit): void {

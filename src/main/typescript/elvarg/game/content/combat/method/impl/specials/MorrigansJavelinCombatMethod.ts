@@ -13,6 +13,8 @@ import { Task } from "../../../../../task/Task";
 import { TaskManager } from "../../../../../task/TaskManager";
 import { HitDamage } from "../../../hit/HitDamage";
 import { HitMask } from "../../../hit/HitMask";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 
 export class MorrigansJavelinCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(806);
@@ -34,6 +36,7 @@ export class MorrigansJavelinCombatMethod extends RangedCombatMethod {
         const player = character.getAsPlayer();
         CombatSpecial.drain(player, CombatSpecial.MORRIGANS_JAVELIN.getDrainAmount());
         player.performAnimation(MorrigansJavelinCombatMethod.ANIMATION);
+        Sounds.sendSound(character, Sound.THROW_DART);
         Projectile.createProjectile(character, target, 1622, 30, 60, 40, 36).sendProjectile();
         MorrigansJavelinCombatMethod.decrementThrownWeapon(player, 1);
     }

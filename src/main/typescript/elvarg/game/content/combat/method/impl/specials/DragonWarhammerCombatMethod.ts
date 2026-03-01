@@ -6,6 +6,7 @@ import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { PendingHit } from "../../../hit/PendingHit";
 import { Skill } from "../../../../../model/Skill";
+import { Sounds } from "../../../../../Sounds";
 
 export class DragonWarhammerCombatMethod extends MeleeCombatMethod {
     private static ANIMATION = new Animation(1378);
@@ -15,6 +16,7 @@ export class DragonWarhammerCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.DRAGON_WARHAMMER.getDrainAmount());
         character.performAnimation(DragonWarhammerCombatMethod.ANIMATION);
         character.performGraphic(DragonWarhammerCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 
     handleAfterHitEffects(hit: PendingHit): void {

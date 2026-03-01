@@ -10,6 +10,8 @@ import { Animation } from "../../../../../model/Animation";
 import { Direction } from "../../../../../model/Direction";
 import { Graphic } from "../../../../../model/Graphic";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 import { Task } from "../../../../../task/Task";
 import { TaskManager } from "../../../../../task/TaskManager";
 import { TimerKey } from "../../../../../../util/timers/TimerKey";
@@ -44,6 +46,7 @@ export class ShoveCombatMethod extends CombatMethod {
         CombatSpecial.drain(character, CombatSpecial.SHOVE_SPECIAL.getDrainAmount());
         character.performAnimation(ShoveCombatMethod.ANIMATION);
         character.performGraphic(ShoveCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, Sound.DRAGON_SPEAR_SPECIAL);
         target.performAnimation(ShoveCombatMethod.STUN_ANIMATION);
         CombatFactory.stun(target, 3, true);
         target.getTimers().registers(TimerKey.FREEZE_IMMUNITY, 10);

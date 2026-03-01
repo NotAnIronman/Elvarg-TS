@@ -2,6 +2,8 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { ForceMovementTask } = require("../../src/main/typescript/elvarg/game/task/impl/ForceMovementTask");
 const { ForceMovement } = require("../../src/main/typescript/elvarg/game/model/ForceMovement");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
@@ -35,6 +37,7 @@ function tryCrossWildernessDitch(player, ditchY, sourceY) {
   );
 
   TaskManager.submit(new ForceMovementTask(player, 3, forceMovement));
+  Sounds.sendSound(player, Sound.WILDERNESS_DITCH_JUMP);
   clickDelay.reset();
   return { crossed: true, reason: "ok", elapsed };
 }

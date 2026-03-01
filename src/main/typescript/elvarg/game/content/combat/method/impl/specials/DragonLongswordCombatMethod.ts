@@ -4,6 +4,8 @@ import { Graphic } from "../../../../../model/Graphic";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { Priority } from "../../../../../model/Priority";
 import { Mobile } from "../../../../../entity/impl/Mobile";
+import { Sound } from "../../../../../Sound";
+import { Sounds } from "../../../../../Sounds";
 import { CombatSpecial } from "../../../CombatSpecial";
 
 export class DragonLongswordCombatMethod extends MeleeCombatMethod {
@@ -15,5 +17,6 @@ export class DragonLongswordCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.DRAGON_LONGSWORD.getDrainAmount());
         character.performAnimation(DragonLongswordCombatMethod.ANIMATION);
         character.performGraphic(DragonLongswordCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, Sound.DRAGON_LONGSWORD_SPECIAL);
     }
 }

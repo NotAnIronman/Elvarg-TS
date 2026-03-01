@@ -16,6 +16,8 @@ const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
 const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
@@ -522,11 +524,25 @@ module.exports = {
       if (!requireRights(player, ownerOrDev)) {
         return true;
       }
-      const id = parseIntArg(parts[1]);
-      if (id === null) {
-        player.getPacketSender().sendMessage("Usage: ::sound id [volume=1] [delay=0] [loop=1]");
+      const input = parts[1];
+      if (!input) {
+        player
+          .getPacketSender()
+          .sendMessage("Usage: ::sound <id|SOUND_NAME> [volume=1] [delay=0] [loop=1]");
         return true;
       }
+
+      const directId = parseIntArg(input);
+      const resolvedSound =
+        directId !== null ? Sounds.resolveKnownSound(directId) : Sounds.resolveKnownSound(input);
+      const id = resolvedSound ? resolvedSound.getId() : directId;
+      if (id === null) {
+        player
+          .getPacketSender()
+          .sendMessage("Unknown sound id/name. Example: ::sound 386 or ::sound MAGIC_SHORTBOW_SPECIAL");
+        return true;
+      }
+
       const volume = parts.length > 2 ? parseIntArg(parts[2]) : 1;
       const delay = parts.length > 3 ? parseIntArg(parts[3]) : 0;
       const loopType = parts.length > 4 ? parseIntArg(parts[4]) : 1;
@@ -538,6 +554,11 @@ module.exports = {
           Number.isInteger(delay) ? delay : 0,
           Number.isInteger(volume) ? volume : 1
         );
+      if (resolvedSound) {
+        const soundName =
+          Object.entries(Sound).find(([, value]) => value === resolvedSound)?.[0] ?? "UNKNOWN";
+        player.getPacketSender().sendMessage(`Played ${soundName} (${id}).`);
+      }
       return true;
     });
 

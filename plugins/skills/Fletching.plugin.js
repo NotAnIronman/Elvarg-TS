@@ -1,6 +1,8 @@
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const CUTTING_ANIMATION = new Animation(1248);
@@ -61,6 +63,7 @@ module.exports = {
           return;
         }
         player.performAnimation(CUTTING_ANIMATION);
+        Sounds.sendSound(player, Sound.CUTTING);
         player.getInventory().deleteNumber(logId, 1);
         player.getInventory().addItem(new Item(cut.product, 1));
         player.getSkillManager().addExperiences(Skill.FLETCHING, cut.xp);
@@ -108,6 +111,7 @@ module.exports = {
           return;
         }
         player.performAnimation(CUTTING_ANIMATION);
+        Sounds.sendSound(player, Sound.CUTTING);
         player.getInventory().deleteNumber(ItemIds.ARROW_SHAFT, 15);
         player.getInventory().deleteNumber(ItemIds.FEATHER, 15);
         player.getInventory().addItem(new Item(ItemIds.HEADLESS_ARROW, 15));
@@ -146,6 +150,7 @@ module.exports = {
           return;
         }
         player.performAnimation(CUTTING_ANIMATION);
+        Sounds.sendSound(player, Sound.CUTTING);
         player.getInventory().deleteNumber(ItemIds.HEADLESS_ARROW, 15);
         player.getInventory().deleteNumber(headId, 15);
         player.getInventory().addItem(new Item(head.product, 15));

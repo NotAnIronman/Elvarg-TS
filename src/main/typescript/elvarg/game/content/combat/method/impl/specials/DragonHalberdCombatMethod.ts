@@ -6,6 +6,7 @@ import { Priority } from "../../../../../model/Priority";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
 import { PendingHit } from "../../../hit/PendingHit";
+import { Sounds } from "../../../../../Sounds";
 
 export class DragonHalberdCombatMethod extends MeleeCombatMethod {
 
@@ -20,5 +21,6 @@ export class DragonHalberdCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.DRAGON_HALBERD.getDrainAmount());
         character.performAnimation(DragonHalberdCombatMethod.ANIMATION);
         character.performGraphic(DragonHalberdCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 }

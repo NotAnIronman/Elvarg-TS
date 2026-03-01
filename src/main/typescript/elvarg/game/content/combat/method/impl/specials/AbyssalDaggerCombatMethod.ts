@@ -5,6 +5,7 @@ import { Priority } from "../../../../../model/Priority";
 import { PendingHit } from "../../../hit/PendingHit";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
+import { Sounds } from "../../../../../Sounds";
 
 export class AbyssalDaggerCombatMethod extends MeleeCombatMethod {
     private static readonly ANIMATION = new Animation(3300);
@@ -25,6 +26,6 @@ export class AbyssalDaggerCombatMethod extends MeleeCombatMethod {
         CombatSpecial.drain(character, CombatSpecial.ABYSSAL_DAGGER.getDrainAmount());
         character.performAnimation(AbyssalDaggerCombatMethod.ANIMATION);
         character.performGraphic(AbyssalDaggerCombatMethod.GRAPHIC);
+        Sounds.sendSound(character, character.getAttackSound());
     }
 }
-

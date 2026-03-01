@@ -6,6 +6,8 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { HitDamage } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitDamage");
 const { HitMask } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitMask");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { NpcIds, ObjectIds, ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
@@ -228,6 +230,7 @@ module.exports = {
           npc.forceChat("What do you think you're doing?");
           npc.performAnimation(NPC_ATTACK_ANIMATION);
           player.getPacketSender().sendMessage("You fail to pick the pocket.");
+          Sounds.sendSound(player, Sound.THIEVING_STUNNED);
           CombatFactory.stun(player, def.stunTime, true);
           player
             .getCombat()
