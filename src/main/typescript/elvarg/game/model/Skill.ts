@@ -1,5 +1,3 @@
-import { Misc } from '../../util/Misc';
-
 export class Skill {
     // Must be initialized before any static Skill instances are constructed.
     // If declared after ATTACK/DEFENCE/etc, indices become NaN and all skill
@@ -54,6 +52,31 @@ export class Skill {
         Skill.RUNECRAFTING,
         Skill.CONSTRUCTION,
         Skill.HUNTER,
+    ];
+    private static readonly NAMES: readonly string[] = [
+        "Attack",
+        "Defence",
+        "Strength",
+        "Hitpoints",
+        "Ranged",
+        "Prayer",
+        "Magic",
+        "Cooking",
+        "Woodcutting",
+        "Fletching",
+        "Fishing",
+        "Firemaking",
+        "Crafting",
+        "Smithing",
+        "Mining",
+        "Herblore",
+        "Agility",
+        "Thieving",
+        "Slayer",
+        "Farming",
+        "Runecrafting",
+        "Construction",
+        "Hunter",
     ];
 
     private static readonly ALLOWED_TO_SET_LEVELS: ReadonlySet<Skill> = new Set([
@@ -149,6 +172,6 @@ export class Skill {
     @return The {@link Skill}'s name in a suitable format.
     */
     public getName(): string {
-        return Misc.FORMATTER.format(this.toString().toLowerCase());
+        return Skill.NAMES[this.index] ?? "Skill";
     }
 }

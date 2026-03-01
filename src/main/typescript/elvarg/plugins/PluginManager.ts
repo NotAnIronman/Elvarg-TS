@@ -8,6 +8,7 @@ import {
   PluginCanDrinkEvent,
   PluginCanEatEvent,
   PluginCanEquipEvent,
+  PluginFiremakingBlockedEvent,
   PluginCanTeleportEvent,
   PluginGroundItemInteractionEvent,
   PluginItemActionEvent,
@@ -22,6 +23,7 @@ import {
   PluginPlayerDefeatedEvent,
   PluginPathBlockedEvent,
   PluginPlayerProcessEvent,
+  PluginPlayerLevelUpEvent,
   PluginPlayerPathBlockedEvent,
   PluginPacketEvent,
   PluginCommandEvent,
@@ -60,6 +62,7 @@ export class PluginManager {
   private static disconnectHooks: PluginHook<PluginPlayerDisconnectEvent>[] = [];
   private static logoutHooks: PluginHook<PluginPlayerLogoutEvent>[] = [];
   private static playerProcessHooks: PluginHook<PluginPlayerProcessEvent>[] = [];
+  private static playerLevelUpHooks: PluginHook<PluginPlayerLevelUpEvent>[] = [];
   private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
@@ -68,6 +71,7 @@ export class PluginManager {
   private static canAttackHooks: PluginHook<PluginCanAttackEvent>[] = [];
   private static canTeleportHooks: PluginHook<PluginCanTeleportEvent>[] = [];
   private static canEatHooks: PluginHook<PluginCanEatEvent>[] = [];
+  private static firemakingBlockedHooks: PluginHook<PluginFiremakingBlockedEvent>[] = [];
   private static canDrinkHooks: PluginHook<PluginCanDrinkEvent>[] = [];
   private static canTradeHooks: PluginHook<PluginCanTradeEvent>[] = [];
   private static canEquipHooks: PluginHook<PluginCanEquipEvent>[] = [];
@@ -231,6 +235,19 @@ export class PluginManager {
     }
   }
 
+  public static emitPlayerLevelUp(event: PluginPlayerLevelUpEvent): void {
+    for (const hook of PluginManager.playerLevelUpHooks) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] player_level_up hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+  }
+
   public static emitRegionLoaded(event: PluginRegionLoadedEvent): void {
     for (const hook of PluginManager.regionLoadedHooks) {
       try {
@@ -365,6 +382,29 @@ export class PluginManager {
       }
     }
     return null;
+  }
+
+  public static emitFiremakingBlocked(
+    event: PluginFiremakingBlockedEvent
+  ): boolean {
+    if (!event || !event.player || event.handled) {
+      return false;
+    }
+
+    for (const hook of PluginManager.firemakingBlockedHooks) {
+      if (event.handled) {
+        break;
+      }
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(
+          `[plugins] firemaking_blocked hook failed (${hook.pluginName})`,
+          err
+        );
+      }
+    }
+    return event.handled === true;
   }
 
   public static emitCanDrink(player: any, itemId: number): boolean | null {
@@ -1028,6 +1068,26 @@ export class PluginManager {
           },
         });
       },
+      onPlayerLevelUp: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerLevelUpHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !event.skill ||
+              !Number.isInteger(event.oldLevel) ||
+              !Number.isInteger(event.newLevel)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onRegionLoaded: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -1157,6 +1217,20 @@ export class PluginManager {
               !event.player ||
               !Number.isInteger(event.itemId)
             ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onFiremakingBlocked: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.firemakingBlockedHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.location) {
               return;
             }
             handler(event);

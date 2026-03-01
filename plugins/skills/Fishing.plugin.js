@@ -266,6 +266,9 @@ module.exports = {
     api.onPlayerDisconnect(({ player }) => {
       stopFishing(activeSessions, player, false);
     });
+    api.onPlayerLevelUp(({ player }) => {
+      stopFishing(activeSessions, player, false);
+    });
 
     api.onNpcInteraction((event) => {
       const started = startFishing(

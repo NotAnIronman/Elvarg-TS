@@ -234,6 +234,9 @@ module.exports = {
     api.onPlayerDisconnect(({ player }) => {
       stopMining(activeSessions, player, false);
     });
+    api.onPlayerLevelUp(({ player }) => {
+      stopMining(activeSessions, player, false);
+    });
 
     api.onObjectFirstClick([...ROCK_BY_OBJECT_ID.keys()], (event) => {
       const rock = ROCK_BY_OBJECT_ID.get(event.objectId);

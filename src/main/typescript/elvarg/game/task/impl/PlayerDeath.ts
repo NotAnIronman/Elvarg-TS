@@ -1,5 +1,4 @@
 import { GameConstants } from "../../GameConstants";
-import { ItemsKeptOnDeath } from "../../content/ItemsKeptOnDeath";
 import { CombatFactory } from "../../content/combat/CombatFactory";
 import { Emblem } from "../../content/combat/bountyhunter/Emblem";
 import { Presetables } from "../../content/presets/Presetables";
@@ -9,6 +8,7 @@ import { Player } from "../../entity/impl/player/Player";
 import { PlayerRights } from "../../model/rights/PlayerRights";
 import { Task } from "../Task";
 import { Item } from "../../model/Item";
+import { SkullType } from "../../model/SkullType";
 import { PrayerHandler } from "../../content/PrayerHandler";
 import { Location } from "../../model/Location";
 import { BrokenItem } from "../../model/BrokenItem";
@@ -47,7 +47,7 @@ export class PlayerDeathTask extends Task {
                     }
                     const droppedItems: Item[] = [];
                     if (this.loseItems) {
-                        const itemsToKeep = ItemsKeptOnDeath.getItemsToKeep(this.player);
+                        const itemsToKeep = PlayerDeathTask.getItemsToKeep(this.player);
                         this.itemsToKeep = Array.isArray(itemsToKeep) ? itemsToKeep : [];
                         const playerItems = this.player.getInventory().getValidItems().concat(this.player.getEquipment().getValidItems());
                         const position = this.player.getLocation();
@@ -209,6 +209,52 @@ export class PlayerDeathTask extends Task {
             this.player.resetAttributes();
             this.player.moveTo(GameConstants.DEFAULT_LOCATION);
         }
+    }
+
+    private static getAmountToKeep(player: Player): number {
+        if (
+            player.getSkullTimer() > 0 &&
+            player.getSkullType() == SkullType.RED_SKULL
+        ) {
+            return 0;
+        }
+        return (player.getSkullTimer() > 0 ? 0 : 3) + (PrayerHandler.isActivated(player, PrayerHandler.PROTECT_ITEM) ? 1 : 0);
+    }
+
+    private static getItemsToKeep(player: Player): Item[] {
+        const items: Item[] = [];
+        for (const item of [...player.getInventory().getItems(), ...player.getEquipment().getItems()]) {
+            if (
+                item == null ||
+                item.getId() <= 0 ||
+                item.getAmount() <= 0 ||
+                !item.getDefinition().isTradeable()
+            ) {
+                continue;
+            }
+            if (PlayerDeathTask.isMysteriousEmblem(item.getId())) {
+                continue;
+            }
+            items.push(item);
+        }
+
+        items.sort((a: Item, b: Item) => b.getDefinition().getValue() - a.getDefinition().getValue());
+        return items.slice(0, PlayerDeathTask.getAmountToKeep(player));
+    }
+
+    private static isMysteriousEmblem(itemId: number): boolean {
+        return (
+            itemId === Emblem.MYSTERIOUS_EMBLEM_1.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_2.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_3.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_4.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_5.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_6.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_7.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_8.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_9.id ||
+            itemId === Emblem.MYSTERIOUS_EMBLEM_10.id
+        );
     }
 
     private openPresetsAfterDeath(): void {

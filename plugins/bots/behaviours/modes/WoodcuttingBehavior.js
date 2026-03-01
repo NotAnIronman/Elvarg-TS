@@ -1,22 +1,22 @@
 const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
-const { ItemOnGroundManager } = require("../../../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
-const { Item } = require("../../../../src/main/typescript/elvarg/game/model/Item");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag");
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
+const { setModeFiremaking } = require("../state/PlayerBotState");
 const {
   queueRouteAndFlagAppearance,
   randomInRange,
 } = require("../navigation/BotNavigation");
 const Woodcutting = require("../../../skills/Woodcutting.plugin");
+const {Item} = require("../../../../src/main/typescript/elvarg/game/model/Item");
 
 const RETRY_SEARCH_MS = 1500;
 const WALK_COMMAND_COOLDOWN_MS = 900;
-const DROP_LOGS_COOLDOWN_MS = 300;
 const MAX_NEXT_TREE_DISTANCE_TILES = 10;
+const MAX_TREE_TARGET_DISTANCE_TILES = 18;
 const TREE_SEARCH_REGION_RADIUS = 1;
 const SEARCH_WALK_ATTEMPTS = 12;
 const SEARCH_TREE_VISIBILITY_RADIUS_TILES = 18;
@@ -28,6 +28,14 @@ class WoodcuttingBehavior {
     this.api = api;
     this.behaviorMode = options.behaviorMode;
     this.searchWalkRadius = options.botWalkRadius ?? 6;
+    this.treeTierByObjectId = new Map();
+    for (const tree of Woodcutting.TREES) {
+      for (const objectId of tree.objectIds ?? []) {
+        if (!this.treeTierByObjectId.has(objectId)) {
+          this.treeTierByObjectId.set(objectId, tree);
+        }
+      }
+    }
   }
 
   tick(context) {
@@ -52,11 +60,15 @@ class WoodcuttingBehavior {
     }
 
     if (player.getInventory().isFull()) {
-      const dropped = this.dropAllWoodcuttingLogs(player);
-      state.woodcutting.nextActionAt = nowMs + DROP_LOGS_COOLDOWN_MS;
-      if (dropped) {
-        this.api.log("woodcutting_drop_logs", { username: player.getUsername() });
+      setModeFiremaking(player, state, this.behaviorMode);
+      if (state.firemaking) {
+        state.firemaking.nextActionAt = nowMs;
       }
+      this.api.log("bot_mode_switch", {
+        username: player.getUsername(),
+        mode: this.behaviorMode.FIREMAKING,
+        reason: "inventory_full_logs",
+      });
       return "running";
     }
 
@@ -108,11 +120,32 @@ class WoodcuttingBehavior {
         return "running";
       }
 
+      const distanceToTarget = this.getDistanceToTree(player, targetTree);
+      if (distanceToTarget > MAX_TREE_TARGET_DISTANCE_TILES) {
+        state.woodcutting.target = null;
+        if (this.queueSearchWalk(player, state)) {
+          state.woodcutting.nextActionAt = nowMs + WALK_COMMAND_COOLDOWN_MS;
+        } else {
+          state.woodcutting.nextActionAt = nowMs + RETRY_SEARCH_MS;
+        }
+        state.woodcutting.nextSearchAt = nowMs + RETRY_SEARCH_MS;
+        this.api.log("woodcutting_target_too_far", {
+          username: player.getUsername(),
+          targetX: targetTree.getLocation().getX(),
+          targetY: targetTree.getLocation().getY(),
+          targetZ: targetTree.getLocation().getZ(),
+          distance: distanceToTarget,
+          maxDistance: MAX_TREE_TARGET_DISTANCE_TILES,
+        });
+        return "running";
+      }
+
       // If the next available tree is too far away, keep waiting at the
       // previous tree location for its respawn instead of running off.
       if (
         state.woodcutting.target &&
-        this.getDistanceToTree(player, targetTree) > MAX_NEXT_TREE_DISTANCE_TILES
+        distanceToTarget > MAX_NEXT_TREE_DISTANCE_TILES &&
+        !this.isLowerTierFallbackTarget(state.woodcutting.target, targetTree)
       ) {
         state.woodcutting.nextActionAt = nowMs + RETRY_SEARCH_MS;
         state.woodcutting.nextSearchAt = nowMs + RETRY_SEARCH_MS;
@@ -242,25 +275,6 @@ class WoodcuttingBehavior {
     return axe;
   }
 
-  dropAllWoodcuttingLogs(player) {
-    const inventory = player.getInventory();
-    let droppedAny = false;
-    for (const logId of Woodcutting.TREE_LOG_IDS) {
-      const amount = inventory.getAmount(logId);
-      if (amount <= 0) {
-        continue;
-      }
-      inventory.delete(logId, amount);
-      ItemOnGroundManager.registerLocation(
-        player,
-        new Item(logId, amount),
-        player.getLocation().clone()
-      );
-      droppedAny = true;
-    }
-    return droppedAny;
-  }
-
   resolveTargetTreeObject(player, state) {
     const target = state?.woodcutting?.target;
     if (!target) {
@@ -276,6 +290,18 @@ class WoodcuttingBehavior {
       return Number.MAX_SAFE_INTEGER;
     }
     return player.getLocation().getDistance(treeObject.getLocation());
+  }
+
+  isLowerTierFallbackTarget(previousTarget, nextTreeObject) {
+    if (!previousTarget || !nextTreeObject) {
+      return false;
+    }
+    const previousTier = this.treeTierByObjectId.get(previousTarget.objectId);
+    const nextTier = this.treeTierByObjectId.get(nextTreeObject.getId());
+    if (!previousTier || !nextTier) {
+      return false;
+    }
+    return nextTier.requiredLevel < previousTier.requiredLevel;
   }
 
   queueSearchWalk(player, state) {

@@ -10,6 +10,7 @@ const { BotReadyConditionNode } = require("../nodes/conditions/BotReadyCondition
 const { RoamingBehavior } = require("../modes/RoamingBehavior");
 const { SparringBehavior } = require("../modes/SparringBehavior");
 const { WoodcuttingBehavior } = require("../modes/WoodcuttingBehavior");
+const { FiremakingBehavior } = require("../modes/FiremakingBehavior");
 
 class PlayerBotBehaviorTreeFactory {
   constructor(botStatesByName, api, options) {
@@ -32,6 +33,9 @@ class PlayerBotBehaviorTreeFactory {
     this.woodcuttingBehavior = new WoodcuttingBehavior(botStatesByName, api, {
       behaviorMode: this.behaviorMode,
       botWalkRadius: this.botWalkRadius,
+    });
+    this.firemakingBehavior = new FiremakingBehavior(botStatesByName, api, {
+      behaviorMode: this.behaviorMode,
     });
   }
 
@@ -61,6 +65,14 @@ class PlayerBotBehaviorTreeFactory {
           requiredMode: this.behaviorMode.WOODCUTTING,
         }),
         new ActionNode((context) => this.woodcuttingBehavior.tick(context)),
+      ]),
+      new SequenceNode([
+        new BotReadyConditionNode(this.botStatesByName, {
+          requiredMode: this.behaviorMode.FIREMAKING,
+          requireNotBusy: false,
+          requireNotInCombat: false,
+        }),
+        new ActionNode((context) => this.firemakingBehavior.tick(context)),
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {

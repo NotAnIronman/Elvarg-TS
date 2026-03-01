@@ -6,8 +6,10 @@ const { Location } = require("../../src/main/typescript/elvarg/game/model/Locati
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
+const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
+const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
 
@@ -46,6 +48,7 @@ const LIGHTABLE_LOGS = [
 const LIGHTABLE_LOGS_BY_ID = new Map(
   LIGHTABLE_LOGS.map((log) => [log.itemId, log])
 );
+let activeSessionsRef = null;
 
 function randomIntInclusive(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -57,6 +60,10 @@ function getFiremakingLevel(player) {
 
 function getFiremakingMaxLevel(player) {
   return player.getSkillManager().getMaxLevel(Skill.FIREMAKING);
+}
+
+function requiresTinderbox(player) {
+  return !(player?.isPlayerBot?.() === true);
 }
 
 function stopFiremaking(activeSessions, player, resetAnimation = true) {
@@ -74,9 +81,21 @@ function canLightFireAt(player, location) {
     return false;
   }
   if (ObjectManager.existsLocation(location)) {
-    player
-      .getPacketSender()
-      .sendMessage("You cannot light a fire here. Try moving around a bit.");
+    const handled = PluginManager.emitFiremakingBlocked({
+      player,
+      location: {
+        x: location.getX(),
+        y: location.getY(),
+        z: location.getZ(),
+      },
+      reason: "tile_blocked",
+      handled: false,
+    });
+    if (!handled) {
+      player
+        .getPacketSender()
+        .sendMessage("You cannot light a fire here. Try moving around a bit.");
+    }
     return false;
   }
   return true;
@@ -185,7 +204,11 @@ function startFiremakingAttempt(player, log, source, activeSessions) {
   }
 
   const inventory = player.getInventory();
-  if (source.mode !== SESSION_MODE.BONFIRE && !inventory.contains(TINDERBOX_ID)) {
+  if (
+    source.mode !== SESSION_MODE.BONFIRE &&
+    requiresTinderbox(player) &&
+    !inventory.contains(TINDERBOX_ID)
+  ) {
     player.getPacketSender().sendMessage("You need a tinderbox to light fires.");
     return false;
   }
@@ -331,7 +354,11 @@ function processFiremakingTick(activeSessions, currentTick) {
       continue;
     }
 
-    if (state.mode !== SESSION_MODE.BONFIRE && !player.getInventory().contains(TINDERBOX_ID)) {
+    if (
+      state.mode !== SESSION_MODE.BONFIRE &&
+      requiresTinderbox(player) &&
+      !player.getInventory().contains(TINDERBOX_ID)
+    ) {
       player.getPacketSender().sendMessage("You need a tinderbox to light fires.");
       stopFiremaking(activeSessions, player);
       continue;
@@ -536,10 +563,54 @@ function handleItemOnObject(event, activeSessions) {
   }
 }
 
+function startBotInventoryFiremaking(player, preferredLogId = null) {
+  if (!player || !activeSessionsRef) {
+    return false;
+  }
+  const inventory = player.getInventory?.();
+  if (!inventory) {
+    return false;
+  }
+
+  let log = null;
+  if (preferredLogId != null) {
+    log = LIGHTABLE_LOGS_BY_ID.get(preferredLogId) ?? null;
+    if (log && !inventory.contains(log.itemId)) {
+      log = null;
+    }
+  }
+  if (!log) {
+    for (const candidate of LIGHTABLE_LOGS) {
+      if (inventory.contains(candidate.itemId)) {
+        log = candidate;
+        break;
+      }
+    }
+  }
+  if (!log) {
+    return false;
+  }
+
+  return startFiremakingAttempt(
+    player,
+    log,
+    { mode: SESSION_MODE.INVENTORY },
+    activeSessionsRef
+  );
+}
+
 module.exports = {
   name: "Firemaking",
+  startBotInventoryFiremaking,
+  isFiremakingActive(player) {
+    return !!(activeSessionsRef && player && activeSessionsRef.has(player));
+  },
+  isWoodcuttingLog(itemId) {
+    return LIGHTABLE_LOGS_BY_ID.has(itemId);
+  },
   register(api) {
     const activeSessions = new Map();
+    activeSessionsRef = activeSessions;
 
     // If plugins are hot-reloaded in the same process, ensure no runtime fires linger.
     // Static map fires are not stored in World.getObjects(), so this only clears
@@ -559,6 +630,9 @@ module.exports = {
     TaskManager.submit(new FiremakingTask(activeSessions));
 
     api.onPlayerDisconnect(({ player }) => {
+      stopFiremaking(activeSessions, player, false);
+    });
+    api.onPlayerLevelUp(({ player }) => {
       stopFiremaking(activeSessions, player, false);
     });
 

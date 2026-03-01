@@ -5,7 +5,6 @@ import { BonusManager } from "../../../game/model/equipment/BonusManager";
 import { FightType } from "../../../game/content/combat/FightType";
 import { PrayerHandler } from "../../../game/content/PrayerHandler";
 // import { Emotes } from '../../../game/content/Emotes';
-// import { ItemsKeptOnDeath } from '../../../game/content/ItemsKeptOnDeath';
 // import { PrayerHandler } from '../../../game/content/PrayerHandler';
 // import { ClanChatManager } from '../../../game/content/clan/ClanChatManager';
 // import { WeaponInterfaces } from '../../../game/content/combat/WeaponInterfaces';
@@ -41,7 +40,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
   private static readonly LOGOUT: number = 2458;
   private static readonly TOGGLE_RUN_ENERGY_ORB: number = 1050;
   private static readonly TOGGLE_RUN_ENERGY_SETTINGS: number = 42507;
-  private static readonly OPEN_ITEMS_KEPT_ON_DEATH_SCREEN: number = 27654;
   private static readonly TOGGLE_AUTO_RETALIATE_328: number = 24115;
   private static readonly TOGGLE_AUTO_RETALIATE_425: number = 24041;
   private static readonly TOGGLE_AUTO_RETALIATE_3796: number = 24033;
@@ -221,13 +219,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
           player.getPacketSender().sendInterfaceRemoval();
         }
         player.getPacketSender().sendInterface(53000);
-        break;
-
-      case ButtonClickPacketListener.OPEN_ITEMS_KEPT_ON_DEATH_SCREEN:
-        if (player.busy()) {
-          player.getPacketSender().sendInterfaceRemoval();
-        }
-        // ItemsKeptOnDeath.open(player);
         break;
 
       case ButtonClickPacketListener.TRADE_ACCEPT_BUTTON_1:

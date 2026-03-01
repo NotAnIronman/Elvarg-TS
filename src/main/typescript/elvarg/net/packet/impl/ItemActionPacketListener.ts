@@ -3,7 +3,6 @@ import { Packet } from "../Packet";
 import { PluginManager } from "../../../plugins/PluginManager";
 // import { Player } from "../../../game/entity/impl/player/Player";
 // import { Barricades } from "../../../game/entity/impl/npc/impl/Barricades";
-// import { Food } from "../../../game/content/Food";
 // import { TeleportHandler } from "../../../game/model/teleportation/TeleportHandler";
 // import { TeleportTablets } from '../../../game/model/teleportation/TeleportTablets'
 // import { TeleportType } from "../../../game/model/teleportation/TeleportType";
@@ -249,11 +248,6 @@ export class ItemActionPacketListener implements PacketExecutor {
 
     // // Prayer
     // if (Prayer.buryBone(player, itemId)) {
-    //     return;
-    // }
-
-    // // Eating food..
-    // if (Food.consume(player, itemId, slot)) {
     //     return;
     // }
 

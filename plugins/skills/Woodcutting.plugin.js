@@ -615,6 +615,9 @@ module.exports = {
     api.onPlayerDisconnect(({ player }) => {
       stopWoodcutting(activeSessions, player, false);
     });
+    api.onPlayerLevelUp(({ player }) => {
+      stopWoodcutting(activeSessions, player, false);
+    });
 
     api.onItemFirstAction((event) => {
       if (searchBirdNest(event.player, event.itemId)) {

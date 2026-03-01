@@ -24,7 +24,6 @@ import { TaskManager } from "../../../task/TaskManager";
 import { World } from "../../../World";
 import { HitDamage } from "../../combat/hit/HitDamage";
 import { HitMask } from "../../combat/hit/HitMask";
-import { Edible, Food } from "../../Food";
 import { Minigame } from "../Minigame";
 import { Location } from "../../../model/Location";
 import { CountdownTask } from "../../../task/impl/CountdownTask";
@@ -33,6 +32,7 @@ import { ObjectIdentifiers } from "../../../../util/ObjectIdentifiers";
 import { Animation } from "../../../model/Animation";
 import { cloneDeep } from 'lodash';
 import { TaskType } from "../../../task/TaskType";
+import { ItemIds } from "../../../../util/IdEnums";
 
 
 
@@ -79,6 +79,45 @@ enum CatapultState {
     BURNING,
     REPAIR
 }
+
+const CASTLE_WARS_FOOD_IDS: number[] = [
+    ItemIds.KEBAB,
+    ItemIds.CHEESE,
+    ItemIds.CAKE,
+    ItemIds._2_3_CAKE,
+    ItemIds.SLICE_OF_CAKE,
+    ItemIds.NULL_2422,
+    ItemIds.JANGERBERRIES,
+    ItemIds.WORM_CRUNCHIES,
+    ItemIds.EDIBLE_SEAWEED,
+    ItemIds.ANCHOVIES,
+    ItemIds.SHRIMPS,
+    ItemIds.SARDINE,
+    ItemIds.COD,
+    ItemIds.TROUT,
+    ItemIds.PIKE,
+    ItemIds.SALMON,
+    ItemIds.TUNA,
+    ItemIds.LOBSTER,
+    ItemIds.BASS,
+    ItemIds.SWORDFISH,
+    ItemIds.MEAT_PIZZA,
+    ItemIds.MONKFISH,
+    ItemIds.SHARK,
+    ItemIds.SEA_TURTLE,
+    ItemIds.DARK_CRAB,
+    ItemIds.MANTA_RAY,
+    ItemIds.COOKED_KARAMBWAN,
+    ItemIds.ANGLERFISH,
+    ItemIds.POTATO,
+    ItemIds.BAKED_POTATO,
+    ItemIds.POTATO_WITH_BUTTER,
+    ItemIds.CHILLI_POTATO,
+    ItemIds.EGG_POTATO,
+    ItemIds.POTATO_WITH_CHEESE,
+    ItemIds.MUSHROOM_POTATO,
+    ItemIds.TUNA_POTATO,
+];
 
 
 
@@ -262,8 +301,7 @@ Booleans to check if a team's flag is safe
             return;
         }
 
-        const foodIds = Edible.getTypes();
-        if (player.getEquipment().containsAny(foodIds)) {
+        if (player.getEquipment().containsAny(CASTLE_WARS_FOOD_IDS)) {
             player.getPacketSender().sendMessage("You may not bring your own consumables inside of Castle Wars.");
             return;
         }

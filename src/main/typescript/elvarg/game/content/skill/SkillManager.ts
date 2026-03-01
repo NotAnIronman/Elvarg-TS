@@ -12,6 +12,7 @@ import { BountyHunter } from "../combat/bountyhunter/BountyHunter";
 import { GameObject } from "../../entity/impl/object/GameObject";
 import { EnteredAmountAction } from "../../model/EnteredAmountAction";
 import { Wilderness } from "../wilderness/Wilderness";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 
 class SkillEntered implements EnteredAmountAction {
@@ -169,9 +170,15 @@ export class SkillManager {
         // Handle level up..
         if (newLevel > startingLevel) {
             let level = newLevel - startingLevel;
-            let skillName = skill.toString().toLowerCase().charAt(0).toUpperCase() + skill.toString().toLowerCase().slice(1);
+            let skillName = skill.getName();
             this.skills.maxLevel[skill.getIndex()] += level;
             this.stopSkillable(); // Stop skilling on level up like osrs
+            PluginManager.emitPlayerLevelUp({
+                player: this.player,
+                skill,
+                oldLevel: startingLevel,
+                newLevel: this.skills.maxLevel[skill.getIndex()],
+            });
             this.setCurrentLevels(skill, this.skills.maxLevel[skill.getIndex()]);
             this.player.getPacketSender().sendInterfaceRemoval();
             this.player.getPacketSender().sendString("Congratulations! You have achieved a " + skillName + " level!", 4268);

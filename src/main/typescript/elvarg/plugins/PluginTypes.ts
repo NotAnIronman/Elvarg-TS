@@ -29,6 +29,13 @@ export interface PluginPlayerProcessEvent {
   player: any;
 }
 
+export interface PluginPlayerLevelUpEvent {
+  player: any;
+  skill: any;
+  oldLevel: number;
+  newLevel: number;
+}
+
 export interface PluginRegionLoadedEvent {
   regionId: number;
   absX: number;
@@ -96,6 +103,13 @@ export interface PluginCanEatEvent {
   player: any;
   itemId: number;
   allow: boolean | null;
+}
+
+export interface PluginFiremakingBlockedEvent {
+  player: any;
+  location: { x: number; y: number; z: number };
+  reason: string;
+  handled: boolean;
 }
 
 export interface PluginCanDrinkEvent {
@@ -264,6 +278,7 @@ export interface PluginApi {
   onPlayerDisconnect(handler: (event: PluginPlayerDisconnectEvent) => void): void;
   onPlayerLogout(handler: (event: PluginPlayerLogoutEvent) => void): void;
   onPlayerProcess(handler: (event: PluginPlayerProcessEvent) => void): void;
+  onPlayerLevelUp(handler: (event: PluginPlayerLevelUpEvent) => void): void;
   onRegionLoaded(handler: (event: PluginRegionLoadedEvent) => void): void;
   onPathBlocked(handler: (event: PluginPathBlockedEvent) => void): void;
   onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
@@ -273,6 +288,9 @@ export interface PluginApi {
   onCanAttack(handler: (event: PluginCanAttackEvent) => void): void;
   onCanTeleport(handler: (event: PluginCanTeleportEvent) => void): void;
   onCanEat(handler: (event: PluginCanEatEvent) => void): void;
+  onFiremakingBlocked(
+    handler: (event: PluginFiremakingBlockedEvent) => void
+  ): void;
   onCanDrink(handler: (event: PluginCanDrinkEvent) => void): void;
   onCanTrade(handler: (event: PluginCanTradeEvent) => void): void;
   onCanEquip(handler: (event: PluginCanEquipEvent) => void): void;

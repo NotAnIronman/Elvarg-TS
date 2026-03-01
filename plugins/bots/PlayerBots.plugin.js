@@ -1,7 +1,11 @@
+const fs = require("fs");
+const path = require("path");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
+const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
+const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
@@ -9,13 +13,14 @@ const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { BotController } = require("../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { createTraversalAssist } = require("./lib/TraversalAssist");
-const { randomInRange } = require("./behaviours/navigation/BotNavigation");
+const { queueRouteAndFlagAppearance, randomInRange } = require("./behaviours/navigation/BotNavigation");
 const { createSpawnOffsets, spawnLocationForIndex } = require("./behaviours/spawn/BotSpawnLayout");
 const { createBotPlayer } = require("./behaviours/spawn/BotPlayerFactory");
 const {
   clearFollowState,
   createInitialState,
   resetMovementState,
+  setModeFiremaking,
   setModeRoaming,
   setModeWoodcutting,
 } = require("./behaviours/state/PlayerBotState");
@@ -36,8 +41,8 @@ const DITCH_ATTEMPT_COOLDOWN_MS = 1200;
 const DITCH_TRANSITION_TIMEOUT_MS = 15000;
 const DITCH_POST_CROSS_RETRY_DELAY_MS = 0;
 const ENDPOINT_LINGER_MS = 500;
-const BLOCKED_RETARGET_MIN_DELAY_MS = 120;
-const BLOCKED_RETARGET_MAX_DELAY_MS = 320;
+const BLOCKED_RETARGET_MIN_DELAY_MS = 450;
+const BLOCKED_RETARGET_MAX_DELAY_MS = 900;
 const BOT_SPAWN_RADIUS = 14;
 const BOT_SPAWN_MIN_DISTANCE = 2;
 const BOT_SPAWN_MAX_ATTEMPTS = 80;
@@ -62,6 +67,7 @@ const AUTO_MODE_SPARRING_WEIGHT = 0.15;
 const BOT_BEHAVIOR_MODE = Object.freeze({
   ROAMING: "roaming",
   WOODCUTTING: "woodcutting",
+  FIREMAKING: "firemaking",
   SPARRING: "sparring",
   FOLLOW_BACK: "follow_back",
   RETURN_HOME: "return_home",
@@ -69,9 +75,11 @@ const BOT_BEHAVIOR_MODE = Object.freeze({
 const ASSIGNABLE_BEHAVIORS = Object.freeze({
   roaming: BOT_BEHAVIOR_MODE.ROAMING,
   woodcutting: BOT_BEHAVIOR_MODE.WOODCUTTING,
+  firemaking: BOT_BEHAVIOR_MODE.FIREMAKING,
 });
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
+const PLAYER_BOTS_LOG_PATH = path.join(process.cwd(), "logs", "player-bots.log");
 const MANUAL_CONTROL_PACKET_OPCODES = new Set([
   PacketConstants.COMMAND_MOVEMENT_OPCODE,
   PacketConstants.GAME_MOVEMENT_OPCODE,
@@ -126,11 +134,39 @@ class FlashHintArrowTask extends Task {
 module.exports = {
   name: "PlayerBots",
   register(api) {
-    const traversalAssist = createTraversalAssist(api, {
+    const writeBotLog = (message, extra) => {
+      try {
+        const timestamp = new Date().toISOString();
+        const suffix =
+          extra && Object.keys(extra).length > 0
+            ? ` ${JSON.stringify(extra)}`
+            : "";
+        fs.appendFileSync(PLAYER_BOTS_LOG_PATH, `[${timestamp}] ${message}${suffix}\n`);
+      } catch (_) {
+        // Keep bot behavior running even if file logging fails.
+      }
+    };
+    const botApi = Object.create(api);
+    botApi.log = (message, extra) => {
+      api.log(message, extra);
+      writeBotLog(message, extra);
+    };
+    try {
+      fs.mkdirSync(path.dirname(PLAYER_BOTS_LOG_PATH), { recursive: true });
+      fs.writeFileSync(PLAYER_BOTS_LOG_PATH, "");
+      writeBotLog("log_reset");
+    } catch (err) {
+      api.log("bot_log_init_failed", {
+        path: PLAYER_BOTS_LOG_PATH,
+        error: String(err?.message ?? err),
+      });
+    }
+
+    const traversalAssist = createTraversalAssist(botApi, {
       objectIds: [WILDERNESS_DITCH_OBJECT_ID],
     });
     const traversalService = new DitchTraversalService({
-      api,
+      api: botApi,
       traversalAssist,
       objectId: WILDERNESS_DITCH_OBJECT_ID,
       emitObjectInteraction: (interaction) =>
@@ -149,7 +185,7 @@ module.exports = {
     const playerBotUsernames = new Set();
     const entries = [];
     const entriesByUsername = new Map();
-    const treeFactory = new PlayerBotBehaviorTreeFactory(botStatesByName, api, {
+    const treeFactory = new PlayerBotBehaviorTreeFactory(botStatesByName, botApi, {
       behaviorMode: BOT_BEHAVIOR_MODE,
       endpointLingerMs: ENDPOINT_LINGER_MS,
       followRepathIntervalMs: FOLLOW_REPATH_INTERVAL_MS,
@@ -160,7 +196,7 @@ module.exports = {
     const pathBlockedHandler = new PathBlockedHandler({
       botStatesByName,
       traversalService,
-      api,
+      api: botApi,
       options: {
         behaviorMode: BOT_BEHAVIOR_MODE,
         followBlockedRetryMs: FOLLOW_BLOCKED_RETRY_MS,
@@ -172,7 +208,7 @@ module.exports = {
     const followBackTrigger = new FollowBackTrigger({
       botStatesByName,
       playerBotUsernames,
-      api,
+      api: botApi,
       options: {
         behaviorMode: BOT_BEHAVIOR_MODE,
         followBackDurationMs: FOLLOW_BACK_DURATION_MS,
@@ -203,7 +239,7 @@ module.exports = {
       }
       TaskManager.submit(
         new BotBehaviorTask(entries, traversalService, BOT_DECISION_TICKS, {
-          api,
+          api: botApi,
           behaviorMode: BOT_BEHAVIOR_MODE,
           roamWeight: AUTO_MODE_ROAM_WEIGHT,
           woodcuttingWeight: AUTO_MODE_WOODCUTTING_WEIGHT,
@@ -226,6 +262,30 @@ module.exports = {
 
     function hasControllerForUsername(username) {
       return !!username && entriesByUsername.has(username);
+    }
+
+    function findNearbyLightableTile(player, radius = 2, attempts = 18) {
+      if (!player) {
+        return null;
+      }
+      const loc = player.getLocation();
+      const baseX = loc.getX();
+      const baseY = loc.getY();
+      const z = loc.getZ();
+      for (let i = 0; i < attempts; i++) {
+        const dx = randomInRange(-radius, radius);
+        const dy = randomInRange(-radius, radius);
+        if (dx === 0 && dy === 0) {
+          continue;
+        }
+        const x = baseX + dx;
+        const y = baseY + dy;
+        const candidate = new Location(x, y, z);
+        if (!ObjectManager.existsLocation(candidate)) {
+          return { x, y, z };
+        }
+      }
+      return null;
     }
 
     function addEntry(username, entry) {
@@ -328,7 +388,7 @@ module.exports = {
         spawned++;
       }
 
-      api.log("spawn_complete", { spawned, configured: BOT_COUNT });
+      botApi.log("spawn_complete", { spawned, configured: BOT_COUNT });
       ensureBehaviorTaskStarted();
     };
 
@@ -422,7 +482,7 @@ module.exports = {
           .sendMessage(
             "botme enabled: your character is running PlayerBots behavior."
           );
-        api.log("botme_enabled", { username: player.getUsername() });
+        botApi.log("botme_enabled", { username: player.getUsername() });
         return true;
       }
 
@@ -435,7 +495,7 @@ module.exports = {
         player
           .getPacketSender()
           .sendMessage("botme disabled: your character is no longer bot-driven.");
-        api.log("botme_disabled", { username: player.getUsername() });
+        botApi.log("botme_disabled", { username: player.getUsername() });
         return true;
       }
 
@@ -458,7 +518,7 @@ module.exports = {
       if (!usernameArg || !behaviorArg) {
         player
           .getPacketSender()
-          .sendMessage("Usage: ::bh <username> <roaming|woodcutting>");
+          .sendMessage("Usage: ::bh <username> <roaming|woodcutting|firemaking>");
         return true;
       }
 
@@ -466,7 +526,7 @@ module.exports = {
       if (!normalizedBehavior) {
         player
           .getPacketSender()
-          .sendMessage("Unknown behaviour. Supported: roaming, woodcutting");
+          .sendMessage("Unknown behaviour. Supported: roaming, woodcutting, firemaking");
         return true;
       }
 
@@ -498,6 +558,8 @@ module.exports = {
         setModeRoaming(target, state, BOT_BEHAVIOR_MODE);
       } else if (normalizedBehavior === BOT_BEHAVIOR_MODE.WOODCUTTING) {
         setModeWoodcutting(target, state, BOT_BEHAVIOR_MODE);
+      } else if (normalizedBehavior === BOT_BEHAVIOR_MODE.FIREMAKING) {
+        setModeFiremaking(target, state, BOT_BEHAVIOR_MODE);
       }
       resetMovementState(target);
       TaskManager.submit(new FlashHintArrowTask(player, target));
@@ -505,7 +567,7 @@ module.exports = {
       player
         .getPacketSender()
         .sendMessage(`bh: ${targetUsername} -> ${normalizedBehavior}`);
-      api.log("bot_behavior_assigned", {
+      botApi.log("bot_behavior_assigned", {
         assignedBy: player.getUsername(),
         target: targetUsername,
         behavior: normalizedBehavior,
@@ -518,7 +580,7 @@ module.exports = {
         try {
           GameConstants.PLAYER_PERSISTENCE.save(player);
         } catch (err) {
-          api.log("bot_persistence_save_failed_disconnect", {
+          botApi.log("bot_persistence_save_failed_disconnect", {
             username,
             error: String(err?.message ?? err),
           });
@@ -529,8 +591,45 @@ module.exports = {
       botmeUsernames.delete(username);
       playerBotUsernames.delete(username);
       if (removed) {
-        api.log("botme_auto_disabled_disconnect", { username });
+        botApi.log("botme_auto_disabled_disconnect", { username });
       }
+    });
+
+    api.onFiremakingBlocked((event) => {
+      const player = event?.player;
+      if (!player?.isPlayerBot?.()) {
+        return;
+      }
+      const username = player.getUsername?.();
+      if (!username) {
+        return;
+      }
+      const state = botStatesByName.get(username);
+      if (!state || state.mode !== BOT_BEHAVIOR_MODE.FIREMAKING) {
+        return;
+      }
+      if (player.getForceMovement?.() != null) {
+        return;
+      }
+      if (player.getMovementQueue?.()?.size?.() > 0) {
+        return;
+      }
+
+      const nextTile = findNearbyLightableTile(player);
+      if (!nextTile) {
+        return;
+      }
+      queueRouteAndFlagAppearance(player, nextTile.x, nextTile.y);
+      if (state.firemaking) {
+        state.firemaking.nextActionAt = Date.now() + 500;
+      }
+      event.handled = true;
+      botApi.log("bot_firemaking_reposition", {
+        username,
+        toX: nextTile.x,
+        toY: nextTile.y,
+        toZ: nextTile.z,
+      });
     });
 
     api.onEstablishedPacket((event) => {
@@ -554,14 +653,14 @@ module.exports = {
       player
         .getPacketSender()
         .sendMessage("botme auto-disabled due to manual input.");
-      api.log("botme_auto_disabled_manual_input", { username, opcode });
+      botApi.log("botme_auto_disabled_manual_input", { username, opcode });
     });
 
     api.onPlayerPathBlocked((event) => {
       pathBlockedHandler.handle(event, Date.now());
     });
 
-    api.log("registered", {
+    botApi.log("registered", {
       spawned,
       totalConfigured: BOT_COUNT,
       walkRadius: BOT_WALK_RADIUS,

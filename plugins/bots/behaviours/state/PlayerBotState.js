@@ -37,6 +37,12 @@ function createWoodcuttingBehaviorState() {
   };
 }
 
+function createFiremakingBehaviorState() {
+  return {
+    nextActionAt: 0,
+  };
+}
+
 function createSparringBehaviorState() {
   return {
     targetUsername: null,
@@ -71,6 +77,13 @@ function clearWoodcuttingBehaviorState(state) {
   state.woodcutting.nextSearchAt = 0;
   state.woodcutting.nextDebugChatAt = 0;
   state.woodcutting.searchTarget = null;
+}
+
+function clearFiremakingBehaviorState(state) {
+  if (!state?.firemaking) {
+    return;
+  }
+  state.firemaking.nextActionAt = 0;
 }
 
 function resetMovementState(player) {
@@ -110,6 +123,7 @@ function setModeRoaming(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearFiremakingBehaviorState(state);
   clearSparringBehaviorState(state);
 }
 
@@ -121,6 +135,7 @@ function setModeReturnHome(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearFiremakingBehaviorState(state);
   clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
 }
@@ -148,6 +163,7 @@ function setModeFollowBack(
   state.awaitingDitchTransition = null;
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearFiremakingBehaviorState(state);
   clearSparringBehaviorState(state);
   state.roaming.target = {
     x: followTarget.getLocation().getX(),
@@ -170,6 +186,20 @@ function setModeWoodcutting(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearFiremakingBehaviorState(state);
+  clearSparringBehaviorState(state);
+  state.awaitingDitchTransition = null;
+}
+
+function setModeFiremaking(player, state, behaviorMode) {
+  if (!state) {
+    return;
+  }
+  state.mode = behaviorMode.FIREMAKING;
+  clearFollowState(player, state);
+  clearRoamingBehaviorState(state);
+  clearWoodcuttingBehaviorState(state);
+  clearFiremakingBehaviorState(state);
   clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
 }
@@ -194,6 +224,7 @@ function setModeSparring(
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearFiremakingBehaviorState(state);
   clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
   if (!state.sparring) {
@@ -248,6 +279,7 @@ function createInitialState(home, behaviorMode) {
     // behavior modes (minigames, skilling, PvP) from coupling to roam fields.
     roaming: createRoamingBehaviorState(),
     woodcutting: createWoodcuttingBehaviorState(),
+    firemaking: createFiremakingBehaviorState(),
     sparring: createSparringBehaviorState(),
     autonomy: createAutonomyState(),
     followTargetUsername: null,
@@ -280,5 +312,6 @@ module.exports = {
   setModeReturnHome,
   setModeRoaming,
   setModeWoodcutting,
+  setModeFiremaking,
   teleportHome,
 };

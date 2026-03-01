@@ -138,7 +138,17 @@ class CookingTask extends Task {
       if (isSuccess(player, session.cookable)) {
         player.getInventory().addItem(new Item(session.cookable.cooked, 1));
         player.getPacketSender().sendMessage(`You cook the ${session.cookable.name}.`);
+        const levelBefore = player
+          .getSkillManager()
+          .getMaxLevel(Skill.COOKING);
         player.getSkillManager().addExperiences(Skill.COOKING, session.cookable.xp);
+        const levelAfter = player
+          .getSkillManager()
+          .getMaxLevel(Skill.COOKING);
+        if (levelAfter > levelBefore) {
+          stopCooking(this.activeSessions, player);
+          continue;
+        }
       } else {
         player.getInventory().addItem(new Item(session.cookable.burnt, 1));
         const rawName =
@@ -157,6 +167,9 @@ module.exports = {
     TaskManager.submit(new CookingTask(activeSessions));
 
     api.onPlayerDisconnect(({ player }) => {
+      stopCooking(activeSessions, player, false);
+    });
+    api.onPlayerLevelUp(({ player }) => {
       stopCooking(activeSessions, player, false);
     });
 
