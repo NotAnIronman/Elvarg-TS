@@ -18,8 +18,6 @@ const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
-const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
-const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ClanChatManager } = require("../../src/main/typescript/elvarg/game/content/clan/ClanChatManager");
@@ -526,10 +524,20 @@ module.exports = {
       }
       const id = parseIntArg(parts[1]);
       if (id === null) {
+        player.getPacketSender().sendMessage("Usage: ::sound id [volume=1] [delay=0] [loop=1]");
         return true;
       }
-      const sound = new Sound(id, null, null, null);
-      Sounds.sendSound(player, sound);
+      const volume = parts.length > 2 ? parseIntArg(parts[2]) : 1;
+      const delay = parts.length > 3 ? parseIntArg(parts[3]) : 0;
+      const loopType = parts.length > 4 ? parseIntArg(parts[4]) : 1;
+      player
+        .getPacketSender()
+        .sendSoundEffect(
+          id,
+          Number.isInteger(loopType) ? loopType : 1,
+          Number.isInteger(delay) ? delay : 0,
+          Number.isInteger(volume) ? volume : 1
+        );
       return true;
     });
 

@@ -6,6 +6,7 @@ import { Graphic } from "../../../game/model/Graphic";
 import { GraphicHeight } from "../../../game/model/GraphicHeight";
 import { Item } from "../../../game/model/Item";
 import { Location } from "../../../game/model/Location";
+import { MagicSpellbook } from "../../../game/model/MagicSpellbook";
 import { Projectile } from "../../../game/model/Projectile";
 import { Skill } from "../../../game/model/Skill";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
@@ -14,16 +15,31 @@ import { Packet } from "../Packet";
 import { PacketConstants } from "../PacketConstants";
 
 export class MagicOnItemPacketListener {
+  private static readonly LOW_ALCH_SPELL_ID = 1162;
+  private static readonly HIGH_ALCH_SPELL_ID = 1178;
+  private static readonly LOW_ALCH_LEVEL = 21;
+  private static readonly HIGH_ALCH_LEVEL = 55;
+  private static readonly LOW_ALCH_XP = 4000;
+  private static readonly HIGH_ALCH_XP = 20000;
+  private static readonly LOW_ALCH_FIRE_RUNES = 3;
+  private static readonly HIGH_ALCH_FIRE_RUNES = 5;
   private static readonly TELEKINETIC_GRAB_SPELL_ID = 1168;
   private static readonly TELEKINETIC_GRAB_LEVEL = 33;
   private static readonly TELEKINETIC_GRAB_XP = 3988;
   private static readonly TELEKINETIC_GRAB_RANGE = 15;
   private static readonly AIR_STAVES = new Set<number>([1381, 1397, 1405, 6562, 6563, 3053, 3054]);
+  private static readonly FIRE_STAVES = new Set<number>([1387, 1393, 1401, 3053, 3054]);
 
   private hasInfiniteAirRune(player: any): boolean {
     const weapon = player?.getEquipment?.()?.getWeapon?.();
     const weaponId = weapon?.getId?.() ?? -1;
     return MagicOnItemPacketListener.AIR_STAVES.has(weaponId);
+  }
+
+  private hasInfiniteFireRune(player: any): boolean {
+    const weapon = player?.getEquipment?.()?.getWeapon?.();
+    const weaponId = weapon?.getId?.() ?? -1;
+    return MagicOnItemPacketListener.FIRE_STAVES.has(weaponId);
   }
 
   private hasTelegrabRunes(player: any): boolean {
@@ -122,6 +138,72 @@ export class MagicOnItemPacketListener {
     player.getClickDelay().reset();
   }
 
+  private isAlchSpell(spellId: number): boolean {
+    return (
+      spellId === MagicOnItemPacketListener.LOW_ALCH_SPELL_ID ||
+      spellId === MagicOnItemPacketListener.HIGH_ALCH_SPELL_ID
+    );
+  }
+
+  private castAlchemy(player: any, spellId: number, item: any, itemId: number): void {
+    const inventory = player.getInventory();
+    const isHighAlch = spellId === MagicOnItemPacketListener.HIGH_ALCH_SPELL_ID;
+    const requiredLevel = isHighAlch
+      ? MagicOnItemPacketListener.HIGH_ALCH_LEVEL
+      : MagicOnItemPacketListener.LOW_ALCH_LEVEL;
+    const fireRunesRequired = isHighAlch
+      ? MagicOnItemPacketListener.HIGH_ALCH_FIRE_RUNES
+      : MagicOnItemPacketListener.LOW_ALCH_FIRE_RUNES;
+    const experience = isHighAlch
+      ? MagicOnItemPacketListener.HIGH_ALCH_XP
+      : MagicOnItemPacketListener.LOW_ALCH_XP;
+    const definition = item?.getDefinition?.();
+
+    if (player.getSkillManager().getCurrentLevel(Skill.MAGIC) < requiredLevel) {
+      player
+        .getPacketSender()
+        .sendMessage(`You need a Magic level of ${requiredLevel} to cast this spell.`);
+      return;
+    }
+    if (
+      !definition?.isTradeable?.() ||
+      !definition?.isSellable?.() ||
+      itemId === ItemIdentifiers.COINS ||
+      definition.getHighAlchValue() <= 0 ||
+      definition.getLowAlchValue() <= 0
+    ) {
+      player.getPacketSender().sendMessage("This spell can not be cast on this item.");
+      return;
+    }
+    if (!inventory.contains(ItemIdentifiers.NATURE_RUNE)) {
+      player.getPacketSender().sendMessage("You do not have the required items to cast this spell.");
+      return;
+    }
+    if (!this.hasInfiniteFireRune(player) && inventory.getAmount(ItemIdentifiers.FIRE_RUNE) < fireRunesRequired) {
+      player.getPacketSender().sendMessage("You do not have the required items to cast this spell.");
+      return;
+    }
+    if (player.getSpellbook()?.getInterfaceId?.() !== MagicSpellbook.NORMAL.getInterfaceId()) {
+      return;
+    }
+
+    inventory.deleteNumber(itemId, 1);
+    inventory.deleteNumber(ItemIdentifiers.NATURE_RUNE, 1);
+    if (!this.hasInfiniteFireRune(player)) {
+      inventory.deleteNumber(ItemIdentifiers.FIRE_RUNE, fireRunesRequired);
+    }
+
+    player.performAnimation(new Animation(712));
+    if (isHighAlch) {
+      inventory.adds(ItemIdentifiers.COINS, definition.getHighAlchValue());
+    } else {
+      inventory.adds(ItemIdentifiers.COINS, definition.getLowAlchValue());
+    }
+    player.performGraphic(new Graphic(112, GraphicHeight.HIGH));
+    player.getSkillManager().addExperiences(Skill.MAGIC, experience);
+    player.getPacketSender().sendTab(6);
+  }
+
   private findVisibleGroundItem(player: any, groundItemId: number, position: Location): any | null {
     const exact = ItemOnGroundManager.getGroundItem(player.getUsername(), groundItemId, position);
     if (exact) {
@@ -159,36 +241,13 @@ export class MagicOnItemPacketListener {
         if (!player.getClickDelay().elapsedTime(1300)) return;
         if (slot < 0 || slot >= player.getInventory().capacity()) return;
         if (player.getInventory().getItems()[slot].getId() != itemId) return;
-        // let spell = EffectSpells.forSpellId(spellId);
-        // if (!spell) {
-        //     return;
-        // }
+
+        if (!this.isAlchSpell(spellId)) {
+          return;
+        }
+
         let item = player.getInventory().getItems()[slot];
-      // switch (spell) {
-      //     case EffectSpells.LOW_ALCHEMY:
-      //     case EffectSpells.HIGH_ALCHEMY:
-      //         if (!item.getDefinition().isTradeable() || !item.getDefinition().isSellable() || item.getId() == 995
-      //                 || item.getDefinition().getHighAlchValue() <= 0 || item.getDefinition().getLowAlchValue() <= 0) {
-      //             player.getPacketSender().sendMessage("This spell can not be cast on this item.");
-      //             return;
-      //         }
-      //         if (!EffectSpells.getSpell().canCast(player, true)) {
-      //             return;
-      //         }
-      //         player.getInventory().deleteNumber(itemId, 1);
-      //         player.performAnimation(new Animation(712));
-      //         if (spell == EffectSpells.LOW_ALCHEMY) {
-      //             player.getInventory().adds(995, item.getDefinition().getLowAlchValue());
-      //         } else {
-      //             player.getInventory().adds(995, item.getDefinition().getHighAlchValue());
-      //         }
-      //         player.performGraphic(new Graphic(112, GraphicHeight.HIGH));
-      //         player.getSkillManager().addExperiences(Skill.MAGIC, EffectSpells.getSpell().baseExperience());
-      //         player.getPacketSender().sendTab(6);
-      //         break;
-      //     default:
-      //         break;
-      // }
+        this.castAlchemy(player, spellId, item, itemId);
         break;
       case PacketConstants.MAGIC_ON_GROUND_ITEM_OPCODE:
         this.castTelekineticGrab(player, packet);
