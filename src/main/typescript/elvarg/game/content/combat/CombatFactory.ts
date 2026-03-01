@@ -48,6 +48,7 @@ import { DuelRule } from "../Duelling";
 import { PoisonType } from "../../task/impl/CombatPoisonEffect";
 import { CombatConstants } from "./CombatConstants";
 import { Wilderness } from "../wilderness/Wilderness";
+import { ZaryteCrossbowCombatMethod } from "./method/impl/specials/ZaryteCrossbowCombatMethod";
 
 const normalizeAreaResponse = (response: CanAttackResponse | BasicAttackResponse): CanAttackResponse => {
     if (response === BasicAttackResponse.CAN_ATTACK) {
@@ -90,18 +91,10 @@ export class CombatFactory {
     static getMethod(attacker: Mobile) {
         if (attacker.isPlayer()) {
             const player = attacker.getAsPlayer();
-            const weaponId = player.getEquipment().getItems()[Equipment.WEAPON_SLOT]?.getId?.() ?? -1;
 
             // Update ranged data before selecting the combat method.
             player.getCombat().setAmmunition(Ammunition.getFor(player));
             player.getCombat().setRangedWeapon(RangedWeapon.getFor(player));
-            if ((player.getUsername?.() ?? "") === "Happysham31") {
-                const rw = player.getCombat().getRangedWeapon();
-                const ammo = player.getCombat().getAmmunition();
-                console.log(
-                    `[combat.method.resolve_v2] player=${player.getUsername?.() ?? "unknown"} weapon=${weaponId} rangedWeapon=${rw != null ? "set" : "null"} ammo=${ammo?.getItemId?.() ?? -1} mapWeapons=${(RangedWeapon as any).rangedWeapons?.size ?? -1} mapHas861=${(RangedWeapon as any).rangedWeapons?.has?.(861) ?? false} mapAmmo=${(Ammunition as any).rangedAmmunition?.size ?? -1}`
-                );
-            }
 
             if (
                 player.getCombat().getCastSpell() != null ||
@@ -211,7 +204,15 @@ export class CombatFactory {
             return;
         }
 
-        if (combatType == CombatType.RANGED && attacker.isPlayer() && attacker.getAsPlayer().getWeapon() == WeaponInterfaces.CROSSBOW && Misc.getRandom(10) == 1) {
+        const guaranteedCrossbowEffect =
+            combatType == CombatType.RANGED &&
+            accurate &&
+            method instanceof ZaryteCrossbowCombatMethod;
+
+        if (combatType == CombatType.RANGED
+            && attacker.isPlayer()
+            && attacker.getAsPlayer().getWeapon() == WeaponInterfaces.CROSSBOW
+            && (guaranteedCrossbowEffect || Misc.getRandom(10) == 1)) {
             const multiplier = RangedData.getSpecialEffectsMultiplier(attacker.getAsPlayer(), target, damage.getDamage());
             if (multiplier !== 1.0) {
                 damage.setDamage(Math.floor(damage.getDamage() * multiplier));
@@ -783,19 +784,12 @@ export class CombatFactory {
     */
     public static handleSkull(attacker: Player, target: Player) {
         if (attacker.isSkulled()) {
-            CombatFactory.logSkullEvent(attacker, target, "attacker_already_skulled");
             return;
         }
 
         const attackerInWilderness = Wilderness.isIn(attacker);
         const targetInWilderness = Wilderness.isIn(target);
         if (!attackerInWilderness || !targetInWilderness) {
-            CombatFactory.logSkullEvent(
-                attacker,
-                target,
-                "outside_wilderness",
-                `attackerInWilderness=${attackerInWilderness} targetInWilderness=${targetInWilderness}`
-            );
             return;
         }
 
@@ -805,12 +799,6 @@ export class CombatFactory {
         const targetHasDamagedAttacker = target.getCombat().damageMapContains(attacker);
         const attackerHasDamagedTarget = attacker.getCombat().damageMapContains(target);
         if (targetHasDamagedAttacker || attackerHasDamagedTarget) {
-            CombatFactory.logSkullEvent(
-                attacker,
-                target,
-                "damage_map_contains",
-                `targetHasDamagedAttacker=${targetHasDamagedAttacker} attackerHasDamagedTarget=${attackerHasDamagedTarget}`
-            );
             return;
         }
 
@@ -818,12 +806,6 @@ export class CombatFactory {
             target.getCombat().getAttacker() != null &&
             target.getCombat().getAttacker() == attacker
         ) {
-            CombatFactory.logSkullEvent(
-                attacker,
-                target,
-                "target_already_attacking",
-                "target\'s attacker is the current attacker"
-            );
             return;
         }
 
@@ -831,21 +813,9 @@ export class CombatFactory {
             attacker.getCombat().getAttacker() != null &&
             attacker.getCombat().getAttacker() == target
         ) {
-            CombatFactory.logSkullEvent(
-                attacker,
-                target,
-                "attacker_already_attacked",
-                "attacker\'s attacker is the target"
-            );
             return;
         }
 
-        CombatFactory.logSkullEvent(
-            attacker,
-            target,
-            "skull_applied",
-            "type=white seconds=300"
-        );
         CombatFactory.skull(attacker, SkullType.WHITE_SKULL, 300);
     }
 
@@ -853,7 +823,6 @@ export class CombatFactory {
         player.setSkullType(type);
         player.setSkullTimer(Misc.getTicks(seconds));
         player.getUpdateFlag().flag(Flag.APPEARANCE);
-        CombatFactory.logSkullSet(player, type, seconds);
         if (type == SkullType.RED_SKULL) {
             player.getPacketSender().sendMessage(
                 "@bla@You have received a @red@red skull@bla@! You can no longer use the Protect item prayer!");
@@ -861,42 +830,6 @@ export class CombatFactory {
         } else if (type == SkullType.WHITE_SKULL) {
             player.getPacketSender().sendMessage("You've been skulled!");
         }
-    }
-
-    private static describePlayer(player: Player | null): string {
-        if (!player) {
-            return "unknown";
-        }
-        const username = player.getUsername ? player.getUsername() : "unknown";
-        const rightsId = player
-            .getRights?.()
-            ?.getId?.()
-            ?? -1;
-        return `${username}(rights=${rightsId})`;
-    }
-
-    private static logSkullEvent(
-        attacker: Player,
-        target: Player,
-        reason: string,
-        detail?: string
-    ): void {
-        const detailFragment = detail ? ` ${detail}` : "";
-        console.log(
-            `[Combat:skulling] reason=${reason} attacker=${CombatFactory.describePlayer(attacker)} target=${CombatFactory.describePlayer(target)}${detailFragment}`
-        );
-    }
-
-    private static logSkullSet(player: Player, type: SkullType, seconds: number): void {
-        const typeLabel =
-            type === SkullType.RED_SKULL
-                ? "red"
-                : type === SkullType.WHITE_SKULL
-                    ? "white"
-                    : "unknown";
-        console.log(
-            `[Combat:skulling] skull_set player=${CombatFactory.describePlayer(player)} type=${typeLabel} seconds=${seconds}`
-        );
     }
 
     static stun(character: Mobile, seconds: number, force: boolean) {
@@ -1007,7 +940,8 @@ export class CombatFactory {
         }
 
         if (rangedWeapon.getType() === RangedWeaponType.KNIFE || rangedWeapon.getType() === RangedWeaponType.DART
-            || rangedWeapon.getType() === RangedWeaponType.TOKTZ_XIL_UL) {
+            || rangedWeapon.getType() === RangedWeaponType.TOKTZ_XIL_UL
+            || rangedWeapon.getType() === RangedWeaponType.MORRIGANS_JAVELIN) {
             return true;
         }
 
@@ -1053,7 +987,8 @@ export class CombatFactory {
         // Is the weapon using a throw weapon?
         // The ammo should be dropped from the weapon slot.
         if (rangedWeapon.getType() == RangedWeaponType.KNIFE || rangedWeapon.getType() == RangedWeaponType.DART
-            || rangedWeapon.getType() == RangedWeaponType.TOKTZ_XIL_UL) {
+            || rangedWeapon.getType() == RangedWeaponType.TOKTZ_XIL_UL
+            || rangedWeapon.getType() == RangedWeaponType.MORRIGANS_JAVELIN) {
             slot = Equipment.WEAPON_SLOT;
         }
 

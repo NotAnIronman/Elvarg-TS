@@ -120,11 +120,6 @@ export class Equipment extends ItemContainer {
         return this.get(Equipment.WEAPON_SLOT);
     }
 
-    public hasCastleWarsBracelet(): boolean {
-        const hands = this.get(Equipment.HANDS_SLOT);
-        return hands != null && hands.getId() >= 11079 && hands.getId() <= 11083;
-    }
-
     public hasGodsword(): boolean {
         return this.get(Equipment.WEAPON_SLOT) != null && this.get(Equipment.WEAPON_SLOT).getDefinition().getName().toLowerCase().includes("godsword");
     }

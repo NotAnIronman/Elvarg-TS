@@ -1,16 +1,34 @@
 const fs = require("fs");
 const path = require("path");
 
+function requireGameModule(modulePath) {
+  const candidates = [
+    path.resolve(process.cwd(), "src", "main", "typescript", "elvarg", modulePath),
+    path.resolve(process.cwd(), "dist", modulePath),
+  ];
+
+  let lastError = null;
+  for (const candidate of candidates) {
+    try {
+      return require(candidate);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
 const getGameConstants = () =>
-  require("../../src/main/typescript/elvarg/game/GameConstants").GameConstants;
+  requireGameModule(path.join("game", "GameConstants")).GameConstants;
 const getItemDefinition = () =>
-  require("../../src/main/typescript/elvarg/game/definition/ItemDefinition")
+  requireGameModule(path.join("game", "definition", "ItemDefinition"))
     .ItemDefinition;
 const getEquipmentType = () =>
-  require("../../src/main/typescript/elvarg/game/model/EquipmentType")
+  requireGameModule(path.join("game", "model", "EquipmentType"))
     .EquipmentType;
 const getWeaponInterfaces = () =>
-  require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces")
+  requireGameModule(path.join("game", "content", "combat", "WeaponInterfaces"))
     .WeaponInterfaces;
 
 function hydrateEquipmentType(raw) {
@@ -25,15 +43,15 @@ function hydrateEquipmentType(raw) {
 }
 
 function hydrateWeaponInterface(raw) {
-  const WeaponInterfaces = getWeaponInterfaces();
   if (raw == null) {
     return null;
   }
   if (raw && typeof raw.getInterfaceId === "function") {
     return raw;
   }
-  if (typeof raw === "string" && WeaponInterfaces[raw] != null) {
-    return WeaponInterfaces[raw];
+  const WeaponInterfaces = getWeaponInterfaces();
+  if (typeof raw === "string") {
+    return WeaponInterfaces?.[raw] ?? null;
   }
   return null;
 }
@@ -57,6 +75,7 @@ function loadItemDefinitions() {
   ItemDefinition.definitions.clear();
 
   let loaded = 0;
+  let unresolvedWeaponInterfaces = 0;
   for (const rawDef of defs) {
     if (!rawDef || typeof rawDef !== "object") {
       continue;
@@ -65,6 +84,9 @@ function loadItemDefinitions() {
     const def = Object.assign(new ItemDefinition(), rawDef);
     def.equipmentType = hydrateEquipmentType(rawDef.equipmentType);
     def.weaponInterface = hydrateWeaponInterface(rawDef.weaponInterface);
+    if (rawDef.weaponInterface != null && def.weaponInterface == null) {
+      unresolvedWeaponInterfaces++;
+    }
 
     const id = rawDef.id ?? def.getId?.();
     if (!Number.isInteger(id) || id < 0) {
@@ -79,6 +101,7 @@ function loadItemDefinitions() {
     filePath,
     loaded,
     total: ItemDefinition.definitions.size,
+    unresolvedWeaponInterfaces,
   };
 }
 
@@ -91,6 +114,7 @@ module.exports = {
       file: path.relative(process.cwd(), result.filePath),
       loaded: result.loaded,
       total: result.total,
+      unresolvedWeaponInterfaces: result.unresolvedWeaponInterfaces,
       elapsedMs: Date.now() - startedAt,
     });
   },

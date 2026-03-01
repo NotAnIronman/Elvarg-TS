@@ -8,17 +8,14 @@ import { PluginManager } from "../../../plugins/PluginManager";
 // import { TeleportType } from "../../../game/model/teleportation/TeleportType";
 // import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 // import { PotionConsumable } from '../../../game/content/PotionConsumable'
-// import { Barrows } from '../../../game/content/minigames/impl/Barrows'
 // import { Animation } from "../../../game/model/Animation";
 // import { Task } from "../../../game/task/Task";
 // import { TaskManager } from "../../../game/task/TaskManager";
 // import { PacketConstants } from "../PacketConstants";
-// import { WildernessArea } from "../../../game/model/areas/impl/WildernessArea";
 // import { CombatSpecial } from "../../../game/content/combat/CombatSpecial";
 // import { ItemDefinition } from "../../../game/definition/ItemDefinition";
 // import { Gambling } from '../../../game/content/Gambiling'
 // import { GameConstants } from "../../../game/GameConstants";
-// import { BarrowsSet } from "../../../game/model/BarrowsSet";
 
 // class ItemActionTask extends Task{
 class ItemActionTask {
@@ -274,32 +271,13 @@ export class ItemActionPacketListener implements PacketExecutor {
       // case ItemIdentifiers.BIRD_NEST_5:
       //     BirdNest.handleSearchNest(player, itemId);
       //     break;
-      // case ItemIdentifiers.SPADE:
-      //     player.performAnimation(new Animation(830));
-      //     TaskManager.submit(new ItemActionTask(1, player, false, () =>{if (!player.isTeleportingReturn()) {
-      //         Barrows.dig(player);
-      //     }}));
-      //     break;
       // case Gambling.MITHRIL_SEEDS:
       //     Gambling.plantFlower(player);
       //     break;
       case 9520:
-        // if (!(player.getArea() instanceof WildernessArea)) {
-        //     if (player.getSpecialPercentage() < 100) {
-        //         player.getPacketSender().sendInterfaceRemoval();
-        //         player.performAnimation(new Animation(829));
-        //         player.getInventory().deleteNumber(9520, 1);
-        //         player.setSpecialPercentage(100);
-        //         CombatSpecial.updateBar(player);
-        //         player.getPacketSender().sendMessage("You now have 100% special attack energy.");
-        //     } else {
-        //         player.getPacketSender().sendMessage("You already have full special attack energy!");
-        //     }
-        // } else {
         player
           .getPacketSender()
           .sendMessage("You cannot use this in the Wilderness!");
-        // }
         break;
       // case ItemIdentifiers.TELEPORT_TO_HOUSE:
       //     if (TeleportHandler.checkReqs(player, GameConstants.DEFAULT_LOCATION)) {
@@ -345,22 +323,6 @@ export class ItemActionPacketListener implements PacketExecutor {
       case 12881:
       case 12883:
       case 12877:
-      // const set: BarrowsSet | null = BarrowsSet.get(itemId);
-      // if (set) {
-      //   if (!player.getInventory().contains(set.getSetId())) {
-      //     return;
-      //   }
-      //   if ((player.getInventory().getFreeSlots() - 1) < set.getItems().length) {
-      //     player.getPacketSender().sendMessage(`You need at least ${set.getItems().length} free inventory slots to do that.`);
-      //     return;
-      //   }
-      //   player.getInventory().deleteNumber(set.getSetId(), 1);
-      //   for (const item of set.getItems()) {
-      //     player.getInventory().adds(item, 1);
-      //   }
-      // //   player.getPacketSender().sendMessage(`You've opened your ${ItemDefinition.forId(itemId).getName()}.`);
-      //   player.getPacketSender().sendMessage(`You've opened your .`);
-      // }
     }
   }
 
@@ -475,9 +437,6 @@ export class ItemActionPacketListener implements PacketExecutor {
       return;
     }
 
-    // if (BarrowsSet.pack(player, itemId)) {
-    //     return;
-    // }
     // if (Runecrafting.handlePouch(player, itemId, 3)) {
     //     return;
     // }

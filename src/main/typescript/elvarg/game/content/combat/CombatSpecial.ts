@@ -9,20 +9,36 @@ import { RestoreSpecialAttackTask } from '../../task/impl/RestoreSpecialAttackTa
 import { Equipment } from "../../model/container/impl/Equipment";
 import { DuelRule } from "../Duelling";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
-
-class DummyCombatMethod extends CombatMethod {
-    start(): void {}
-    finished(): void {}
-    onCombatBegan(): void {}
-    onCombatEnded(): void {}
-    handleAfterHitEffects(): void {}
-    canAttack(): boolean { return true; }
-    attackSpeed(character: Mobile): number { return character.getBaseAttackSpeed(); }
-    attackDistance(): number { return 1; }
-    type(): CombatType { return CombatType.MELEE; }
-    hits(): any[] { return []; }
-}
-const DUMMY_COMBAT_METHOD = new DummyCombatMethod();
+import { AbyssalBludgeonCombatMethod } from "./method/impl/specials/AbyssalBludgeonCombatMethod";
+import { AbyssalDaggerCombatMethod } from "./method/impl/specials/AbyssalDaggerCombatMethod";
+import { AbyssalWhipCombatMethod } from "./method/impl/specials/AbyssalWhipCombatMethod";
+import { AbyssalTentacleCombatMethod } from "./method/impl/specials/AbyssalTentacleCombatMethod";
+import { AncientGodswordCombatMethod } from "./method/impl/specials/AncientGodswordCombatMethod";
+import { ArmadylCrossbowCombatMethod } from "./method/impl/specials/ArmadylCrossbowCombatMethod";
+import { ArmadylGodswordCombatMethod } from "./method/impl/specials/ArmadylGodswordCombatMethod";
+import { BallistaCombatMethod } from "./method/impl/specials/BallistaCombatMethod";
+import { BandosGodswordCombatMethod } from "./method/impl/specials/BandosGodswordCombatMethod";
+import { BarrelchestAnchorCombatMethod } from "./method/impl/specials/BarrelchestAnchorCombatMethod";
+import { DarkBowCombatMethod } from "./method/impl/specials/DarkBowCombatMethod";
+import { DragonClawCombatMethod } from "./method/impl/specials/DragonClawCombatMethod";
+import { DragonDaggerCombatMethod } from "./method/impl/specials/DragonDaggerCombatMethod";
+import { DragonHalberdCombatMethod } from "./method/impl/specials/DragonHalberdCombatMethod";
+import { DragonKnifeCombatMethod } from "./method/impl/specials/DragonKnifeCombatMethod";
+import { DragonLongswordCombatMethod } from "./method/impl/specials/DragonLongswordCombatMethod";
+import { DragonMaceCombatMethod } from "./method/impl/specials/DragonMaceCombatMethod";
+import { DragonScimitarCombatMethod } from "./method/impl/specials/DragonScimitarCombatMethod";
+import { DragonWarhammerCombatMethod } from "./method/impl/specials/DragonWarhammerCombatMethod";
+import { GraniteMaulCombatMethod } from "./method/impl/specials/GraniteMaulCombatMethod";
+import { MagicShortbowCombatMethod } from "./method/impl/specials/MagicShortbowCombatMethod";
+import { MorrigansJavelinCombatMethod } from "./method/impl/specials/MorrigansJavelinCombatMethod";
+import { SaradominGodswordCombatMethod } from "./method/impl/specials/SaradominGodswordCombatMethod";
+import { SaradominSwordCombatMethod } from "./method/impl/specials/SaradominSwordCombatMethod";
+import { ShoveCombatMethod } from "./method/impl/specials/ShoveCombatMethod";
+import { StatiusWarhammerCombatMethod } from "./method/impl/specials/StatiusWarhammerCombatMethod";
+import { VestasLongswordCombatMethod } from "./method/impl/specials/VestasLongswordCombatMethod";
+import { VolatileNightmareStaffCombatMethod } from "./method/impl/specials/VolatileNightmareStaffCombatMethod";
+import { ZamorakGodswordCombatMethod } from "./method/impl/specials/ZamorakGodswordCombatMethod";
+import { ZaryteCrossbowCombatMethod } from "./method/impl/specials/ZaryteCrossbowCombatMethod";
 
 
 export class CombatSpecial {
@@ -31,7 +47,7 @@ export class CombatSpecial {
         50,
         1,
         1,
-        DUMMY_COMBAT_METHOD,
+        new AbyssalWhipCombatMethod(),
         null as any
     )
     public static readonly ABYSSAL_TENTACLE = new CombatSpecial(
@@ -39,7 +55,7 @@ export class CombatSpecial {
         50,
         1,
         1,
-        DUMMY_COMBAT_METHOD,
+        new AbyssalTentacleCombatMethod(),
         null
     )
     public static readonly BARRELSCHEST_ANCHOR = new CombatSpecial(
@@ -47,15 +63,19 @@ export class CombatSpecial {
         50,
         1.22,
         1.10,
-        DUMMY_COMBAT_METHOD,
+        new BarrelchestAnchorCombatMethod(),
         null
     )
     public static readonly DRAGON_SCIMITAR = new CombatSpecial(
-        [4587],
+        [
+            ItemIdentifiers.DRAGON_SCIMITAR,
+            ItemIdentifiers.DRAGON_SCIMITAR_OR_,
+            ItemIdentifiers.DRAGON_SCIMITAR_3
+        ],
         55,
         1.00,
         1.25,
-        DUMMY_COMBAT_METHOD,
+        new DragonScimitarCombatMethod(),
         null
     )
     public static readonly DRAGON_LONGSWORD = new CombatSpecial(
@@ -63,7 +83,7 @@ export class CombatSpecial {
         25,
         1.15,
         1.25,
-        DUMMY_COMBAT_METHOD,
+        new DragonLongswordCombatMethod(),
         null
     )
     public static readonly DRAGON_MACE =  new CombatSpecial(
@@ -71,7 +91,7 @@ export class CombatSpecial {
         25,
         1.5,
         1.25,
-        DUMMY_COMBAT_METHOD,
+        new DragonMaceCombatMethod(),
         null
     )
     public static readonly DRAGON_WARHAMMER =  new CombatSpecial (
@@ -79,7 +99,23 @@ export class CombatSpecial {
         50,
         1.5,
         1.00,
-        DUMMY_COMBAT_METHOD,
+        new DragonWarhammerCombatMethod(),
+        null
+    )
+    public static readonly VESTAS_LONGSWORD = new CombatSpecial(
+        [ItemIdentifiers.VESTAS_LONGSWORD],
+        25,
+        1.0,
+        1.0,
+        new VestasLongswordCombatMethod(),
+        null
+    )
+    public static readonly STATIUS_WARHAMMER = new CombatSpecial(
+        [ItemIdentifiers.STATIUSS_WARHAMMER],
+        35,
+        1.0,
+        1.0,
+        new StatiusWarhammerCombatMethod(),
         null
     )
     public static readonly SARADOMIN_SWORD = new CombatSpecial(
@@ -87,7 +123,7 @@ export class CombatSpecial {
         100,
         1.0,
         1.0,
-        DUMMY_COMBAT_METHOD,
+        new SaradominSwordCombatMethod(),
         null
     )
     public static readonly ARMADYL_GODSWORD = new CombatSpecial(
@@ -95,7 +131,15 @@ export class CombatSpecial {
         50,
         1.375,
         2,
-        DUMMY_COMBAT_METHOD,
+        new ArmadylGodswordCombatMethod(),
+        null
+    )
+    public static readonly ANCIENT_GODSWORD = new CombatSpecial(
+        [ItemIdentifiers.ANCIENT_GODSWORD],
+        50,
+        1.1,
+        2,
+        new AncientGodswordCombatMethod(),
         null
     )
     public static readonly SARADOMIN_GODSWORD = new CombatSpecial(
@@ -103,7 +147,7 @@ export class CombatSpecial {
         50,
         1.1,
         1.5,
-        DUMMY_COMBAT_METHOD,
+        new SaradominGodswordCombatMethod(),
         null
     )
     public static readonly BANDOS_GODSWORD = new CombatSpecial(
@@ -111,15 +155,15 @@ export class CombatSpecial {
         100,
         1.21,
         1.5,
-        DUMMY_COMBAT_METHOD,
+        new BandosGodswordCombatMethod(),
         null
     )
     public static readonly ZAMORAK_GODSWORD = new CombatSpecial(
         [11808],
         50,
         1.1,
-        1.5,
-        DUMMY_COMBAT_METHOD,
+        2,
+        new ZamorakGodswordCombatMethod(),
         null
     )
     public static readonly ABYSSAL_BLUDGEON = new CombatSpecial(
@@ -127,7 +171,23 @@ export class CombatSpecial {
         50,
         1.20,
         1.0,
-        DUMMY_COMBAT_METHOD,
+        new AbyssalBludgeonCombatMethod(),
+        null
+    )
+    public static readonly SHOVE_SPECIAL = new CombatSpecial(
+        [
+            ItemIdentifiers.DRAGON_SPEAR,
+            ItemIdentifiers.DRAGON_SPEAR_P_PLUS_PLUS_,
+            ItemIdentifiers.DRAGON_SPEAR_P_PLUS_,
+            ItemIdentifiers.DRAGON_SPEAR_KP_,
+            ItemIdentifiers.DRAGON_SPEAR_P_,
+            ItemIdentifiers.ZAMORAKIAN_SPEAR,
+            ItemIdentifiers.ZAMORAKIAN_HASTA
+        ],
+        25,
+        1.0,
+        1.0,
+        new ShoveCombatMethod(),
         null
     )
     public static readonly DRAGON_HALBERD = new CombatSpecial(
@@ -135,7 +195,7 @@ export class CombatSpecial {
         30,
         1.1,
         1.35,
-        DUMMY_COMBAT_METHOD,
+        new DragonHalberdCombatMethod(),
         null
     )
     public static readonly DRAGON_DAGGER = new CombatSpecial(
@@ -143,7 +203,7 @@ export class CombatSpecial {
         25,
         1.15,
         1.20,
-        DUMMY_COMBAT_METHOD,
+        new DragonDaggerCombatMethod(),
         null
     )
     public static readonly ABYSSAL_DAGGER = new CombatSpecial (
@@ -151,7 +211,7 @@ export class CombatSpecial {
         50,
         0.85,
         1.25,
-        DUMMY_COMBAT_METHOD,
+        new AbyssalDaggerCombatMethod(),
         null
     )
     public static readonly GRANITE_MAUL = new CombatSpecial(
@@ -159,7 +219,7 @@ export class CombatSpecial {
         50,
         1,
         1,
-        DUMMY_COMBAT_METHOD,
+        new GraniteMaulCombatMethod(),
         null
     )
     public static readonly DRAGON_CLAWS = new CombatSpecial(
@@ -167,7 +227,7 @@ export class CombatSpecial {
         50,
         1,
         1.35,
-        DUMMY_COMBAT_METHOD,
+        new DragonClawCombatMethod(),
         null
     )
     public static readonly MAGIC_SHORTBOW = new CombatSpecial(
@@ -175,31 +235,68 @@ export class CombatSpecial {
         55,
         1,
         1,
-        DUMMY_COMBAT_METHOD,
+        new MagicShortbowCombatMethod(),
         null
     )
     public static readonly DARK_BOW = new CombatSpecial(
         [11235],
         55,
         1.5,
-        1.35,
-        DUMMY_COMBAT_METHOD,
+        1.0,
+        new DarkBowCombatMethod(),
         null
     )
     public static readonly ARMADYL_CROSSBOW = new CombatSpecial(
         [11785],
-        40,
+        50,
         1,
         2.0,
-        DUMMY_COMBAT_METHOD,
+        new ArmadylCrossbowCombatMethod(),
+        null
+    )
+    public static readonly ZARYTE_CROSSBOW = new CombatSpecial(
+        [ItemIdentifiers.ZARYTE_CROSSBOW],
+        75,
+        1,
+        2.0,
+        new ZaryteCrossbowCombatMethod(),
         null
     )
     public static readonly BALLISTA = new CombatSpecial(
-        [19481],
+        [19478, 19481],
         65,
         1.25,
-        1.45,
-        DUMMY_COMBAT_METHOD,
+        1.25,
+        new BallistaCombatMethod(),
+        null
+    )
+    public static readonly MORRIGANS_JAVELIN = new CombatSpecial(
+        [ItemIdentifiers.MORRIGANS_JAVELIN],
+        50,
+        1,
+        1,
+        new MorrigansJavelinCombatMethod(),
+        null
+    )
+    public static readonly DRAGON_KNIFE = new CombatSpecial(
+        [
+            ItemIdentifiers.DRAGON_KNIFE,
+            ItemIdentifiers.DRAGON_KNIFE_P_,
+            ItemIdentifiers.DRAGON_KNIFE_P_PLUS_,
+            ItemIdentifiers.DRAGON_KNIFE_P_PLUS_PLUS_
+        ],
+        25,
+        1,
+        1,
+        new DragonKnifeCombatMethod(),
+        null
+    )
+    public static readonly VOLATILE_NIGHTMARE_STAFF = new CombatSpecial(
+        [ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF],
+        55,
+        1,
+        1.5,
+        new VolatileNightmareStaffCombatMethod(),
         null
     )
 

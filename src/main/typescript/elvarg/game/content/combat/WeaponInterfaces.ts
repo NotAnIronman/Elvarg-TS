@@ -18,8 +18,9 @@ export class WeaponInterfaces {
 
         //Get the currently equipped weapon's interface
         if (equippedWeapon.getId() > 0) {
-            if (equippedWeapon.getDefinition().getWeaponInterface() != null) {
-                weapon = equippedWeapon.getDefinition().getWeaponInterface();
+            const resolvedWeaponInterface = equippedWeapon.getDefinition().getWeaponInterface();
+            if (resolvedWeaponInterface != null && typeof (resolvedWeaponInterface as any).getInterfaceId === "function") {
+                weapon = resolvedWeaponInterface;
             }
         }
 

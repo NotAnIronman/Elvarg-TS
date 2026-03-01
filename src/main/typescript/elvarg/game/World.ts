@@ -1,6 +1,5 @@
 
 import { Server } from '../Server';
-import { MinigameHandler } from './content/minigames/MinigameHandler';
 import { MobileList } from '../game/entity/impl/MobileList'
 import { ItemOnGround } from './entity/impl/grounditem/ItemOnGround';
 import { ItemOnGroundManager } from './entity/impl/grounditem/ItemOnGroundManager';
@@ -285,13 +284,6 @@ export class World {
             TaskManager.process();
         } catch (e) {
             console.error("[World] TaskManager.process failure", e);
-        }
-
-        // Process all minigames
-        try {
-            MinigameHandler.process();
-        } catch (e) {
-            console.error("[World] MinigameHandler.process failure", e);
         }
 
         // Process all ground items..

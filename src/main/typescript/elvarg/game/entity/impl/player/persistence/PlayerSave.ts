@@ -68,10 +68,6 @@ export class PlayerSave {
     private recoilDamage: number;
     private poisonDamage: number;
     private blowpipeScales: number;
-    private barrowsCrypt: number;
-    private barrowsChests: number;
-    private killedBrothers: boolean[];
-    private gwdKills: number[];
     private poisonImmunityTimer: number;
     private fireImmunityTimer: number;
     private teleblockTimer: number;
@@ -253,38 +249,6 @@ export class PlayerSave {
 
     public setBlowpipeScales(blowpipeScales: number): void {
         this.blowpipeScales = blowpipeScales;
-    }
-
-    public getBarrowsCrypt(): number {
-        return this.barrowsCrypt;
-    }
-
-    public setBarrowsCrypt(barrowsCrypt: number): void {
-        this.barrowsCrypt = barrowsCrypt;
-    }
-
-    public getBarrowsChests(): number {
-        return this.barrowsChests;
-    }
-
-    public setBarrowsChests(barrowsChests: number): void {
-        this.barrowsChests = barrowsChests;
-    }
-
-    public getKilledBrothers(): boolean[] {
-        return this.killedBrothers;
-    }
-
-    public setKilledBrothers(killedBrothers: boolean[]): void {
-        this.killedBrothers = killedBrothers;
-    }
-
-    public getGwdKills(): number[] {
-        return this.gwdKills;
-    }
-
-    public setGwdKills(gwdKills: number[]): void {
-        this.gwdKills = gwdKills;
     }
 
     public getPoisonImmunityTimer(): number {
@@ -686,12 +650,6 @@ export class PlayerSave {
         player.setPoisonDamage(this.poisonDamage);
         player.setBlowpipeScales(this.blowpipeScales);
 
-        player.setBarrowsCrypt(this.barrowsCrypt);
-        player.setBarrowsChestsLooted(this.barrowsChests);
-        player.setKilledBrothers(this.killedBrothers);
-
-        player.setGodwarsKillcountReturn(this.gwdKills);
-
         // RC pouches
         player.setPouches(this.pouches);
 
@@ -788,12 +746,6 @@ export class PlayerSave {
         playerSave.points = player.getPoints();
         playerSave.poisonDamage = player.getPoisonDamage();
         playerSave.blowpipeScales = player.getBlowpipeScales();
-
-        playerSave.barrowsCrypt = player.getBarrowsCrypt();
-        playerSave.barrowsChests = player.getBarrowsChestsLooted();
-        playerSave.killedBrothers = player.getKilledBrothers();
-
-        playerSave.gwdKills = player.getGodwarsKillcount();
 
         // RC pouches
         playerSave.pouches = player.getPouches();

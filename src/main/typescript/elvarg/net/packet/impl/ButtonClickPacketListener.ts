@@ -10,7 +10,6 @@ import { PrayerHandler } from "../../../game/content/PrayerHandler";
 // import { WeaponInterfaces } from '../../../game/content/combat/WeaponInterfaces';
 // import { Autocasting } from '../../../game/content/combat/magic/Autocasting';
 // import { EffectSpells } from '../../../game/content/combat/magic/EffectSpells';
-// import { MinigameHandler } from '../../../game/content/minigames/MinigameHandler';
 // import { Presetables } from '../../../game/content/presets/Presetables';
 // import { QuestHandler, Quests } from '../../../game/content/quests/QuestHandler';
 // import { Player } from '../../../game/entity/impl/player/Player';

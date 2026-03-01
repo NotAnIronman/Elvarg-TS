@@ -1,5 +1,3 @@
-import { CastleWars } from "../content/minigames/impl/CastleWars";
-
 enum Priority {
     LOW
 }

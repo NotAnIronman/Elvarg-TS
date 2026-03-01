@@ -15,7 +15,6 @@ import { TimerKey } from "../../../util/timers/TimerKey";
 import { CombatFactory, CanAttackResponse } from "./CombatFactory";
 import { CombatSpecial } from "./CombatSpecial";
 import { CombatConstants } from "./CombatConstants";
-import { Equipment } from "../../model/container/impl/Equipment";
 export class Combat {
     private character: Mobile;
     private hitQueue: HitQueue;
@@ -81,19 +80,6 @@ export class Combat {
         }
         // Fetch the combat method the character will be attacking with
         this.method = CombatFactory.getMethod(this.character);
-        if (this.character.isPlayer() && (this.character.getAsPlayer().getUsername?.() ?? "") === "Happysham31") {
-            const player = this.character.getAsPlayer();
-            const weaponId = player.getEquipment().getItems()[Equipment.WEAPON_SLOT]?.getId?.() ?? -1;
-            const methodType = typeof (this.method as any)?.type === "function" ? (this.method as any).type() : "unknown";
-            const methodName = (this.method as any)?.constructor?.name ?? "unknown";
-            const rangedWeapon = player.getCombat().getRangedWeapon();
-            const ammo = player.getCombat().getAmmunition();
-            const targetName = this.target?.isPlayer?.() ? this.target.getAsPlayer().getUsername?.() : "npc";
-            console.log(
-                `[combat.attack.cycle] player=${player.getUsername?.() ?? "unknown"} target=${targetName ?? "unknown"} weapon=${weaponId} method=${methodName} type=${methodType} rangedWeapon=${rangedWeapon != null ? "set" : "null"} ammo=${ammo?.getItemId?.() ?? -1}`
-            );
-        }
-
         this.character.setCombatFollowing(this.target);
 
         // Primary combat lock-on comes from entity interaction.

@@ -1,5 +1,4 @@
 import { RegionManager } from "../../../game/collision/RegionManager";
-import { Barrows } from "../../../game/content/minigames/impl/Barrows";
 import { ItemOnGroundManager } from "../../../game/entity/impl/grounditem/ItemOnGroundManager";
 import { NpcAggression } from "../../../game/entity/impl/npc/NpcAggression";
 import { ObjectManager } from "../../../game/entity/impl/object/ObjectManager";
@@ -16,7 +15,6 @@ export class RegionChangePacketListener implements PacketExecutor {
       player.getPacketSender().deleteRegionalSpawns();
       ItemOnGroundManager.onRegionChange(player);
       ObjectManager.onRegionChange(player);
-      Barrows.brotherDespawn(player);
       player.getAggressionTolerance().start(NpcAggression.NPC_TOLERANCE_SECONDS);
       player.setAllowRegionChangePacket(false);
     }

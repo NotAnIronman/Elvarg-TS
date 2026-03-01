@@ -11,7 +11,6 @@ import { WeaponInterfaces } from "../../../content/combat/WeaponInterfaces";
 import { BountyHunter } from "../../../content/combat/bountyhunter/BountyHunter"
 import { PendingHit } from "../../../content/combat/hit/PendingHit";
 import { Autocasting } from "../../../content/combat/magic/Autocasting";
-import { Barrows, Brother } from "../../../content/minigames/impl/Barrows"
 import { Presetable } from "../../../content/presets/Presetable";
 import { Presetables } from "../../../content/presets/Presetables";
 import { SkillManager } from "../../../content/skill/SkillManager";
@@ -26,7 +25,6 @@ import { EnteredAmountAction } from "../../../model/EnteredAmountAction";
 import { EnteredSyntaxAction } from "../../../model/EnteredSyntaxAction";
 import { Flag } from "../../../model/Flag";
 import { ForceMovement } from "../../../model/ForceMovement";
-import { God } from "../../../model/God";
 import { Location } from "../../../model/Location";
 import { PlayerInteractingOption, PlayerInteractingOptions } from "../../../model/PlayerInteractingOption";
 import { PlayerRelations } from "../../../model/PlayerRelations";
@@ -185,11 +183,6 @@ export class Player extends Mobile {
     public deaths: number;
     private safeTimer = 180;
     public pcPoints: number;
-    // Barrows
-    public barrowsCrypt: number;
-    public barrowsChestsLooted: number;
-    public killedBrothers: boolean[] = Array(Brother.length).fill(false);
-    private currentBrother: NPC;
     private preserveUnlocked: boolean;
     private rigourUnlocked: boolean;
     private auguryUnlocked: boolean;
@@ -208,9 +201,6 @@ export class Player extends Mobile {
     public weapon: WeaponInterfaces = WeaponInterfaces.UNARMED;
     private autoRetaliate = true;
 
-    // GWD
-    public godwarsKillcount: number[] = Array(Object.keys(God).length / 2).fill(0);
-
     // Rights
     public rights = PlayerRights.NONE;
     public donatorRights = DonatorRights.NONE;
@@ -219,7 +209,6 @@ export class Player extends Mobile {
      */
     private cachedUpdateBlock: Buffer;
     private loyaltyTitle = "empty";
-    private spawnedBarrows: boolean;
     private oldPosition: Location;
     public id: number;
     public name: string;
@@ -542,7 +531,6 @@ export class Player extends Mobile {
         }
 
         // Do stuff...
-        Barrows.brotherDespawn(this);
         PluginManager.emitPlayerLogout({
             player: this,
             username: this.getUsername(),
@@ -882,14 +870,6 @@ export class Player extends Mobile {
 
     public setWildernessLevel(wildernessLevel: number) {
         this.wildernessLevel = wildernessLevel;
-    }
-
-    public isSpawnedBarrows(): boolean {
-        return this.spawnedBarrows;
-    }
-
-    public setSpawnedBarrows(spawnedBarrows: boolean) {
-        this.spawnedBarrows = spawnedBarrows;
     }
 
     public getDestroyItem(): number {
@@ -1338,42 +1318,6 @@ export class Player extends Mobile {
         this.donatorRights = donatorPrivilege;
     }
 
-    public getCurrentBrother(): NPC {
-        return this.currentBrother;
-    }
-
-    public setCurrentBrother(brother: NPC): void {
-        this.currentBrother = brother;
-    }
-
-    public getBarrowsCrypt(): number {
-        return this.barrowsCrypt;
-    }
-
-    public setBarrowsCrypt(crypt: number): void {
-        this.barrowsCrypt = crypt;
-    }
-
-    public getKilledBrothers(): boolean[] {
-        return this.killedBrothers;
-    }
-
-    public setKilledBrothers(killedBrothers: boolean[]): void {
-        this.killedBrothers = killedBrothers;
-    }
-
-    public setKilledBrother(index: number, state: boolean): void {
-        this.killedBrothers[index] = state;
-    }
-
-    public getBarrowsChestsLooted(): number {
-        return this.barrowsChestsLooted;
-    }
-
-    public setBarrowsChestsLooted(chestsLooted: number): void {
-        this.barrowsChestsLooted = chestsLooted;
-    }
-
     public isPlaceholders(): boolean {
         return this.placeholders;
     }
@@ -1448,22 +1392,6 @@ export class Player extends Mobile {
 
     public setOldPosition(oldPosition: Location): void {
         this.oldPosition = oldPosition;
-    }
-
-    public getGodwarsKillcount(): number[] {
-        return this.godwarsKillcount;
-    }
-
-    public setGodwarsKillcountArray(godwarsKillcount: number[]): void {
-        this.godwarsKillcount = godwarsKillcount;
-    }
-
-    public setGodwarsKillcount(index: number, value: number): void {
-        this.godwarsKillcount[index] = value;
-    }
-
-    public setGodwarsKillcountReturn(godwarsKillcount: number[]) {
-        this.godwarsKillcount = godwarsKillcount;
     }
 
     public getEnteredAmountAction(): EnteredAmountAction {

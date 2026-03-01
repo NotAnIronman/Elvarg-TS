@@ -1,5 +1,4 @@
 import { Player } from "../../Player";
-import { PlayerBot } from "../../../playerbot/PlayerBot";
 import { PlayerPersistence } from "../PlayerPersistence";
 import { PlayerSave } from "../PlayerSave";
 import * as AWS from "aws-sdk";
@@ -17,7 +16,7 @@ export class DynamoDBPlayerPersistence extends PlayerPersistence {
 
 
     public save(player: Player): void {
-        if (player instanceof PlayerBot) {
+        if ((player as any).isPlayerBot?.()) {
             return;
         }
 
