@@ -27,8 +27,7 @@ export class InterfaceActionClickOpcode implements PacketExecutor {
 
     if (
       Autocasting.handleWeaponInterface(player, interfaceId) ||
-      Autocasting.handleAutocastTab(player, interfaceId) ||
-      Autocasting.toggleAutocast(player, interfaceId)
+      Autocasting.handleAutocastTab(player, interfaceId)
     ) {
       return;
     }

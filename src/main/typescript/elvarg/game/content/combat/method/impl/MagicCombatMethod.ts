@@ -17,6 +17,9 @@ import { AreaManager } from "../../../../model/areas/AreaManager";
 export class MagicCombatMethod extends CombatMethod {
 
     public static SPLASH_GRAPHIC = new Graphic(85, GraphicHeight.MIDDLE);
+    private static readonly MAGIC_CAST_DEBUG =
+        process.env.MAGIC_CAST_DEBUG === "1" ||
+        process.env.MAGIC_CAST_DEBUG === "true";
 
     public type(): CombatType {
         return CombatType.MAGIC;
@@ -88,6 +91,18 @@ export class MagicCombatMethod extends CombatMethod {
         const spell = character.getCombat().getSelectedSpell();
 
         if (spell != null) {
+            if (MagicCombatMethod.MAGIC_CAST_DEBUG) {
+                const casterName = character.isPlayer()
+                    ? character.getAsPlayer()?.getUsername?.() ?? "unknown-player"
+                    : `npc-${character.getAsNpc?.()?.getId?.() ?? "unknown"}`;
+                const targetName = target?.isPlayer?.()
+                    ? target.getAsPlayer()?.getUsername?.() ?? "unknown-player"
+                    : `npc-${target?.getAsNpc?.()?.getId?.() ?? "unknown"}`;
+                const spellId = spell?.spellId?.() ?? -1;
+                console.info(
+                    `[magic.cast] caster=${casterName} target=${targetName} spellId=${spellId}`
+                );
+            }
             spell.startCast(character, target);
         }
     }

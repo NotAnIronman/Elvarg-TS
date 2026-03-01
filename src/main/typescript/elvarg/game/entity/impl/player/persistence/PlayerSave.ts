@@ -1,5 +1,6 @@
 import { PrayerHandler, PrayerData } from "../../../../content/PrayerHandler";
 import { FightType } from "../../../../content/combat/FightType";
+import { CombatSpells } from "../../../../content/combat/magic/CombatSpells";
 import { Presetable } from "../../../../content/presets/Presetable";
 import { SkillManager, Skills } from "../../../../content/skill/SkillManager";
 import { Player } from "../Player";
@@ -53,6 +54,7 @@ export class PlayerSave {
     private position: Location;
     private spellBook;
     private fightType;
+    private autocastSpellId: number;
     private autoRetaliate: boolean;
     private xpLocked: boolean;
     private clanChat: string;
@@ -644,6 +646,12 @@ export class PlayerSave {
         player.setLocation(this.position);
         player.setSpellbook(this.spellBook);
         player.setFightType(this.fightType);
+        player.getCombat().setAutocastSpell(
+            Number.isInteger(this.autocastSpellId)
+                ? CombatSpells.getCombatSpell(this.autocastSpellId)
+                : null
+        );
+        player.getCombat().setCastSpell(null);
         player.setAutoRetaliate(this.autoRetaliate);
         player.setExperienceLocked(this.xpLocked);
         player.setClanChatName(this.clanChat);
@@ -744,6 +752,7 @@ export class PlayerSave {
         playerSave.position = player.getLocation();
         playerSave.spellBook = player.getSpellbook();
         playerSave.fightType = player.getFightType();
+        playerSave.autocastSpellId = player.getCombat().getAutocastSpell()?.spellId?.() ?? -1;
         playerSave.autoRetaliate = player.autoRetaliateReturn();
         playerSave.xpLocked = player.experienceLockedReturn();
         playerSave.clanChat = player.getClanChatName();

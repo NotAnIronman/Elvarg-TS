@@ -1,4 +1,3 @@
-import { GameConstants } from "../../../GameConstants"
 import { World } from "../../../World"
 import { Location } from "../../../model/Location"
 import { TaskManager } from "../../../task/TaskManager"
@@ -91,12 +90,6 @@ export class ItemOnGroundManager {
         }
     }
     public static register(item: ItemOnGround) {
-        // No point spamming with spawned items...
-        let spawnable = Array.from(GameConstants.ALLOWED_SPAWNS).includes(item.getItem().getId());
-        if (spawnable) {
-            return;
-        }
-
         // Check for merge with existing stackables..
         if (item.getItem().getDefinition().isStackable()) {
             if (this.merge(item)) {

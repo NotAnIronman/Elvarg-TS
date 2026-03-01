@@ -61,6 +61,9 @@ export class NPCDeathTask extends Task {
     
     public stop(): void {
         super.stop();
+        const skipDefaultRespawn = (this.npc as any).__skipDefaultRespawn === true;
+        (this.npc as any).__skipDefaultRespawn = false;
+
         if (this.npc.getArea() !== null) {
             this.npc.getArea().leave(this.npc, false);
             this.npc.getArea().postLeave(this.npc, false);
@@ -68,7 +71,7 @@ export class NPCDeathTask extends Task {
         }
         this.npc.setDying(false);
         this.npc.setNpcTransformationId(-1);
-        if (this.npc.getDefinition().getRespawn() > 0) {
+        if (!skipDefaultRespawn && this.npc.getDefinition().getRespawn() > 0) {
             TaskManager.submit(new NPCRespawnTask(this.npc, this.npc.getDefinition().getRespawn()));
         }
         if (this.npc.isBarricade()) {

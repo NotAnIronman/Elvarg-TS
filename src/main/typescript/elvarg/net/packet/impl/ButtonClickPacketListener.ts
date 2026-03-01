@@ -148,8 +148,7 @@ export class ButtonClickPacketListener implements PacketExecutor {
 
     if (
       Autocasting.handleWeaponInterface(player, button) ||
-      Autocasting.handleAutocastTab(player, button) ||
-      Autocasting.toggleAutocast(player, button)
+      Autocasting.handleAutocastTab(player, button)
     ) {
       return;
     }

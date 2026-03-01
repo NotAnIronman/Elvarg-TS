@@ -7,6 +7,7 @@ import { Skill } from "../../../model/Skill";
 import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
 import { CombatSpell } from "./CombatSpell";
 import { Spell } from "./Spell";
+import { FightType } from "../FightType";
 const getBonusManager = () => require("../../../model/equipment/BonusManager").BonusManager as typeof import("../../../model/equipment/BonusManager").BonusManager;
 const getWeaponInterfaces = () => require("../WeaponInterfaces").WeaponInterfaces as typeof import("../WeaponInterfaces").WeaponInterfaces;
 
@@ -66,7 +67,7 @@ export class Autocasting {
 
     public static handleAutocastTab(player: Player, actionButtonId: number) {
         if (Autocasting.AUTOCAST_SPELLS.has(actionButtonId)) {
-            Autocasting.setAutocast(player, Autocasting.AUTOCAST_SPELLS.get(actionButtonId).getSpell());
+            Autocasting.setAutocast(player, Autocasting.AUTOCAST_SPELLS.get(actionButtonId) ?? null);
             getWeaponInterfaces().assign(player);
             return true;
         }
@@ -171,7 +172,9 @@ export class Autocasting {
 
     private static updateConfigsOnAutocast(player: Player, autocast: boolean) {
         if (autocast) {
-            player.getPacketSender().sendConfig(player.getFightType().getParentId(), 3);
+            player.getPacketSender().sendConfig(FightType.STAFF_BASH.getParentId(), 3);
+            player.getPacketSender().sendConfig(FightType.STAFF_FOCUS.getParentId(), 3);
+            player.getPacketSender().sendConfig(FightType.STAFF_POUND.getParentId(), 3);
         }
     }
 

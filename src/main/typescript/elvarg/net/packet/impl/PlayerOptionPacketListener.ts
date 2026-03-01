@@ -17,6 +17,12 @@ export class PlayerOptionPacketListener implements PacketExecutor {
       return;
     }
 
+    // Plain attack packets should use the currently configured autocast spell,
+    // not any stale manually-selected cast spell from an earlier magic-on-player click.
+    if (player.getCombat?.().getAutocastSpell?.() != null) {
+      player.getCombat().setCastSpell(null);
+    }
+
     player.getCombat().attack(attacked);
   }
 

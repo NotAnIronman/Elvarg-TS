@@ -6,12 +6,27 @@ export class Graphic {
     public height: GraphicHeight;
     public priority: Priority;
 
-    constructor(id: number, delay?: number, height: GraphicHeight = GraphicHeight.LOW) {
+    constructor(id: number);
+    constructor(id: number, delay: number);
+    constructor(id: number, height: GraphicHeight);
+    constructor(id: number, delay: number, height: GraphicHeight);
+    constructor(id: number, delayOrHeight?: number | GraphicHeight, heightArg?: GraphicHeight) {
         this.id = id;
-        this.delay = delay ?? -1;
-        this.height = height;
+        if (typeof heightArg === "number") {
+            this.delay = typeof delayOrHeight === "number" ? delayOrHeight : 0;
+            this.height = heightArg;
+        } else if (typeof delayOrHeight === "number" && delayOrHeight in GraphicHeight) {
+            this.delay = 0;
+            this.height = delayOrHeight as GraphicHeight;
+        } else if (typeof delayOrHeight === "number") {
+            this.delay = delayOrHeight;
+            this.height = GraphicHeight.LOW;
+        } else {
+            this.delay = 0;
+            this.height = GraphicHeight.LOW;
+        }
         this.priority = Priority.LOW;
-      }
+    }
 
     public getId(): number {
         return this.id;

@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Server } = require("../../src/main/typescript/elvarg/Server");
@@ -30,10 +32,106 @@ const { ServerLogger } = require("../../src/main/typescript/elvarg/util/ServerLo
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
+const NPC_SPAWN_FILE_CANDIDATES = [
+  path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
+  path.join(process.cwd(), "data", "npc_spawns.json"),
+];
+const NPC_FACING_BY_NAME = Object.freeze({
+  NORTH_WEST: 0,
+  NORTH: 1,
+  NORTH_EAST: 2,
+  WEST: 3,
+  EAST: 4,
+  SOUTH_WEST: 5,
+  SOUTH: 6,
+  SOUTH_EAST: 7,
+});
+const NPC_FACING_ALIASES = Object.freeze({
+  N: "NORTH",
+  NORTH: "NORTH",
+  S: "SOUTH",
+  SOUTH: "SOUTH",
+  E: "EAST",
+  EAST: "EAST",
+  W: "WEST",
+  WEST: "WEST",
+  NW: "NORTH_WEST",
+  NORTHWEST: "NORTH_WEST",
+  NORTH_WEST: "NORTH_WEST",
+  NE: "NORTH_EAST",
+  NORTHEAST: "NORTH_EAST",
+  NORTH_EAST: "NORTH_EAST",
+  SW: "SOUTH_WEST",
+  SOUTHWEST: "SOUTH_WEST",
+  SOUTH_WEST: "SOUTH_WEST",
+  SE: "SOUTH_EAST",
+  SOUTHEAST: "SOUTH_EAST",
+  SOUTH_EAST: "SOUTH_EAST",
+});
 
 function parseIntArg(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function normalizeFacingToken(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (normalized.length === 0) {
+    return null;
+  }
+  return NPC_FACING_ALIASES[normalized] ?? null;
+}
+
+function parseFacingArg(value) {
+  if (value == null) {
+    return { id: -1, label: "default" };
+  }
+  const parsedNumeric = parseIntArg(value);
+  if (parsedNumeric !== null && parsedNumeric >= -1 && parsedNumeric <= 7) {
+    return {
+      id: parsedNumeric,
+      label: parsedNumeric === -1 ? "default" : String(parsedNumeric),
+    };
+  }
+  const directionName = normalizeFacingToken(value);
+  if (!directionName) {
+    return null;
+  }
+  return { id: NPC_FACING_BY_NAME[directionName], label: directionName.toLowerCase() };
+}
+
+function resolveNpcSpawnFileForWrite() {
+  for (const candidate of NPC_SPAWN_FILE_CANDIDATES) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return NPC_SPAWN_FILE_CANDIDATES[0];
+}
+
+function appendPersistentNpcSpawn(spawnEntry) {
+  const file = resolveNpcSpawnFileForWrite();
+  const directory = path.dirname(file);
+  fs.mkdirSync(directory, { recursive: true });
+
+  let existing = [];
+  if (fs.existsSync(file)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (Array.isArray(parsed)) {
+        existing = parsed;
+      }
+    } catch (error) {
+      throw new Error(`Failed to parse npc spawns file (${file}): ${error?.message ?? error}`);
+    }
+  }
+
+  existing.push(spawnEntry);
+  fs.writeFileSync(file, `${JSON.stringify(existing, null, 2)}\n`, "utf8");
+  return file;
 }
 
 function parseCsvArgs(parts, start = 1) {
@@ -299,39 +397,67 @@ module.exports = {
       return true;
     });
 
-    // Accept common typo for convenience while testing.
-    api.registerCommand("npd", ({ player, parts }) => {
+    api.registerCommand("npcperm", ({ player, parts }) => {
       if (!requireRights(player, ownerOrDev)) {
         return true;
       }
-      const id = parseIntArg(parts[1]);
-      const amount = parts.length >= 3 ? parseIntArg(parts[2]) : 1;
-      if (id === null || id < 0 || amount === null || amount < 1) {
-        player.getPacketSender().sendMessage("Usage: ::npc id [amount]");
-        return true;
-      }
-      const spawned = queueNpcSpawn(player, id, amount);
-      player.getPacketSender().sendMessage(
-        `Queued ${spawned} NPC${spawned === 1 ? "" : "s"} (id=${id}).`
-      );
-      return true;
-    });
 
-    api.registerCommand("n", ({ player, parts }) => {
-      if (!requireRights(player, ownerOrDev)) {
-        return true;
-      }
       const id = parseIntArg(parts[1]);
-      const amount = parts.length >= 3 ? parseIntArg(parts[2]) : 1;
-      if (id === null || id < 0 || amount === null || amount < 1) {
-        player.getPacketSender().sendMessage("Usage: ::n id [amount]");
+      let radiusArg = null;
+      let facingArg = null;
+      if (parts.length >= 3) {
+        const maybeRadius = parseIntArg(parts[2]);
+        if (maybeRadius !== null) {
+          radiusArg = maybeRadius;
+          facingArg = parts.length >= 4 ? parts[3] : null;
+        } else {
+          facingArg = parts[2];
+        }
+      }
+      if (id === null || id < 0) {
+        player.getPacketSender().sendMessage("Usage: ::npcperm id [radius] [north|south|east|west|0-7]");
         return true;
       }
-      const spawned = queueNpcSpawn(player, id, amount);
+
+      if (radiusArg !== null && radiusArg < 0) {
+        player.getPacketSender().sendMessage("Radius must be 0 or higher.");
+        return true;
+      }
+
+      const facing = parseFacingArg(facingArg);
+      if (facingArg != null && facing == null) {
+        player
+          .getPacketSender()
+          .sendMessage("Invalid facing. Use north/south/east/west (or north_east etc) or -1..7.");
+        return true;
+      }
+
+      const location = player.getLocation();
+      const spawnEntry = {
+        id,
+        position: {
+          x: location.getX(),
+          y: location.getY(),
+          z: location.getZ(),
+        },
+        radius: radiusArg == null ? 0 : radiusArg,
+        facing: facing?.id ?? -1,
+      };
+
+      let file;
+      try {
+        file = appendPersistentNpcSpawn(spawnEntry);
+      } catch (error) {
+        console.error(error);
+        player.getPacketSender().sendMessage("Failed to append persistent npc spawn.");
+        return true;
+      }
+
+      const spawned = queueNpcSpawn(player, id, 1);
       player
         .getPacketSender()
         .sendMessage(
-          `Spawned ${spawned} NPC${spawned === 1 ? "" : "s"} in-memory (id=${id}). Persistent spawn file write is not enabled in plugins.`
+          `Spawned ${spawned} NPC (id=${id}) and appended to ${file} at ${location.getX()},${location.getY()},${location.getZ()} (radius=${spawnEntry.radius}, facing=${facing?.label ?? "default"}).`
         );
       return true;
     });

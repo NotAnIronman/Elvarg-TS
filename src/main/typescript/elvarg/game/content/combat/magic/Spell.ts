@@ -55,7 +55,7 @@ export abstract class Spell {
             return false;
         }
 
-        if (player.getSpellbook() === this.getSpellbook()) {
+        if (player.getSpellbook() !== this.getSpellbook()) {
             Autocasting.setAutocast(player, null);
             player.getCombat().setCastSpell(null);
             player.getCombat().reset();
@@ -63,7 +63,7 @@ export abstract class Spell {
         }
 
         const items = this.itemsRequired(player);
-        if (items !== null) {
+        if (Array.isArray(items) && items.length > 0) {
             const suppressedItems = PlayerMagicStaff.suppressRunes(player, items);
 
             if (!player.getInventory().containsAllItem(suppressedItems)) {
@@ -74,7 +74,7 @@ export abstract class Spell {
             }
 
             const equipment = this.equipmentRequired(player);
-            if (equipment !== null && !player.getEquipment().containsAllItem(equipment)) {
+            if (Array.isArray(equipment) && equipment.length > 0 && !player.getEquipment().containsAllItem(equipment)) {
                 player.getPacketSender().sendMessage("You do not have the required equipment to cast this spell.");
                 player.getCombat().setCastSpell(null);
                 player.getCombat().reset();

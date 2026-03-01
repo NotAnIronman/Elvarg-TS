@@ -575,6 +575,12 @@ export class Player extends Mobile {
         this.getCombat().reset();
         this.getSkillManager().ensureCombatBaseline();
         WeaponInterfaces.assign(this);
+        const autocastSpell = this.getCombat().getAutocastSpell();
+        if (autocastSpell != null && this.getEquipment().hasStaffEquipped()) {
+            Autocasting.setAutocast(this, autocastSpell);
+        } else {
+            this.getPacketSender().sendAutocastId(-1).sendConfig(108, 3);
+        }
 
         // Keep baseline right-click player interactions available outside wilderness/duel areas.
         this.getPacketSender().sendInteractionOption("Follow", 3, false);

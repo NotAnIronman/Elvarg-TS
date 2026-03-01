@@ -64,6 +64,9 @@ export class NPCOptionPacketListener implements PacketExecutor {
           return;
         }
         player.getCombat().setCastSpell(spell);
+      } else if (player.getCombat?.().getAutocastSpell?.() != null) {
+        // Plain attack packets should use current autocast and discard stale manual casts.
+        player.getCombat().setCastSpell(null);
       }
 
       player.getCombat().attack(npc);

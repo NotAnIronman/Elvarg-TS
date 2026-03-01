@@ -23,7 +23,7 @@ interface CombatNormalSpellOptions {
 
 export class CombatNormalSpell extends CombatSpell {
     getSpell(): CombatSpell {
-      throw new Error("Method not implemented.");
+      return this;
     }
     constructor(private readonly options: CombatNormalSpellOptions){
         super();
@@ -49,46 +49,31 @@ export class CombatNormalSpell extends CombatSpell {
     }
 
     finishCast(cast: Mobile, castOn: Mobile, accurate: boolean, damage: number): void {
-        return this.options.finishCast(cast, castOn, accurate, damage)
+        if (!accurate || damage <= 0) {
+          return;
+        }
+        this.options.finishCast?.(cast, castOn, accurate, damage);
     }
 
     baseExperience(): number {
-        if(this.options.baseExperience) {
-          return this.options.baseExperience()
-        } else {
-          return this.baseExperience()
-        }
+        return this.options.baseExperience ? this.options.baseExperience() : 0;
     }
 
     equipmentRequired(player: Player): Item[] {
-        if(this.options.equipmentRequired) {
-          return this.options.equipmentRequired(player)
-        } else {
-          return this.equipmentRequired(player)
-        }
+        return this.options.equipmentRequired ? this.options.equipmentRequired(player) : null;
     }
 
     itemsRequired(player: Player): Item[] {
-        if(this.options.itemsRequired) {
-          return this.options.itemsRequired(player)
-        } else {
-          return this.itemsRequired(player)
-        }
+        return this.options.itemsRequired ? this.options.itemsRequired(player) : null;
     }
 
     levelRequired(): number {
-        if(this.options.levelRequired) {
-          return this.options.levelRequired()
-        } else {
-          return this.levelRequired()
-        }
+        return this.options.levelRequired ? this.options.levelRequired() : 1;
     }
 
     spellEffect(cast: Mobile, castOn: Mobile): void {
         if(this.options.spellEffect) {
           return this.options.spellEffect(cast, castOn)
-        } else {
-          return this.spellEffect(cast, castOn)
         }
     }  
 

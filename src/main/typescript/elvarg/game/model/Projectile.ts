@@ -44,6 +44,25 @@ export class Projectile {
 
 
     public sendProjectile(): void {
+        let resolvedDelay = this.delay;
+        let resolvedSpeed = this.speed;
+
+        // Most combat spells use Java ProjectileBuilder defaults:
+        // start=43, end=31, delay=51, duration=-5, span=10.
+        // Older TS spell ports still pass (delay=0, speed=20), which makes
+        // spell travel/desync look off versus Java. Normalize only this legacy
+        // magic shape and keep all custom/ranged projectiles untouched.
+        if (
+            this.delay === 0 &&
+            this.speed === 20 &&
+            this.startHeight === 43 &&
+            this.endHeight === 31
+        ) {
+            const distance = this.start.getDistance(this.end);
+            resolvedDelay = 51;
+            resolvedSpeed = resolvedDelay - 5 + distance * 10;
+        }
+
         let recipients = 0;
         let skippedNull = 0;
         let skippedArea = 0;
@@ -62,7 +81,7 @@ export class Projectile {
                 continue;
             }
             recipients++;
-            player.getPacketSender().sendProjectile(this.start, this.end, 0, this.speed, this.projectileId, this.startHeight, this.endHeight, this.lockon, this.delay);
+            player.getPacketSender().sendProjectile(this.start, this.end, 0, resolvedSpeed, this.projectileId, this.startHeight, this.endHeight, this.lockon, resolvedDelay);
         }
         if (process.env.PROJECTILE_DEBUG === "1") {
             console.log(

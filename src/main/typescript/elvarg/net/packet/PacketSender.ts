@@ -678,11 +678,12 @@ export class PacketSender {
   }
 
   public sendString(string: string, id: number): PacketSender {
-    if (!this.player.getFrameUpdater().shouldUpdate(string, id)) {
+    const safeText = String(string ?? "");
+    if (!this.player.getFrameUpdater().shouldUpdate(safeText, id)) {
       return this;
     }
     const out = new PacketBuilder(126, PacketType.VARIABLE_SHORT);
-    out.putString(string);
+    out.putString(safeText);
     out.putInt(id);
     this.player.getSession().write(out);
     return this;

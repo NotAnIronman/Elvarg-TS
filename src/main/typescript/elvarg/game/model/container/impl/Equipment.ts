@@ -96,9 +96,24 @@ export class Equipment extends ItemContainer {
 
     public hasStaffEquipped(): boolean {
         const staff = this.get(Equipment.WEAPON_SLOT);
+        if (staff == null || staff.getId() <= 0) {
+            return false;
+        }
+
         const WeaponInterfaces = getWeaponInterfaces();
-        return (staff != null && (this.player.getWeapon() == WeaponInterfaces.STAFF
-                || this.player.getWeapon() == WeaponInterfaces.ANCIENT_STAFF));
+        const equippedWeaponInterface = staff.getDefinition()?.getWeaponInterface?.();
+        if (equippedWeaponInterface != null) {
+            return (
+                equippedWeaponInterface == WeaponInterfaces.STAFF ||
+                equippedWeaponInterface == WeaponInterfaces.ANCIENT_STAFF
+            );
+        }
+
+        // Fallback for any edge-case definitions that don't expose a weapon interface.
+        return (
+            this.player.getWeapon() == WeaponInterfaces.STAFF ||
+            this.player.getWeapon() == WeaponInterfaces.ANCIENT_STAFF
+        );
     }
 
     public getWeapon(): Item {

@@ -23,16 +23,16 @@ interface CombatEffectSpellInterface {
 
 export class  CombatEffectSpell extends CombatSpell {
     levelRequired(): number {
-        throw new Error("Method not implemented.");
+        return this.options.levelRequired();
     }
     getSpell(): CombatSpell {
-        throw new Error("Method not implemented.");
+        return this;
     }
     itemsRequired(player: Player): Item[] {
-        throw new Error("Method not implemented.");
+        return this.options.itemsRequired(player);
     }
     baseExperience() {
-        throw new Error("Method not implemented.");
+        return this.options.baseExperience();
     }
 
     constructor(private readonly options: CombatEffectSpellInterface) {
@@ -67,7 +67,7 @@ export class  CombatEffectSpell extends CombatSpell {
         }
     }
     public spellEffect(cast: Mobile, castOn: Mobile) {
-
+        this.options.spellEffect(cast, castOn);
     }
 
 
