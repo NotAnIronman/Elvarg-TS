@@ -1,5 +1,6 @@
 {
   "ignore": [
-    "data/saves/**"
+    "data/saves/**",
+    "plugins/world/data/**"
   ]
 }
