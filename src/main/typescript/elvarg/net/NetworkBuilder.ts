@@ -23,6 +23,7 @@ import { PlayerRights } from "../game/model/rights/PlayerRights";
 import { Skill } from "../game/model/Skill";
 import { ItemOnGroundManager } from "../game/entity/impl/grounditem/ItemOnGroundManager";
 import { ObjectManager } from "../game/entity/impl/object/ObjectManager";
+import { MapRegionReplacementManager } from "../game/collision/MapRegionReplacementManager";
 import {
   getExpectedOutboundPacketSize,
   getExpectedOutboundPacketType,
@@ -623,6 +624,22 @@ class LoginSession {
     mapPayload.writeUInt8((((regionX & 0xff) + 128) & 0xff) >>> 0, 1); // ValueType.A on low byte
     mapPayload.writeUInt8(((regionY >> 8) & 0xff) >>> 0, 2);
     mapPayload.writeUInt8((regionY & 0xff) >>> 0, 3);
+
+    // Stream visible replacement regions before map load to avoid showing vanilla terrain first.
+    if (this.gamePlayer) {
+      try {
+        MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
+          this.gamePlayer,
+          location.x,
+          location.y
+        );
+      } catch (err) {
+        this.log("visible_region_replacements_failed", {
+          err: (err as Error)?.message ?? String(err),
+        });
+      }
+    }
+
     this.sendPacket(73, mapPayload, PacketType.FIXED, "map_region");
 
     // Force a clean regional sync on login.

@@ -14,6 +14,8 @@ type RegionMapFiles = {
 type TerrainDecodeResult = {
   heights: Buffer;
   overlays: Buffer;
+  overlayTypes: Buffer;
+  overlayOrientations: Buffer;
   underlays: Buffer;
   flags: Buffer;
 };
@@ -37,6 +39,8 @@ type ProceduralRegionPayload = {
   planes: number;
   heightsB64: string;
   overlaysB64: string;
+  overlayTypesB64: string;
+  overlayOrientationsB64: string;
   underlaysB64: string;
   flagsB64: string;
   buildingPlacements: ProceduralObjectPlacement[];
@@ -126,6 +130,59 @@ export class MapRegionReplacementManager {
       (a, b) => a.regionId - b.regionId
     );
     for (const replacement of ordered) {
+      if (this.sendPayloadToPlayer(player, replacement.payload)) {
+        sent++;
+      }
+    }
+    return sent;
+  }
+
+  public static sendVisibleReplacementsToPlayer(
+    player: any,
+    tileX: number,
+    tileY: number,
+    chunkRadius: number = 6
+  ): number {
+    if (!Number.isInteger(tileX) || !Number.isInteger(tileY)) {
+      return 0;
+    }
+    const visibleRegionIds = this.computeVisibleRegionIds(tileX, tileY, chunkRadius);
+    if (visibleRegionIds.size === 0) {
+      return 0;
+    }
+
+    let sent = 0;
+    const orderedIds = Array.from(visibleRegionIds).sort((a, b) => a - b);
+    for (const regionId of orderedIds) {
+      const replacement = this.replacements.get(regionId);
+      if (!replacement) {
+        continue;
+      }
+      if (this.sendPayloadToPlayer(player, replacement.payload)) {
+        sent++;
+      }
+    }
+    return sent;
+  }
+
+  public static sendNonVisibleReplacementsToPlayer(
+    player: any,
+    tileX: number,
+    tileY: number,
+    chunkRadius: number = 6
+  ): number {
+    if (!Number.isInteger(tileX) || !Number.isInteger(tileY)) {
+      return this.sendAllReplacementsToPlayer(player);
+    }
+    const visibleRegionIds = this.computeVisibleRegionIds(tileX, tileY, chunkRadius);
+    let sent = 0;
+    const ordered = Array.from(this.replacements.values()).sort(
+      (a, b) => a.regionId - b.regionId
+    );
+    for (const replacement of ordered) {
+      if (visibleRegionIds.has(replacement.regionId)) {
+        continue;
+      }
       if (this.sendPayloadToPlayer(player, replacement.payload)) {
         sent++;
       }
@@ -232,6 +289,33 @@ export class MapRegionReplacementManager {
     return chunks;
   }
 
+  private static computeVisibleRegionIds(
+    tileX: number,
+    tileY: number,
+    chunkRadius: number
+  ): Set<number> {
+    const chunkX = tileX >> 3;
+    const chunkY = tileY >> 3;
+    const minRegionX = (chunkX - chunkRadius) >> 3;
+    const maxRegionX = (chunkX + chunkRadius) >> 3;
+    const minRegionY = (chunkY - chunkRadius) >> 3;
+    const maxRegionY = (chunkY + chunkRadius) >> 3;
+    const ids = new Set<number>();
+
+    for (let regionX = minRegionX; regionX <= maxRegionX; regionX++) {
+      if (regionX < 0 || regionX > 0xff) {
+        continue;
+      }
+      for (let regionY = minRegionY; regionY <= maxRegionY; regionY++) {
+        if (regionY < 0 || regionY > 0xff) {
+          continue;
+        }
+        ids.add(((regionX & 0xff) << 8) | (regionY & 0xff));
+      }
+    }
+    return ids;
+  }
+
   private static buildProceduralPayload(
     regionId: number,
     terrainData: Uint8Array,
@@ -252,6 +336,8 @@ export class MapRegionReplacementManager {
       planes: this.REGION_PLANES,
       heightsB64: terrain.heights.toString("base64"),
       overlaysB64: terrain.overlays.toString("base64"),
+      overlayTypesB64: terrain.overlayTypes.toString("base64"),
+      overlayOrientationsB64: terrain.overlayOrientations.toString("base64"),
       underlaysB64: terrain.underlays.toString("base64"),
       flagsB64: terrain.flags.toString("base64"),
       buildingPlacements: placements,
@@ -265,6 +351,8 @@ export class MapRegionReplacementManager {
     const tileCount = this.REGION_PLANES * this.REGION_SIZE * this.REGION_SIZE;
     const heights = Buffer.alloc(tileCount * 2);
     const overlays = Buffer.alloc(tileCount);
+    const overlayTypes = Buffer.alloc(tileCount);
+    const overlayOrientations = Buffer.alloc(tileCount);
     const underlays = Buffer.alloc(tileCount);
     const flags = Buffer.alloc(tileCount);
     const stream = new CollisionBuffer(data);
@@ -335,6 +423,8 @@ export class MapRegionReplacementManager {
                 localX * this.REGION_SIZE +
                 localY;
               overlays[idx] = stream.readUnsignedByte() & 0xff;
+              overlayTypes[idx] = Math.floor((tileType - 2) / 4) & 0xff;
+              overlayOrientations[idx] = (tileType - 2) & 0x3;
             } else if (tileType <= 81) {
               const idx =
                 z * this.REGION_SIZE * this.REGION_SIZE +
@@ -360,7 +450,14 @@ export class MapRegionReplacementManager {
       }
     }
 
-    return { heights, overlays, underlays, flags };
+    return {
+      heights,
+      overlays,
+      overlayTypes,
+      overlayOrientations,
+      underlays,
+      flags,
+    };
   }
 
   private static clampHeightRaw(value: number): number {

@@ -36,7 +36,7 @@ This is plugin-based and developer-only (commands require developer/owner rights
   - Ladder chain parsing/placement logic for multi-floor houses.
 - `ProceduralDataPaths.js`
   - Shared data output paths.
-- `ExtendEdgevilleMine.plugin.js`
+- `ReplaceMapRegions.plugin.js`
   - Startup hook for runtime region replacement via plugin API.
   - Current default replaces region `12343` from `plugins/world/data/12343.pack`.
 
