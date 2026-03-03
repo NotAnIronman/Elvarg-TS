@@ -368,6 +368,10 @@ export interface PluginApi {
     objectIds: number | number[],
     handler: (event: PluginObjectInteractionEvent) => void | boolean
   ): void;
+  replaceMapRegion(
+    regionId: number,
+    source: string | [string, string]
+  ): void;
   registerPacketListener(opcode: number, listener: PacketExecutor): void;
   registerAlivePacketListener(opcode: number, listener: PacketExecutor): void;
   setPlayerPersistence(persistence: PlayerPersistence): void;

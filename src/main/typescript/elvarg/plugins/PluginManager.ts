@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { GameConstants } from "../game/GameConstants";
+import { MapRegionReplacementManager } from "../game/collision/MapRegionReplacementManager";
 import { PacketExecutor } from "../net/packet/PacketExecutor";
 import {
   PluginApi,
@@ -193,6 +194,12 @@ export class PluginManager {
           err
         );
       }
+    }
+
+    try {
+      MapRegionReplacementManager.sendAllReplacementsToPlayer(event.player);
+    } catch (err) {
+      console.error("[plugins] failed to stream region replacements on login", err);
     }
   }
 
@@ -1650,6 +1657,82 @@ export class PluginManager {
       },
       onObjectFifthClick: (objectIds, handler) => {
         registerObjectClickHook(5, objectIds, handler, "fifth");
+      },
+      replaceMapRegion: (regionId, source) => {
+        if (!Number.isInteger(regionId) || regionId < 0 || regionId > 0xffff) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid replaceMapRegion regionId=${regionId}`
+          );
+          return;
+        }
+        const validSourceArray =
+          Array.isArray(source) &&
+          source.length === 2 &&
+          typeof source[0] === "string" &&
+          typeof source[1] === "string";
+        const validSource = typeof source === "string" || validSourceArray;
+        if (!validSource) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid replaceMapRegion source`
+          );
+          return;
+        }
+
+        try {
+          const result = MapRegionReplacementManager.replaceMapRegion(
+            regionId,
+            source as string | [string, string]
+          );
+
+          let clippingReloaded = false;
+          try {
+            const collisionModule = require("../game/collision/RegionManager");
+            clippingReloaded =
+              collisionModule?.RegionManager?.reloadRegion?.(regionId) === true;
+          } catch (reloadErr) {
+            console.error(
+              `[plugins] ${pluginName} failed to reload clipping for region ${regionId}`,
+              reloadErr
+            );
+          }
+
+          let streamedPlayers = 0;
+          try {
+            const worldModule = require("../game/World");
+            const World = worldModule?.World;
+            if (World?.getPlayers && World?.isPlayerSessionConnected) {
+              const players = World.getPlayers();
+              players?.forEach?.((player: any) => {
+                if (!player || !World.isPlayerSessionConnected(player)) {
+                  return;
+                }
+                if (MapRegionReplacementManager.sendReplacementToPlayer(player, regionId)) {
+                  streamedPlayers++;
+                }
+              });
+            }
+          } catch (streamErr) {
+            console.error(
+              `[plugins] ${pluginName} failed to stream region replacement ${regionId}`,
+              streamErr
+            );
+          }
+
+          console.info(`[plugins] ${pluginName} replaced map region`, {
+            regionId,
+            source: result.source,
+            terrainBytes: result.terrainBytes,
+            objectBytes: result.objectBytes,
+            objectCount: result.objectCount,
+            clippingReloaded,
+            streamedPlayers,
+          });
+        } catch (err) {
+          console.error(
+            `[plugins] ${pluginName} failed to replace map region ${regionId}`,
+            err
+          );
+        }
       },
       registerPacketListener: (opcode, listener) => {
         if (

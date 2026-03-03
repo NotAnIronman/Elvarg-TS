@@ -13,9 +13,7 @@ import pako from 'pako';
 import * as zlib from "zlib";
 import * as path from "path";
 import { PluginManager } from "../../plugins/PluginManager";
-
-
-
+import { MapRegionReplacementManager } from "./MapRegionReplacementManager";
 
 export class RegionManager {
     public static PROJECTILE_NORTH_WEST_BLOCKED = 0x200;
@@ -724,6 +722,41 @@ export class RegionManager {
         return this.canMove(position.getX(), position.getY(), end.getX(), end.getY(), position.getZ(), size, size, privateArea);
     }
 
+    private static createEmptyClipGrid(): number[][][] {
+        return Array.from({ length: 4 }, () =>
+            Array.from({ length: 64 }, () => new Array(64).fill(0))
+        );
+    }
+
+    private static clearRegionMapObjects(regionId: number): void {
+        const absX = ((regionId >> 8) & 0xff) * 64;
+        const absY = (regionId & 0xff) * 64;
+        for (let z = 0; z < 4; z++) {
+            for (let localX = 0; localX < 64; localX++) {
+                for (let localY = 0; localY < 64; localY++) {
+                    const hash = MapObjects.getHash(absX + localX, absY + localY, z);
+                    MapObjects.mapObjects.delete(hash);
+                }
+            }
+        }
+    }
+
+    public static reloadRegion(regionId: number): boolean {
+        const region = RegionManager.getRegionid(regionId);
+        if (!region) {
+            return false;
+        }
+        RegionManager.loadingRegions.delete(regionId);
+        RegionManager.clearRegionMapObjects(regionId);
+        region.clips = RegionManager.createEmptyClipGrid();
+        region.setLoaded(false);
+
+        const absX = ((regionId >> 8) & 0xff) * 64;
+        const absY = (regionId & 0xff) * 64;
+        RegionManager.loadMapFiles(absX, absY);
+        return region.isLoaded();
+    }
+
     public static loadMapFiles(x: number, y: number) {
         try {
             const regionId = RegionManager.regionIdForTile(x, y);
@@ -739,10 +772,16 @@ export class RegionManager {
 
 
             // Attempt to create streams..
+            const replacement = MapRegionReplacementManager.getReplacementMapData(regionId);
             const terrainPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${r.getTerrainFile()}.dat`);
             const objectPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${r.getObjectFile()}.dat`);
-            const gFileData = fs.existsSync(terrainPath) ? zlib.gunzipSync(fs.readFileSync(terrainPath)) : null;
-            const oFileData = fs.existsSync(objectPath) ? zlib.gunzipSync(fs.readFileSync(objectPath)) : null;
+            const defaultObjectData = fs.existsSync(objectPath) ? zlib.gunzipSync(fs.readFileSync(objectPath)) : null;
+            const gFileData = replacement?.terrainData
+                ? replacement.terrainData
+                : (fs.existsSync(terrainPath) ? zlib.gunzipSync(fs.readFileSync(terrainPath)) : null);
+            const oFileData = replacement
+                ? (replacement.objectData ?? defaultObjectData)
+                : defaultObjectData;
 
             // Don't allow ground file to be invalid..
             if (!gFileData) {

@@ -36,6 +36,26 @@ This is plugin-based and developer-only (commands require developer/owner rights
   - Ladder chain parsing/placement logic for multi-floor houses.
 - `ProceduralDataPaths.js`
   - Shared data output paths.
+- `ExtendEdgevilleMine.plugin.js`
+  - Startup hook for runtime region replacement via plugin API.
+  - Current default replaces region `12343` from `plugins/world/data/12343.pack`.
+
+## Runtime Region Replacement Hook
+
+Use the plugin API hook:
+
+```js
+api.replaceMapRegion(regionId, source);
+```
+
+Supported `source` formats:
+- `"/absolute/or/relative/path/to/12343.pack"`
+- `["/path/to/terrain.dat|.gz", "/path/to/object.dat|.gz"]`
+
+Behavior:
+- Replaces server clipping/runtime map decode for that region.
+- Streams a procedural override payload (opcode `12`) to connected players so they see the same map edits.
+- Re-streams active replacements on player login.
 
 ## Data Files
 
