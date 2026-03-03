@@ -3,6 +3,9 @@ const path = require("path");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { PacketBuilder } = require("../../src/main/typescript/elvarg/net/packet/PacketBuilder");
 const { PacketType } = require("../../src/main/typescript/elvarg/net/packet/PacketType");
+const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
+const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { generateBuildingsForRegion, generateSingleHouseForRegion } = require("./BuildingUtil");
 const { generateStreetTownForRegion } = require("./TownUtil");
 const { ObjectType } = require("./ObjectType");
@@ -11,8 +14,11 @@ const {
   writeLearnedPresetFile,
   writeHouseExample,
   checkHouseBoundary,
+  decodeRegionObjects,
+  decodeRegionTerrainData,
   HOUSE_DUMP_DIRECTORY,
 } = require("./RegionBuildingAnalysisUtil");
+const { dumpTerrainBiome, loadTerrainBiome } = require("./TerrainBiomeUtil");
 
 const PROCEDURAL_REGION_OPCODE = 12;
 const REGION_PACKET_TYPE = Object.freeze({
@@ -29,6 +35,8 @@ const PROCEDURAL_FLOOR_OVERLAYS_ENABLED = true;
 
 let requestCounter = 0;
 const playerProceduralRegionOverrides = new Map();
+const playerProceduralRegionPayloads = new Map();
+const regionProceduralClipOverrides = new Map();
 
 function isDev(player) {
   const rights = player?.getRights?.();
@@ -111,6 +119,201 @@ function clearTrackedOverrideRegionsForPlayer(player) {
     return;
   }
   playerProceduralRegionOverrides.delete(key);
+  playerProceduralRegionPayloads.delete(key);
+}
+
+function getTrackedOverrideRegionsForPlayer(player) {
+  const key = getPlayerOverrideKey(player);
+  if (!key) {
+    return null;
+  }
+  return playerProceduralRegionOverrides.get(key) ?? null;
+}
+
+function trackPlayerRegionPayload(player, payload) {
+  const key = getPlayerOverrideKey(player);
+  const regionIdValue = payload?.regionId | 0;
+  if (!key || !payload || !Number.isInteger(regionIdValue) || regionIdValue < 0) {
+    return;
+  }
+  let perPlayer = playerProceduralRegionPayloads.get(key);
+  if (!perPlayer) {
+    perPlayer = new Map();
+    playerProceduralRegionPayloads.set(key, perPlayer);
+  }
+  perPlayer.set(regionIdValue, payload);
+}
+
+function getTrackedRegionPayload(player, regionIdValue) {
+  const key = getPlayerOverrideKey(player);
+  if (!key || !Number.isInteger(regionIdValue) || regionIdValue < 0) {
+    return null;
+  }
+  const perPlayer = playerProceduralRegionPayloads.get(key);
+  if (!perPlayer) {
+    return null;
+  }
+  return perPlayer.get(regionIdValue) ?? null;
+}
+
+function createEmptyClipGrid() {
+  return Array.from({ length: REGION_PLANES }, () => Array.from({ length: REGION_SIZE }, () => new Array(REGION_SIZE).fill(0)));
+}
+
+function resetRegionToTerrainOnlyClipping(regionId) {
+  if (!Number.isInteger(regionId) || regionId < 0) {
+    return { appliedTerrainTiles: 0, terrainData: null };
+  }
+  const region = RegionManager.getRegionid(regionId);
+  if (!region) {
+    return { appliedTerrainTiles: 0, terrainData: null };
+  }
+
+  region.clips = createEmptyClipGrid();
+
+  const terrainData = decodeRegionTerrainData(regionId);
+  if (!terrainData) {
+    return { appliedTerrainTiles: 0, terrainData: null };
+  }
+
+  const absX = ((regionId >> 8) & 0xff) * REGION_SIZE;
+  const absY = (regionId & 0xff) * REGION_SIZE;
+  let appliedTerrainTiles = 0;
+  for (let z = 0; z < REGION_PLANES; z++) {
+    for (let localX = 0; localX < REGION_SIZE; localX++) {
+      for (let localY = 0; localY < REGION_SIZE; localY++) {
+        const flags = terrainData?.flags?.[z]?.[localX]?.[localY] | 0;
+        if ((flags & 1) !== 1) {
+          continue;
+        }
+        let height = z;
+        if (((terrainData?.flags?.[1]?.[localX]?.[localY] | 0) & 2) === 2) {
+          height--;
+        }
+        if (height < 0 || height >= REGION_PLANES) {
+          continue;
+        }
+        RegionManager.addClipping(absX + localX, absY + localY, height, 0x200000, null, region);
+        appliedTerrainTiles++;
+      }
+    }
+  }
+
+  return { appliedTerrainTiles, terrainData };
+}
+
+function applyCacheObjectClipping(regionId, terrainData) {
+  const objects = decodeRegionObjects(regionId);
+  const absX = ((regionId >> 8) & 0xff) * REGION_SIZE;
+  const absY = (regionId & 0xff) * REGION_SIZE;
+  let restoredObjects = 0;
+
+  for (const obj of objects) {
+    const id = obj?.id | 0;
+    if (id <= 0) {
+      continue;
+    }
+    const localX = (obj?.x | 0) - absX;
+    const localY = (obj?.y | 0) - absY;
+    if (localX < 0 || localX >= REGION_SIZE || localY < 0 || localY >= REGION_SIZE) {
+      continue;
+    }
+    let height = obj?.z | 0;
+    if (((terrainData?.flags?.[1]?.[localX]?.[localY] | 0) & 2) === 2) {
+      height--;
+    }
+    if (height < 0 || height >= REGION_PLANES) {
+      continue;
+    }
+    const type = clamp(obj?.type | 0, ObjectType.MIN, ObjectType.MAX);
+    const orientation = (obj?.orientation | 0) & 0x3;
+    try {
+      RegionManager.addObjectClipping(new GameObject(id, new Location(obj.x | 0, obj.y | 0, height), type, orientation, null));
+      restoredObjects++;
+    } catch {
+      // Ignore invalid cache object clipping entries.
+    }
+  }
+
+  return restoredObjects;
+}
+
+function clearProceduralRegionClipping(regionId) {
+  const reset = resetRegionToTerrainOnlyClipping(regionId);
+  if (!reset.terrainData) {
+    regionProceduralClipOverrides.delete(regionId);
+    return 0;
+  }
+  const restoredObjects = applyCacheObjectClipping(regionId, reset.terrainData);
+  regionProceduralClipOverrides.delete(regionId);
+  return restoredObjects;
+}
+
+function buildProceduralClipObjects(payload) {
+  if (!payload || !Array.isArray(payload.buildingPlacements)) {
+    return [];
+  }
+  const baseX = (payload.regionX | 0) * REGION_SIZE;
+  const baseY = (payload.regionY | 0) * REGION_SIZE;
+  const objects = [];
+  for (const placement of payload.buildingPlacements) {
+    const id = placement?.id | 0;
+    if (id <= 0) {
+      continue;
+    }
+    const localX = placement?.x | 0;
+    const localY = placement?.y | 0;
+    const z = placement?.z | 0;
+    if (localX < 0 || localX >= REGION_SIZE || localY < 0 || localY >= REGION_SIZE || z < 0 || z >= REGION_PLANES) {
+      continue;
+    }
+    const type = clamp(placement?.type | 0, ObjectType.MIN, ObjectType.MAX);
+    const orientation = (placement?.orientation | 0) & 0x3;
+    objects.push(new GameObject(id, new Location(baseX + localX, baseY + localY, z), type, orientation, null));
+  }
+  return objects;
+}
+
+function applyProceduralRegionClipping(payload) {
+  const regionIdValue = payload?.regionId | 0;
+  if (!Number.isInteger(regionIdValue) || regionIdValue < 0) {
+    return { cleared: 0, applied: 0 };
+  }
+  const reset = resetRegionToTerrainOnlyClipping(regionIdValue);
+  const cleared = reset.appliedTerrainTiles;
+  if (!reset.terrainData) {
+    return { cleared, applied: 0 };
+  }
+  const objects = buildProceduralClipObjects(payload);
+  let applied = 0;
+  for (const object of objects) {
+    try {
+      RegionManager.addObjectClipping(object);
+      applied++;
+    } catch {
+      // Ignore invalid object clipping cases.
+    }
+  }
+  if (applied > 0) {
+    regionProceduralClipOverrides.set(regionIdValue, true);
+  } else {
+    regionProceduralClipOverrides.delete(regionIdValue);
+  }
+  return { cleared, applied };
+}
+
+function clearProceduralClippingForPlayer(player) {
+  const tracked = getTrackedOverrideRegionsForPlayer(player);
+  if (!tracked || tracked.size === 0) {
+    clearTrackedOverrideRegionsForPlayer(player);
+    return 0;
+  }
+  let cleared = 0;
+  for (const regionIdValue of tracked) {
+    cleared += clearProceduralRegionClipping(regionIdValue);
+  }
+  clearTrackedOverrideRegionsForPlayer(player);
+  return cleared;
 }
 
 function tileNoise(x, y, seed) {
@@ -241,6 +444,9 @@ function flattenHeightsAroundRect(heights, rect, size) {
 
 function generateRegionPayload(regionX, regionY, seed, options = null) {
   const customPlacementsMode = Array.isArray(options?.buildingPlacements);
+  const terrainUnderlayIds = Array.isArray(options?.terrainUnderlayIds)
+    ? options.terrainUnderlayIds.filter((id) => Number.isInteger(id) && id > 0).map((id) => id | 0)
+    : [];
   const tileCount = REGION_PLANES * REGION_SIZE * REGION_SIZE;
   const heights = Buffer.allocUnsafe(tileCount * 2);
   const overlays = Buffer.allocUnsafe(tileCount);
@@ -280,7 +486,6 @@ function generateRegionPayload(regionX, regionY, seed, options = null) {
       for (let localY = 0; localY < REGION_SIZE; localY++) {
         const worldX = regionX * REGION_SIZE + localX;
         const worldY = regionY * REGION_SIZE + localY;
-        const baseNoise = smoothedNoise(worldX, worldY, seed);
         const plane0Height = baseHeights[localX][localY];
         const heightValue = Math.max(4, plane0Height - plane * 30);
         heights.writeUInt16LE(heightValue & 0xffff, tileIndex * 2);
@@ -289,7 +494,19 @@ function generateRegionPayload(regionX, regionY, seed, options = null) {
         let underlay = 0;
         if (plane === 0) {
           // Keep world terrain mostly natural/grass-like; avoid blue/grey overlays.
-          underlay = 1;
+          if (terrainUnderlayIds.length > 0) {
+            const underlayNoise = smoothedNoise(worldX + 31, worldY + 17, seed ^ 0x4d3f9b);
+            const paletteIndex = Math.min(
+              terrainUnderlayIds.length - 1,
+              ((underlayNoise * terrainUnderlayIds.length) / 256) | 0
+            );
+            underlay = terrainUnderlayIds[paletteIndex] | 0;
+          } else {
+            underlay = 1;
+          }
+          if (underlay <= 0) {
+            underlay = 1;
+          }
           overlay = 0;
         }
 
@@ -460,7 +677,9 @@ function streamProceduralPayload(player, payload, messagePrefix = "[proc-region]
   sendProceduralPacket(player, REGION_PACKET_TYPE.END, requestId, mapRegionId, chunks.length, chunks.length, String(json.length));
 
   if (trackOverride) {
+    applyProceduralRegionClipping(payload);
     trackPlayerOverrideRegion(player, mapRegionId);
+    trackPlayerRegionPayload(player, payload);
   }
   if (!silent) {
     player.getPacketSender().sendMessage(
@@ -742,6 +961,86 @@ function buildHousePayloadAtPlayer(player, styleTag, indexArg) {
   };
 }
 
+function decodeTrackedTerrainArrays(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  if ((payload?.size | 0) !== REGION_SIZE || (payload?.planes | 0) !== REGION_PLANES) {
+    return null;
+  }
+  if (
+    typeof payload?.heightsB64 !== "string" ||
+    typeof payload?.overlaysB64 !== "string" ||
+    typeof payload?.underlaysB64 !== "string" ||
+    typeof payload?.flagsB64 !== "string"
+  ) {
+    return null;
+  }
+
+  const tileCount = REGION_PLANES * REGION_SIZE * REGION_SIZE;
+  try {
+    const heightsBuffer = Buffer.from(payload.heightsB64, "base64");
+    const overlaysBuffer = Buffer.from(payload.overlaysB64, "base64");
+    const underlaysBuffer = Buffer.from(payload.underlaysB64, "base64");
+    const flagsBuffer = Buffer.from(payload.flagsB64, "base64");
+    if (
+      heightsBuffer.length < tileCount * 2 ||
+      overlaysBuffer.length < tileCount ||
+      underlaysBuffer.length < tileCount ||
+      flagsBuffer.length < tileCount
+    ) {
+      return null;
+    }
+
+    const heights = new Int32Array(tileCount);
+    const overlays = new Uint8Array(tileCount);
+    const underlays = new Uint8Array(tileCount);
+    const flags = new Uint8Array(tileCount);
+    for (let idx = 0; idx < tileCount; idx++) {
+      heights[idx] = heightsBuffer.readUInt16LE(idx * 2) | 0;
+      overlays[idx] = overlaysBuffer[idx] & 0xff;
+      underlays[idx] = underlaysBuffer[idx] & 0xff;
+      flags[idx] = flagsBuffer[idx] & 0xff;
+    }
+    return { heights, overlays, underlays, flags };
+  } catch {
+    return null;
+  }
+}
+
+function normalizePayloadPlacements(payload) {
+  if (!Array.isArray(payload?.buildingPlacements)) {
+    return [];
+  }
+  const placements = [];
+  for (const placement of payload.buildingPlacements) {
+    const id = placement?.id | 0;
+    const x = placement?.x | 0;
+    const y = placement?.y | 0;
+    const z = placement?.z | 0;
+    if (id <= 0 || x < 0 || x >= REGION_SIZE || y < 0 || y >= REGION_SIZE || z < 0 || z >= REGION_PLANES) {
+      continue;
+    }
+    placements.push({
+      id,
+      x,
+      y,
+      z,
+      type: clamp(placement?.type | 0, ObjectType.MIN, ObjectType.MAX),
+      orientation: (placement?.orientation | 0) & 0x3,
+    });
+  }
+  return placements;
+}
+
+function normalizeCacheHeightForPayload(rawHeight) {
+  const value = rawHeight | 0;
+  if (value < 0) {
+    return clamp(Math.abs(value) >> 3, 4, 120);
+  }
+  return clamp(value, 4, 120);
+}
+
 function buildGeneratedHousePayloadAtPlayer(player, styleTag, seed, houseType = null) {
   const location = player.getLocation();
   const regionX = (location.getX() / REGION_SIZE) | 0;
@@ -750,6 +1049,7 @@ function buildGeneratedHousePayloadAtPlayer(player, styleTag, seed, houseType = 
   const localPlayerY = location.getY() - regionY * REGION_SIZE;
   const playerZ = location.getZ() | 0;
   const normalizedSeed = seed >>> 0;
+  const mapRegionId = regionId(regionX, regionY);
 
   const normalizedType = normalizeHouseType(houseType);
   const generated = generateSingleHouseForRegion(
@@ -769,21 +1069,275 @@ function buildGeneratedHousePayloadAtPlayer(player, styleTag, seed, houseType = 
     throw new Error(`Generated house for style '${styleTag}' has no footprint.`);
   }
 
-  const payload = generateRegionPayload(regionX, regionY, normalizedSeed, {
-    buildings: generated.buildings,
-    floorPatches: generated.floorPatches,
-    buildingPlacements: generated.placements,
-    flattenRects: [{ x: primary.x, y: primary.y, w: primary.width, h: primary.height }],
-  });
+  const placementMargin = 1;
+  const flattenMargin = 0;
+  const targetX = clamp(
+    localPlayerX - ((primary.width / 2) | 0),
+    placementMargin,
+    REGION_SIZE - primary.width - placementMargin
+  );
+  const targetY = clamp(
+    localPlayerY - ((primary.height / 2) | 0),
+    placementMargin,
+    REGION_SIZE - primary.height - placementMargin
+  );
+  const shiftX = targetX - (primary.x | 0);
+  const shiftY = targetY - (primary.y | 0);
+
+  const shiftedBuildings = (generated.buildings ?? [])
+    .map((building) => ({
+      ...building,
+      x: (building?.x | 0) + shiftX,
+      y: (building?.y | 0) + shiftY,
+    }))
+    .filter((building) => {
+      const x = building.x | 0;
+      const y = building.y | 0;
+      const w = Math.max(1, building.width | 0);
+      const h = Math.max(1, building.height | 0);
+      return x >= 0 && y >= 0 && x + w <= REGION_SIZE && y + h <= REGION_SIZE;
+    });
+
+  const shiftedFloorPatches = (generated.floorPatches ?? [])
+    .map((patch) => ({
+      ...patch,
+      x: (patch?.x | 0) + shiftX,
+      y: (patch?.y | 0) + shiftY,
+    }))
+    .filter((patch) => {
+      const x = patch.x | 0;
+      const y = patch.y | 0;
+      const w = Math.max(1, patch.width | 0);
+      const h = Math.max(1, patch.height | 0);
+      return x >= 0 && y >= 0 && x + w <= REGION_SIZE && y + h <= REGION_SIZE;
+    });
+
+  const housePlacements = (generated.placements ?? [])
+    .map((placement) => ({
+      id: placement?.id | 0,
+      x: (placement?.x | 0) + shiftX,
+      y: (placement?.y | 0) + shiftY,
+      z: clamp(placement?.z | 0, 0, REGION_PLANES - 1),
+      type: clamp(placement?.type | 0, ObjectType.MIN, ObjectType.MAX),
+      orientation: (placement?.orientation | 0) & 0x3,
+    }))
+    .filter((placement) => placement.id > 0 && placement.x >= 0 && placement.x < REGION_SIZE && placement.y >= 0 && placement.y < REGION_SIZE);
+
+  if (shiftedBuildings.length === 0 || housePlacements.length === 0) {
+    throw new Error(`Failed to position generated house for style '${styleTag}' near player.`);
+  }
+
+  const placedPrimary = shiftedBuildings[0];
+  const clearMinX = clamp((placedPrimary.x | 0) - flattenMargin, 0, REGION_SIZE - 1);
+  const clearMinY = clamp((placedPrimary.y | 0) - flattenMargin, 0, REGION_SIZE - 1);
+  const clearMaxX = clamp(
+    (placedPrimary.x | 0) + (placedPrimary.width | 0) + flattenMargin - 1,
+    0,
+    REGION_SIZE - 1
+  );
+  const clearMaxY = clamp(
+    (placedPrimary.y | 0) + (placedPrimary.height | 0) + flattenMargin - 1,
+    0,
+    REGION_SIZE - 1
+  );
+
+  const indexFor = (plane, x, y) => plane * REGION_SIZE * REGION_SIZE + x * REGION_SIZE + y;
+  const tileCount = REGION_PLANES * REGION_SIZE * REGION_SIZE;
+  let heights;
+  let overlays;
+  let underlays;
+  let flags;
+  let basePlacements = [];
+
+  const trackedPayload = getTrackedRegionPayload(player, mapRegionId);
+  const trackedTerrain = decodeTrackedTerrainArrays(trackedPayload);
+  if (trackedTerrain) {
+    heights = trackedTerrain.heights;
+    overlays = trackedTerrain.overlays;
+    underlays = trackedTerrain.underlays;
+    flags = trackedTerrain.flags;
+    basePlacements = normalizePayloadPlacements(trackedPayload);
+  } else {
+    const terrainData = decodeRegionTerrainData(mapRegionId);
+    if (!terrainData) {
+      throw new Error(`Unable to decode terrain for region ${regionX},${regionY}.`);
+    }
+    heights = new Int32Array(tileCount);
+    overlays = new Uint8Array(tileCount);
+    underlays = new Uint8Array(tileCount);
+    flags = new Uint8Array(tileCount);
+    for (let plane = 0; plane < REGION_PLANES; plane++) {
+      for (let localX = 0; localX < REGION_SIZE; localX++) {
+        for (let localY = 0; localY < REGION_SIZE; localY++) {
+          const idx = indexFor(plane, localX, localY);
+          heights[idx] = normalizeCacheHeightForPayload(terrainData?.heights?.[plane]?.[localX]?.[localY] | 0);
+          overlays[idx] = (terrainData?.overlays?.[plane]?.[localX]?.[localY] | 0) & 0xff;
+          underlays[idx] = (terrainData?.underlays?.[plane]?.[localX]?.[localY] | 0) & 0xff;
+          flags[idx] = (terrainData?.flags?.[plane]?.[localX]?.[localY] | 0) & 0xff;
+        }
+      }
+    }
+    const cacheObjects = decodeRegionObjects(mapRegionId);
+    const baseX = regionX * REGION_SIZE;
+    const baseY = regionY * REGION_SIZE;
+    for (const object of cacheObjects) {
+      const id = object?.id | 0;
+      if (id <= 0) {
+        continue;
+      }
+      const localX = (object?.x | 0) - baseX;
+      const localY = (object?.y | 0) - baseY;
+      const localZ = object?.z | 0;
+      if (
+        localX < 0 ||
+        localX >= REGION_SIZE ||
+        localY < 0 ||
+        localY >= REGION_SIZE ||
+        localZ < 0 ||
+        localZ >= REGION_PLANES
+      ) {
+        continue;
+      }
+      basePlacements.push({
+        id,
+        x: localX,
+        y: localY,
+        z: localZ,
+        type: clamp(object?.type | 0, ObjectType.MIN, ObjectType.MAX),
+        orientation: (object?.orientation | 0) & 0x3,
+      });
+    }
+  }
+
+  let sumHeights = 0;
+  let sampleTiles = 0;
+  for (let x = clearMinX; x <= clearMaxX; x++) {
+    for (let y = clearMinY; y <= clearMaxY; y++) {
+      sumHeights += heights[indexFor(0, x, y)];
+      sampleTiles++;
+    }
+  }
+  const averageHeight = sampleTiles > 0 ? Math.round(sumHeights / sampleTiles) : heights[indexFor(0, localPlayerX, localPlayerY)];
+
+  for (let x = clearMinX; x <= clearMaxX; x++) {
+    for (let y = clearMinY; y <= clearMaxY; y++) {
+      heights[indexFor(0, x, y)] = averageHeight;
+      for (let plane = 0; plane < REGION_PLANES; plane++) {
+        const idx = indexFor(plane, x, y);
+        overlays[idx] = 0;
+        flags[idx] = 0;
+        if (plane > 0) {
+          heights[idx] = Math.max(4, averageHeight - plane * 30);
+        }
+      }
+    }
+  }
+
+  const keepOutsideClearRect = (localX, localY) =>
+    localX < clearMinX || localX > clearMaxX || localY < clearMinY || localY > clearMaxY;
+  const isInsideAnyBuildingInterior = (localX, localY) =>
+    shiftedBuildings.some((building) => {
+      const startX = (building?.x | 0) + 1;
+      const startY = (building?.y | 0) + 1;
+      const endX = (building?.x | 0) + Math.max(1, building?.width | 0) - 2;
+      const endY = (building?.y | 0) + Math.max(1, building?.height | 0) - 2;
+      if (startX > endX || startY > endY) {
+        return false;
+      }
+      return localX >= startX && localX <= endX && localY >= startY && localY <= endY;
+    });
+
+  const preservedPlacements = [];
+  for (const object of basePlacements) {
+    const localX = object?.x | 0;
+    const localY = object?.y | 0;
+    if (!keepOutsideClearRect(localX, localY)) {
+      const objectType = object?.type | 0;
+      const isGroundDecor = objectType === ObjectType.GROUND_DECOR;
+      const shouldClearGroundDecor = isGroundDecor && isInsideAnyBuildingInterior(localX, localY);
+      const shouldClearOther = !isGroundDecor;
+      if (shouldClearGroundDecor || shouldClearOther) {
+        continue;
+      }
+    }
+    preservedPlacements.push({
+      id: object.id | 0,
+      x: localX,
+      y: localY,
+      z: object.z | 0,
+      type: clamp(object?.type | 0, ObjectType.MIN, ObjectType.MAX),
+      orientation: (object?.orientation | 0) & 0x3,
+    });
+  }
+
+  for (const patch of shiftedFloorPatches) {
+    const startX = clamp(patch?.x | 0, 0, REGION_SIZE - 1);
+    const startY = clamp(patch?.y | 0, 0, REGION_SIZE - 1);
+    const width = Math.max(1, patch?.width | 0);
+    const height = Math.max(1, patch?.height | 0);
+    const endX = Math.min(REGION_SIZE, startX + width);
+    const endY = Math.min(REGION_SIZE, startY + height);
+    const plane = clamp(patch?.z | 0, 0, REGION_PLANES - 1);
+    const overlayValue = (patch?.underlay | 0) & 0xff;
+    for (let x = startX; x < endX; x++) {
+      for (let y = startY; y < endY; y++) {
+        const idx = indexFor(plane, x, y);
+        overlays[idx] = overlayValue;
+        if (overlayValue > 0 && underlays[idx] === 0) {
+          underlays[idx] = 1;
+        }
+      }
+    }
+  }
+
+  for (const building of shiftedBuildings) {
+    const startX = clamp(building?.x | 0, 0, REGION_SIZE - 1);
+    const startY = clamp(building?.y | 0, 0, REGION_SIZE - 1);
+    const width = Math.max(1, building?.width | 0);
+    const height = Math.max(1, building?.height | 0);
+    const endX = Math.min(REGION_SIZE, startX + width);
+    const endY = Math.min(REGION_SIZE, startY + height);
+    for (let x = startX; x < endX; x++) {
+      for (let y = startY; y < endY; y++) {
+        for (let plane = 0; plane < REGION_PLANES; plane++) {
+          const idx = indexFor(plane, x, y);
+          flags[idx] = (flags[idx] | 4) & 0xff;
+        }
+      }
+    }
+  }
+
+  const combinedPlacements = [...preservedPlacements, ...housePlacements];
+
+  const heightBuffer = Buffer.allocUnsafe(tileCount * 2);
+  for (let idx = 0; idx < tileCount; idx++) {
+    heightBuffer.writeUInt16LE(heights[idx] & 0xffff, idx * 2);
+  }
+
+  const payload = {
+    v: 1,
+    regionX,
+    regionY,
+    regionId: mapRegionId,
+    seed: normalizedSeed,
+    size: REGION_SIZE,
+    planes: REGION_PLANES,
+    heightsB64: heightBuffer.toString("base64"),
+    overlaysB64: Buffer.from(overlays).toString("base64"),
+    underlaysB64: Buffer.from(underlays).toString("base64"),
+    flagsB64: Buffer.from(flags).toString("base64"),
+    buildings: shiftedBuildings,
+    buildingPlacements: combinedPlacements,
+  };
 
   return {
     payload,
     styleKey: generated.styleKey,
     type: normalizedType,
-    width: primary.width,
-    height: primary.height,
-    floors: primary.floors,
-    objectCount: generated.placements.length,
+    width: placedPrimary.width,
+    height: placedPrimary.height,
+    floors: placedPrimary.floors,
+    objectCount: housePlacements.length,
     seed: normalizedSeed,
   };
 }
@@ -816,6 +1370,250 @@ function buildStreetPayloadAtPlayer(player, styleTag, seed, houseType = "SHOP") 
     streetWidth: generated.streetWidth,
     streetStartY: generated.streetStartY,
     streetEndY: generated.streetEndY,
+    seed: normalizedSeed,
+  };
+}
+
+function buildGeneratedTerrainPayloadAtPlayer(player, biomeArg, seed) {
+  const location = player.getLocation();
+  const regionX = (location.getX() / REGION_SIZE) | 0;
+  const regionY = (location.getY() / REGION_SIZE) | 0;
+  const normalizedSeed = seed >>> 0;
+  const biome = loadTerrainBiome(biomeArg);
+
+  const treeIds = biome.treeIds;
+  const groundDecorationIds = biome.groundDecorationIds;
+  const treeProfileById = biome.treeProfileById ?? {};
+  const groundDecorationProfileById = biome.groundDecorationProfileById ?? {};
+  const treeDensityById = biome.treeDensityById ?? {};
+  const groundDecorationDensityById = biome.groundDecorationDensityById ?? {};
+  const treeChance = treeIds.length > 0 ? clamp(biome.treeDensity, 0, 0.85) : 0;
+  const groundDecorationChance = groundDecorationIds.length > 0 ? clamp(biome.groundDecorationDensity, 0, 0.9) : 0;
+
+  const placements = [];
+  const occupiedTiles = new Uint8Array(REGION_SIZE * REGION_SIZE);
+  const treePlacedTiles = new Uint8Array(REGION_SIZE * REGION_SIZE);
+  const groundPlacedTiles = new Uint8Array(REGION_SIZE * REGION_SIZE);
+  const isOccupied = (x, y) => occupiedTiles[x * REGION_SIZE + y] !== 0;
+  const markOccupied = (x, y) => {
+    occupiedTiles[x * REGION_SIZE + y] = 1;
+  };
+  const hasNearbyPlaced = (mask, x, y, radius) => {
+    if (radius <= 0) {
+      return false;
+    }
+    const minX = Math.max(1, x - radius);
+    const maxX = Math.min(REGION_SIZE - 2, x + radius);
+    const minY = Math.max(1, y - radius);
+    const maxY = Math.min(REGION_SIZE - 2, y + radius);
+    for (let nx = minX; nx <= maxX; nx++) {
+      for (let ny = minY; ny <= maxY; ny++) {
+        if (mask[nx * REGION_SIZE + ny] !== 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+  const markPlaced = (mask, x, y) => {
+    mask[x * REGION_SIZE + y] = 1;
+  };
+  const pickIdByNoise = (ids, worldX, worldY, salt) => {
+    if (ids.length <= 1) {
+      return ids[0];
+    }
+    const selector = tileNoise(worldX + salt * 13, worldY - salt * 29, normalizedSeed ^ (salt * 0x9e3779b1));
+    const idx = Math.min(ids.length - 1, ((selector / 256) * ids.length) | 0);
+    return ids[idx];
+  };
+  const placementTypeForId = (id, profileById, fallbackType) => {
+    const profile = profileById[String(id)];
+    const type = profile?.type;
+    return Number.isInteger(type) ? (type | 0) : fallbackType | 0;
+  };
+  const placementOrientationForId = (id, worldX, worldY, profileById, fallbackSeedSalt = 0) => {
+    const profile = profileById[String(id)];
+    const orientation = profile?.orientation;
+    if (Number.isInteger(orientation)) {
+      return orientation & 0x3;
+    }
+    return tileNoise(worldX + 43 + fallbackSeedSalt, worldY - 17 - fallbackSeedSalt, normalizedSeed ^ 0x56ab331) & 0x3;
+  };
+  const densityForId = (id, densityById, fallbackDensity, totalIds, scale = 1) => {
+    const entry = densityById[String(id)];
+    const parsed = Number(entry?.density);
+    const base = Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackDensity / Math.max(1, totalIds);
+    return clamp(base * scale, 0, 0.9);
+  };
+  const spacingRadiusForDensity = (density, category) => {
+    if (category === "tree") {
+      if (density <= 0.008) {
+        return 3;
+      }
+      if (density <= 0.02) {
+        return 2;
+      }
+      return 1;
+    }
+    if (density <= 0.006) {
+      return 2;
+    }
+    if (density <= 0.02) {
+      return 1;
+    }
+    return 0;
+  };
+  const candidatesForId = (source, id, scoreField, salt) =>
+    [...source].sort((a, b) => {
+      const aNoise = tileNoise(a.worldX + salt, a.worldY - salt, normalizedSeed ^ Math.imul(id | 0, 0x45d9f3b));
+      const bNoise = tileNoise(b.worldX + salt, b.worldY - salt, normalizedSeed ^ Math.imul(id | 0, 0x45d9f3b));
+      const aScore = a[scoreField] * 0.8 + (aNoise / 255) * 0.2;
+      const bScore = b[scoreField] * 0.8 + (bNoise / 255) * 0.2;
+      if (aScore !== bScore) {
+        return aScore - bScore;
+      }
+      return aNoise - bNoise;
+    });
+
+  let treeCount = 0;
+  let groundDecorationCount = 0;
+  const tileCandidates = [];
+  const maxPlacements = (REGION_SIZE - 2) * (REGION_SIZE - 2);
+  for (let localX = 1; localX < REGION_SIZE - 1; localX++) {
+    for (let localY = 1; localY < REGION_SIZE - 1; localY++) {
+      const worldX = regionX * REGION_SIZE + localX;
+      const worldY = regionY * REGION_SIZE + localY;
+      const treeMacro = smoothedNoise((worldX >> 1) + 97, (worldY >> 1) - 41, normalizedSeed ^ 0x13f29a7) / 255;
+      const treeDetail = smoothedNoise(worldX + 197, worldY - 89, normalizedSeed ^ 0x4a31d2f) / 255;
+      const treeScore = treeMacro * 0.7 + treeDetail * 0.3;
+
+      const decorMacro = smoothedNoise(worldX - 37, worldY + 79, normalizedSeed ^ 0x3358af) / 255;
+      const decorDetail = smoothedNoise((worldX >> 1) + 141, (worldY >> 1) + 53, normalizedSeed ^ 0x12be47) / 255;
+      const decorScore = decorMacro * 0.65 + decorDetail * 0.35;
+      tileCandidates.push({ localX, localY, worldX, worldY, treeScore, decorScore });
+    }
+  }
+
+  if (treeChance > 0 && treeIds.length > 0) {
+    const treeIdsByDensity = [...treeIds].sort((a, b) => {
+      const da = densityForId(a, treeDensityById, treeChance, treeIds.length, 1);
+      const db = densityForId(b, treeDensityById, treeChance, treeIds.length, 1);
+      return db - da;
+    });
+    for (const id of treeIdsByDensity) {
+      if (placements.length >= maxPlacements) {
+        break;
+      }
+      const idDensity = densityForId(id, treeDensityById, treeChance, treeIds.length, 1);
+      const targetForId = Math.max(1, Math.round(idDensity * tileCandidates.length));
+      const idCandidates = candidatesForId(tileCandidates, id, "treeScore", 211);
+      const strictRadius = spacingRadiusForDensity(idDensity, "tree");
+      let placedForId = 0;
+      const placeWithRadius = (radius) => {
+        for (const candidate of idCandidates) {
+          if (placedForId >= targetForId || placements.length >= maxPlacements) {
+            break;
+          }
+          if (isOccupied(candidate.localX, candidate.localY)) {
+            continue;
+          }
+          if (hasNearbyPlaced(treePlacedTiles, candidate.localX, candidate.localY, radius)) {
+            continue;
+          }
+          placements.push({
+            id,
+            x: candidate.localX,
+            y: candidate.localY,
+            z: 0,
+            type: placementTypeForId(id, treeProfileById, ObjectType.INTERACTIVE),
+            orientation: placementOrientationForId(id, candidate.worldX, candidate.worldY, treeProfileById),
+          });
+          markOccupied(candidate.localX, candidate.localY);
+          markPlaced(treePlacedTiles, candidate.localX, candidate.localY);
+          treeCount++;
+          placedForId++;
+        }
+      };
+      placeWithRadius(strictRadius);
+      if (placedForId < targetForId) {
+        placeWithRadius(Math.max(0, strictRadius - 1));
+      }
+      if (placedForId < targetForId) {
+        placeWithRadius(0);
+      }
+    }
+  }
+
+  if (groundDecorationChance > 0 && groundDecorationIds.length > 0 && placements.length < maxPlacements) {
+    const groundIdsByDensity = [...groundDecorationIds].sort((a, b) => {
+      const da = densityForId(a, groundDecorationDensityById, groundDecorationChance, groundDecorationIds.length, 1.15);
+      const db = densityForId(b, groundDecorationDensityById, groundDecorationChance, groundDecorationIds.length, 1.15);
+      return db - da;
+    });
+    for (const id of groundIdsByDensity) {
+      if (placements.length >= maxPlacements) {
+        break;
+      }
+      const idDensity = densityForId(id, groundDecorationDensityById, groundDecorationChance, groundDecorationIds.length, 1.15);
+      const remaining = maxPlacements - placements.length;
+      const targetForId = Math.min(remaining, Math.max(1, Math.round(idDensity * tileCandidates.length)));
+      const idCandidates = candidatesForId(tileCandidates, id, "decorScore", 157);
+      const strictRadius = spacingRadiusForDensity(idDensity, "ground");
+      let placedForId = 0;
+      const placeWithRadius = (radius) => {
+        for (const candidate of idCandidates) {
+          if (placedForId >= targetForId || placements.length >= maxPlacements) {
+            break;
+          }
+          if (isOccupied(candidate.localX, candidate.localY)) {
+            continue;
+          }
+          if (hasNearbyPlaced(groundPlacedTiles, candidate.localX, candidate.localY, radius)) {
+            continue;
+          }
+          placements.push({
+            id,
+            x: candidate.localX,
+            y: candidate.localY,
+            z: 0,
+            type: placementTypeForId(id, groundDecorationProfileById, ObjectType.GROUND_DECOR),
+            orientation: placementOrientationForId(id, candidate.worldX, candidate.worldY, groundDecorationProfileById, 7),
+          });
+          markOccupied(candidate.localX, candidate.localY);
+          markPlaced(groundPlacedTiles, candidate.localX, candidate.localY);
+          groundDecorationCount++;
+          placedForId++;
+        }
+      };
+      placeWithRadius(strictRadius);
+      if (placedForId < targetForId) {
+        placeWithRadius(Math.max(0, strictRadius - 1));
+      }
+      if (placedForId < targetForId) {
+        placeWithRadius(0);
+      }
+    }
+  }
+
+  const payload = generateRegionPayload(regionX, regionY, normalizedSeed, {
+    buildings: [],
+    floorPatches: [],
+    buildingPlacements: placements,
+    roofFlagRects: [],
+    terrainUnderlayIds: biome.underlayIds,
+  });
+
+  return {
+    payload,
+    biome: biome.biome,
+    sampleCount: biome.sampleCount,
+    treeIds: biome.treeIds.length,
+    underlayIds: biome.underlayIds.length,
+    groundDecorationIds: biome.groundDecorationIds.length,
+    treeDensity: treeChance,
+    groundDecorationDensity: groundDecorationChance,
+    treeCount,
+    groundDecorationCount,
     seed: normalizedSeed,
   };
 }
@@ -882,9 +1680,13 @@ module.exports = {
         return true;
       }
 
+      const restoredCacheObjects = clearProceduralClippingForPlayer(player);
       sendProceduralClear(player);
-      clearTrackedOverrideRegionsForPlayer(player);
-      player.getPacketSender().sendMessage("[proc-region] cleargen requested: client procedural overrides cleared and region reload forced.");
+      player
+        .getPacketSender()
+        .sendMessage(
+          `[proc-region] cleargen requested: client procedural overrides cleared and region reload forced (cache object clips restored=${restoredCacheObjects}).`
+        );
       return true;
     });
 
@@ -964,6 +1766,82 @@ module.exports = {
       } catch (error) {
         const reason = error?.message ?? String(error);
         player.getPacketSender().sendMessage(`[proc-region] dumphouse failed: ${reason}`);
+      }
+      return true;
+    });
+
+    api.registerCommand("dumpterrain", ({ player, parts }) => {
+      if (!isDev(player)) {
+        player.getPacketSender().sendMessage("Developer rights required.");
+        return true;
+      }
+
+      if (parts.length !== 2) {
+        player.getPacketSender().sendMessage("Usage: ::dumpterrain <biome>");
+        return true;
+      }
+
+      const biome = String(parts[1] ?? "").trim();
+      if (!biome) {
+        player.getPacketSender().sendMessage("Usage: ::dumpterrain <biome>");
+        return true;
+      }
+
+      try {
+        const result = dumpTerrainBiome(player, biome);
+        const sample = result.sample;
+        player
+          .getPacketSender()
+          .sendMessage(
+            `[proc-region] dumpterrain biome=${result.biome} region=${sample.regionX},${sample.regionY} landTiles=${sample.landTileCount} waterTilesSkipped=${sample.waterTileCount} treeDensity=${sample.treeDensity}`
+          );
+        player
+          .getPacketSender()
+          .sendMessage(
+            `[proc-region] ids trees=${result.totalTreeIds} underlays=${result.totalUnderlayIds} groundDecor=${result.totalGroundDecorationIds} samples=${result.sampleCount} saved: ${result.outputPath}`
+          );
+      } catch (error) {
+        const reason = error?.message ?? String(error);
+        player.getPacketSender().sendMessage(`[proc-region] dumpterrain failed: ${reason}`);
+      }
+      return true;
+    });
+
+    api.registerCommand("genterrain", ({ player, parts }) => {
+      if (!isDev(player)) {
+        player.getPacketSender().sendMessage("Developer rights required.");
+        return true;
+      }
+
+      if (parts.length < 2 || parts.length > 3) {
+        player.getPacketSender().sendMessage("Usage: ::genterrain <biome> [seed]");
+        return true;
+      }
+
+      const biome = String(parts[1] ?? "").trim();
+      if (!biome) {
+        player.getPacketSender().sendMessage("Usage: ::genterrain <biome> [seed]");
+        return true;
+      }
+
+      const explicitSeed = parts.length === 3 ? parseIntArg(parts[2]) : null;
+      if (parts.length === 3 && explicitSeed === null) {
+        player.getPacketSender().sendMessage("Usage: ::genterrain <biome> [seed]");
+        return true;
+      }
+      const seed = explicitSeed === null ? normalizeSeed(undefined) : explicitSeed >>> 0;
+
+      try {
+        const result = buildGeneratedTerrainPayloadAtPlayer(player, biome, seed);
+        streamProceduralPayload(player, result.payload, "[proc-region] generated terrain region");
+        player
+          .getPacketSender()
+          .sendMessage(
+            `[proc-region] genterrain biome=${result.biome} trees=${result.treeCount} groundDecor=${result.groundDecorationCount} treeIds=${result.treeIds} underlays=${result.underlayIds} groundDecorIds=${result.groundDecorationIds} samples=${result.sampleCount} seed=${result.seed}`
+          );
+      } catch (error) {
+        const reason = error?.message ?? String(error);
+        player.getPacketSender().sendMessage(`[proc-region] genterrain failed: ${reason}`);
       }
       return true;
     });

@@ -60,6 +60,7 @@ export class ObjectDefinition extends ObjectIdentifiers {
     private cachedIsInteractive: boolean = false;
     private cachedObstructsGround: boolean = false;
     private cachedInteractions: string[] | null = null;
+    private cachedMinimapFunction: number = -1;
 
     constructor() {
         super();
@@ -483,6 +484,10 @@ export class ObjectDefinition extends ObjectIdentifiers {
         return this.cachedInteractions;
     }
 
+    public getMinimapFunction(): number {
+        return this.cachedMinimapFunction;
+    }
+
     public getSize(): number {
         switch (this.id) {
             case ObjectDefinition.BARROWS_STAIRCASE_AHRIM:
@@ -507,6 +512,7 @@ export class ObjectDefinition extends ObjectIdentifiers {
         this.cachedIsInteractive = ObjectDefinition.isInteractive;
         this.cachedObstructsGround = ObjectDefinition.obstructsGround;
         this.cachedInteractions = ObjectDefinition.interactions ? [...ObjectDefinition.interactions] : null;
+        this.cachedMinimapFunction = ObjectDefinition.minimapFunction;
     }
 
     private restoreCachedState(): void {
@@ -518,5 +524,6 @@ export class ObjectDefinition extends ObjectIdentifiers {
         ObjectDefinition.isInteractive = this.cachedIsInteractive;
         ObjectDefinition.obstructsGround = this.cachedObstructsGround;
         ObjectDefinition.interactions = this.cachedInteractions ? [...this.cachedInteractions] : null;
+        ObjectDefinition.minimapFunction = this.cachedMinimapFunction;
     }
 }

@@ -47,6 +47,8 @@ All procedural data is stored in this plugin folder:
   - Learned generation presets from `::procreglearn`.
 - `plugins/world/data/analysis-reports/*.json`
   - Region scans from `::procregscan`.
+- `plugins/world/data/terrain-biomes/*.json`
+  - Terrain biome samples merged by `::dumpterrain <biome>`.
 
 ## Command Reference
 
@@ -59,6 +61,8 @@ All commands are in `ProceduralRegionStream.plugin.js`.
 
 ::procregscan [radius]
 ::procreglearn [radius]
+::dumpterrain <biome>
+::genterrain <biome> [seed]
 
 ::dumphouse <tag> [type]
 ::checkhouse
@@ -72,6 +76,8 @@ All commands are in `ProceduralRegionStream.plugin.js`.
 
 - `::cleargen` clears all streamed procedural overrides on the client for that player and forces cache map behavior again.
 - `::dumphouse` writes examples into `plugins/world/data/house-examples/<tag>.json`.
+- `::dumpterrain` writes biome terrain samples into `plugins/world/data/terrain-biomes/<biome>.json`.
+- `::genterrain` generates a full region from a dumped biome profile.
 - `::buildhouse` replays a dumped house example exactly (by index or random).
 - `::genhouse` generates a similar house using dump-derived profile data when available.
 - `::genstreet` currently defaults to:
@@ -152,3 +158,5 @@ Recommended next tasks:
 - If cache map should return: run `::cleargen`.
 - If house dump fails: verify position with `::checkhouse`.
 - If generation quality is poor: add more `::dumphouse <tag> <type>` examples and rerun `::genhouse`.
+
+`codex resume 019ca379-af07-7ea0-a53b-e4694197cf43`

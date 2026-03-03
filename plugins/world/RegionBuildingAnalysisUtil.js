@@ -103,12 +103,19 @@ function decodeRegionObjects(regionId) {
       const x = absX + localX;
       const y = absY + localY;
       let name = null;
+      let interactions = null;
+      let mapFunction = -1;
       try {
-        name = ObjectDefinition.forId(objectId)?.getName?.() ?? null;
+        const def = ObjectDefinition.forId(objectId);
+        name = def?.getName?.() ?? null;
+        interactions = def?.getInteractions?.() ?? null;
+        mapFunction = def?.getMinimapFunction?.() ?? -1;
       } catch {
         name = null;
+        interactions = null;
+        mapFunction = -1;
       }
-      objects.push({ id: objectId, x, y, z: height, type, orientation, name });
+      objects.push({ id: objectId, x, y, z: height, type, orientation, name, interactions, mapFunction });
     }
   }
 
@@ -188,6 +195,7 @@ function decodeRegionTerrainData(regionId) {
   const heights = Array.from({ length: 4 }, () => Array.from({ length: 64 }, () => new Array(64).fill(0)));
   const flags = Array.from({ length: 4 }, () => Array.from({ length: 64 }, () => new Array(64).fill(0)));
   const overlays = Array.from({ length: 4 }, () => Array.from({ length: 64 }, () => new Array(64).fill(0)));
+  const underlays = Array.from({ length: 4 }, () => Array.from({ length: 64 }, () => new Array(64).fill(0)));
 
   for (let z = 0; z < 4; z++) {
     for (let tileX = 0; tileX < 64; tileX++) {
@@ -219,14 +227,14 @@ function decodeRegionTerrainData(regionId) {
           } else if (tileType <= 81) {
             flags[z][tileX][tileY] = tileType - 49;
           } else {
-            // underlay id ignored by dumphouse capture
+            underlays[z][tileX][tileY] = (tileType - 81) & 0xff;
           }
         }
       }
     }
   }
 
-  return { heights, flags, overlays };
+  return { heights, flags, overlays, underlays };
 }
 
 function isStructureObject(obj) {
@@ -2075,6 +2083,8 @@ module.exports = {
   writeLearnedPresetFile,
   writeHouseExample,
   checkHouseBoundary,
+  decodeRegionObjects,
+  decodeRegionTerrainData,
   PRESET_OUTPUT_PATH,
   HOUSE_DUMP_DIRECTORY,
 };
