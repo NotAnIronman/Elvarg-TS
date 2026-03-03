@@ -15,6 +15,7 @@ const FURNACE_OBJECT_IDS = new Set([
   ObjectIds.FURNACE_4,
   ObjectIds.FURNACE_5,
   ObjectIds.FURNACE_6,
+  ObjectIds.FURNACE_12,
   ObjectIds.SMALL_FURNACE,
 ]);
 
