@@ -656,7 +656,6 @@ export class PacketSender {
     out.put(slot);
     out.putInt(amount);
     out.putShort(id + 1);
-    out.put(amount);
     this.player.getSession().write(out);
     return this;
   }
