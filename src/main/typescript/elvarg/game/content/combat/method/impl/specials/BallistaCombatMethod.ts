@@ -4,7 +4,7 @@ import { Priority } from "../../../../../model/Priority";
 import { PendingHit } from "../../../hit/PendingHit";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
-import { RangedWeapon } from "../../../ranged/RangedData";
+import { RangedData, RangedWeapon } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
 import { Sound } from "../../../../../Sound";
@@ -15,7 +15,9 @@ export class BallistaCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(7222);
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
-        return [new PendingHit(character, target, this, 2)];
+        const distance = character.getLocation().getDistance(target.getLocation());
+        const delay = RangedData.hitDelay(distance, character.getCombat().getRangedWeapon());
+        return [new PendingHit(character, target, this, delay)];
     }
 
     canAttack(character: Mobile, target: Mobile): boolean {

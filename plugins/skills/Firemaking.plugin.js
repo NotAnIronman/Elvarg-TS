@@ -29,8 +29,8 @@ const FIRE_OBJECT_FACE = 0;
 const LIGHT_FIRE_ANIMATION = new Animation(733);
 const BONFIRE_ANIMATION = new Animation(896);
 
-const ANIMATION_INTERVAL_TICKS = 3;
-const BONFIRE_CYCLES = 2;
+const FIREMAKING_ACTION_INTERVAL_TICKS = 4;
+const ANIMATION_INTERVAL_TICKS = 4;
 const MAX_ACTION_DISTANCE = 25;
 
 const LIGHTABLE_LOGS = [
@@ -104,13 +104,7 @@ function canLightFireAt(player, location) {
 }
 
 function calculateCyclesRequired(player, log, mode) {
-  if (mode === SESSION_MODE.BONFIRE) {
-    return BONFIRE_CYCLES;
-  }
-
-  let cycles = log.cycles + randomIntInclusive(0, 2);
-  cycles -= getFiremakingMaxLevel(player) * 0.1;
-  return Math.max(3, Math.floor(cycles));
+  return FIREMAKING_ACTION_INTERVAL_TICKS;
 }
 
 class FireExpireTask extends Task {

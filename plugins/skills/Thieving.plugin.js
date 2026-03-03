@@ -14,6 +14,7 @@ const { Pets } = require("../npcs/Pets.plugin");
 
 const THIEVING_ANIMATION = new Animation(881);
 const NPC_ATTACK_ANIMATION = new Animation(401);
+const PICKPOCKET_COOLDOWN_MS = 1200;
 
 class PickpocketResolveTask extends Task {
   constructor(onResolve) {
@@ -32,7 +33,7 @@ const PICKPOCKETS = [
     name: "man",
     level: 1,
     xp: 8,
-    stunTime: 5,
+    stunTime: 8,
     stunDamage: 1,
     rewards: [[ItemIds.COINS, 3]],
     npcIds: [
@@ -71,7 +72,7 @@ const PICKPOCKETS = [
     name: "farmer",
     level: 10,
     xp: 14.5,
-    stunTime: 5,
+    stunTime: 8,
     stunDamage: 1,
     rewards: [[ItemIds.COINS, 9], [ItemIds.POTATO_SEED, 1]],
     npcIds: [NpcIds.FARMER, NpcIds.FARMER_2, NpcIds.FARMER_3, NpcIds.FARMER_4, NpcIds.FARMER_5, NpcIds.FARMER_6],
@@ -80,7 +81,7 @@ const PICKPOCKETS = [
     name: "rogue",
     level: 32,
     xp: 36.5,
-    stunTime: 5,
+    stunTime: 9,
     stunDamage: 2,
     rewards: [[ItemIds.COINS, 34], [ItemIds.LOCKPICK, 1], [ItemIds.JUG_OF_WINE, 1]],
     npcIds: [NpcIds.ROGUE],
@@ -89,7 +90,7 @@ const PICKPOCKETS = [
     name: "master farmer",
     level: 38,
     xp: 43,
-    stunTime: 5,
+    stunTime: 9,
     stunDamage: 3,
     rewards: [[ItemIds.POTATO_SEED, 1], [ItemIds.ONION_SEED, 1], [ItemIds.MARRENTILL_SEED, 1], [ItemIds.RANARR_SEED, 1]],
     npcIds: [NpcIds.MASTER_FARMER, NpcIds.MASTER_FARMER_2],
@@ -98,7 +99,7 @@ const PICKPOCKETS = [
     name: "guard",
     level: 40,
     xp: 47,
-    stunTime: 5,
+    stunTime: 9,
     stunDamage: 2,
     rewards: [[ItemIds.COINS, 30]],
     npcIds: [NpcIds.GUARD, NpcIds.GUARD_2, NpcIds.GUARD_3, NpcIds.GUARD_4, NpcIds.GUARD_5, NpcIds.GUARD_6],
@@ -107,7 +108,7 @@ const PICKPOCKETS = [
     name: "paladin",
     level: 70,
     xp: 152,
-    stunTime: 5,
+    stunTime: 10,
     stunDamage: 3,
     rewards: [[ItemIds.COINS, 80], [ItemIds.CHAOS_RUNE, 2]],
     npcIds: [NpcIds.PALADIN, NpcIds.PALADIN_2, NpcIds.PALADIN_3],
@@ -116,7 +117,7 @@ const PICKPOCKETS = [
     name: "gnome",
     level: 75,
     xp: 199,
-    stunTime: 5,
+    stunTime: 10,
     stunDamage: 1,
     rewards: [[ItemIds.COINS, 300], [ItemIds.GOLD_ORE, 1], [ItemIds.EARTH_RUNE, 1]],
     npcIds: [NpcIds.GNOME],
@@ -165,7 +166,7 @@ module.exports = {
         return;
       }
 
-      if (!player.getClickDelay().elapsedTime(1500)) {
+      if (!player.getClickDelay().elapsedTime(PICKPOCKET_COOLDOWN_MS)) {
         event.handled = true;
         return;
       }

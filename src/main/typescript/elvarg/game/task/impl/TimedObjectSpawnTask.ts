@@ -6,7 +6,7 @@ export class TimedObjectSpawnTask extends Task {
     private temp: GameObject;
     private ticks: number;
     private action: Action;
-    public static tick = 0;
+    private progressTick = 0;
 
     constructor(temp: GameObject, ticks: number, action: Action) {
         super();
@@ -16,9 +16,9 @@ export class TimedObjectSpawnTask extends Task {
     }
 
     execute() {
-        if (TimedObjectSpawnTask.tick === 0) {
+        if (this.progressTick === 0) {
             ObjectManager.register(this.temp, true);
-        } else if (TimedObjectSpawnTask.tick >= this.ticks) {
+        } else if (this.progressTick >= this.ticks) {
             ObjectManager.deregister(this.temp, true);
 
             if (this.action != null) {
@@ -27,7 +27,7 @@ export class TimedObjectSpawnTask extends Task {
 
             this.stop();
         }
-        TimedObjectSpawnTask.tick++;
+        this.progressTick++;
     }
 
     onExecute() {

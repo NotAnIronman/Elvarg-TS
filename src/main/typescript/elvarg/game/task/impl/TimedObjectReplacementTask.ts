@@ -6,7 +6,7 @@ export class TimedObjectReplacementTask extends Task {
     private original: GameObject;
     private temp: GameObject;
     private ticks: number;
-    public static tick = 0;
+    private progressTick = 0;
     private sameTile = false;
 
     constructor(original: GameObject, temp: GameObject, ticks: number) {
@@ -18,15 +18,15 @@ export class TimedObjectReplacementTask extends Task {
     }
 
     execute() {
-        if (TimedObjectReplacementTask.tick === 0) {
+        if (this.progressTick === 0) {
             ObjectManager.deregister(this.original, !this.sameTile);
             ObjectManager.register(this.temp, true);
-        } else if (TimedObjectReplacementTask.tick >= this.ticks) {
+        } else if (this.progressTick >= this.ticks) {
             ObjectManager.deregister(this.temp, !this.sameTile);
             ObjectManager.register(this.original, true);
             this.stop();
         }
-        TimedObjectReplacementTask.tick++;
+        this.progressTick++;
     }
     onExecute() {
 

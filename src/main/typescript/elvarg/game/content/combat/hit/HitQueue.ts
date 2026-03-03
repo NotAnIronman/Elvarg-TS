@@ -20,12 +20,14 @@ export class HitQueue {
             const hit = this.pendingHits[i];
             if (hit == null || hit.getTarget() == null || hit.getAttacker() == null || hit.getTarget().isUntargetable() || hit.getAttacker().getHitpoints() <= 0) {
                 this.pendingHits.splice(i, 1);
+                i--;
                 continue;
             }
 
             if (hit.getAndDecrementDelay() <= 0) {
                 CombatFactory.executeHit(hit);
                 this.pendingHits.splice(i, 1);
+                i--;
             }
         }
 

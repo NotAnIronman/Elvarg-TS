@@ -2,7 +2,7 @@ import { CombatMethod } from "../CombatMethod";
 import { CombatType } from "../../CombatType";
 import { CombatFactory } from "../../CombatFactory";
 import { PendingHit } from "../../hit/PendingHit";
-import { Ammunition, RangedWeapon, RangedWeaponType, } from "../../ranged/RangedData";
+import { Ammunition, RangedData, RangedWeapon, RangedWeaponType } from "../../ranged/RangedData";
 import { Mobile } from "../../../../entity/impl/Mobile";
 import { Animation } from "../../../../model/Animation";
 import { Projectile } from "../../../../model/Projectile";
@@ -53,14 +53,18 @@ export class RangedCombatMethod extends CombatMethod {
     }
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
+        const distance = character.getLocation().getDistance(target.getLocation());
+        const rangedWeapon = character.getCombat().getRangedWeapon();
+        const delay = RangedData.hitDelay(distance, rangedWeapon);
+
         if (character.getCombat().getRangedWeapon() === RangedWeapon.DARK_BOW) {
-            return [new PendingHit(character, target, this, 1), new PendingHit(character, target, this, 2)];
-        }
-        if (character.getCombat().getRangedWeapon() === RangedWeapon.BALLISTA) {
-            return [new PendingHit(character, target, this, 2)];
+            return [
+                new PendingHit(character, target, this, delay),
+                new PendingHit(character, target, this, RangedData.dbowArrowDelay(distance)),
+            ];
         }
 
-        return [new PendingHit(character, target, this, 1)];
+        return [new PendingHit(character, target, this, delay)];
     }
 
     canAttack(character: Mobile, target: Mobile): boolean {

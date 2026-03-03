@@ -502,7 +502,7 @@ export class WeaponInterfaces {
     public static readonly BATTLEAXE = new WeaponInterfaces(
         1698,
         1701,
-        5,
+        6,
         [FightType.BATTLEAXE_CHOP,
         FightType.BATTLEAXE_HACK, FightType.BATTLEAXE_SMASH,
         FightType.BATTLEAXE_BLOCK],
@@ -618,7 +618,7 @@ export class WeaponInterfaces {
     public static readonly SWORD = new WeaponInterfaces(
         2276,
         2279,
-        5,
+        4,
         [FightType.SWORD_STAB,
         FightType.SWORD_LUNGE, FightType.SWORD_SLASH,
         FightType.SWORD_BLOCK],
@@ -651,7 +651,7 @@ export class WeaponInterfaces {
     public static readonly MACE = new WeaponInterfaces(
         3796,
         3799,
-        5,
+        4,
         [FightType.MACE_POUND,
         FightType.MACE_PUMMEL, FightType.MACE_SPIKE,
         FightType.MACE_BLOCK],
@@ -682,7 +682,7 @@ export class WeaponInterfaces {
     public static readonly SPEAR = new WeaponInterfaces(
         4679,
         4682,
-        5,
+        4,
         [FightType.SPEAR_LUNGE,
         FightType.SPEAR_SWIPE, FightType.SPEAR_POUND,
         FightType.SPEAR_BLOCK],
@@ -751,7 +751,7 @@ export class WeaponInterfaces {
     public static readonly THROWNAXE = new WeaponInterfaces(
         4446,
         4449,
-        4,
+        5,
         [FightType.THROWNAXE_ACCURATE, FightType.THROWNAXE_RAPID,
         FightType.THROWNAXE_LONGRANGE],
         7649,
@@ -771,7 +771,7 @@ export class WeaponInterfaces {
     public static readonly JAVELIN = new WeaponInterfaces(
         4446,
         4449,
-        3,
+        6,
         [FightType.JAVELIN_ACCURATE,
         FightType.JAVELIN_RAPID, FightType.JAVELIN_LONGRANGE],
         7649,
@@ -781,14 +781,14 @@ export class WeaponInterfaces {
     public static readonly ANCIENT_STAFF = new WeaponInterfaces(
         328,
         355,
-        4,
+        5,
         [FightType.STAFF_BASH, FightType.STAFF_POUND, FightType.STAFF_FOCUS]
     )
 
     public static readonly DARK_BOW = new WeaponInterfaces(
         1764,
         1767,
-        8,
+        9,
         [FightType.LONGBOW_ACCURATE,
         FightType.LONGBOW_RAPID, FightType.LONGBOW_LONGRANGE],
         7549,

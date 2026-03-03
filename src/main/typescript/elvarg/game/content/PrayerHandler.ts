@@ -409,7 +409,7 @@ export class PrayerHandler {
                 }
                 let drainMinute = pd.drainRate;
                 let drainSeconds = drainMinute / 60;
-                let drainTicks = (drainSeconds * 0.6);
+                let drainTicks = Misc.getTicks(drainSeconds);
                 drainPerTick += drainTicks;
             }
             if (player.getHitpoints() <= 0 || drainPerTick <= 0) {
@@ -444,6 +444,7 @@ export class PrayerHandler {
                 task.stop();
             }
         });
+        TaskManager.submit(task);
     }
 
 

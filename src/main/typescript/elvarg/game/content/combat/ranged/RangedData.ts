@@ -119,6 +119,30 @@ export class RangedData {
 
         return multiplier;
     }
+
+    public static hitDelay(distance: number, weapon: RangedWeapon | null): number {
+        const normalizedDistance = Math.max(0, Math.floor(distance));
+        if (!weapon) {
+            return 1;
+        }
+
+        if (weapon === RangedWeapon.BALLISTA) {
+            return 2 + Math.floor((1 + normalizedDistance) / 6);
+        }
+
+        const type = weapon.getType();
+        const defaultDistance = type?.getDefaultDistance?.() ?? 0;
+        if (defaultDistance <= 5) {
+            return 1 + Math.floor(normalizedDistance / 6);
+        }
+
+        return 1 + Math.floor((3 + normalizedDistance) / 6);
+    }
+
+    public static dbowArrowDelay(distance: number): number {
+        const normalizedDistance = Math.max(0, Math.floor(distance));
+        return 1 + Math.floor((2 + normalizedDistance) / 3);
+    }
 }
 
 export class Ammunition {

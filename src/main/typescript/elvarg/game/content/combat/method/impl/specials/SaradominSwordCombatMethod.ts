@@ -13,7 +13,11 @@ export class SaradominSwordCombatMethod extends MeleeCombatMethod {
     private static GRAPHIC = new Graphic(1213, Priority.HIGH);
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
-        const hit = new PendingHit(character, target, this, 2);
+        const hit = new PendingHit(character, target, this, {
+            delay: 0,
+            rollAccuracy: true,
+            hitAmount: 2,
+        });
         hit.getHits()[1].setDamage(hit.isAccurate() ? hit.getHits()[0].getDamage() + 16 : 0);
         hit.updateTotalDamage();
         return [hit];

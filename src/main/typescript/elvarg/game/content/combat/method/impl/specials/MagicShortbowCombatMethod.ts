@@ -3,7 +3,7 @@ import { Animation } from "../../../../../model/Animation";
 import { Priority } from "../../../../../model/Priority";
 import { PendingHit } from "../../../hit/PendingHit";
 import { CombatSpecial } from "../../../CombatSpecial";
-import { RangedWeapon } from "../../../ranged/RangedData";
+import { RangedData, RangedWeapon } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
 import { Graphic } from "../../../../../model/Graphic";
@@ -17,7 +17,9 @@ export class MagicShortbowCombatMethod extends RangedCombatMethod {
     private static GRAPHIC = new Graphic(250, GraphicHeight.HIGH);
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
-        return [new PendingHit(character, target, this, 3), new PendingHit(character, target, this, 2)];
+        const distance = character.getLocation().getDistance(target.getLocation());
+        const delay = RangedData.hitDelay(distance, character.getCombat().getRangedWeapon());
+        return [new PendingHit(character, target, this, delay), new PendingHit(character, target, this, delay)];
     }
 
     canAttack(character: Mobile, target: Mobile): boolean {

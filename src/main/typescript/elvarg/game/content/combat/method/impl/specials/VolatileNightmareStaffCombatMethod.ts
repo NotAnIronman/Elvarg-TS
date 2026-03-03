@@ -13,8 +13,7 @@ export class VolatileNightmareStaffCombatMethod extends CombatMethod {
     private static readonly CAST_ANIMATION = new Animation(8532);
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
-        const delay = 1 + Math.floor((1 + character.getLocation().getDistance(target.getLocation())) / 3);
-        const hit = new PendingHit(character, target, this, delay);
+        const hit = new PendingHit(character, target, this, 2);
         if (hit.isAccurate() && character.isPlayer()) {
             const player = character.getAsPlayer();
             const maxHit = Math.min(

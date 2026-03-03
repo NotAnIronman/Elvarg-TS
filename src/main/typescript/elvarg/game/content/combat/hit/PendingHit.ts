@@ -6,6 +6,14 @@ import { Mobile } from "../../../entity/impl/Mobile";
 import type { Player } from "../../../entity/impl/player/Player";
 import { AccuracyFormulasDpsCalc } from "../formula/AccuracyFormulasDpsCalc";
 import { HitMask } from "./HitMask";
+
+type PendingHitConfig = {
+    delay?: number;
+    handleAfterHitEffects?: boolean;
+    hitAmount?: number;
+    rollAccuracy?: boolean;
+};
+
 export class PendingHit {
     private attacker: Mobile;
     private target: Mobile;
@@ -17,14 +25,40 @@ export class PendingHit {
     private accurate: boolean;
     private handleAfterHitEffects: boolean;
 
-    constructor(attacker: Mobile, target: Mobile, method: CombatMethod, delay?: number, handleAfterHitEffects?: boolean) {
+    constructor(attacker: Mobile, target: Mobile, method: CombatMethod, delayOrConfig?: number | PendingHitConfig, handleAfterHitEffects?: boolean) {
         this.attacker = attacker;
         this.target = target;
         this.method = method;
         this.combatType = method.type();
-        this.hits = this.prepareHits(1, true);
-        this.delay = delay ? delay : 0;
-        this.handleAfterHitEffects = handleAfterHitEffects ? handleAfterHitEffects : true;
+
+        let resolvedDelay = 0;
+        let resolvedHandleAfterHitEffects = true;
+        let resolvedHitAmount = 1;
+        let resolvedRollAccuracy = true;
+
+        if (typeof delayOrConfig === "number") {
+            resolvedDelay = delayOrConfig;
+            if (typeof handleAfterHitEffects === "boolean") {
+                resolvedHandleAfterHitEffects = handleAfterHitEffects;
+            }
+        } else if (delayOrConfig && typeof delayOrConfig === "object") {
+            if (Number.isInteger(delayOrConfig.delay)) {
+                resolvedDelay = delayOrConfig.delay as number;
+            }
+            if (typeof delayOrConfig.handleAfterHitEffects === "boolean") {
+                resolvedHandleAfterHitEffects = delayOrConfig.handleAfterHitEffects;
+            }
+            if (Number.isInteger(delayOrConfig.hitAmount) && (delayOrConfig.hitAmount as number) > 0) {
+                resolvedHitAmount = delayOrConfig.hitAmount as number;
+            }
+            if (typeof delayOrConfig.rollAccuracy === "boolean") {
+                resolvedRollAccuracy = delayOrConfig.rollAccuracy;
+            }
+        }
+
+        this.hits = this.prepareHits(resolvedHitAmount, resolvedRollAccuracy);
+        this.delay = Math.max(0, resolvedDelay);
+        this.handleAfterHitEffects = resolvedHandleAfterHitEffects;
     }
 
     public getAttacker(): Mobile {

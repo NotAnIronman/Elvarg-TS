@@ -14,6 +14,7 @@ const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/Id
 const { Pets } = require("../npcs/Pets.plugin");
 
 const TREE_STUMP_OBJECT_ID = ObjectIds.TREE_STUMP_3;
+const WOODCUTTING_ACTION_INTERVAL_TICKS = 4;
 const CHOP_ANIMATION_INTERVAL_TICKS = 4;
 const CHOP_SOUND_INTERVAL_TICKS = 2;
 const MULTI_TREE_DEPLETION_ROLL_MAX = 15;
@@ -263,7 +264,8 @@ function calculateCyclesRequired(player, tree, axe) {
   let cycles = tree.cycles + randomIntInclusive(0, 4);
   cycles -= getWoodcuttingLevel(player) * 0.1;
   cycles -= cycles * axe.speed;
-  return Math.max(3, Math.floor(cycles));
+  const tickBudget = Math.max(3, Math.floor(cycles));
+  return Math.max(1, Math.ceil(tickBudget / WOODCUTTING_ACTION_INTERVAL_TICKS));
 }
 
 function shouldDepleteTree(tree) {
@@ -473,6 +475,7 @@ function startWoodcutting(player, treeObject, tree, activeSessions) {
     location,
     privateArea: treeObject.getPrivateArea(),
     cyclesUntilReward: calculateCyclesRequired(player, tree, axe),
+    nextActionTick: woodcuttingTick + WOODCUTTING_ACTION_INTERVAL_TICKS,
     nextAnimationTick: woodcuttingTick + CHOP_ANIMATION_INTERVAL_TICKS,
     nextSoundTick: woodcuttingTick + CHOP_SOUND_INTERVAL_TICKS,
   });
@@ -566,6 +569,10 @@ function processWoodcuttingTick(activeSessions, currentTick) {
       state.nextAnimationTick = currentTick + CHOP_ANIMATION_INTERVAL_TICKS;
     }
 
+    if (currentTick < state.nextActionTick) {
+      continue;
+    }
+    state.nextActionTick = currentTick + WOODCUTTING_ACTION_INTERVAL_TICKS;
     state.cyclesUntilReward--;
     if (state.cyclesUntilReward > 0) {
       continue;

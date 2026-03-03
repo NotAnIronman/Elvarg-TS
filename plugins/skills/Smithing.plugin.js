@@ -391,6 +391,8 @@ const EQUIPMENT_CONTAINER_ACTION_OPCODES = [
   PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE,
 ];
 
+let smithingTick = 0;
+
 function getSmithingLevel(player) {
   return player.getSkillManager().getCurrentLevel(Skill.SMITHING);
 }
@@ -499,6 +501,24 @@ function stopSmithingSession(activeSessions, player, resetAnimation = true) {
   }
 }
 
+class CloseSmithingInterfaceTask extends Task {
+  constructor(player) {
+    super(1);
+    this.player = player;
+  }
+
+  execute() {
+    if (this.player?.isRegistered?.()) {
+      this.player.getPacketSender().sendInterfaceRemoval();
+    }
+    this.stop();
+  }
+}
+
+function closeSmithingInterfaceNextTick(player) {
+  TaskManager.submit(new CloseSmithingInterfaceTask(player));
+}
+
 function startSmeltingSession(activeSessions, player, recipe, amount) {
   if (!recipe || !Number.isInteger(amount) || amount <= 0) {
     return false;
@@ -527,7 +547,7 @@ function startSmeltingSession(activeSessions, player, recipe, amount) {
     recipe,
     remaining: amount,
     interval: SMELTING_INTERVAL_TICKS,
-    nextActionTick: 0,
+    nextActionTick: smithingTick + SMELTING_INTERVAL_TICKS,
   });
   Sounds.sendSound(player, Sound.SMELTING);
   player.performAnimation(SMELT_ANIMATION);
@@ -572,7 +592,7 @@ function startSmithingSession(activeSessions, player, smithable, amount) {
     smithable,
     remaining: amount,
     interval: smithingInterval,
-    nextActionTick: 0,
+    nextActionTick: smithingTick + smithingInterval,
   });
   Sounds.sendSound(player, Sound.SMITHING);
   player.performAnimation(SMITH_ANIMATION);
@@ -585,7 +605,7 @@ function handleSmeltingButton(activeSessions, player, buttonId) {
     return false;
   }
 
-  player.getPacketSender().sendInterfaceRemoval();
+  closeSmithingInterfaceNextTick(player);
 
   if (entry.amount === -1) {
     player.setEnteredAmountAction({
@@ -701,6 +721,7 @@ class SmithingTask extends Task {
 
   execute() {
     this.cycle++;
+    smithingTick = this.cycle;
 
     for (const [player, session] of this.activeSessions) {
       if (!player || !player.isRegistered?.() || player.getHitpoints() <= 0) {
@@ -717,7 +738,7 @@ class SmithingTask extends Task {
       }
 
       if (!Number.isInteger(session.remaining) || session.remaining <= 0) {
-        stopSmithingSession(this.activeSessions, player);
+        stopSmithingSession(this.activeSessions, player, false);
         continue;
       }
 
@@ -735,13 +756,13 @@ class SmithingTask extends Task {
       }
 
       if (!progressed) {
-        stopSmithingSession(this.activeSessions, player);
+        stopSmithingSession(this.activeSessions, player, false);
         continue;
       }
 
       session.remaining--;
       if (session.remaining <= 0) {
-        stopSmithingSession(this.activeSessions, player);
+        stopSmithingSession(this.activeSessions, player, false);
       }
     }
   }
@@ -888,7 +909,7 @@ function handleEquipmentContainerAction(activeSessions, player, opcode, payload)
     decoded.amount
   );
   if (started) {
-    player.getPacketSender().sendInterfaceRemoval();
+    closeSmithingInterfaceNextTick(player);
   }
   return started;
 }

@@ -11,7 +11,9 @@ const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, NpcIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
 
-const FISHING_ANIMATION_INTERVAL_TICKS = 4;
+const FISHING_ACTION_INTERVAL_TICKS = 5;
+const FISHING_ANIMATION_INTERVAL_TICKS = 5;
+let fishingTick = 0;
 
 class Fish {
   constructor(id, level, chance, experience, name) {
@@ -137,7 +139,8 @@ function stopFishing(activeSessions, player, resetAnimation = true) {
 function cyclesRequired(player) {
   let cycles = 4 + Misc.getRandom(2);
   cycles -= getFishingLevel(player) * 0.03;
-  return Math.max(3, Math.floor(cycles));
+  const tickBudget = Math.max(3, Math.floor(cycles));
+  return Math.max(1, Math.ceil(tickBudget / FISHING_ACTION_INTERVAL_TICKS));
 }
 
 function determineFish(player, tool) {
@@ -176,7 +179,8 @@ function startFishing(player, npc, clickType, activeSessions) {
     npcId: npc.getId(),
     tool,
     cyclesUntilCatch: cyclesRequired(player),
-    nextAnimationTick: 0,
+    nextAnimationTick: fishingTick + FISHING_ANIMATION_INTERVAL_TICKS,
+    nextCatchTick: fishingTick + FISHING_ACTION_INTERVAL_TICKS,
   });
 
   player.getPacketSender().sendMessage("You begin to fish..");
@@ -194,6 +198,7 @@ class FishingTask extends Task {
 
   execute() {
     this.cycle++;
+    fishingTick = this.cycle;
 
     for (const [player, session] of this.activeSessions) {
       if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
@@ -234,6 +239,10 @@ class FishingTask extends Task {
         session.nextAnimationTick = this.cycle + FISHING_ANIMATION_INTERVAL_TICKS;
       }
 
+      if (this.cycle < session.nextCatchTick) {
+        continue;
+      }
+      session.nextCatchTick = this.cycle + FISHING_ACTION_INTERVAL_TICKS;
       session.cyclesUntilCatch--;
       if (session.cyclesUntilCatch > 0) {
         continue;

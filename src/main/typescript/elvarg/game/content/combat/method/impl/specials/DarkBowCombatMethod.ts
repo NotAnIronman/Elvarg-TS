@@ -3,7 +3,7 @@ import { Animation } from "../../../../../model/Animation";
 import { Priority } from "../../../../../model/Priority";
 import { PendingHit } from "../../../hit/PendingHit";
 import { CombatSpecial } from "../../../CombatSpecial";
-import { RangedWeapon, Ammunition } from "../../../ranged/RangedData";
+import { RangedData, RangedWeapon, Ammunition } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
 import { Graphic } from "../../../../../model/Graphic";
@@ -18,8 +18,12 @@ export class DarkBowCombatMethod extends RangedCombatMethod {
     private static GRAPHIC = new Graphic(1100, GraphicHeight.HIGH);
 
     public hits(character: Mobile, target: Mobile): PendingHit[] {
-        return [new PendingHit(character, target, this, 3, false),
-        new PendingHit(character, target, this, 2, false)];
+        const distance = character.getLocation().getDistance(target.getLocation());
+        const delay = RangedData.hitDelay(distance, character.getCombat().getRangedWeapon());
+        return [
+            new PendingHit(character, target, this, delay, false),
+            new PendingHit(character, target, this, RangedData.dbowArrowDelay(distance), false),
+        ];
     }
 
     public canAttack(character: Mobile, target: Mobile): boolean {

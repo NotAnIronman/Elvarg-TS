@@ -12,17 +12,18 @@ const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
 
 const DEPLETED_ROCK_ID = 2704;
-const MINING_ANIMATION_INTERVAL_TICKS = 6;
+const MINING_ANIMATION_INTERVAL_TICKS = 4;
+let miningTick = 0;
 
 const PICKAXES = [
-  { id: ItemIds.BRONZE_PICKAXE, requiredLevel: 1, speed: 0.03, animation: new Animation(625) },
-  { id: ItemIds.IRON_PICKAXE, requiredLevel: 1, speed: 0.05, animation: new Animation(626) },
-  { id: ItemIds.STEEL_PICKAXE, requiredLevel: 6, speed: 0.09, animation: new Animation(627) },
-  { id: ItemIds.BLACK_PICKAXE, requiredLevel: 11, speed: 0.11, animation: new Animation(627) },
-  { id: ItemIds.MITHRIL_PICKAXE, requiredLevel: 21, speed: 0.13, animation: new Animation(628) },
-  { id: ItemIds.ADAMANT_PICKAXE, requiredLevel: 31, speed: 0.16, animation: new Animation(629) },
-  { id: ItemIds.RUNE_PICKAXE, requiredLevel: 41, speed: 0.2, animation: new Animation(624) },
-  { id: ItemIds.DRAGON_PICKAXE, requiredLevel: 61, speed: 0.25, animation: new Animation(624) },
+  { id: ItemIds.BRONZE_PICKAXE, requiredLevel: 1, speed: 0.03, attemptIntervalTicks: 8, animation: new Animation(625) },
+  { id: ItemIds.IRON_PICKAXE, requiredLevel: 1, speed: 0.05, attemptIntervalTicks: 7, animation: new Animation(626) },
+  { id: ItemIds.STEEL_PICKAXE, requiredLevel: 6, speed: 0.09, attemptIntervalTicks: 6, animation: new Animation(627) },
+  { id: ItemIds.BLACK_PICKAXE, requiredLevel: 11, speed: 0.11, attemptIntervalTicks: 5, animation: new Animation(627) },
+  { id: ItemIds.MITHRIL_PICKAXE, requiredLevel: 21, speed: 0.13, attemptIntervalTicks: 5, animation: new Animation(628) },
+  { id: ItemIds.ADAMANT_PICKAXE, requiredLevel: 31, speed: 0.16, attemptIntervalTicks: 4, animation: new Animation(629) },
+  { id: ItemIds.RUNE_PICKAXE, requiredLevel: 41, speed: 0.2, attemptIntervalTicks: 3, animation: new Animation(624) },
+  { id: ItemIds.DRAGON_PICKAXE, requiredLevel: 61, speed: 0.25, attemptIntervalTicks: 3, animation: new Animation(624) },
 ];
 
 const PICKAXES_DESC = [...PICKAXES].sort((a, b) => b.requiredLevel - a.requiredLevel);
@@ -92,7 +93,8 @@ function cyclesRequired(player, rock, pickaxe) {
   let cycles = rock.cycles + Math.floor(Math.random() * 5);
   cycles -= getMiningLevel(player) * 0.1;
   cycles -= cycles * pickaxe.speed;
-  return Math.max(3, Math.floor(cycles));
+  const tickBudget = Math.max(3, Math.floor(cycles));
+  return Math.max(1, Math.ceil(tickBudget / pickaxe.attemptIntervalTicks));
 }
 
 function stopMining(activeSessions, player, resetAnim = true) {
@@ -151,7 +153,9 @@ function startMining(player, rockObject, rock, activeSessions) {
     location: rockObject.getLocation().clone(),
     privateArea: rockObject.getPrivateArea(),
     cyclesUntilOre: cyclesRequired(player, rock, pickaxe),
-    nextAnimationTick: 0,
+    nextAnimationTick: miningTick + MINING_ANIMATION_INTERVAL_TICKS,
+    nextOreAttemptTick: miningTick + pickaxe.attemptIntervalTicks,
+    attemptIntervalTicks: pickaxe.attemptIntervalTicks,
   });
 
   player.getPacketSender().sendMessage("You swing your pickaxe at the rock..");
@@ -169,6 +173,7 @@ class MiningTask extends Task {
 
   execute() {
     this.cycle++;
+    miningTick = this.cycle;
     for (const [player, state] of this.activeSessions) {
       if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
         this.activeSessions.delete(player);
@@ -201,6 +206,7 @@ class MiningTask extends Task {
       }
 
       state.pickaxe = pickaxe;
+      state.attemptIntervalTicks = pickaxe.attemptIntervalTicks;
 
       if (player.getInventory().isFull()) {
         player.getInventory().full();
@@ -213,6 +219,11 @@ class MiningTask extends Task {
         player.performAnimation(state.pickaxe.animation);
         state.nextAnimationTick = this.cycle + MINING_ANIMATION_INTERVAL_TICKS;
       }
+
+      if (this.cycle < state.nextOreAttemptTick) {
+        continue;
+      }
+      state.nextOreAttemptTick = this.cycle + state.attemptIntervalTicks;
 
       state.cyclesUntilOre--;
       if (state.cyclesUntilOre > 0) {
