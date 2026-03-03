@@ -35,7 +35,6 @@ import { AreaManager } from "../../../model/areas/AreaManager";
 import { Bank } from "../../../model/container/impl/Bank";
 import { Equipment } from "../../../model/container/impl/Equipment";
 import { Inventory } from "../../../model/container/impl/Inventory";
-import { Shop } from "../../../model/container/shop/Shop";
 import { DialogueManager } from "../../../model/dialogues/DialogueManager"
 import { BonusManager } from "../../../model/equipment/BonusManager";
 import { CreationMenu } from "../../../model/menu/CreationMenu"
@@ -117,7 +116,8 @@ export class Player extends Mobile {
     public status: PlayerStatus = PlayerStatus.NONE;
     public currentClanChat: ClanChat;
     public clanChatName: string;
-    public shop: Shop;
+    // Legacy shop field kept for compile compatibility with deprecated core shop classes.
+    public shop: any;
     public interfaceId: number = -1
     private walkableInterfaceId: number = -1
     private multiIcon: number;
@@ -920,11 +920,11 @@ export class Player extends Mobile {
         return this.clickDelay;
     }
 
-    public getShop(): Shop {
+    public getShop(): any {
         return this.shop;
     }
 
-    public setShop(shop: Shop): Player {
+    public setShop(shop: any): Player {
         this.shop = shop;
         return this;
     }

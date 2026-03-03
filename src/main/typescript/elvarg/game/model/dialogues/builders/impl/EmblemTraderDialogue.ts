@@ -4,7 +4,6 @@ import { ShopIdentifiers } from "../../../../../util/ShopIdentifiers";
 import { NpcIdentifiers } from "../../../../../util/NpcIdentifiers";
 import { BountyHunter } from "../../../../content/combat/bountyhunter/BountyHunter";
 import { ActionDialogue } from "../../entries/impl/ActionDialogue";
-import { ShopManager } from "../../../container/shop/ShopManager";
 import { NpcDialogue } from "../../entries/impl/NpcDialogue";
 import { EndDialogue } from "../../entries/impl/EndDialogue";
 import { DialogueExpression } from "../../DialogueExpression";
@@ -13,6 +12,7 @@ import { CombatFactory } from "../../../../content/combat/CombatFactory";
 import { Player } from "../../../../entity/impl/player/Player";
 import { DialogueOption } from "../../DialogueOption";
 import { DialogueOptionAction } from "../../DialogueOptionAction";
+const { openShopById } = require("../../../../../../../../../plugins/interface/Shops.plugin.js");
 
 class BankerDialogueAction implements DialogueOptionAction{
     constructor(private readonly execFunc: Function){
@@ -30,7 +30,7 @@ export class EmblemTraderDialogue extends DynamicDialogueBuilder {
         this.add(new OptionDialogue(0, new BankerDialogueAction((option) => {
             switch (option) {
                 case DialogueOption.FIRST_OPTION:
-                    ShopManager.opens(player, ShopIdentifiers.PVP_SHOP);
+                    openShopById(player, ShopIdentifiers.PVP_SHOP);
                     break;
                 case DialogueOption.SECOND_OPTION:
                     player.getDialogueManager().startDialogue(2);

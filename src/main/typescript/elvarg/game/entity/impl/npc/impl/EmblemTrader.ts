@@ -1,9 +1,9 @@
 import { NPC } from "../NPC";
 import { Player } from "../../player/Player";
-import { ShopManager } from "../../../../model/container/shop/ShopManager"
 import { EmblemTraderDialogue } from "../../../../model/dialogues/builders/impl/EmblemTraderDialogue"
 import { NPCInteraction } from "../NPCInteraction"
 import { ShopIdentifiers } from "../../../../../util/ShopIdentifiers"
+const { openShopById } = require("../../../../../../../../../plugins/interface/Shops.plugin.js");
 
 export class EmblemTrader implements NPCInteraction {
 
@@ -12,7 +12,7 @@ export class EmblemTrader implements NPCInteraction {
     }
 
     public secondOptionClick(player: Player, npc: NPC): void {
-        ShopManager.opens(player, ShopIdentifiers.PVP_SHOP);
+        openShopById(player, ShopIdentifiers.PVP_SHOP);
     }
 
     public thirdOptionClick(player: Player, npc: NPC): void {
