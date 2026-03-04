@@ -3,6 +3,7 @@ const { Animation } = require("../../../../src/main/typescript/elvarg/game/model
 const { Graphic } = require("../../../../src/main/typescript/elvarg/game/model/Graphic");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { TaskManager } = require("../../../../src/main/typescript/elvarg/game/task/TaskManager");
+const { clearMovementRequest } = require("../navigation/BotNavigation");
 
 const HOME_TELEPORT_START_ANIMATION = new Animation(714);
 const HOME_TELEPORT_END_ANIMATION = new Animation(715);
@@ -162,6 +163,7 @@ function resetMovementState(player) {
   if (!player) {
     return;
   }
+  clearMovementRequest(player);
   try {
     TaskManager.cancelTasks(player);
   } catch (_) {
@@ -201,6 +203,7 @@ function applyModeTransition(player, state, mode, options = {}) {
   if (!state) {
     return;
   }
+  clearMovementRequest(player);
   const clearFollow = options.clearFollow !== false;
   const resetTraversal = options.resetTraversal === true;
   state.mode = mode;

@@ -7,11 +7,15 @@ const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
+const {
+  PlayerOptionPacketListener,
+} = require("../../src/main/typescript/elvarg/net/packet/impl/PlayerOptionPacketListener");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { BotController } = require("../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { createTraversalAssist } = require("./lib/TraversalAssist");
 const {
+  peekMovementRequest,
   randomInRange,
 } = require("./behaviours/navigation/BotNavigation");
 const {
@@ -146,6 +150,10 @@ const REQUIRED_MODE_HOOKS_BY_MODE = Object.freeze({
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
 const PLAYER_BOTS_LOG_PATH = path.join(process.cwd(), "logs", "player-bots.log");
+const BOT_STATUS_INTERACTION_SLOT = 1;
+const BOT_STATUS_OPTION_LABEL = "Status";
+const BOT_STATUS_RECENT_LOG_LIMIT = 24;
+const BOT_STATUS_RECENT_LOG_LINES = 8;
 const MANUAL_CONTROL_PACKET_OPCODES = new Set([
   PacketConstants.COMMAND_MOVEMENT_OPCODE,
   PacketConstants.GAME_MOVEMENT_OPCODE,
@@ -216,6 +224,62 @@ function applyForcedModeForDiagnosis(player, state) {
   state.autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
 }
 
+function formatTile(loc) {
+  if (!loc) {
+    return "n/a";
+  }
+  const x =
+    typeof loc.getX === "function" ? loc.getX() : Number.isFinite(loc.x) ? loc.x : null;
+  const y =
+    typeof loc.getY === "function" ? loc.getY() : Number.isFinite(loc.y) ? loc.y : null;
+  const z =
+    typeof loc.getZ === "function" ? loc.getZ() : Number.isFinite(loc.z) ? loc.z : null;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+    return "n/a";
+  }
+  return `${x},${y},${z}`;
+}
+
+function formatPoint(point) {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    return "n/a";
+  }
+  return `${point.x},${point.y},${Number.isFinite(point.z) ? point.z : 0}`;
+}
+
+function msRemainingLabel(targetMs, nowMs) {
+  if (!Number.isFinite(targetMs) || targetMs <= 0) {
+    return "n/a";
+  }
+  const remaining = Math.max(0, targetMs - nowMs);
+  return `${remaining}ms`;
+}
+
+function formatPendingMovement(request, nowMs) {
+  if (!request || !Number.isFinite(request.x) || !Number.isFinite(request.y)) {
+    return "none";
+  }
+  const target = formatPoint(request);
+  const ageMs = Number.isFinite(request.requestedAtMs)
+    ? Math.max(0, nowMs - request.requestedAtMs)
+    : null;
+  const reason = request.reason ?? "n/a";
+  const segment = Number.isFinite(request.maxRouteSegmentTiles)
+    ? request.maxRouteSegmentTiles
+    : "n/a";
+  return `${target} reason=${reason} age=${ageMs ?? "n/a"}ms seg=${segment}`;
+}
+
+function chatTrim(text, max = 200) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  if (text.length <= max) {
+    return text;
+  }
+  return `${text.slice(0, max - 3)}...`;
+}
+
 class FlashHintArrowTask extends Task {
   constructor(player, target, flashes = 6) {
     super(2);
@@ -256,6 +320,29 @@ module.exports = {
   name: "PlayerBots",
   dependsOn: ["ReplaceMapRegions"],
   register(api) {
+    const recentBotLogsByUsername = new Map();
+    const rememberRecentBotLog = (username, line) => {
+      if (!username || typeof line !== "string") {
+        return;
+      }
+      const history = recentBotLogsByUsername.get(username) ?? [];
+      history.push(line);
+      if (history.length > BOT_STATUS_RECENT_LOG_LIMIT) {
+        history.splice(0, history.length - BOT_STATUS_RECENT_LOG_LIMIT);
+      }
+      recentBotLogsByUsername.set(username, history);
+    };
+    const trackRecentBotLog = (message, extra, timestamp) => {
+      const username = extra?.username;
+      if (typeof username !== "string" || username.length === 0) {
+        return;
+      }
+      const suffix =
+        extra && Object.keys(extra).length > 0
+          ? ` ${JSON.stringify(extra)}`
+          : "";
+      rememberRecentBotLog(username, `[${timestamp}] ${message}${suffix}`);
+    };
     const writeBotLog = (message, extra) => {
       try {
         const timestamp = new Date().toISOString();
@@ -264,6 +351,7 @@ module.exports = {
             ? ` ${JSON.stringify(extra)}`
             : "";
         fs.appendFileSync(PLAYER_BOTS_LOG_PATH, `[${timestamp}] ${message}${suffix}\n`);
+        trackRecentBotLog(message, extra, timestamp);
       } catch (_) {
         // Keep bot behavior running even if file logging fails.
       }
@@ -404,6 +492,149 @@ module.exports = {
         treeFactory.create(randomizedCooldownMs(), initialDelayMs)
       );
 
+    const sendBotStatus = (viewer, bot) => {
+      if (!viewer || !bot) {
+        return;
+      }
+
+      const viewerSender = viewer.getPacketSender?.();
+      if (!viewerSender?.sendMessage) {
+        return;
+      }
+
+      const username = bot.getUsername?.();
+      const state = username ? botStatesByName.get(username) : null;
+      const nowMs = Date.now();
+      const queue = bot.getMovementQueue?.();
+      const bankRun = state?.bankRun ?? null;
+      const woodcutting = state?.woodcutting ?? null;
+      const mining = state?.mining ?? null;
+      const firemaking = state?.firemaking ?? null;
+      const sparring = state?.sparring ?? null;
+      const autonomy = state?.autonomy ?? null;
+      const awaitingDitch = state?.awaitingDitchTransition ?? null;
+      const pendingMovement = peekMovementRequest(bot);
+
+      viewerSender.sendMessage(
+        chatTrim(
+          `[Bot Status] ${username ?? "unknown"} idx=${bot.getIndex?.() ?? "n/a"} mode=${
+            state?.mode ?? "n/a"
+          }`
+        )
+      );
+      viewerSender.sendMessage(
+        chatTrim(
+          `tile=${formatTile(bot.getLocation?.())} hp=${bot.getHitpoints?.() ?? "n/a"} forceMove=${
+            bot.getForceMovement?.() != null
+          }`
+        )
+      );
+      viewerSender.sendMessage(
+        chatTrim(
+          `move queue=${queue?.size?.() ?? "n/a"} moving=${queue?.isMovings?.() === true} run=${
+            queue?.isRunToggled?.() === true
+          } dest=${
+            Number.isFinite(queue?.lastDestX) && Number.isFinite(queue?.lastDestY)
+              ? `${queue.lastDestX},${queue.lastDestY}`
+              : "n/a"
+          }`
+        )
+      );
+      viewerSender.sendMessage(
+        chatTrim(
+          `follow=${bot.getFollowing?.()?.getUsername?.() ?? "n/a"} face=${formatTile(
+            bot.getPositionToFace?.()
+          )} ditch=${awaitingDitch ? "pending" : "none"}`
+        )
+      );
+      viewerSender.sendMessage(
+        chatTrim(`pendingMove=${formatPendingMovement(pendingMovement, nowMs)}`)
+      );
+
+      if (bankRun) {
+        viewerSender.sendMessage(
+          chatTrim(
+            `bankRun id=${bankRun.id ?? "n/a"} phase=${bankRun.phase ?? "n/a"} next=${msRemainingLabel(
+              bankRun.nextActionAt,
+              nowMs
+            )} travel=${formatPoint(bankRun.travelTarget)} return=${formatPoint(
+              bankRun.returnTo
+            )}`
+          )
+        );
+      }
+
+      if (state?.mode === BOT_BEHAVIOR_MODE.WOODCUTTING && woodcutting) {
+        viewerSender.sendMessage(
+          chatTrim(
+            `woodcutting target=${formatPoint(
+              woodcutting.target
+            )} nextAction=${msRemainingLabel(woodcutting.nextActionAt, nowMs)}`
+          )
+        );
+      }
+      if (state?.mode === BOT_BEHAVIOR_MODE.MINING && mining) {
+        viewerSender.sendMessage(
+          chatTrim(
+            `mining target=${formatPoint(mining.target)} nextAction=${msRemainingLabel(
+              mining.nextActionAt,
+              nowMs
+            )}`
+          )
+        );
+      }
+      if (state?.mode === BOT_BEHAVIOR_MODE.FIREMAKING && firemaking) {
+        viewerSender.sendMessage(
+          chatTrim(
+            `firemaking phase=${firemaking.phase ?? "n/a"} lightTile=${formatPoint(
+              firemaking.lightTile
+            )} next=${msRemainingLabel(firemaking.nextActionAt, nowMs)}`
+          )
+        );
+      }
+      if (state?.mode === BOT_BEHAVIOR_MODE.SPARRING && sparring) {
+        viewerSender.sendMessage(
+          chatTrim(
+            `sparring target=${sparring.targetUsername ?? "n/a"} ends=${msRemainingLabel(
+              sparring.endsAt,
+              nowMs
+            )}`
+          )
+        );
+      }
+
+      if (autonomy) {
+        viewerSender.sendMessage(
+          chatTrim(
+            `autonomy nextDecision=${msRemainingLabel(
+              autonomy.nextDecisionAt,
+              nowMs
+            )} modeEnds=${msRemainingLabel(autonomy.modeEndsAt, nowMs)} manual=${
+              autonomy.manualMode ?? "none"
+            }`
+          )
+        );
+      }
+
+      const history = username ? recentBotLogsByUsername.get(username) ?? [] : [];
+      if (history.length === 0) {
+        viewerSender.sendMessage("[Bot Status] No recent per-bot logs captured.");
+      } else {
+        viewerSender.sendMessage(
+          `[Bot Status] Recent logs (${Math.min(BOT_STATUS_RECENT_LOG_LINES, history.length)}):`
+        );
+        for (const line of history.slice(-BOT_STATUS_RECENT_LOG_LINES)) {
+          viewerSender.sendMessage(chatTrim(line, 220));
+        }
+      }
+
+      botApi.log("bot_status_requested", {
+        requester: viewer.getUsername?.(),
+        target: username ?? null,
+        mode: state?.mode ?? null,
+      });
+    };
+
     const ensureBehaviorTaskStarted = () => {
       if (behaviorTaskStarted || !runtime || runtime.entries.length === 0) {
         return;
@@ -456,6 +687,41 @@ module.exports = {
       playerBotUsernames,
       entries,
       entriesByUsername,
+    });
+
+    const corePlayerOptionListener = new PlayerOptionPacketListener();
+    api.registerPacketListener(PacketConstants.PLAYER_OPTION_1_OPCODE, {
+      execute: (player, packet) => {
+        const payload = packet?.getBuffer?.();
+        const targetIndex =
+          payload && payload.length >= 2 ? payload.readUInt16BE(0) : Number.NaN;
+
+        if (!Number.isInteger(targetIndex)) {
+          corePlayerOptionListener.execute(player, packet);
+          return;
+        }
+
+        const target = World.getPlayers().get(targetIndex);
+        if (!target?.isPlayerBot?.()) {
+          corePlayerOptionListener.execute(player, packet);
+          return;
+        }
+
+        sendBotStatus(player, target);
+      },
+    });
+
+    api.onPlayerLogin(({ player }) => {
+      if (player?.isPlayerBot?.()) {
+        return;
+      }
+      player
+        ?.getPacketSender?.()
+        ?.sendInteractionOption?.(
+          BOT_STATUS_OPTION_LABEL,
+          BOT_STATUS_INTERACTION_SLOT,
+          false
+        );
     });
 
     const followBackTrigger = new FollowBackTrigger({

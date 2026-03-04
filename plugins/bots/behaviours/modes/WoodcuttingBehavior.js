@@ -22,6 +22,10 @@ const WALK_COMMAND_COOLDOWN_MS = 900;
 const DROP_LOGS_RETRY_MS = 650;
 const MAX_NEXT_TREE_DISTANCE_TILES = 10;
 const MAX_TREE_TARGET_DISTANCE_TILES = 18;
+const TOO_FAR_STREAK_WINDOW_MS = 12000;
+const TOO_FAR_STREAK_THRESHOLD = 4;
+const TOO_FAR_AVOID_MS = 25000;
+const TOO_FAR_AVOID_MAX_ENTRIES = 12;
 const TREE_SEARCH_REGION_RADIUS = 1;
 const SEARCH_WALK_ATTEMPTS = 12;
 const SEARCH_TREE_VISIBILITY_RADIUS_TILES = 18;
@@ -52,6 +56,8 @@ class WoodcuttingBehavior {
     setModeWoodcutting(player, state, this.behaviorMode);
     if (state.woodcutting) {
       state.woodcutting.nextActionAt = 0;
+      state.woodcutting.tooFarTracker = null;
+      state.woodcutting.avoidedTargets = [];
     }
     return true;
   }
@@ -95,6 +101,8 @@ class WoodcuttingBehavior {
     state.woodcutting.target = resumeTarget;
     state.woodcutting.nextActionAt = nowMs;
     state.woodcutting.nextSearchAt = nowMs;
+    state.woodcutting.tooFarTracker = null;
+    state.woodcutting.avoidedTargets = [];
     return true;
   }
 
@@ -198,7 +206,12 @@ class WoodcuttingBehavior {
         return "failure";
       }
       for (const treeTier of treeTiers) {
-        targetTree = this.findNearestTreeObjectForTier(player, treeTier);
+        targetTree = this.findNearestTreeObjectForTier(
+          player,
+          treeTier,
+          state,
+          nowMs
+        );
         if (targetTree) {
           break;
         }
@@ -228,13 +241,16 @@ class WoodcuttingBehavior {
 
       const distanceToTarget = this.getDistanceToTree(player, targetTree);
       if (distanceToTarget > MAX_TREE_TARGET_DISTANCE_TILES) {
+        const tooFar = this.noteTooFarTarget(state, targetTree, nowMs);
         state.woodcutting.target = null;
         if (this.queueSearchWalk(player, state)) {
           state.woodcutting.nextActionAt = nowMs + WALK_COMMAND_COOLDOWN_MS;
         } else {
           state.woodcutting.nextActionAt = nowMs + RETRY_SEARCH_MS;
         }
-        state.woodcutting.nextSearchAt = nowMs + RETRY_SEARCH_MS;
+        state.woodcutting.nextSearchAt = tooFar.avoidApplied
+          ? nowMs
+          : nowMs + RETRY_SEARCH_MS;
         this.api.log("woodcutting_target_too_far", {
           username: player.getUsername(),
           targetX: targetTree.getLocation().getX(),
@@ -242,7 +258,19 @@ class WoodcuttingBehavior {
           targetZ: targetTree.getLocation().getZ(),
           distance: distanceToTarget,
           maxDistance: MAX_TREE_TARGET_DISTANCE_TILES,
+          repeatCount: tooFar.count,
+          avoidApplied: tooFar.avoidApplied,
         });
+        if (tooFar.avoidApplied) {
+          this.api.log("woodcutting_target_temporarily_avoided", {
+            username: player.getUsername(),
+            targetX: targetTree.getLocation().getX(),
+            targetY: targetTree.getLocation().getY(),
+            targetZ: targetTree.getLocation().getZ(),
+            objectId: targetTree.getId(),
+            avoidForMs: TOO_FAR_AVOID_MS,
+          });
+        }
         return "running";
       }
 
@@ -264,6 +292,7 @@ class WoodcuttingBehavior {
         y: targetTree.getLocation().getY(),
         z: targetTree.getLocation().getZ(),
       };
+      state.woodcutting.tooFarTracker = null;
     }
 
     if (player.getForceMovement() != null) {
@@ -309,10 +338,11 @@ class WoodcuttingBehavior {
     ).sort((a, b) => b.requiredLevel - a.requiredLevel);
   }
 
-  findNearestTreeObjectForTier(player, treeTier) {
+  findNearestTreeObjectForTier(player, treeTier, state = null, nowMs = Date.now()) {
     if (!player || !treeTier) {
       return null;
     }
+    this.pruneAvoidedTargets(state, nowMs);
     this.ensureNearbyRegionsLoaded(player);
     const loc = player.getLocation();
     const privateArea = player.getPrivateArea();
@@ -338,6 +368,9 @@ class WoodcuttingBehavior {
         const dx = objectLoc.getX() - loc.getX();
         const dy = objectLoc.getY() - loc.getY();
         const distSq = dx * dx + dy * dy;
+        if (this.isTreeTemporarilyAvoided(state, object, nowMs)) {
+          continue;
+        }
         if (distSq < bestDistSq) {
           bestDistSq = distSq;
           bestObject = object;
@@ -396,6 +429,75 @@ class WoodcuttingBehavior {
       return Number.MAX_SAFE_INTEGER;
     }
     return player.getLocation().getDistance(treeObject.getLocation());
+  }
+
+  treeKey(objectId, x, y, z) {
+    return `${objectId}:${x}:${y}:${z}`;
+  }
+
+  pruneAvoidedTargets(state, nowMs) {
+    const woodcutting = state?.woodcutting;
+    if (!woodcutting) {
+      return;
+    }
+    const avoided = Array.isArray(woodcutting.avoidedTargets)
+      ? woodcutting.avoidedTargets
+      : [];
+    woodcutting.avoidedTargets = avoided.filter(
+      (entry) => Number(entry?.expiresAt) > nowMs
+    );
+  }
+
+  isTreeTemporarilyAvoided(state, treeObject, nowMs) {
+    const avoided = state?.woodcutting?.avoidedTargets;
+    if (!Array.isArray(avoided) || avoided.length === 0 || !treeObject) {
+      return false;
+    }
+    const loc = treeObject.getLocation();
+    const key = this.treeKey(
+      treeObject.getId(),
+      loc.getX(),
+      loc.getY(),
+      loc.getZ()
+    );
+    return avoided.some((entry) => entry?.key === key && Number(entry?.expiresAt) > nowMs);
+  }
+
+  noteTooFarTarget(state, treeObject, nowMs) {
+    const woodcutting = state?.woodcutting;
+    if (!woodcutting || !treeObject) {
+      return { count: 1, avoidApplied: false };
+    }
+    const loc = treeObject.getLocation();
+    const key = this.treeKey(treeObject.getId(), loc.getX(), loc.getY(), loc.getZ());
+    const previous = woodcutting.tooFarTracker;
+    const count =
+      previous &&
+      previous.key === key &&
+      nowMs - Number(previous.lastAt ?? 0) <= TOO_FAR_STREAK_WINDOW_MS
+        ? Number(previous.count ?? 0) + 1
+        : 1;
+    woodcutting.tooFarTracker = { key, count, lastAt: nowMs };
+
+    if (count < TOO_FAR_STREAK_THRESHOLD) {
+      return { count, avoidApplied: false };
+    }
+
+    const avoided = Array.isArray(woodcutting.avoidedTargets)
+      ? woodcutting.avoidedTargets
+      : [];
+    const expiresAt = nowMs + TOO_FAR_AVOID_MS;
+    const nextAvoided = avoided.filter((entry) => entry?.key !== key);
+    nextAvoided.push({
+      key,
+      expiresAt,
+    });
+    if (nextAvoided.length > TOO_FAR_AVOID_MAX_ENTRIES) {
+      nextAvoided.splice(0, nextAvoided.length - TOO_FAR_AVOID_MAX_ENTRIES);
+    }
+    woodcutting.avoidedTargets = nextAvoided;
+    woodcutting.tooFarTracker = null;
+    return { count, avoidApplied: true };
   }
 
   isLowerTierFallbackTarget(previousTarget, nextTreeObject) {

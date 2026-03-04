@@ -1,6 +1,9 @@
 const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag");
 const { PathFinder } = require("../../../../src/main/typescript/elvarg/game/model/movement/path/PathFinder");
 
+const MAX_ROUTE_SEGMENT_TILES = 24;
+const pendingMovementByPlayer = new WeakMap();
+
 function randomInRange(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -80,9 +83,98 @@ function calculateStrictWalkRoute(player, targetX, targetY) {
   PathFinder.calculateRoute(player, 0, targetX, targetY, 0, 0, 0, 0, false);
 }
 
+function resolveSegmentTarget(
+  player,
+  targetX,
+  targetY,
+  maxRouteSegmentTiles = MAX_ROUTE_SEGMENT_TILES
+) {
+  if (!player) {
+    return { x: targetX, y: targetY };
+  }
+  const maxSegmentTiles = Math.max(1, Math.floor(maxRouteSegmentTiles));
+  const loc = player.getLocation();
+  const currentX = loc.getX();
+  const currentY = loc.getY();
+  const dx = targetX - currentX;
+  const dy = targetY - currentY;
+  const chebyshevDistance = Math.max(Math.abs(dx), Math.abs(dy));
+  if (chebyshevDistance <= maxSegmentTiles) {
+    return { x: targetX, y: targetY };
+  }
+
+  const ratio = maxSegmentTiles / chebyshevDistance;
+  let segmentX = currentX + Math.round(dx * ratio);
+  let segmentY = currentY + Math.round(dy * ratio);
+
+  if (segmentX === currentX && dx !== 0) {
+    segmentX += Math.sign(dx);
+  }
+  if (segmentY === currentY && dy !== 0) {
+    segmentY += Math.sign(dy);
+  }
+
+  return {
+    x: segmentX,
+    y: segmentY,
+  };
+}
+
 function queueRouteAndFlagAppearance(player, targetX, targetY) {
-  calculateStrictWalkRoute(player, targetX, targetY);
+  return requestMovement(player, targetX, targetY);
+}
+
+function requestMovement(player, targetX, targetY, options = {}) {
+  if (!player) {
+    return false;
+  }
+  if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) {
+    return false;
+  }
+  const loc = player.getLocation?.();
+  const z = Number.isFinite(options.z) ? Math.floor(options.z) : loc?.getZ?.();
+  pendingMovementByPlayer.set(player, {
+    x: Math.floor(targetX),
+    y: Math.floor(targetY),
+    z: Number.isFinite(z) ? z : null,
+    reason: typeof options.reason === "string" ? options.reason : null,
+    requestedAtMs: Number.isFinite(options.nowMs) ? options.nowMs : Date.now(),
+    maxRouteSegmentTiles:
+      Number.isFinite(options.maxRouteSegmentTiles) &&
+      options.maxRouteSegmentTiles > 0
+        ? Math.floor(options.maxRouteSegmentTiles)
+        : MAX_ROUTE_SEGMENT_TILES,
+  });
+  return true;
+}
+
+function peekMovementRequest(player) {
+  if (!player) {
+    return null;
+  }
+  return pendingMovementByPlayer.get(player) ?? null;
+}
+
+function clearMovementRequest(player) {
+  if (!player) {
+    return;
+  }
+  pendingMovementByPlayer.delete(player);
+}
+
+function dispatchMovementRequest(player, request) {
+  if (!player || !request) {
+    return null;
+  }
+  const segmentTarget = resolveSegmentTarget(
+    player,
+    request.x,
+    request.y,
+    request.maxRouteSegmentTiles
+  );
+  calculateStrictWalkRoute(player, segmentTarget.x, segmentTarget.y);
   player.getUpdateFlag().flag(Flag.APPEARANCE);
+  return segmentTarget;
 }
 
 function retargetAfterBlocked(
@@ -147,8 +239,13 @@ function retargetAfterBlocked(
 module.exports = {
   calculateStrictWalkRoute,
   chooseNextTarget,
+  clearMovementRequest,
+  dispatchMovementRequest,
   isAtTarget,
+  peekMovementRequest,
   queueRouteAndFlagAppearance,
   randomInRange,
+  requestMovement,
+  resolveSegmentTarget,
   retargetAfterBlocked,
 };

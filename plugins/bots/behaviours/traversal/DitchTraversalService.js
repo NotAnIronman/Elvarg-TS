@@ -125,6 +125,12 @@ class DitchTraversalService {
     if (!traversalTarget) {
       return false;
     }
+    const objectLoc = traversalObject.getLocation();
+    const traversalTargetSnapshot = {
+      x: traversalTarget.x ?? null,
+      y: traversalTarget.y ?? null,
+      z: traversalTarget.z ?? null,
+    };
 
     if (nowMs < state.nextDitchAttemptAt) {
       if (
@@ -139,46 +145,42 @@ class DitchTraversalService {
           ...this.getModeContext(state),
         });
       }
-      return false;
+      return true;
     }
     state.nextDitchAttemptAt = nowMs + this.ditchAttemptCooldownMs;
 
-    const objectY = traversalObject.getLocation().getY();
-    const startSide = player.getLocation().getY() <= objectY ? "south" : "north";
-    state.awaitingDitchTransition = {
-      ditchY: objectY,
-      startSide,
-      sourceX: player.getLocation().getX(),
-      sourceY: player.getLocation().getY(),
-      sourceZ: player.getLocation().getZ(),
-      targetX: traversalTarget.x ?? player.getLocation().getX(),
-      targetY: traversalTarget.y ?? player.getLocation().getY(),
-      targetZ: traversalTarget.z ?? player.getLocation().getZ(),
-      startedAt: nowMs,
-      lastWaitLogAt: 0,
-    };
+    const objectY = objectLoc.getY();
 
     player.getMovementQueue().walkToObject(traversalObject, {
       execute: () => {
-        const transition = state.awaitingDitchTransition;
         const executedAt = Date.now();
-        if (transition) {
-          transition.startedAt = executedAt;
-          transition.sourceX = player.getLocation().getX();
-          transition.sourceY = player.getLocation().getY();
-          transition.sourceZ = player.getLocation().getZ();
-        }
+        const currentTraversalTarget =
+          this.getTraversalTarget(state) ?? traversalTargetSnapshot;
+        const startSide = player.getLocation().getY() <= objectY ? "south" : "north";
+        state.awaitingDitchTransition = {
+          ditchY: objectY,
+          startSide,
+          sourceX: player.getLocation().getX(),
+          sourceY: player.getLocation().getY(),
+          sourceZ: player.getLocation().getZ(),
+          targetX: currentTraversalTarget.x ?? player.getLocation().getX(),
+          targetY: currentTraversalTarget.y ?? player.getLocation().getY(),
+          targetZ: currentTraversalTarget.z ?? player.getLocation().getZ(),
+          startedAt: executedAt,
+          lastWaitLogAt: 0,
+        };
+        const transition = state.awaitingDitchTransition;
         this.clearMovementQueue(player);
-        player.setPositionToFace(traversalObject.getLocation());
+        player.setPositionToFace(objectLoc);
         const handled = this.emitObjectInteraction({
           player,
           object: traversalObject,
           objectId: traversalObject.getId(),
           clickType: 1,
           location: {
-            x: traversalObject.getLocation().getX(),
-            y: traversalObject.getLocation().getY(),
-            z: traversalObject.getLocation().getZ(),
+            x: objectLoc.getX(),
+            y: objectLoc.getY(),
+            z: objectLoc.getZ(),
           },
           sourceLocation: {
             x: transition?.sourceX ?? player.getLocation().getX(),
@@ -189,9 +191,9 @@ class DitchTraversalService {
         });
         this.api.log("ditch_cross_execute", {
           username: player.getUsername(),
-          objectX: traversalObject.getLocation().getX(),
-          objectY: traversalObject.getLocation().getY(),
-          objectZ: traversalObject.getLocation().getZ(),
+          objectX: objectLoc.getX(),
+          objectY: objectLoc.getY(),
+          objectZ: objectLoc.getZ(),
           handled,
           ...this.getModeContext(state),
         });
@@ -200,9 +202,9 @@ class DitchTraversalService {
           state.awaitingDitchTransition = null;
           this.api.log("ditch_cross_not_handled", {
             username: player.getUsername(),
-            objectX: traversalObject.getLocation().getX(),
-            objectY: traversalObject.getLocation().getY(),
-            objectZ: traversalObject.getLocation().getZ(),
+            objectX: objectLoc.getX(),
+            objectY: objectLoc.getY(),
+            objectZ: objectLoc.getZ(),
             ...this.getModeContext(state),
           });
         }
@@ -211,10 +213,13 @@ class DitchTraversalService {
 
     this.api.log("ditch_cross_requested", {
       username: player.getUsername(),
-      objectX: traversalObject.getLocation().getX(),
+      objectX: objectLoc.getX(),
       objectY,
-      objectZ: traversalObject.getLocation().getZ(),
-      target: this.getTraversalTarget(state),
+      objectZ: objectLoc.getZ(),
+      target: traversalTargetSnapshot,
+      currentX: player.getLocation().getX(),
+      currentY: player.getLocation().getY(),
+      currentZ: player.getLocation().getZ(),
       ...this.getModeContext(state),
     });
     return true;

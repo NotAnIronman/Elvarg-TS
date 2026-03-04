@@ -7,6 +7,7 @@ const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
+const {NpcIdentifiers} = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
 const INTERACTION_ANIM = new Animation(827);
 let pluginApi = null;
@@ -133,7 +134,7 @@ const PETS = [
   },
   {
     enumName: "ROCK_GOLEM",
-    petId: 6723,
+    petId: NpcIdentifiers.ROCK_GOLEM_25,
     morphId: 0,
     itemId: 13321,
     dialogue: -1,

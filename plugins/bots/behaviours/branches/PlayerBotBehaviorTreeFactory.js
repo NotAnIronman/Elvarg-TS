@@ -5,6 +5,9 @@ const {
   SequenceNode,
 } = require("../../../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { FollowBackActionNode } = require("../nodes/actions/FollowBackActionNode");
+const {
+  ProcessPendingMovementActionNode,
+} = require("../nodes/actions/ProcessPendingMovementActionNode");
 const { ReturnHomeActionNode } = require("../nodes/actions/ReturnHomeActionNode");
 const { BotReadyConditionNode } = require("../nodes/conditions/BotReadyConditionNode");
 const { RoamingBehavior } = require("../modes/RoamingBehavior");
@@ -68,6 +71,7 @@ class PlayerBotBehaviorTreeFactory {
 
   create(cooldownMs, initialDelayMs) {
     return new SelectorNode([
+      new ProcessPendingMovementActionNode(this.botStatesByName, this.api),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {
           requiredMode: this.behaviorMode.RETURN_HOME,

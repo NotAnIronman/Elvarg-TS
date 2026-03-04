@@ -20,6 +20,7 @@ const WALK_COMMAND_COOLDOWN_MS = 900;
 const POST_WITHDRAW_DELAY_MS = 350;
 const BANK_SEARCH_REGION_RADIUS = 2;
 const LIGHT_TILE_SEARCH_MAX_RADIUS = 8;
+const LIGHT_TILE_SEARCH_MAX_RADIUS_FROM_BANK = 15;
 const LIGHT_TILE_MIN_DIST_FROM_BANK = 3;
 
 const BANK_BOOTH_IDS = new Set(
@@ -130,25 +131,58 @@ class FiremakingBehavior {
     }
 
     const firemaking = state.firemaking;
-    const nextTile = this.findLightableTileNear(player, firemaking?.bankTarget ?? null);
-    if (!nextTile) {
+    const step = this.tryStepAfterFireBlocked(player);
+    if (!step) {
       return false;
     }
-    queueRouteAndFlagAppearance(player, nextTile.x, nextTile.y);
     if (firemaking) {
-      firemaking.phase = "to_light_tile";
-      firemaking.lightTile = { x: nextTile.x, y: nextTile.y, z: nextTile.z };
-      firemaking.travelTarget = { x: nextTile.x, y: nextTile.y, z: nextTile.z };
+      firemaking.phase = "burning";
+      firemaking.lightTile = null;
+      firemaking.travelTarget = null;
       firemaking.nextActionAt = nowMs + 500;
     }
     event.handled = true;
-    this.api?.log?.("bot_firemaking_reposition", {
+    this.api?.log?.("bot_firemaking_step_after_blocked", {
       username,
-      toX: nextTile.x,
-      toY: nextTile.y,
-      toZ: nextTile.z,
+      direction: step.direction,
+      toX: step.x,
+      toY: step.y,
+      toZ: step.z,
     });
     return true;
+  }
+
+  tryStepAfterFireBlocked(player) {
+    const queue = player?.getMovementQueue?.();
+    const loc = player?.getLocation?.();
+    if (!queue || !loc) {
+      return null;
+    }
+    const stepOrder = [
+      { dx: -1, dy: 0, direction: "west" },
+      { dx: 1, dy: 0, direction: "east" },
+      { dx: 0, dy: -1, direction: "south" },
+      { dx: 0, dy: 1, direction: "north" },
+    ];
+    for (const step of stepOrder) {
+      if (!queue.canWalk(step.dx, step.dy)) {
+        continue;
+      }
+      const x = loc.getX() + step.dx;
+      const y = loc.getY() + step.dy;
+      const z = loc.getZ();
+      if (!this.isTileLightable(x, y, z)) {
+        continue;
+      }
+      queue.walkStep(step.dx, step.dy);
+      return {
+        direction: step.direction,
+        x,
+        y,
+        z,
+      };
+    }
+    return null;
   }
 
   handleBlocked({
@@ -550,14 +584,21 @@ class FiremakingBehavior {
     if (!loc) {
       return null;
     }
-    const baseX = loc.getX();
-    const baseY = loc.getY();
+    const hasBankTarget =
+      bankTarget &&
+      Number.isFinite(bankTarget.x) &&
+      Number.isFinite(bankTarget.y);
+    const baseX = hasBankTarget ? bankTarget.x : loc.getX();
+    const baseY = hasBankTarget ? bankTarget.y : loc.getY();
     const z = loc.getZ();
     const bankX = bankTarget?.x ?? null;
     const bankY = bankTarget?.y ?? null;
     const minDistSq = LIGHT_TILE_MIN_DIST_FROM_BANK * LIGHT_TILE_MIN_DIST_FROM_BANK;
+    const maxRadius = hasBankTarget
+      ? LIGHT_TILE_SEARCH_MAX_RADIUS_FROM_BANK
+      : LIGHT_TILE_SEARCH_MAX_RADIUS;
 
-    for (let radius = 1; radius <= LIGHT_TILE_SEARCH_MAX_RADIUS; radius++) {
+    for (let radius = 1; radius <= maxRadius; radius++) {
       for (let attempt = 0; attempt < 14; attempt++) {
         const dx = randomInRange(-radius, radius);
         const dy = randomInRange(-radius, radius);
