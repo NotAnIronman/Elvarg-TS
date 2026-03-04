@@ -461,7 +461,10 @@ export class NPC extends Mobile {
     }
 
     public clone(): NPC {
-        return NPC.create(this.getId(), this.getSpawnPosition());
+        const npc = NPC.create(this.getId(), this.getSpawnPosition());
+        npc.setFace(this.getFace());
+        npc.getMovementCoordinator().setRadius(this.getMovementCoordinator().getRadius());
+        return npc;
     }
 
     public getFace(): FacingDirection {
