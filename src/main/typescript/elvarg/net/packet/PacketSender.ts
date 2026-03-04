@@ -16,6 +16,7 @@ import { PlayerStatus } from "../../game/model/PlayerStatus";
 // import { Inventory } from "../../game/model/container/impl/Inventory";
 import { Location } from "../../game/model/Location";
 import { DonatorRights } from "../../game/model/rights/DonatorRights";
+import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
 // import { Mobile } from "../../game/entity/impl/Mobile";
@@ -44,6 +45,18 @@ export class PacketSender {
     this.player.setAllowRegionChangePacket(true);
     // Track the last known region using the player's actual position, matching the Java server.
     this.player.setLastKnownRegion(this.player.getLocation().clone());
+
+    // Stream only currently-visible replacement regions before map packet.
+    try {
+      MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
+        this.player,
+        this.player.getLocation().getX(),
+        this.player.getLocation().getY()
+      );
+    } catch (err) {
+      console.error("[packet] failed to stream visible replacement regions", err);
+    }
+
     let out = new PacketBuilder(73);
     out.putShort(this.player.getLocation().getRegionX() + 6, ValueType.A);
     out.putShort(this.player.getLocation().getRegionY() + 6);

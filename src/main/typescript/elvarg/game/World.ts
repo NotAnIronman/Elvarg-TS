@@ -141,7 +141,23 @@ export class World {
     * Saves all players in the game.
     */
     public static savePlayers() {
-        this.players.forEach(player => GameConstants.PLAYER_PERSISTENCE.save(player));
+        let saved = 0;
+        let failed = 0;
+        this.players.forEach(player => {
+            if (!player) {
+                return;
+            }
+            try {
+                GameConstants.PLAYER_PERSISTENCE.save(player);
+                saved++;
+            } catch (err) {
+                failed++;
+                console.error(`[world] Failed to save player ${player.getUsername?.() ?? "unknown"}`, err);
+            }
+        });
+        if (saved > 0 || failed > 0) {
+            console.info(`[world] savePlayers complete: saved=${saved}, failed=${failed}`);
+        }
     }
 
     public static getPlayers(): MobileList<Player> {

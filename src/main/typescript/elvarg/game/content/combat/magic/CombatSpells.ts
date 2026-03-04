@@ -1798,16 +1798,36 @@ Gets the spell with a {@link CombatSpell#spellId()} of {@code id}.
        the identification of the combat spell.
 @return the combat spell with that identification.
 */
-    public static getCombatSpells(id: number): CombatSpells | undefined {
-        const spell = Object.values(CombatSpells).find((s) => s && s.getSpell().spellId() === id);
-        return spell ? spell : null;
+    public static getCombatSpells(id: number): CombatSpell | null {
+        if (!Number.isInteger(id) || id <= 0) {
+            return null;
+        }
+
+        const values = Object.values(CombatSpells) as any[];
+        for (const value of values) {
+            if (!value) {
+                continue;
+            }
+            const maybeSpell =
+                typeof value.spellId === "function"
+                    ? value
+                    : typeof value.getSpell === "function"
+                      ? value.getSpell()
+                      : null;
+            if (!maybeSpell || typeof maybeSpell.spellId !== "function") {
+                continue;
+            }
+            if (maybeSpell.spellId() === id) {
+                return maybeSpell as CombatSpell;
+            }
+        }
+        return null;
     }
 
 
 
     public static getCombatSpell(spellId: number): CombatSpell | null {
-        const spell = CombatSpells.getCombatSpells(spellId);
-        return spell ? spell.getSpell() : null;
+        return CombatSpells.getCombatSpells(spellId);
     }
 
 

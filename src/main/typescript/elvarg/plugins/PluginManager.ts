@@ -214,24 +214,8 @@ export class PluginManager {
       }
     }
 
-    try {
-      const location = event.player?.getLocation?.();
-      if (
-        location &&
-        Number.isInteger(location.getX?.()) &&
-        Number.isInteger(location.getY?.())
-      ) {
-        MapRegionReplacementManager.sendNonVisibleReplacementsToPlayer(
-          event.player,
-          location.getX(),
-          location.getY()
-        );
-      } else {
-        MapRegionReplacementManager.sendAllReplacementsToPlayer(event.player);
-      }
-    } catch (err) {
-      console.error("[plugins] failed to stream region replacements on login", err);
-    }
+    // Do not flood login with non-visible replacement regions.
+    // Visible replacements are sent during map-region packets.
   }
 
   public static emitPlayerDisconnect(event: PluginPlayerDisconnectEvent): void {

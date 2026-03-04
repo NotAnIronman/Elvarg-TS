@@ -611,7 +611,7 @@ export class PlayerSave {
         player.setSpellbook(this.spellBook);
         player.setFightType(this.fightType);
         player.getCombat().setAutocastSpell(
-            Number.isInteger(this.autocastSpellId)
+            Number.isInteger(this.autocastSpellId) && this.autocastSpellId > 0
                 ? CombatSpells.getCombatSpell(this.autocastSpellId)
                 : null
         );

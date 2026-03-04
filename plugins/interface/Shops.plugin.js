@@ -24,6 +24,9 @@ const IFACE_SCROLL = 29995;
 const MAX_SHOP_ITEMS = 1000;
 const MAX_ACTION_AMOUNT = 5000;
 const SALES_TAX = 0.85;
+// Stock movement should be timer-based (1 item per interval), not percentage bursts.
+const DEFAULT_STOCK_CHANGE_TICKS = 4;
+const GENERAL_STORE_SOLD_ITEM_DESTOCK_TICKS = 100;
 
 const SHOP_ACTION_OPCODES = new Set([
   PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE,
@@ -42,18 +45,18 @@ let restockTaskRunning = false;
 
 class ShopRestockTask extends Task {
   constructor() {
-    super(4);
+    super(1);
   }
 
   execute() {
-    let changed = false;
+    let pending = false;
     for (const shop of shopsById.values()) {
       if (restockShop(shop)) {
-        changed = true;
+        pending = true;
       }
     }
 
-    if (!changed) {
+    if (!pending) {
       this.stop();
       restockTaskRunning = false;
     }
@@ -77,6 +80,46 @@ function normalizeCurrency(value) {
     return "COINS";
   }
   return value.toUpperCase();
+}
+
+function parseRestockTicks(value) {
+  if (Number.isFinite(value)) {
+    const n = Math.floor(Number(value));
+    return n > 0 ? n : null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const tickMatch = trimmed.match(/(\d+)\s*t\b/i);
+  if (tickMatch) {
+    const ticks = Number.parseInt(tickMatch[1], 10);
+    return Number.isFinite(ticks) && ticks > 0 ? ticks : null;
+  }
+
+  const minuteMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?\b/i);
+  if (minuteMatch) {
+    const minutes = Number.parseFloat(minuteMatch[1]);
+    if (Number.isFinite(minutes) && minutes > 0) {
+      return Math.max(1, Math.round((minutes * 60) / 0.6));
+    }
+  }
+
+  const secondMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?\b/i);
+  if (secondMatch) {
+    const seconds = Number.parseFloat(secondMatch[1]);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.max(1, Math.round(seconds / 0.6));
+    }
+  }
+
+  return null;
 }
 
 function toUnsignedShort(value) {
@@ -172,16 +215,32 @@ function ensureLoaded() {
     }
 
     const originalAmounts = new Map();
+    const itemRestockTicks = new Map();
     const stock = new Map();
     const order = [];
     const seen = new Set();
     const originalStock = Array.isArray(def.originalStock) ? def.originalStock : [];
+    const defaultRestockTicks =
+      parseRestockTicks(def?.defaultRestockTicks) ??
+      parseRestockTicks(def?.restockTicks) ??
+      DEFAULT_STOCK_CHANGE_TICKS;
+    const defaultDestockTicks =
+      parseRestockTicks(def?.defaultDestockTicks) ??
+      defaultRestockTicks;
 
     for (const stockEntry of originalStock) {
       const id = Number(stockEntry?.id ?? -1);
       const amount = normalizeAmount(stockEntry?.amount ?? 1);
       if (id <= 0 || amount <= 0) {
         continue;
+      }
+
+      const restockTicks =
+        parseRestockTicks(stockEntry?.restockTicks) ??
+        parseRestockTicks(stockEntry?.restockTime) ??
+        parseRestockTicks(stockEntry?.restock);
+      if (Number.isInteger(restockTicks) && restockTicks > 0) {
+        itemRestockTicks.set(id, restockTicks);
       }
 
       originalAmounts.set(id, (originalAmounts.get(id) ?? 0) + amount);
@@ -198,6 +257,13 @@ function ensureLoaded() {
       name: typeof def.name === "string" ? def.name : "Shop",
       currency: normalizeCurrency(def.currency),
       originalAmounts,
+      itemRestockTicks,
+      defaultRestockTicks,
+      defaultDestockTicks,
+      soldItemDestockTicks:
+        parseRestockTicks(def?.soldItemDestockTicks) ??
+        GENERAL_STORE_SOLD_ITEM_DESTOCK_TICKS,
+      changeTimers: new Map(),
       stock,
       order,
       originalSlotCount: originalStock.length,
@@ -411,40 +477,96 @@ function refreshShop(shopId) {
   }
 }
 
-function restockStep(target, current) {
-  const delta = target - current;
-  return delta <= 0 ? 0 : Math.max(1, Math.floor(delta * 0.3));
+function stockChangeIntervalTicks(shop, itemId, decrease) {
+  if (decrease && deletesItems(shop) && !shop.originalAmounts.has(itemId)) {
+    return Math.max(1, Number(shop.soldItemDestockTicks) || GENERAL_STORE_SOLD_ITEM_DESTOCK_TICKS);
+  }
+
+  if (decrease) {
+    return Math.max(
+      1,
+      Number(
+        shop.itemRestockTicks.get(itemId) ??
+          shop.defaultDestockTicks ??
+          shop.defaultRestockTicks ??
+          DEFAULT_STOCK_CHANGE_TICKS
+      )
+    );
+  }
+
+  return Math.max(
+    1,
+    Number(shop.itemRestockTicks.get(itemId) ?? shop.defaultRestockTicks ?? DEFAULT_STOCK_CHANGE_TICKS)
+  );
 }
 
 function restockShop(shop) {
   const ids = new Set([...shop.order, ...shop.originalAmounts.keys()]);
   let changed = false;
+  let pending = false;
 
   for (const itemId of ids) {
     const original = shop.originalAmounts.get(itemId) ?? 0;
     const current = shop.stock.get(itemId) ?? 0;
 
     if (current > original) {
-      const removed = removeStock(shop, itemId, restockStep(current, original));
-      if (removed > 0) {
-        changed = true;
+      pending = true;
+      const interval = stockChangeIntervalTicks(shop, itemId, true);
+      let timer = Number(shop.changeTimers.get(itemId) ?? interval);
+      if (!Number.isFinite(timer) || timer <= 0) {
+        timer = interval;
+      }
+      timer -= 1;
+      if (timer <= 0) {
+        const removed = removeStock(shop, itemId, 1);
+        if (removed > 0) {
+          changed = true;
+        }
+        timer = interval;
+      }
+
+      const nextCurrent = shop.stock.get(itemId) ?? 0;
+      if (nextCurrent > original) {
+        shop.changeTimers.set(itemId, timer);
+      } else {
+        shop.changeTimers.delete(itemId);
       }
       continue;
     }
 
     if (current < original && restocks(shop)) {
-      const added = addStock(shop, itemId, restockStep(original, current));
-      if (added) {
-        changed = true;
+      pending = true;
+      const interval = stockChangeIntervalTicks(shop, itemId, false);
+      let timer = Number(shop.changeTimers.get(itemId) ?? interval);
+      if (!Number.isFinite(timer) || timer <= 0) {
+        timer = interval;
       }
+      timer -= 1;
+      if (timer <= 0) {
+        const added = addStock(shop, itemId, 1);
+        if (added) {
+          changed = true;
+        }
+        timer = interval;
+      }
+
+      const nextCurrent = shop.stock.get(itemId) ?? 0;
+      if (nextCurrent < original) {
+        shop.changeTimers.set(itemId, timer);
+      } else {
+        shop.changeTimers.delete(itemId);
+      }
+      continue;
     }
+
+    shop.changeTimers.delete(itemId);
   }
 
   if (changed) {
     refreshShop(shop.id);
   }
 
-  return changed;
+  return pending;
 }
 
 function decodeAction(opcode, payload) {

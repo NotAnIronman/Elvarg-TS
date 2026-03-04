@@ -3238,5 +3238,155 @@
     },
     "radius": 5,
     "facing": -1
+  },
+  {
+    "id": 101,
+    "position": {
+      "x": 3126,
+      "y": 3511,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 103,
+    "position": {
+      "x": 3124,
+      "y": 3513,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 103,
+    "position": {
+      "x": 3126,
+      "y": 3509,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 101,
+    "position": {
+      "x": 3123,
+      "y": 3510,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 101,
+    "position": {
+      "x": 3125,
+      "y": 3506,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 103,
+    "position": {
+      "x": 3122,
+      "y": 3506,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 103,
+    "position": {
+      "x": 3122,
+      "y": 3503,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 101,
+    "position": {
+      "x": 3119,
+      "y": 3505,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": -1
+  },
+  {
+    "id": 2693,
+    "position": {
+      "x": 3078,
+      "y": 3489,
+      "z": 0
+    },
+    "radius": 2,
+    "facing": -1
+  },
+  {
+    "id": 2693,
+    "position": {
+      "x": 3080,
+      "y": 3488,
+      "z": 0
+    },
+    "radius": 2,
+    "facing": -1
+  },
+  {
+    "id": 2692,
+    "position": {
+      "x": 3081,
+      "y": 3491,
+      "z": 0
+    },
+    "radius": 3,
+    "facing": -1
+  },
+  {
+    "id": 2693,
+    "position": {
+      "x": 3078,
+      "y": 3491,
+      "z": 0
+    },
+    "radius": 3,
+    "facing": -1
+  },
+  {
+    "id": 2692,
+    "position": {
+      "x": 3079,
+      "y": 3492,
+      "z": 0
+    },
+    "radius": 3,
+    "facing": -1
+  },
+  {
+    "id": 2692,
+    "position": {
+      "x": 3077,
+      "y": 3488,
+      "z": 0
+    },
+    "radius": 3,
+    "facing": -1
+  },
+  {
+    "id": 2693,
+    "position": {
+      "x": 3077,
+      "y": 3491,
+      "z": 0
+    },
+    "radius": 3,
+    "facing": -1
   }
 ]

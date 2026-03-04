@@ -54,6 +54,8 @@ type RegionReplacement = {
   terrainData: Uint8Array;
   objectData: Uint8Array | null;
   payload: ProceduralRegionPayload;
+  payloadJson: string;
+  payloadChunks: string[];
 };
 
 export type ReplaceMapRegionResult = {
@@ -93,6 +95,8 @@ export class MapRegionReplacementManager {
       loadedSource.terrainData,
       loadedSource.objectData
     );
+    const payloadJson = JSON.stringify(payload);
+    const payloadChunks = this.splitIntoChunks(payloadJson, this.CHUNK_TEXT_SIZE);
 
     this.replacements.set(regionId, {
       regionId,
@@ -100,6 +104,8 @@ export class MapRegionReplacementManager {
       terrainData: loadedSource.terrainData,
       objectData: loadedSource.objectData,
       payload,
+      payloadJson,
+      payloadChunks,
     });
 
     return {
@@ -130,7 +136,7 @@ export class MapRegionReplacementManager {
       (a, b) => a.regionId - b.regionId
     );
     for (const replacement of ordered) {
-      if (this.sendPayloadToPlayer(player, replacement.payload)) {
+      if (this.sendPayloadToPlayer(player, replacement)) {
         sent++;
       }
     }
@@ -158,7 +164,7 @@ export class MapRegionReplacementManager {
       if (!replacement) {
         continue;
       }
-      if (this.sendPayloadToPlayer(player, replacement.payload)) {
+      if (this.sendPayloadToPlayer(player, replacement)) {
         sent++;
       }
     }
@@ -183,7 +189,7 @@ export class MapRegionReplacementManager {
       if (visibleRegionIds.has(replacement.regionId)) {
         continue;
       }
-      if (this.sendPayloadToPlayer(player, replacement.payload)) {
+      if (this.sendPayloadToPlayer(player, replacement)) {
         sent++;
       }
     }
@@ -195,21 +201,22 @@ export class MapRegionReplacementManager {
     if (!replacement) {
       return false;
     }
-    return this.sendPayloadToPlayer(player, replacement.payload);
+    return this.sendPayloadToPlayer(player, replacement);
   }
 
   private static sendPayloadToPlayer(
     player: any,
-    payload: ProceduralRegionPayload
+    replacement: RegionReplacement
   ): boolean {
     const session = player?.getSession?.();
     if (!session || typeof session.write !== "function") {
       return false;
     }
 
+    const payload = replacement.payload;
     const requestId = ++this.requestCounter & 0xffff;
-    const json = JSON.stringify(payload);
-    const chunks = this.splitIntoChunks(json, this.CHUNK_TEXT_SIZE);
+    const json = replacement.payloadJson;
+    const chunks = replacement.payloadChunks;
     const meta = JSON.stringify({
       v: payload.v,
       requestId,

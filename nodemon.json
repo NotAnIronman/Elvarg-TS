@@ -1,6 +1,8 @@
 {
   "ignore": [
     "data/saves/**",
-    "plugins/world/data/**"
+    "plugins/world/data/**",
+    "data/npc_spawns*.json",
+    "data/definitions/npc_spawns*.json"
   ]
 }

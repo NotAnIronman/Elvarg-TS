@@ -9,6 +9,7 @@ if (typeof (global as any).navigator === "undefined") {
 import * as path from "path";
 import { GameBuilder } from "./game/GameBuilder";
 // import { GameConstants } from "./game/GameConstants";
+import { World } from "./game/World";
 import { NetworkBuilder } from "./net/NetworkBuilder";
 import { NetworkConstants } from "./net/NetworkConstants";
 import { PluginManager } from "./plugins/PluginManager";
@@ -27,6 +28,8 @@ export class Server {
   };
   private static updating = false;
   private static consolePatched = false;
+  private static shuttingDown = false;
+  private static gracefulHandlersInstalled = false;
 
   private static setupFileLogging() {
     if (Server.consolePatched) return;
@@ -43,10 +46,58 @@ export class Server {
     });
   }
 
+  private static installGracefulShutdownHandlers() {
+    if (Server.gracefulHandlersInstalled) {
+      return;
+    }
+    Server.gracefulHandlersInstalled = true;
+
+    process.on("SIGINT", () => {
+      Server.gracefulShutdown("SIGINT");
+    });
+    process.on("SIGTERM", () => {
+      Server.gracefulShutdown("SIGTERM");
+    });
+    process.once("SIGUSR2", () => {
+      Server.gracefulShutdown("SIGUSR2", "restart");
+    });
+  }
+
+  private static gracefulShutdown(
+    signal: NodeJS.Signals,
+    mode: "exit" | "restart" = "exit"
+  ) {
+    if (Server.shuttingDown) {
+      console.info(`[shutdown] ${signal} ignored: shutdown already in progress`);
+      return;
+    }
+    Server.shuttingDown = true;
+
+    try {
+      const onlinePlayers = World.getPlayers().sizeReturn();
+      console.info(
+        `[shutdown] ${signal} received. Persisting ${onlinePlayers} online players...`
+      );
+      World.savePlayers();
+      console.info("[shutdown] Player persistence completed.");
+    } catch (err) {
+      console.error("[shutdown] Player persistence failed.", err);
+    }
+
+    if (mode === "restart") {
+      console.info("[shutdown] Continuing nodemon restart (SIGUSR2).");
+      process.kill(process.pid, "SIGUSR2");
+      return;
+    }
+
+    process.exit(0);
+  }
+
   public static main(args: string[]) {
     try {
       Server.setupFileLogging();
       Server.installGlobalCrashHandlers();
+      Server.installGracefulShutdownHandlers();
 
       const productionArg = args.find((arg) => arg === "0" || arg === "1");
       if (productionArg) {
