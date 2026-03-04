@@ -24,7 +24,6 @@ const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ClanChatManager } = require("../../src/main/typescript/elvarg/game/content/clan/ClanChatManager");
 const { NpcDropDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader");
-const { ShopDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/ShopDefinitionLoader");
 const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
 const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
@@ -840,8 +839,18 @@ module.exports = {
         return true;
       }
       try {
-        new ShopDefinitionLoader().load();
-        player.getPacketSender().sendConsoleMessage("Reloaded shops.");
+        const reloadShops = globalThis.__shopReload;
+        if (typeof reloadShops !== "function") {
+          player
+            .getPacketSender()
+            .sendMessage(
+              "Shop plugin reload hook is unavailable. Check shop plugin startup logs."
+            );
+          return true;
+        }
+        const result = reloadShops();
+        const shopCount = Number(result?.shopCount ?? 0);
+        player.getPacketSender().sendConsoleMessage(`Reloaded shops (${shopCount}).`);
       } catch (error) {
         console.error(error);
         player.getPacketSender().sendMessage("Error reloading shops.");

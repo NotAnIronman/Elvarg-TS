@@ -207,6 +207,28 @@ function ensureLoaded() {
   loaded = true;
 }
 
+function reloadShops() {
+  loaded = false;
+  shopsById.clear();
+  ensureLoaded();
+
+  for (const shopId of Array.from(viewersByShopId.keys())) {
+    if (!shopsById.has(shopId)) {
+      const viewers = viewersByShopId.get(shopId);
+      if (!viewers) {
+        continue;
+      }
+      for (const player of Array.from(viewers)) {
+        clearActiveShop(player);
+      }
+      continue;
+    }
+    refreshShop(shopId);
+  }
+
+  return { shopCount: shopsById.size };
+}
+
 function isGeneralStore(shop) {
   return shop.id === ShopIdentifiers.GENERAL_STORE;
 }
@@ -697,6 +719,7 @@ module.exports = {
 
   register(api) {
     ensureLoaded();
+    globalThis.__shopReload = reloadShops;
 
     api.onNpcClick(NpcIds.SHOP_KEEPER, 1, ({ player }) => openGeneralStore(player));
 

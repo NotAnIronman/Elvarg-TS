@@ -10,7 +10,9 @@ const { BotReadyConditionNode } = require("../nodes/conditions/BotReadyCondition
 const { RoamingBehavior } = require("../modes/RoamingBehavior");
 const { SparringBehavior } = require("../modes/SparringBehavior");
 const { WoodcuttingBehavior } = require("../modes/WoodcuttingBehavior");
+const { MiningBehavior } = require("../modes/MiningBehavior");
 const { FiremakingBehavior } = require("../modes/FiremakingBehavior");
+const { BankRunBehavior } = require("../modes/BankRunBehavior");
 
 class PlayerBotBehaviorTreeFactory {
   constructor(botStatesByName, api, options) {
@@ -33,6 +35,13 @@ class PlayerBotBehaviorTreeFactory {
     this.woodcuttingBehavior = new WoodcuttingBehavior(botStatesByName, api, {
       behaviorMode: this.behaviorMode,
       botWalkRadius: this.botWalkRadius,
+    });
+    this.miningBehavior = new MiningBehavior(botStatesByName, api, {
+      behaviorMode: this.behaviorMode,
+      botWalkRadius: this.botWalkRadius,
+    });
+    this.bankRunBehavior = new BankRunBehavior(botStatesByName, api, {
+      behaviorMode: this.behaviorMode,
     });
     this.firemakingBehavior = new FiremakingBehavior(botStatesByName, api, {
       behaviorMode: this.behaviorMode,
@@ -62,9 +71,23 @@ class PlayerBotBehaviorTreeFactory {
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {
+          requiredMode: this.behaviorMode.BANK_RUN,
+          requireNotBusy: false,
+          requireNotInCombat: false,
+        }),
+        new ActionNode((context) => this.bankRunBehavior.tick(context)),
+      ]),
+      new SequenceNode([
+        new BotReadyConditionNode(this.botStatesByName, {
           requiredMode: this.behaviorMode.WOODCUTTING,
         }),
         new ActionNode((context) => this.woodcuttingBehavior.tick(context)),
+      ]),
+      new SequenceNode([
+        new BotReadyConditionNode(this.botStatesByName, {
+          requiredMode: this.behaviorMode.MINING,
+        }),
+        new ActionNode((context) => this.miningBehavior.tick(context)),
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {

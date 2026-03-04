@@ -5,7 +5,7 @@ const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model
 const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag");
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
-const { setModeFiremaking } = require("../state/PlayerBotState");
+const { setModeBankRun, setModeFiremaking } = require("../state/PlayerBotState");
 const {
   queueRouteAndFlagAppearance,
   randomInRange,
@@ -15,12 +15,15 @@ const {Item} = require("../../../../src/main/typescript/elvarg/game/model/Item")
 
 const RETRY_SEARCH_MS = 1500;
 const WALK_COMMAND_COOLDOWN_MS = 900;
+const DROP_LOGS_RETRY_MS = 650;
 const MAX_NEXT_TREE_DISTANCE_TILES = 10;
 const MAX_TREE_TARGET_DISTANCE_TILES = 18;
 const TREE_SEARCH_REGION_RADIUS = 1;
 const SEARCH_WALK_ATTEMPTS = 12;
 const SEARCH_TREE_VISIBILITY_RADIUS_TILES = 18;
 const TREE_DEBUG_CHAT_COOLDOWN_MS = 4000;
+const FULL_INV_CHANCE_DROP_LOGS = 0.34;
+const FULL_INV_CHANCE_FIREMAKING = 0.33;
 
 class WoodcuttingBehavior {
   constructor(botStatesByName, api, options) {
@@ -60,15 +63,7 @@ class WoodcuttingBehavior {
     }
 
     if (player.getInventory().isFull()) {
-      setModeFiremaking(player, state, this.behaviorMode);
-      if (state.firemaking) {
-        state.firemaking.nextActionAt = nowMs;
-      }
-      this.api.log("bot_mode_switch", {
-        username: player.getUsername(),
-        mode: this.behaviorMode.FIREMAKING,
-        reason: "inventory_full_logs",
-      });
+      this.handleFullInventory(player, state, nowMs);
       return "running";
     }
 
@@ -385,6 +380,99 @@ class WoodcuttingBehavior {
       }
     }
     return count;
+  }
+
+  handleFullInventory(player, state, nowMs) {
+    if (!this.hasAnyInventoryLogs(player)) {
+      this.startBankRunForFullInventory(player, state, "inventory_full_no_logs_bank_run");
+      return;
+    }
+    const roll = Math.random();
+    if (roll < FULL_INV_CHANCE_DROP_LOGS) {
+      const dropped = this.dropInventoryLogs(player);
+      if (dropped > 0) {
+        state.woodcutting.nextActionAt = nowMs + DROP_LOGS_RETRY_MS;
+        this.api.log("bot_mode_switch", {
+          username: player.getUsername(),
+          mode: this.behaviorMode.WOODCUTTING,
+          reason: "inventory_full_drop_logs",
+          droppedLogs: dropped,
+        });
+        return;
+      }
+    }
+
+    if (roll < FULL_INV_CHANCE_DROP_LOGS + FULL_INV_CHANCE_FIREMAKING) {
+      setModeFiremaking(player, state, this.behaviorMode);
+      if (state.firemaking) {
+        state.firemaking.nextActionAt = nowMs;
+      }
+      this.api.log("bot_mode_switch", {
+        username: player.getUsername(),
+        mode: this.behaviorMode.FIREMAKING,
+        reason: "inventory_full_firemaking",
+      });
+      return;
+    }
+
+    this.startBankRunForFullInventory(player, state);
+  }
+
+  dropInventoryLogs(player) {
+    const inventory = player?.getInventory?.();
+    if (!inventory) {
+      return 0;
+    }
+    let dropped = 0;
+    for (const logId of Woodcutting.TREE_LOG_IDS) {
+      const amount = inventory.getAmount(logId);
+      if (amount <= 0) {
+        continue;
+      }
+      inventory.deleteNumber(logId, amount);
+      dropped += amount;
+    }
+    return dropped;
+  }
+
+  hasAnyInventoryLogs(player) {
+    const inventory = player?.getInventory?.();
+    if (!inventory) {
+      return false;
+    }
+    for (const logId of Woodcutting.TREE_LOG_IDS) {
+      if (inventory.getAmount(logId) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  startBankRunForFullInventory(player, state, reason = "inventory_full_bank_run") {
+    const woodcutTarget = state.woodcutting?.target;
+    const currentLoc = player.getLocation();
+    const returnTo = {
+      x: currentLoc.getX(),
+      y: currentLoc.getY(),
+      z: currentLoc.getZ(),
+    };
+    setModeBankRun(player, state, this.behaviorMode, {
+      returnMode: this.behaviorMode.WOODCUTTING,
+      returnTo,
+      resumeWoodcuttingTarget: woodcutTarget
+        ? {
+            objectId: woodcutTarget.objectId,
+            x: woodcutTarget.x,
+            y: woodcutTarget.y,
+            z: woodcutTarget.z,
+          }
+        : null,
+    });
+    this.api.log("bot_mode_switch", {
+      username: player.getUsername(),
+      mode: this.behaviorMode.BANK_RUN,
+      reason,
+    });
   }
 }
 

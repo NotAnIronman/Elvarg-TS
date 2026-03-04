@@ -54,6 +54,13 @@ type RegisteredPacketListener = {
   listener: PacketExecutor;
 };
 
+type PluginLoadCandidate = {
+  pluginPath: string;
+  plugin: PluginModule;
+  pluginName: string;
+  dependsOn: string[];
+};
+
 export class PluginManager {
   private static readonly MAX_PLUGIN_DEPTH = 2;
   private static initialized = false;
@@ -141,16 +148,27 @@ export class PluginManager {
       process.argv.includes("--disablePlayerBots") ||
       process.env.DISABLE_PLAYER_BOTS === "1";
 
-    for (const pluginPath of pluginFiles) {
+    const filteredPluginFiles = pluginFiles.filter((pluginPath) => {
       if (
         disablePlayerBots &&
         pluginPath.includes(path.sep + "bots" + path.sep) &&
         pluginPath.endsWith("PlayerBots.plugin.js")
       ) {
         console.info("[plugins] skipped PlayerBots due --disablePlayerBots");
-        continue;
+        return false;
       }
-      PluginManager.loadPlugin(pluginPath);
+      return true;
+    });
+
+    const candidates =
+      PluginManager.collectPluginLoadCandidates(filteredPluginFiles);
+    PluginManager.loadPluginCandidatesWithDependencies(candidates);
+
+    if (filteredPluginFiles.length > 0 && candidates.length === 0) {
+      console.warn(
+        `[plugins] no valid plugins loaded from ${pluginDirectory}`
+      );
+      return;
     }
 
     if (PluginManager.loadedPlugins.length === 0) {
@@ -812,33 +830,160 @@ export class PluginManager {
     return pluginPaths;
   }
 
-  private static loadPlugin(pluginPath: string): void {
-    try {
-      const imported = require(pluginPath);
-      const plugin = (imported?.default ?? imported) as PluginModule;
+  private static collectPluginLoadCandidates(
+    pluginPaths: string[]
+  ): PluginLoadCandidate[] {
+    const candidates: PluginLoadCandidate[] = [];
 
-      if (!plugin || typeof plugin.register !== "function") {
-        console.warn(
-          `[plugins] skipped ${path.basename(
-            pluginPath
-          )}: missing register(api) export`
+    for (const pluginPath of pluginPaths) {
+      try {
+        const imported = require(pluginPath);
+        const plugin = (imported?.default ?? imported) as PluginModule;
+
+        if (!plugin || typeof plugin.register !== "function") {
+          console.warn(
+            `[plugins] skipped ${path.basename(
+              pluginPath
+            )}: missing register(api) export`
+          );
+          continue;
+        }
+
+        const fallbackName = path.basename(pluginPath, path.extname(pluginPath));
+        const pluginName =
+          typeof plugin.name === "string" && plugin.name.trim().length > 0
+            ? plugin.name.trim()
+            : fallbackName;
+        const dependsOn = PluginManager.normalizePluginDependencies(
+          pluginName,
+          plugin.dependsOn,
+          pluginPath
         );
-        return;
+
+        candidates.push({
+          pluginPath,
+          plugin,
+          pluginName,
+          dependsOn,
+        });
+      } catch (err) {
+        console.error(
+          `[plugins] failed to load ${path.basename(pluginPath)}`,
+          err
+        );
+      }
+    }
+
+    return candidates;
+  }
+
+  private static normalizePluginDependencies(
+    pluginName: string,
+    dependsOn: unknown,
+    pluginPath: string
+  ): string[] {
+    if (dependsOn == null) {
+      return [];
+    }
+    if (!Array.isArray(dependsOn)) {
+      console.warn(
+        `[plugins] ${pluginName} ignored invalid dependsOn in ${path.basename(
+          pluginPath
+        )}: expected string[]`
+      );
+      return [];
+    }
+
+    const normalized: string[] = [];
+    for (const dep of dependsOn) {
+      if (typeof dep !== "string" || dep.trim().length === 0) {
+        console.warn(
+          `[plugins] ${pluginName} ignored invalid dependency value in ${path.basename(
+            pluginPath
+          )}`
+        );
+        continue;
       }
 
-      const fallbackName = path.basename(pluginPath, path.extname(pluginPath));
-      const pluginName =
-        typeof plugin.name === "string" && plugin.name.trim().length > 0
-          ? plugin.name.trim()
-          : fallbackName;
+      const dependencyName = dep.trim();
+      if (dependencyName === pluginName) {
+        console.warn(
+          `[plugins] ${pluginName} ignored self dependency in ${path.basename(
+            pluginPath
+          )}`
+        );
+        continue;
+      }
+      if (!normalized.includes(dependencyName)) {
+        normalized.push(dependencyName);
+      }
+    }
+    return normalized;
+  }
 
-      plugin.register(PluginManager.createApi(pluginName));
-      PluginManager.loadedPlugins.push(pluginName);
+  private static loadPluginCandidatesWithDependencies(
+    candidates: PluginLoadCandidate[]
+  ): void {
+    const pending = [...candidates];
+    const loadedByName = new Set<string>();
+
+    while (pending.length > 0) {
+      let progress = false;
+      for (let i = 0; i < pending.length; i++) {
+        const candidate = pending[i];
+        const missingDeps = candidate.dependsOn.filter(
+          (dependency) => !loadedByName.has(dependency)
+        );
+        if (missingDeps.length > 0) {
+          continue;
+        }
+
+        if (!PluginManager.registerPluginCandidate(candidate)) {
+          pending.splice(i, 1);
+          i--;
+          progress = true;
+          continue;
+        }
+        loadedByName.add(candidate.pluginName);
+        pending.splice(i, 1);
+        i--;
+        progress = true;
+      }
+
+      if (!progress) {
+        break;
+      }
+    }
+
+    if (pending.length === 0) {
+      return;
+    }
+
+    for (const unresolved of pending) {
+      const missingDeps = unresolved.dependsOn.filter(
+        (dependency) => !loadedByName.has(dependency)
+      );
+      console.warn(
+        `[plugins] skipped ${unresolved.pluginName}: unresolved dependsOn [${missingDeps.join(
+          ", "
+        )}]`
+      );
+    }
+  }
+
+  private static registerPluginCandidate(
+    candidate: PluginLoadCandidate
+  ): boolean {
+    try {
+      candidate.plugin.register(PluginManager.createApi(candidate.pluginName));
+      PluginManager.loadedPlugins.push(candidate.pluginName);
+      return true;
     } catch (err) {
       console.error(
-        `[plugins] failed to load ${path.basename(pluginPath)}`,
+        `[plugins] failed to initialize ${path.basename(candidate.pluginPath)}`,
         err
       );
+      return false;
     }
   }
 

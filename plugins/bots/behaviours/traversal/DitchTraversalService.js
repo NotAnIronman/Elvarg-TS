@@ -1,5 +1,7 @@
 const { queueRouteAndFlagAppearance } = require("../navigation/BotNavigation");
-const { resetMovementState } = require("../state/PlayerBotState");
+
+const RETRY_WAIT_LOG_INTERVAL_MS = 3000;
+const TRANSITION_WAIT_LOG_INTERVAL_MS = 2500;
 
 class DitchTraversalService {
   constructor({
@@ -22,12 +24,26 @@ class DitchTraversalService {
         : () => false;
   }
 
+  clearMovementQueue(player) {
+    if (!player) {
+      return;
+    }
+    player.getMovementQueue()?.walkToReset?.();
+    player.getMovementQueue()?.reset?.();
+  }
+
   getTraversalTarget(state) {
     if (!state) {
       return null;
     }
     if (state.mode === this.behaviorMode.WOODCUTTING) {
       return state.woodcutting?.target ?? null;
+    }
+    if (state.mode === this.behaviorMode.MINING) {
+      return state.mining?.target ?? null;
+    }
+    if (state.mode === this.behaviorMode.BANK_RUN) {
+      return state.bankRun?.travelTarget ?? null;
     }
     return state.roaming?.target ?? null;
   }
@@ -43,10 +59,37 @@ class DitchTraversalService {
       state.woodcutting.target = target;
       return;
     }
+    if (state.mode === this.behaviorMode.MINING) {
+      if (!state.mining) {
+        return;
+      }
+      state.mining.target = target;
+      return;
+    }
+    if (state.mode === this.behaviorMode.BANK_RUN) {
+      if (!state.bankRun) {
+        return;
+      }
+      state.bankRun.travelTarget = target;
+      return;
+    }
     if (!state.roaming) {
       return;
     }
     state.roaming.target = target;
+  }
+
+  getModeContext(state) {
+    if (!state) {
+      return { mode: null, bankRunPhase: null };
+    }
+    return {
+      mode: state.mode ?? null,
+      bankRunPhase:
+        state.mode === this.behaviorMode.BANK_RUN
+          ? state.bankRun?.phase ?? null
+          : null,
+    };
   }
 
   findObjectOnRoute(player, from, to) {
@@ -81,6 +124,18 @@ class DitchTraversalService {
     }
 
     if (nowMs < state.nextDitchAttemptAt) {
+      if (
+        !Number.isInteger(state.lastDitchAttemptCooldownLogAt) ||
+        nowMs - state.lastDitchAttemptCooldownLogAt >= RETRY_WAIT_LOG_INTERVAL_MS
+      ) {
+        state.lastDitchAttemptCooldownLogAt = nowMs;
+        this.api.log("ditch_cross_cooldown_active", {
+          username: player.getUsername(),
+          nextAttemptAt: state.nextDitchAttemptAt,
+          remainingMs: Math.max(0, state.nextDitchAttemptAt - nowMs),
+          ...this.getModeContext(state),
+        });
+      }
       return false;
     }
     state.nextDitchAttemptAt = nowMs + this.ditchAttemptCooldownMs;
@@ -97,12 +152,20 @@ class DitchTraversalService {
       targetY: traversalTarget.y ?? player.getLocation().getY(),
       targetZ: traversalTarget.z ?? player.getLocation().getZ(),
       startedAt: nowMs,
+      lastWaitLogAt: 0,
     };
 
     player.getMovementQueue().walkToObject(traversalObject, {
       execute: () => {
         const transition = state.awaitingDitchTransition;
-        resetMovementState(player);
+        const executedAt = Date.now();
+        if (transition) {
+          transition.startedAt = executedAt;
+          transition.sourceX = player.getLocation().getX();
+          transition.sourceY = player.getLocation().getY();
+          transition.sourceZ = player.getLocation().getZ();
+        }
+        this.clearMovementQueue(player);
         player.setPositionToFace(traversalObject.getLocation());
         const handled = this.emitObjectInteraction({
           player,
@@ -121,9 +184,24 @@ class DitchTraversalService {
           },
           handled: false,
         });
+        this.api.log("ditch_cross_execute", {
+          username: player.getUsername(),
+          objectX: traversalObject.getLocation().getX(),
+          objectY: traversalObject.getLocation().getY(),
+          objectZ: traversalObject.getLocation().getZ(),
+          handled,
+          ...this.getModeContext(state),
+        });
 
         if (!handled) {
           state.awaitingDitchTransition = null;
+          this.api.log("ditch_cross_not_handled", {
+            username: player.getUsername(),
+            objectX: traversalObject.getLocation().getX(),
+            objectY: traversalObject.getLocation().getY(),
+            objectZ: traversalObject.getLocation().getZ(),
+            ...this.getModeContext(state),
+          });
         }
       },
     });
@@ -134,6 +212,7 @@ class DitchTraversalService {
       objectY,
       objectZ: traversalObject.getLocation().getZ(),
       target: this.getTraversalTarget(state),
+      ...this.getModeContext(state),
     });
     return true;
   }
@@ -156,6 +235,22 @@ class DitchTraversalService {
     }
 
     if (player.getForceMovement() != null) {
+      if (
+        !Number.isInteger(transition.lastWaitLogAt) ||
+        nowMs - transition.lastWaitLogAt >= TRANSITION_WAIT_LOG_INTERVAL_MS
+      ) {
+        transition.lastWaitLogAt = nowMs;
+        this.api.log("ditch_cross_waiting_force_movement", {
+          username: player.getUsername(),
+          elapsedMs: nowMs - transition.startedAt,
+          ditchY: transition.ditchY,
+          startSide: transition.startSide,
+          currentX: player.getLocation().getX(),
+          currentY: player.getLocation().getY(),
+          currentZ: player.getLocation().getZ(),
+          ...this.getModeContext(state),
+        });
+      }
       return;
     }
 
@@ -166,6 +261,22 @@ class DitchTraversalService {
         : currentY < transition.ditchY;
 
     if (!crossed) {
+      if (
+        !Number.isInteger(transition.lastWaitLogAt) ||
+        nowMs - transition.lastWaitLogAt >= TRANSITION_WAIT_LOG_INTERVAL_MS
+      ) {
+        transition.lastWaitLogAt = nowMs;
+        this.api.log("ditch_cross_waiting_position", {
+          username: player.getUsername(),
+          elapsedMs: nowMs - transition.startedAt,
+          ditchY: transition.ditchY,
+          startSide: transition.startSide,
+          currentX: player.getLocation().getX(),
+          currentY,
+          currentZ: player.getLocation().getZ(),
+          ...this.getModeContext(state),
+        });
+      }
       return;
     }
 
@@ -186,22 +297,41 @@ class DitchTraversalService {
     if (nowMs < retry.readyAt) {
       return;
     }
-    if (player.getForceMovement() != null) {
-      return;
-    }
-    if (player.getMovementQueue()?.size?.() > 0) {
+    const queueSize = player.getMovementQueue?.()?.size?.() ?? 0;
+    const forceMovement = player.getForceMovement() != null;
+    if (forceMovement || queueSize > 0) {
+      if (!Number.isInteger(retry.waitingSince)) {
+        retry.waitingSince = nowMs;
+      }
+      if (
+        !Number.isInteger(retry.lastWaitLogAt) ||
+        nowMs - retry.lastWaitLogAt >= RETRY_WAIT_LOG_INTERVAL_MS
+      ) {
+        retry.lastWaitLogAt = nowMs;
+        this.api.log("ditch_post_delay_retry_waiting", {
+          username: player.getUsername(),
+          retryX: retry.x,
+          retryY: retry.y,
+          retryZ: retry.z,
+          queueSize,
+          forceMovement,
+          waitedMs: nowMs - retry.waitingSince,
+          ...this.getModeContext(state),
+        });
+      }
       return;
     }
 
     state.roaming.pendingRetry = null;
     this.setTraversalTarget(state, { x: retry.x, y: retry.y, z: retry.z });
-    resetMovementState(player);
+    this.clearMovementQueue(player);
     queueRouteAndFlagAppearance(player, retry.x, retry.y);
     this.api.log("ditch_post_delay_retry_walk", {
       username: player.getUsername(),
       retryX: retry.x,
       retryY: retry.y,
       retryZ: retry.z,
+      ...this.getModeContext(state),
     });
   }
 
@@ -228,11 +358,20 @@ class DitchTraversalService {
       y: transition.targetY,
       z: transition.targetZ,
       readyAt,
+      waitingSince: null,
+      lastWaitLogAt: 0,
     };
     state.roaming.nextWalkAt = readyAt;
     state.nextDitchAttemptAt = readyAt;
 
-    resetMovementState(player);
+    if (state.mode === this.behaviorMode.BANK_RUN && state.bankRun) {
+      state.bankRun.nextActionAt = Math.min(
+        Number(state.bankRun.nextActionAt ?? readyAt),
+        readyAt
+      );
+    }
+
+    this.clearMovementQueue(player);
 
     const eventName =
       reason === "timeout"
@@ -241,6 +380,11 @@ class DitchTraversalService {
 
     this.api.log(eventName, {
       username: player.getUsername(),
+      reason,
+      elapsedMs: nowMs - Number(transition.startedAt ?? nowMs),
+      sourceX: transition.sourceX,
+      sourceY: transition.sourceY,
+      sourceZ: transition.sourceZ,
       retryX: transition.targetX,
       retryY: transition.targetY,
       retryZ: transition.targetZ,
@@ -248,6 +392,7 @@ class DitchTraversalService {
       currentX: player.getLocation().getX(),
       currentY: player.getLocation().getY(),
       currentZ: player.getLocation().getZ(),
+      ...this.getModeContext(state),
     });
   }
 }

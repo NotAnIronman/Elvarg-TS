@@ -47,6 +47,7 @@ for (const rock of ROCKS) {
     ROCK_BY_OBJECT_ID.set(id, rock);
   }
 }
+const ACTIVE_MINERS = new Set();
 
 class RockRespawnTask extends Task {
   constructor(delayTicks, originalRockObject, depletedObject) {
@@ -102,6 +103,7 @@ function stopMining(activeSessions, player, resetAnim = true) {
     return;
   }
   activeSessions.delete(player);
+  ACTIVE_MINERS.delete(player);
   if (resetAnim) {
     player.performAnimation(Animation.DEFAULT_RESET_ANIMATION);
   }
@@ -157,6 +159,7 @@ function startMining(player, rockObject, rock, activeSessions) {
     nextOreAttemptTick: miningTick + pickaxe.attemptIntervalTicks,
     attemptIntervalTicks: pickaxe.attemptIntervalTicks,
   });
+  ACTIVE_MINERS.add(player);
 
   player.getPacketSender().sendMessage("You swing your pickaxe at the rock..");
   Sounds.sendSound(player, Sound.MINING_MINE);
@@ -243,6 +246,13 @@ class MiningTask extends Task {
 
 module.exports = {
   name: "Mining",
+  PICKAXES,
+  PICKAXES_DESC,
+  ROCKS,
+  findBestPickaxe,
+  isMiningActive(player) {
+    return ACTIVE_MINERS.has(player);
+  },
   register(api) {
     const activeSessions = new Map();
     TaskManager.submit(new MiningTask(activeSessions));

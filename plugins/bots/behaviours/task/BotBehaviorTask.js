@@ -4,6 +4,7 @@ const { randomInRange } = require("../navigation/BotNavigation");
 const {
   setModeRoaming,
   setModeSparring,
+  setModeMining,
   setModeWoodcutting,
 } = require("../state/PlayerBotState");
 
@@ -17,6 +18,7 @@ class BotBehaviorTask extends Task {
     this.autonomy = {
       roamWeight: options.roamWeight ?? 0.55,
       woodcuttingWeight: options.woodcuttingWeight ?? 0.3,
+      miningWeight: options.miningWeight ?? 0.15,
       sparringWeight: options.sparringWeight ?? 0.15,
       decisionDelayMinMs: options.decisionDelayMinMs ?? 4500,
       decisionDelayMaxMs: options.decisionDelayMaxMs ?? 14000,
@@ -24,6 +26,8 @@ class BotBehaviorTask extends Task {
       roamingMaxMs: options.roamingMaxMs ?? 80000,
       woodcuttingMinMs: options.woodcuttingMinMs ?? 30000,
       woodcuttingMaxMs: options.woodcuttingMaxMs ?? 105000,
+      miningMinMs: options.miningMinMs ?? 30000,
+      miningMaxMs: options.miningMaxMs ?? 105000,
       sparringMinMs: options.sparringMinMs ?? 18000,
       sparringMaxMs: options.sparringMaxMs ?? 50000,
       sparringMaxDistanceTiles: options.sparringMaxDistanceTiles ?? 16,
@@ -41,7 +45,11 @@ class BotBehaviorTask extends Task {
         nextDecisionAt: 0,
         modeEndsAt: 0,
         pvpCooldownUntil: 0,
+        manualMode: null,
       };
+    }
+    if (!Object.prototype.hasOwnProperty.call(state.autonomy, "manualMode")) {
+      state.autonomy.manualMode = null;
     }
     return state.autonomy;
   }
@@ -94,6 +102,21 @@ class BotBehaviorTask extends Task {
     this.api?.log?.("bot_mode_switch", {
       username: player.getUsername?.(),
       mode: this.behaviorMode.WOODCUTTING,
+      reason,
+      activeForMs: autonomy.modeEndsAt - nowMs,
+    });
+  }
+
+  startMining(entry, nowMs, reason = "auto_switch") {
+    const { player, state } = entry;
+    setModeMining(player, state, this.behaviorMode);
+    const autonomy = this.ensureAutonomyState(state);
+    autonomy.modeEndsAt =
+      nowMs + randomInRange(this.autonomy.miningMinMs, this.autonomy.miningMaxMs);
+    this.scheduleNextDecision(state, nowMs);
+    this.api?.log?.("bot_mode_switch", {
+      username: player.getUsername?.(),
+      mode: this.behaviorMode.MINING,
       reason,
       activeForMs: autonomy.modeEndsAt - nowMs,
     });
@@ -358,9 +381,41 @@ class BotBehaviorTask extends Task {
       this.scheduleNextDecision(state, nowMs);
     }
 
+    const manualMode = autonomy.manualMode ?? null;
+    if (manualMode) {
+      const isTransient =
+        state.mode === this.behaviorMode.FOLLOW_BACK ||
+        state.mode === this.behaviorMode.RETURN_HOME ||
+        state.mode === this.behaviorMode.BANK_RUN;
+      if (isTransient) {
+        return;
+      }
+
+      if (state.mode !== manualMode) {
+        if (manualMode === this.behaviorMode.ROAMING) {
+          setModeRoaming(player, state, this.behaviorMode);
+        } else if (manualMode === this.behaviorMode.WOODCUTTING) {
+          setModeWoodcutting(player, state, this.behaviorMode);
+        } else if (manualMode === this.behaviorMode.MINING) {
+          setModeMining(player, state, this.behaviorMode);
+        }
+        this.api?.log?.("bot_mode_switch", {
+          username: player.getUsername?.(),
+          mode: manualMode,
+          reason: "manual_override_resume",
+          activeForMs: -1,
+        });
+      }
+
+      autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
+      autonomy.modeEndsAt = Number.MAX_SAFE_INTEGER;
+      return;
+    }
+
     if (
       state.mode === this.behaviorMode.FOLLOW_BACK ||
-      state.mode === this.behaviorMode.RETURN_HOME
+      state.mode === this.behaviorMode.RETURN_HOME ||
+      state.mode === this.behaviorMode.BANK_RUN
     ) {
       this.scheduleNextDecision(state, nowMs);
       return;
@@ -390,6 +445,7 @@ class BotBehaviorTask extends Task {
     const totalWeight = Math.max(
       this.autonomy.roamWeight +
         this.autonomy.woodcuttingWeight +
+        this.autonomy.miningWeight +
         (canAttemptSparring ? this.autonomy.sparringWeight : 0),
       0.0001
     );
@@ -397,12 +453,18 @@ class BotBehaviorTask extends Task {
     const sparringThreshold = sparringWeight / totalWeight;
     const woodcuttingThreshold =
       sparringThreshold + this.autonomy.woodcuttingWeight / totalWeight;
+    const miningThreshold =
+      woodcuttingThreshold + this.autonomy.miningWeight / totalWeight;
 
     if (roll < sparringThreshold && this.tryStartSparring(entry, nowMs)) {
       return;
     }
     if (roll < woodcuttingThreshold) {
       this.startWoodcutting(entry, nowMs);
+      return;
+    }
+    if (roll < miningThreshold) {
+      this.startMining(entry, nowMs);
       return;
     }
     this.startRoaming(entry, nowMs);

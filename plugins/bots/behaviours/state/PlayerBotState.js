@@ -7,6 +7,7 @@ const { TaskManager } = require("../../../../src/main/typescript/elvarg/game/tas
 const HOME_TELEPORT_START_ANIMATION = new Animation(714);
 const HOME_TELEPORT_END_ANIMATION = new Animation(715);
 const HOME_TELEPORT_START_GRAPHIC = new Graphic(308, 50);
+let BANK_RUN_SEQUENCE = 0;
 
 function createRoamingBehaviorState() {
   return {
@@ -37,9 +38,39 @@ function createWoodcuttingBehaviorState() {
   };
 }
 
+function createMiningBehaviorState() {
+  return {
+    target: null,
+    nextActionAt: 0,
+    nextSearchAt: 0,
+    nextDebugChatAt: 0,
+    searchTarget: null,
+  };
+}
+
 function createFiremakingBehaviorState() {
   return {
     nextActionAt: 0,
+  };
+}
+
+function createBankRunBehaviorState() {
+  return {
+    id: null,
+    phase: "idle",
+    nextActionAt: 0,
+    bankTarget: null,
+    travelTarget: null,
+    returnMode: null,
+    returnTo: null,
+    resumeWoodcuttingTarget: null,
+    resumeMiningTarget: null,
+    startedAt: 0,
+    phaseStartedAt: 0,
+    lastPhaseLogged: null,
+    phaseTimeoutCount: 0,
+    lastHeartbeatAt: 0,
+    lastStuckWarningAt: 0,
   };
 }
 
@@ -65,6 +96,7 @@ function createAutonomyState() {
     nextDecisionAt: 0,
     modeEndsAt: 0,
     pvpCooldownUntil: 0,
+    manualMode: null,
   };
 }
 
@@ -79,11 +111,43 @@ function clearWoodcuttingBehaviorState(state) {
   state.woodcutting.searchTarget = null;
 }
 
+function clearMiningBehaviorState(state) {
+  if (!state?.mining) {
+    return;
+  }
+  state.mining.target = null;
+  state.mining.nextActionAt = 0;
+  state.mining.nextSearchAt = 0;
+  state.mining.nextDebugChatAt = 0;
+  state.mining.searchTarget = null;
+}
+
 function clearFiremakingBehaviorState(state) {
   if (!state?.firemaking) {
     return;
   }
   state.firemaking.nextActionAt = 0;
+}
+
+function clearBankRunBehaviorState(state) {
+  if (!state?.bankRun) {
+    return;
+  }
+  state.bankRun.phase = "idle";
+  state.bankRun.id = null;
+  state.bankRun.nextActionAt = 0;
+  state.bankRun.bankTarget = null;
+  state.bankRun.travelTarget = null;
+  state.bankRun.returnMode = null;
+  state.bankRun.returnTo = null;
+  state.bankRun.resumeWoodcuttingTarget = null;
+  state.bankRun.resumeMiningTarget = null;
+  state.bankRun.startedAt = 0;
+  state.bankRun.phaseStartedAt = 0;
+  state.bankRun.lastPhaseLogged = null;
+  state.bankRun.phaseTimeoutCount = 0;
+  state.bankRun.lastHeartbeatAt = 0;
+  state.bankRun.lastStuckWarningAt = 0;
 }
 
 function resetMovementState(player) {
@@ -123,7 +187,9 @@ function setModeRoaming(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
   clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
   clearSparringBehaviorState(state);
 }
 
@@ -135,7 +201,9 @@ function setModeReturnHome(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
   clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
   clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
 }
@@ -163,7 +231,9 @@ function setModeFollowBack(
   state.awaitingDitchTransition = null;
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
   clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
   clearSparringBehaviorState(state);
   state.roaming.target = {
     x: followTarget.getLocation().getX(),
@@ -186,7 +256,24 @@ function setModeWoodcutting(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
   clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
+  clearSparringBehaviorState(state);
+  state.awaitingDitchTransition = null;
+}
+
+function setModeMining(player, state, behaviorMode) {
+  if (!state) {
+    return;
+  }
+  state.mode = behaviorMode.MINING;
+  clearFollowState(player, state);
+  clearRoamingBehaviorState(state);
+  clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
+  clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
   clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
 }
@@ -199,9 +286,72 @@ function setModeFiremaking(player, state, behaviorMode) {
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
   clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
   clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
+}
+
+function setModeBankRun(player, state, behaviorMode, options = {}) {
+  if (!state) {
+    return false;
+  }
+  const loc = player?.getLocation?.();
+  const fallbackReturn = loc
+    ? { x: loc.getX(), y: loc.getY(), z: loc.getZ() }
+    : null;
+  const returnMode = options.returnMode ?? behaviorMode.ROAMING;
+  const returnTo = options.returnTo ?? fallbackReturn;
+  const resumeWoodcuttingTarget = options.resumeWoodcuttingTarget
+    ? {
+        objectId: options.resumeWoodcuttingTarget.objectId,
+        x: options.resumeWoodcuttingTarget.x,
+        y: options.resumeWoodcuttingTarget.y,
+        z: options.resumeWoodcuttingTarget.z,
+      }
+    : null;
+  const resumeMiningTarget = options.resumeMiningTarget
+    ? {
+        objectId: options.resumeMiningTarget.objectId,
+        x: options.resumeMiningTarget.x,
+        y: options.resumeMiningTarget.y,
+        z: options.resumeMiningTarget.z,
+      }
+    : null;
+
+  state.mode = behaviorMode.BANK_RUN;
+  clearFollowState(player, state);
+  clearRoamingBehaviorState(state);
+  clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
+  clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
+  clearSparringBehaviorState(state);
+  state.awaitingDitchTransition = null;
+  if (!state.bankRun) {
+    state.bankRun = createBankRunBehaviorState();
+  }
+  const nowMs = Date.now();
+  BANK_RUN_SEQUENCE += 1;
+  state.bankRun.id = BANK_RUN_SEQUENCE;
+  state.bankRun.phase = "to_bank";
+  state.bankRun.nextActionAt = 0;
+  state.bankRun.bankTarget = null;
+  state.bankRun.travelTarget = null;
+  state.bankRun.returnMode = returnMode;
+  state.bankRun.returnTo = returnTo
+    ? { x: returnTo.x, y: returnTo.y, z: returnTo.z }
+    : null;
+  state.bankRun.resumeWoodcuttingTarget = resumeWoodcuttingTarget;
+  state.bankRun.resumeMiningTarget = resumeMiningTarget;
+  state.bankRun.startedAt = nowMs;
+  state.bankRun.phaseStartedAt = nowMs;
+  state.bankRun.lastPhaseLogged = null;
+  state.bankRun.phaseTimeoutCount = 0;
+  state.bankRun.lastHeartbeatAt = 0;
+  state.bankRun.lastStuckWarningAt = 0;
+  return true;
 }
 
 function setModeSparring(
@@ -224,7 +374,9 @@ function setModeSparring(
   clearFollowState(player, state);
   clearRoamingBehaviorState(state);
   clearWoodcuttingBehaviorState(state);
+  clearMiningBehaviorState(state);
   clearFiremakingBehaviorState(state);
+  clearBankRunBehaviorState(state);
   clearSparringBehaviorState(state);
   state.awaitingDitchTransition = null;
   if (!state.sparring) {
@@ -279,7 +431,9 @@ function createInitialState(home, behaviorMode) {
     // behavior modes (minigames, skilling, PvP) from coupling to roam fields.
     roaming: createRoamingBehaviorState(),
     woodcutting: createWoodcuttingBehaviorState(),
+    mining: createMiningBehaviorState(),
     firemaking: createFiremakingBehaviorState(),
+    bankRun: createBankRunBehaviorState(),
     sparring: createSparringBehaviorState(),
     autonomy: createAutonomyState(),
     followTargetUsername: null,
@@ -311,7 +465,9 @@ module.exports = {
   setModeSparring,
   setModeReturnHome,
   setModeRoaming,
+  setModeBankRun,
   setModeWoodcutting,
+  setModeMining,
   setModeFiremaking,
   teleportHome,
 };

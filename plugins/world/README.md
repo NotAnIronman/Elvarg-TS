@@ -38,7 +38,7 @@ This is plugin-based and developer-only (commands require developer/owner rights
   - Shared data output paths.
 - `ReplaceMapRegions.plugin.js`
   - Startup hook for runtime region replacement via plugin API.
-  - Current default replaces region `12343` from `plugins/world/data/12343.pack`.
+  - Startup hook auto-loads all numeric `*.pack` files from `plugins/world/data` and replaces those regions.
 
 ## Runtime Region Replacement Hook
 

@@ -21,6 +21,7 @@ const {
   createInitialState,
   resetMovementState,
   setModeFiremaking,
+  setModeMining,
   setModeRoaming,
   setModeWoodcutting,
 } = require("./behaviours/state/PlayerBotState");
@@ -37,6 +38,7 @@ const BOT_WALK_RADIUS = 6;
 const BOT_DECISION_TICKS = 1;
 const BOT_BASE_COOLDOWN_MS = 1200;
 const BOT_JITTER_MS = 300;
+const FORCE_ALL_BOTS_MODE_FOR_DIAG = null;
 const DITCH_ATTEMPT_COOLDOWN_MS = 1200;
 const DITCH_TRANSITION_TIMEOUT_MS = 15000;
 const DITCH_POST_CROSS_RETRY_DELAY_MS = 0;
@@ -56,18 +58,23 @@ const AUTO_MODE_ROAMING_MIN_MS = 22000;
 const AUTO_MODE_ROAMING_MAX_MS = 80000;
 const AUTO_MODE_WOODCUTTING_MIN_MS = 30000;
 const AUTO_MODE_WOODCUTTING_MAX_MS = 105000;
+const AUTO_MODE_MINING_MIN_MS = 30000;
+const AUTO_MODE_MINING_MAX_MS = 105000;
 const AUTO_MODE_SPARRING_MIN_MS = 18000;
 const AUTO_MODE_SPARRING_MAX_MS = 50000;
 const AUTO_MODE_POST_SPARRING_COOLDOWN_MIN_MS = 35000;
 const AUTO_MODE_POST_SPARRING_COOLDOWN_MAX_MS = 110000;
 const AUTO_MODE_SPARRING_MAX_DISTANCE_TILES = 16;
-const AUTO_MODE_ROAM_WEIGHT = 0.55;
+const AUTO_MODE_ROAM_WEIGHT = 0.4;
 const AUTO_MODE_WOODCUTTING_WEIGHT = 0.3;
+const AUTO_MODE_MINING_WEIGHT = 0.15;
 const AUTO_MODE_SPARRING_WEIGHT = 0.15;
 const BOT_BEHAVIOR_MODE = Object.freeze({
   ROAMING: "roaming",
   WOODCUTTING: "woodcutting",
+  MINING: "mining",
   FIREMAKING: "firemaking",
+  BANK_RUN: "bank_run",
   SPARRING: "sparring",
   FOLLOW_BACK: "follow_back",
   RETURN_HOME: "return_home",
@@ -75,6 +82,7 @@ const BOT_BEHAVIOR_MODE = Object.freeze({
 const ASSIGNABLE_BEHAVIORS = Object.freeze({
   roaming: BOT_BEHAVIOR_MODE.ROAMING,
   woodcutting: BOT_BEHAVIOR_MODE.WOODCUTTING,
+  mining: BOT_BEHAVIOR_MODE.MINING,
   firemaking: BOT_BEHAVIOR_MODE.FIREMAKING,
 });
 
@@ -93,6 +101,19 @@ const MANUAL_CONTROL_PACKET_OPCODES = new Set([
 
 function randomizedCooldownMs() {
   return BOT_BASE_COOLDOWN_MS + randomInRange(-BOT_JITTER_MS, BOT_JITTER_MS);
+}
+
+function applyForcedModeForDiagnosis(player, state) {
+  if (FORCE_ALL_BOTS_MODE_FOR_DIAG !== "mining") {
+    return;
+  }
+  setModeMining(player, state, BOT_BEHAVIOR_MODE);
+  if (!state.autonomy) {
+    state.autonomy = {};
+  }
+  state.autonomy.manualMode = BOT_BEHAVIOR_MODE.MINING;
+  state.autonomy.modeEndsAt = Number.MAX_SAFE_INTEGER;
+  state.autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
 }
 
 class FlashHintArrowTask extends Task {
@@ -133,6 +154,7 @@ class FlashHintArrowTask extends Task {
 
 module.exports = {
   name: "PlayerBots",
+  dependsOn: ["ReplaceMapRegions"],
   register(api) {
     const writeBotLog = (message, extra) => {
       try {
@@ -243,6 +265,7 @@ module.exports = {
           behaviorMode: BOT_BEHAVIOR_MODE,
           roamWeight: AUTO_MODE_ROAM_WEIGHT,
           woodcuttingWeight: AUTO_MODE_WOODCUTTING_WEIGHT,
+          miningWeight: AUTO_MODE_MINING_WEIGHT,
           sparringWeight: AUTO_MODE_SPARRING_WEIGHT,
           decisionDelayMinMs: AUTO_MODE_DECISION_MIN_MS,
           decisionDelayMaxMs: AUTO_MODE_DECISION_MAX_MS,
@@ -250,6 +273,8 @@ module.exports = {
           roamingMaxMs: AUTO_MODE_ROAMING_MAX_MS,
           woodcuttingMinMs: AUTO_MODE_WOODCUTTING_MIN_MS,
           woodcuttingMaxMs: AUTO_MODE_WOODCUTTING_MAX_MS,
+          miningMinMs: AUTO_MODE_MINING_MIN_MS,
+          miningMaxMs: AUTO_MODE_MINING_MAX_MS,
           sparringMinMs: AUTO_MODE_SPARRING_MIN_MS,
           sparringMaxMs: AUTO_MODE_SPARRING_MAX_MS,
           postSparringCooldownMinMs: AUTO_MODE_POST_SPARRING_COOLDOWN_MIN_MS,
@@ -369,6 +394,7 @@ module.exports = {
           y: botSpawn.getY(),
           z: botSpawn.getZ(),
         }, BOT_BEHAVIOR_MODE);
+        applyForcedModeForDiagnosis(bot, state);
         botStatesByName.set(username, state);
         playerBotUsernames.add(username);
 
@@ -414,6 +440,7 @@ module.exports = {
         y: location.getY(),
         z: location.getZ(),
       }, BOT_BEHAVIOR_MODE);
+      applyForcedModeForDiagnosis(player, state);
       botStatesByName.set(username, state);
       botmeUsernames.add(username);
       player.setPlayerBot?.(true);
@@ -518,16 +545,21 @@ module.exports = {
       if (!usernameArg || !behaviorArg) {
         player
           .getPacketSender()
-          .sendMessage("Usage: ::bh <username> <roaming|woodcutting|firemaking>");
+          .sendMessage("Usage: ::bh <username> <roaming|woodcutting|mining|firemaking|auto>");
         return true;
       }
 
+      const wantsAuto = behaviorArg === "auto";
       const normalizedBehavior = ASSIGNABLE_BEHAVIORS[behaviorArg];
       if (!normalizedBehavior) {
-        player
-          .getPacketSender()
-          .sendMessage("Unknown behaviour. Supported: roaming, woodcutting, firemaking");
-        return true;
+        if (wantsAuto) {
+          // handled below
+        } else {
+          player
+            .getPacketSender()
+            .sendMessage("Unknown behaviour. Supported: roaming, woodcutting, mining, firemaking, auto");
+          return true;
+        }
       }
 
       const target = resolveControlledPlayer(usernameArg);
@@ -554,13 +586,51 @@ module.exports = {
         return true;
       }
 
+      if (wantsAuto) {
+        if (!state.autonomy) {
+          state.autonomy = {};
+        }
+        state.autonomy.manualMode = null;
+        state.autonomy.modeEndsAt = 0;
+        state.autonomy.nextDecisionAt = 0;
+        setModeRoaming(target, state, BOT_BEHAVIOR_MODE);
+        resetMovementState(target);
+        TaskManager.submit(new FlashHintArrowTask(player, target));
+
+        player
+          .getPacketSender()
+          .sendMessage(`bh: ${targetUsername} -> auto`);
+        botApi.log("bot_behavior_assigned", {
+          assignedBy: player.getUsername(),
+          target: targetUsername,
+          behavior: "auto",
+        });
+        return true;
+      }
+
       if (normalizedBehavior === BOT_BEHAVIOR_MODE.ROAMING) {
         setModeRoaming(target, state, BOT_BEHAVIOR_MODE);
       } else if (normalizedBehavior === BOT_BEHAVIOR_MODE.WOODCUTTING) {
         setModeWoodcutting(target, state, BOT_BEHAVIOR_MODE);
+      } else if (normalizedBehavior === BOT_BEHAVIOR_MODE.MINING) {
+        setModeMining(target, state, BOT_BEHAVIOR_MODE);
       } else if (normalizedBehavior === BOT_BEHAVIOR_MODE.FIREMAKING) {
         setModeFiremaking(target, state, BOT_BEHAVIOR_MODE);
       }
+      const currentLoc = target.getLocation?.();
+      if (currentLoc) {
+        state.home = {
+          x: currentLoc.getX(),
+          y: currentLoc.getY(),
+          z: currentLoc.getZ(),
+        };
+      }
+      if (!state.autonomy) {
+        state.autonomy = {};
+      }
+      state.autonomy.manualMode = normalizedBehavior;
+      state.autonomy.modeEndsAt = Number.MAX_SAFE_INTEGER;
+      state.autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
       resetMovementState(target);
       TaskManager.submit(new FlashHintArrowTask(player, target));
 
@@ -663,6 +733,7 @@ module.exports = {
     botApi.log("registered", {
       spawned,
       totalConfigured: BOT_COUNT,
+      forcedModeForDiag: FORCE_ALL_BOTS_MODE_FOR_DIAG,
       walkRadius: BOT_WALK_RADIUS,
       decisionTicks: BOT_DECISION_TICKS,
       baseCooldownMs: BOT_BASE_COOLDOWN_MS,
@@ -675,6 +746,7 @@ module.exports = {
         decisionMaxMs: AUTO_MODE_DECISION_MAX_MS,
         roamingWeight: AUTO_MODE_ROAM_WEIGHT,
         woodcuttingWeight: AUTO_MODE_WOODCUTTING_WEIGHT,
+        miningWeight: AUTO_MODE_MINING_WEIGHT,
         sparringWeight: AUTO_MODE_SPARRING_WEIGHT,
       },
       homeRadius: BOT_HOME_RADIUS,

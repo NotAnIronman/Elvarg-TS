@@ -394,5 +394,6 @@ export interface PluginApi {
 
 export interface PluginModule {
   name: string;
+  dependsOn?: string[];
   register(api: PluginApi): void;
 }
