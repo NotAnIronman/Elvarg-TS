@@ -3208,6 +3208,16 @@
     "facing": 6
   },
   {
+    "id": 82,
+    "position": {
+      "x": 3109,
+      "y": 3511,
+      "z": 0
+    },
+    "radius": 0,
+    "facing": 1
+  },
+  {
     "descripton": "Shop Keeper - Edgeville",
     "id": 506,
     "position": {

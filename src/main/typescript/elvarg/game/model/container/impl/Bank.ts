@@ -66,11 +66,11 @@ export class Bank extends ItemContainer {
 
                 slot = player.getBank(itemTab).getSlotForItemId(item);
 
-                player.getBank(itemTab).switchItem(
+                player.getBank(itemTab).switchsItem(
                     player.getInventory(),
                     new Item(item, amount),
-                    false,
                     slot,
+                    false,
                     false
                 );
 
@@ -100,7 +100,13 @@ export class Bank extends ItemContainer {
                 }
 
                 // Perform the switch.
-                player.getBank(itemTab).switchItem(player.getInventory(), new Item(item, amount), false, slot, false);
+                player.getBank(itemTab).switchsItem(
+                    player.getInventory(),
+                    new Item(item, amount),
+                    slot,
+                    false,
+                    false
+                );
 
                 // Update all tabs if we removed an item from the first item slot.
                 if (slot === 0) {
@@ -741,5 +747,4 @@ class bankEntered implements EnteredSyntaxAction{
     }
 
 }
-
 

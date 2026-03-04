@@ -1028,6 +1028,7 @@ export class PacketSender {
     this.player.getDialogueManager?.()?.reset?.();
     this.player.setDestroyItem?.(-1);
     this.player.setInterfaceId?.(-1);
+    this.player.setCreationMenu?.(null);
     this.player.setSearchingBank?.(false);
     this.player.setTeleportInterfaceOpen?.(false);
     this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
@@ -1219,7 +1220,32 @@ export class PacketSender {
     return this;
   }
 
-  sendCreationMenu(_menu: any): this {
+  sendCreationMenu(menu: any): this {
+    if (
+      !menu ||
+      typeof menu.getItems !== "function" ||
+      typeof menu.getTitle !== "function"
+    ) {
+      return this;
+    }
+
+    const rawItems = menu.getItems();
+    const items = Array.isArray(rawItems)
+      ? rawItems.filter((id: unknown) => Number.isInteger(id))
+      : [];
+    if (items.length <= 0) {
+      return this;
+    }
+
+    this.player.setCreationMenu?.(menu);
+    this.sendString(String(menu.getTitle() ?? "What would you like to make?"), 31104);
+
+    const out = new PacketBuilder(167, PacketType.VARIABLE);
+    out.put(items.length);
+    for (const itemId of items) {
+      out.putInt(itemId);
+    }
+    this.player.getSession().write(out);
     return this;
   }
 

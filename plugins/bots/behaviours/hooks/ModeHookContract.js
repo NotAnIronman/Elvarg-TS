@@ -72,7 +72,8 @@ function callModeHook({
     return fallback;
   }
   try {
-    const value = fn(payload);
+    // Preserve handler method context; mode handlers rely on `this`.
+    const value = fn.call(handler, payload);
     return value === undefined ? fallback : value;
   } catch (err) {
     api?.log?.(errorEvent, {
