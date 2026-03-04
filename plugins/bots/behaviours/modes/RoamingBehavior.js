@@ -2,16 +2,56 @@ const {
   chooseNextTarget,
   isAtTarget,
   queueRouteAndFlagAppearance,
+  randomInRange,
 } = require("../navigation/BotNavigation");
-const { clearFollowState } = require("../state/PlayerBotState");
+const { clearFollowState, setModeRoaming } = require("../state/PlayerBotState");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 
 class RoamingBehavior {
   constructor(botStatesByName, options) {
     this.botStatesByName = botStatesByName;
+    this.api = options.api ?? null;
     this.behaviorMode = options.behaviorMode;
     this.endpointLingerMs = options.endpointLingerMs;
     this.botWalkRadius = options.botWalkRadius;
+    this.roamingMinMs = options.roamingMinMs ?? 22000;
+    this.roamingMaxMs = options.roamingMaxMs ?? 80000;
+  }
+
+  activateMode({ player, state }) {
+    if (!player || !state) {
+      return false;
+    }
+    setModeRoaming(player, state, this.behaviorMode);
+    return true;
+  }
+
+  startMode({ player, state, nowMs, activeForMs, reason = "auto_switch" }) {
+    if (!this.activateMode({ player, state })) {
+      return false;
+    }
+    if (!state.autonomy) {
+      state.autonomy = {
+        nextDecisionAt: 0,
+        modeEndsAt: 0,
+        pvpCooldownUntil: 0,
+        manualMode: null,
+      };
+    }
+    const durationMs =
+      Number.isInteger(activeForMs) && activeForMs > 0
+        ? activeForMs
+        : randomInRange(this.roamingMinMs, this.roamingMaxMs);
+    if (Number.isInteger(nowMs)) {
+      state.autonomy.modeEndsAt = nowMs + durationMs;
+    }
+    this.api?.log?.("bot_mode_switch", {
+      username: player.getUsername?.(),
+      mode: this.behaviorMode.ROAMING,
+      reason,
+      activeForMs: durationMs,
+    });
+    return true;
   }
 
   tick(context) {

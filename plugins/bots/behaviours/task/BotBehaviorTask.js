@@ -1,12 +1,6 @@
 const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task");
-const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { randomInRange } = require("../navigation/BotNavigation");
-const {
-  setModeRoaming,
-  setModeSparring,
-  setModeMining,
-  setModeWoodcutting,
-} = require("../state/PlayerBotState");
+const { callModeHook } = require("../hooks/ModeHookContract");
 
 class BotBehaviorTask extends Task {
   constructor(entries, traversalService, decisionTicks, options = {}) {
@@ -15,25 +9,16 @@ class BotBehaviorTask extends Task {
     this.traversalService = traversalService;
     this.api = options.api ?? null;
     this.behaviorMode = options.behaviorMode ?? null;
+    this.modeHandlers = options.modeHandlers ?? {};
     this.autonomy = {
-      roamWeight: options.roamWeight ?? 0.55,
-      woodcuttingWeight: options.woodcuttingWeight ?? 0.3,
-      miningWeight: options.miningWeight ?? 0.15,
-      sparringWeight: options.sparringWeight ?? 0.15,
       decisionDelayMinMs: options.decisionDelayMinMs ?? 4500,
       decisionDelayMaxMs: options.decisionDelayMaxMs ?? 14000,
-      roamingMinMs: options.roamingMinMs ?? 22000,
-      roamingMaxMs: options.roamingMaxMs ?? 80000,
-      woodcuttingMinMs: options.woodcuttingMinMs ?? 30000,
-      woodcuttingMaxMs: options.woodcuttingMaxMs ?? 105000,
-      miningMinMs: options.miningMinMs ?? 30000,
-      miningMaxMs: options.miningMaxMs ?? 105000,
-      sparringMinMs: options.sparringMinMs ?? 18000,
-      sparringMaxMs: options.sparringMaxMs ?? 50000,
-      sparringMaxDistanceTiles: options.sparringMaxDistanceTiles ?? 16,
-      postSparringCooldownMinMs: options.postSparringCooldownMinMs ?? 35000,
-      postSparringCooldownMaxMs: options.postSparringCooldownMaxMs ?? 110000,
     };
+    this.autonomousModes = Array.isArray(options.autonomousModes)
+      ? options.autonomousModes
+      : [];
+    this.modeStopParamsByMode = options.modeStopParamsByMode ?? {};
+    this.transientModes = new Set(options.transientModes ?? []);
   }
 
   ensureAutonomyState(state) {
@@ -76,278 +61,196 @@ class BotBehaviorTask extends Task {
       randomInRange(this.autonomy.decisionDelayMinMs, this.autonomy.decisionDelayMaxMs);
   }
 
-  startRoaming(entry, nowMs, reason = "auto_switch") {
-    const { player, state } = entry;
-    setModeRoaming(player, state, this.behaviorMode);
-    const autonomy = this.ensureAutonomyState(state);
-    autonomy.modeEndsAt =
-      nowMs + randomInRange(this.autonomy.roamingMinMs, this.autonomy.roamingMaxMs);
-    this.scheduleNextDecision(state, nowMs);
-    this.api?.log?.("bot_mode_switch", {
-      username: player.getUsername?.(),
-      mode: this.behaviorMode.ROAMING,
-      reason,
-      activeForMs: autonomy.modeEndsAt - nowMs,
-    });
+  behaviorRequirementsMet(mode, player, state, nowMs = Date.now()) {
+    return (
+      callModeHook({
+        modeHandlers: this.modeHandlers,
+        mode,
+        hookName: "behaviorRequirementsMet",
+        payload: { player, state, nowMs },
+        fallback: true,
+        api: this.api,
+        errorEvent: "bot_behavior_requirements_error",
+      }) === true
+    );
   }
 
-  startWoodcutting(entry, nowMs, reason = "auto_switch") {
-    const { player, state } = entry;
-    setModeWoodcutting(player, state, this.behaviorMode);
-    const autonomy = this.ensureAutonomyState(state);
-    autonomy.modeEndsAt =
-      nowMs +
-      randomInRange(this.autonomy.woodcuttingMinMs, this.autonomy.woodcuttingMaxMs);
-    this.scheduleNextDecision(state, nowMs);
-    this.api?.log?.("bot_mode_switch", {
-      username: player.getUsername?.(),
-      mode: this.behaviorMode.WOODCUTTING,
-      reason,
-      activeForMs: autonomy.modeEndsAt - nowMs,
-    });
+  activateModeWithHandler(entry, mode, reason = "mode_switch") {
+    return (
+      callModeHook({
+        modeHandlers: this.modeHandlers,
+        mode,
+        hookName: "activateMode",
+        payload: {
+          player: entry.player,
+          state: entry.state,
+          nowMs: Date.now(),
+          reason,
+        },
+        fallback: false,
+        api: this.api,
+        errorEvent: "bot_mode_activation_error",
+      }) === true
+    );
   }
 
-  startMining(entry, nowMs, reason = "auto_switch") {
-    const { player, state } = entry;
-    setModeMining(player, state, this.behaviorMode);
-    const autonomy = this.ensureAutonomyState(state);
-    autonomy.modeEndsAt =
-      nowMs + randomInRange(this.autonomy.miningMinMs, this.autonomy.miningMaxMs);
-    this.scheduleNextDecision(state, nowMs);
-    this.api?.log?.("bot_mode_switch", {
-      username: player.getUsername?.(),
-      mode: this.behaviorMode.MINING,
-      reason,
-      activeForMs: autonomy.modeEndsAt - nowMs,
-    });
-  }
-
-  stopSparring(entry, nowMs, reason) {
+  startModeWithHandler(entry, mode, nowMs, minMs, maxMs, reason = "auto_switch") {
+    const activeForMs = randomInRange(minMs, maxMs);
+    const started =
+      callModeHook({
+        modeHandlers: this.modeHandlers,
+        mode,
+        hookName: "startMode",
+        payload: {
+          player: entry.player,
+          state: entry.state,
+          nowMs,
+          activeForMs,
+          reason,
+        },
+        fallback: false,
+        api: this.api,
+        errorEvent: "bot_mode_start_error",
+      }) === true;
+    if (!started) {
+      return false;
+    }
     const autonomy = this.ensureAutonomyState(entry.state);
-    autonomy.pvpCooldownUntil = Math.max(
-      autonomy.pvpCooldownUntil,
-      nowMs +
-        randomInRange(
-          this.autonomy.postSparringCooldownMinMs,
-          this.autonomy.postSparringCooldownMaxMs
-        )
-    );
-    this.startRoaming(entry, nowMs, reason);
-  }
-
-  isTargetedByActiveSparring(targetUsername, ignoreUsername = null) {
-    if (!targetUsername) {
-      return false;
-    }
-    for (const entry of this.entries) {
-      const username = entry?.player?.getUsername?.();
-      if (!username || (ignoreUsername && username === ignoreUsername)) {
-        continue;
-      }
-      const state = entry?.state;
-      if (state?.mode !== this.behaviorMode.SPARRING) {
-        continue;
-      }
-      if (state?.sparring?.targetUsername === targetUsername) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  isSparringCandidate(sourceEntry, candidateEntry, nowMs) {
-    if (!sourceEntry || !candidateEntry || sourceEntry === candidateEntry) {
-      return false;
-    }
-    const sourcePlayer = sourceEntry.player;
-    const sourceState = sourceEntry.state;
-    const candidatePlayer = candidateEntry.player;
-    const candidateState = candidateEntry.state;
-    if (!sourcePlayer || !candidatePlayer || !candidateState) {
-      return false;
-    }
-    if (!candidatePlayer.isRegistered?.()) {
-      return false;
-    }
-    if ((candidatePlayer.getHitpoints?.() ?? 0) <= 0) {
-      return false;
-    }
-    if (!Wilderness.isIn(candidatePlayer)) {
-      return false;
-    }
-    if (sourcePlayer.getPrivateArea?.() !== candidatePlayer.getPrivateArea?.()) {
-      return false;
-    }
-    if (
-      sourcePlayer.getLocation?.().getZ?.() !== candidatePlayer.getLocation?.().getZ?.()
-    ) {
-      return false;
-    }
-    if (
-      candidateState.mode === this.behaviorMode.FOLLOW_BACK ||
-      candidateState.mode === this.behaviorMode.RETURN_HOME ||
-      candidateState.mode === this.behaviorMode.SPARRING
-    ) {
-      return false;
-    }
-    if (this.isInCombat(candidatePlayer)) {
-      return false;
-    }
-
-    const candidateAutonomy = this.ensureAutonomyState(candidateState);
-    if (nowMs < (candidateAutonomy.pvpCooldownUntil ?? 0)) {
-      return false;
-    }
-
-    const sourceUsername = sourcePlayer.getUsername?.();
-    const candidateUsername = candidatePlayer.getUsername?.();
-    if (this.isTargetedByActiveSparring(candidateUsername, sourceUsername)) {
-      return false;
-    }
-
+    autonomy.modeEndsAt = nowMs + activeForMs;
+    this.scheduleNextDecision(entry.state, nowMs);
     return true;
   }
 
-  pickSparringOpponent(entry, nowMs) {
-    const sourcePlayer = entry?.player;
-    const sourceState = entry?.state;
-    if (!sourcePlayer || !sourceState) {
-      return null;
-    }
-    const candidates = [];
-    for (const other of this.entries) {
-      if (!this.isSparringCandidate(entry, other, nowMs)) {
-        continue;
-      }
-      const distance = sourcePlayer
-        .getLocation()
-        .getDistance(other.player.getLocation());
-      if (distance > this.autonomy.sparringMaxDistanceTiles) {
-        continue;
-      }
-      candidates.push({ entry: other, distance });
-    }
-    if (candidates.length === 0) {
-      return null;
-    }
-    candidates.sort((a, b) => a.distance - b.distance);
-    const nearestPool = candidates.slice(0, Math.min(3, candidates.length));
-    return nearestPool[randomInRange(0, nearestPool.length - 1)].entry;
+  isModeStateValid(mode, entry, nowMs) {
+    return (
+      callModeHook({
+        modeHandlers: this.modeHandlers,
+        mode,
+        hookName: "isModeStateValid",
+        payload: {
+          player: entry?.player,
+          state: entry?.state,
+          nowMs,
+        },
+        fallback: true,
+        api: this.api,
+        errorEvent: "bot_mode_state_validation_error",
+      }) === true
+    );
   }
 
-  tryStartSparring(entry, nowMs) {
-    const sourcePlayer = entry?.player;
-    const sourceState = entry?.state;
-    if (!sourcePlayer || !sourceState) {
-      return false;
-    }
-    if (!Wilderness.isIn(sourcePlayer)) {
-      return false;
-    }
-    const sourceAutonomy = this.ensureAutonomyState(sourceState);
-    if (nowMs < (sourceAutonomy.pvpCooldownUntil ?? 0)) {
-      return false;
-    }
-
-    const opponentEntry = this.pickSparringOpponent(entry, nowMs);
-    if (!opponentEntry) {
-      return false;
-    }
-
-    const opponentPlayer = opponentEntry.player;
-    const opponentState = opponentEntry.state;
-    const opponentAutonomy = this.ensureAutonomyState(opponentState);
-    const durationMs = randomInRange(
-      this.autonomy.sparringMinMs,
-      this.autonomy.sparringMaxMs
+  stopModeWithHandler(entry, mode, nowMs, reason, params = {}) {
+    return (
+      callModeHook({
+        modeHandlers: this.modeHandlers,
+        mode,
+        hookName: "stopMode",
+        payload: {
+          entry,
+          nowMs,
+          reason,
+          ...params,
+        },
+        fallback: false,
+        api: this.api,
+        errorEvent: "bot_mode_stop_error",
+      }) === true
     );
+  }
 
-    if (
-      !setModeSparring(
-        sourcePlayer,
-        sourceState,
-        opponentPlayer,
-        nowMs,
-        durationMs,
-        this.behaviorMode
-      )
-    ) {
+  tryStartModeWithHandler(entry, mode, nowMs, params = {}) {
+    return (
+      callModeHook({
+        modeHandlers: this.modeHandlers,
+        mode,
+        hookName: "tryStartMode",
+        payload: {
+          entry,
+          entries: this.entries,
+          nowMs,
+          ...params,
+        },
+        fallback: false,
+        api: this.api,
+        errorEvent: "bot_mode_try_start_error",
+      }) === true
+    );
+  }
+
+  getAutonomousModeDefinition(mode) {
+    if (!mode || !Array.isArray(this.autonomousModes)) {
+      return null;
+    }
+    return this.autonomousModes.find((definition) => definition?.mode === mode) ?? null;
+  }
+
+  selectWeightedMode(definitions) {
+    if (!Array.isArray(definitions) || definitions.length === 0) {
+      return null;
+    }
+    const totalWeight = definitions.reduce((sum, definition) => {
+      const weight = Number(definition?.weight ?? 0);
+      return weight > 0 ? sum + weight : sum;
+    }, 0);
+    if (totalWeight <= 0) {
+      return null;
+    }
+
+    let roll = Math.random() * totalWeight;
+    for (const definition of definitions) {
+      const weight = Number(definition?.weight ?? 0);
+      if (weight <= 0) {
+        continue;
+      }
+      roll -= weight;
+      if (roll <= 0) {
+        return definition;
+      }
+    }
+    return definitions[definitions.length - 1] ?? null;
+  }
+
+  startAutonomousMode(entry, definition, nowMs) {
+    const mode = definition?.mode;
+    if (!mode) {
       return false;
     }
-    if (
-      !setModeSparring(
-        opponentPlayer,
-        opponentState,
-        sourcePlayer,
+    const strategy = definition?.strategy ?? "start";
+    if (strategy === "try_start") {
+      return this.tryStartModeWithHandler(
+        entry,
+        mode,
         nowMs,
-        durationMs,
-        this.behaviorMode
-      )
-    ) {
-      this.startRoaming(entry, nowMs, "sparring_pair_failed");
-      return false;
-    }
-
-    if (sourceState?.sparring) {
-      sourceState.sparring.nextActionAt = nowMs + randomInRange(350, 1400);
-    }
-    if (opponentState?.sparring) {
-      opponentState.sparring.nextActionAt = nowMs + randomInRange(450, 1650);
-    }
-
-    sourceAutonomy.modeEndsAt = nowMs + durationMs;
-    opponentAutonomy.modeEndsAt = nowMs + durationMs;
-
-    const pvpCooldownUntil =
-      nowMs +
-      durationMs +
-      randomInRange(
-        this.autonomy.postSparringCooldownMinMs,
-        this.autonomy.postSparringCooldownMaxMs
+        definition?.params ?? {}
       );
-    sourceAutonomy.pvpCooldownUntil = pvpCooldownUntil;
-    opponentAutonomy.pvpCooldownUntil = pvpCooldownUntil;
-    this.scheduleNextDecision(sourceState, nowMs + durationMs);
-    this.scheduleNextDecision(opponentState, nowMs + durationMs);
-
-    this.api?.log?.("bot_sparring_started", {
-      a: sourcePlayer.getUsername?.(),
-      b: opponentPlayer.getUsername?.(),
-      durationMs,
-    });
-    return true;
+    }
+    const minMs = Number(definition?.minMs ?? 0);
+    const maxMs = Number(definition?.maxMs ?? minMs);
+    const safeMinMs = Number.isFinite(minMs) && minMs > 0 ? minMs : 1;
+    const safeMaxMs = Number.isFinite(maxMs) && maxMs >= safeMinMs ? maxMs : safeMinMs;
+    return this.startModeWithHandler(
+      entry,
+      mode,
+      nowMs,
+      safeMinMs,
+      safeMaxMs,
+      definition?.reason ?? "auto_switch"
+    );
   }
 
-  validateSparring(entry, nowMs) {
-    const player = entry?.player;
-    const state = entry?.state;
-    const sparring = state?.sparring;
-    if (!player || !state || !sparring) {
+  startRoamingFallback(entry, nowMs, reason = "fallback_roaming") {
+    const roamingDefinition = this.getAutonomousModeDefinition(this.behaviorMode.ROAMING);
+    if (!roamingDefinition) {
       return false;
     }
-    if (!sparring.targetUsername) {
-      return false;
-    }
-    if (nowMs >= (sparring.endsAt ?? 0)) {
-      return false;
-    }
-    const opponentEntry = this.entries.find(
-      (other) => other?.player?.getUsername?.() === sparring.targetUsername
+    return this.startAutonomousMode(
+      entry,
+      {
+        ...roamingDefinition,
+        reason,
+      },
+      nowMs
     );
-    const opponent = opponentEntry?.player;
-    if (!opponent || !opponent.isRegistered?.()) {
-      return false;
-    }
-    if ((player.getHitpoints?.() ?? 0) <= 0 || (opponent.getHitpoints?.() ?? 0) <= 0) {
-      return false;
-    }
-    if (!Wilderness.isIn(player) || !Wilderness.isIn(opponent)) {
-      return false;
-    }
-    if (player.getPrivateArea?.() !== opponent.getPrivateArea?.()) {
-      return false;
-    }
-    return true;
   }
 
   processAutonomousMode(entry, nowMs) {
@@ -365,7 +268,11 @@ class BotBehaviorTask extends Task {
     // are cleared after death so the bot resumes normal autonomous behavior.
     if (deadOrDying) {
       if (!state.deathResetApplied) {
-        setModeRoaming(player, state, this.behaviorMode);
+        this.activateModeWithHandler(
+          entry,
+          this.behaviorMode.ROAMING,
+          "post_death_reset"
+        );
         autonomy.modeEndsAt = 0;
         autonomy.nextDecisionAt = 0;
         state.deathResetApplied = true;
@@ -383,28 +290,34 @@ class BotBehaviorTask extends Task {
 
     const manualMode = autonomy.manualMode ?? null;
     if (manualMode) {
-      const isTransient =
-        state.mode === this.behaviorMode.FOLLOW_BACK ||
-        state.mode === this.behaviorMode.RETURN_HOME ||
-        state.mode === this.behaviorMode.BANK_RUN;
+      const isTransient = this.transientModes.has(state.mode);
       if (isTransient) {
         return;
       }
 
       if (state.mode !== manualMode) {
-        if (manualMode === this.behaviorMode.ROAMING) {
-          setModeRoaming(player, state, this.behaviorMode);
-        } else if (manualMode === this.behaviorMode.WOODCUTTING) {
-          setModeWoodcutting(player, state, this.behaviorMode);
-        } else if (manualMode === this.behaviorMode.MINING) {
-          setModeMining(player, state, this.behaviorMode);
+        const switched = this.activateModeWithHandler(
+          entry,
+          manualMode,
+          "manual_override_resume"
+        );
+        if (switched) {
+          this.api?.log?.("bot_mode_switch", {
+            username: player.getUsername?.(),
+            mode: manualMode,
+            reason: "manual_override_resume",
+            activeForMs: -1,
+          });
+        } else {
+          autonomy.manualMode = null;
+          autonomy.modeEndsAt = 0;
+          autonomy.nextDecisionAt = 0;
+          this.api?.log?.("bot_manual_mode_invalid", {
+            username: player.getUsername?.(),
+            mode: manualMode,
+          });
+          return;
         }
-        this.api?.log?.("bot_mode_switch", {
-          username: player.getUsername?.(),
-          mode: manualMode,
-          reason: "manual_override_resume",
-          activeForMs: -1,
-        });
       }
 
       autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
@@ -412,18 +325,27 @@ class BotBehaviorTask extends Task {
       return;
     }
 
-    if (
-      state.mode === this.behaviorMode.FOLLOW_BACK ||
-      state.mode === this.behaviorMode.RETURN_HOME ||
-      state.mode === this.behaviorMode.BANK_RUN
-    ) {
+    if (this.transientModes.has(state.mode)) {
       this.scheduleNextDecision(state, nowMs);
       return;
     }
 
-    if (state.mode === this.behaviorMode.SPARRING) {
-      if (!this.validateSparring(entry, nowMs)) {
-        this.stopSparring(entry, nowMs, "sparring_invalid");
+    if (!this.isModeStateValid(state.mode, entry, nowMs)) {
+      const stopParamsSource = this.modeStopParamsByMode[state.mode];
+      const stopParams =
+        typeof stopParamsSource === "function"
+          ? stopParamsSource({ entry, player, state, nowMs })
+          : stopParamsSource ?? {};
+      if (
+        !this.stopModeWithHandler(
+          entry,
+          state.mode,
+          nowMs,
+          "mode_state_invalid",
+          stopParams
+        )
+      ) {
+        this.startRoamingFallback(entry, nowMs, "mode_state_invalid");
       }
       return;
     }
@@ -440,34 +362,38 @@ class BotBehaviorTask extends Task {
       return;
     }
 
-    const roll = Math.random();
-    const canAttemptSparring = Wilderness.isIn(player);
-    const totalWeight = Math.max(
-      this.autonomy.roamWeight +
-        this.autonomy.woodcuttingWeight +
-        this.autonomy.miningWeight +
-        (canAttemptSparring ? this.autonomy.sparringWeight : 0),
-      0.0001
-    );
-    const sparringWeight = canAttemptSparring ? this.autonomy.sparringWeight : 0;
-    const sparringThreshold = sparringWeight / totalWeight;
-    const woodcuttingThreshold =
-      sparringThreshold + this.autonomy.woodcuttingWeight / totalWeight;
-    const miningThreshold =
-      woodcuttingThreshold + this.autonomy.miningWeight / totalWeight;
+    const candidates = [];
+    for (const definition of this.autonomousModes) {
+      const mode = definition?.mode;
+      const weight = Number(definition?.weight ?? 0);
+      if (!mode || weight <= 0) {
+        continue;
+      }
+      if (!this.behaviorRequirementsMet(mode, player, state, nowMs)) {
+        continue;
+      }
+      candidates.push(definition);
+    }
 
-    if (roll < sparringThreshold && this.tryStartSparring(entry, nowMs)) {
+    const selectedMode = this.selectWeightedMode(candidates);
+    if (!selectedMode) {
+      this.scheduleNextDecision(state, nowMs);
       return;
     }
-    if (roll < woodcuttingThreshold) {
-      this.startWoodcutting(entry, nowMs);
+    if (this.startAutonomousMode(entry, selectedMode, nowMs)) {
       return;
     }
-    if (roll < miningThreshold) {
-      this.startMining(entry, nowMs);
-      return;
+
+    for (const fallbackMode of candidates) {
+      if (fallbackMode === selectedMode) {
+        continue;
+      }
+      if (this.startAutonomousMode(entry, fallbackMode, nowMs)) {
+        return;
+      }
     }
-    this.startRoaming(entry, nowMs);
+
+    this.startRoamingFallback(entry, nowMs, "auto_switch_fallback");
   }
 
   execute() {

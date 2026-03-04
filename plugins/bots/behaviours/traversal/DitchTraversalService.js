@@ -1,4 +1,5 @@
 const { queueRouteAndFlagAppearance } = require("../navigation/BotNavigation");
+const { callModeHook } = require("../hooks/ModeHookContract");
 
 const RETRY_WAIT_LOG_INTERVAL_MS = 3000;
 const TRANSITION_WAIT_LOG_INTERVAL_MS = 2500;
@@ -14,7 +15,7 @@ class DitchTraversalService {
     this.api = api;
     this.traversalAssist = traversalAssist;
     this.objectId = objectId;
-    this.behaviorMode = options.behaviorMode;
+    this.modeHandlers = options.modeHandlers ?? {};
     this.ditchAttemptCooldownMs = options.ditchAttemptCooldownMs;
     this.ditchPostCrossRetryDelayMs = options.ditchPostCrossRetryDelayMs;
     this.ditchTransitionTimeoutMs = options.ditchTransitionTimeoutMs;
@@ -36,14 +37,17 @@ class DitchTraversalService {
     if (!state) {
       return null;
     }
-    if (state.mode === this.behaviorMode.WOODCUTTING) {
-      return state.woodcutting?.target ?? null;
-    }
-    if (state.mode === this.behaviorMode.MINING) {
-      return state.mining?.target ?? null;
-    }
-    if (state.mode === this.behaviorMode.BANK_RUN) {
-      return state.bankRun?.travelTarget ?? null;
+    const target = callModeHook({
+      modeHandlers: this.modeHandlers,
+      mode: state.mode,
+      hookName: "getTraversalTarget",
+      payload: state,
+      fallback: null,
+      api: this.api,
+      errorEvent: "bot_mode_traversal_target_error",
+    });
+    if (target != null) {
+      return target;
     }
     return state.roaming?.target ?? null;
   }
@@ -52,25 +56,17 @@ class DitchTraversalService {
     if (!state) {
       return;
     }
-    if (state.mode === this.behaviorMode.WOODCUTTING) {
-      if (!state.woodcutting) {
-        return;
-      }
-      state.woodcutting.target = target;
-      return;
-    }
-    if (state.mode === this.behaviorMode.MINING) {
-      if (!state.mining) {
-        return;
-      }
-      state.mining.target = target;
-      return;
-    }
-    if (state.mode === this.behaviorMode.BANK_RUN) {
-      if (!state.bankRun) {
-        return;
-      }
-      state.bankRun.travelTarget = target;
+    const handled =
+      callModeHook({
+        modeHandlers: this.modeHandlers,
+        mode: state.mode,
+        hookName: "setTraversalTarget",
+        payload: { state, target },
+        fallback: false,
+        api: this.api,
+        errorEvent: "bot_mode_set_traversal_target_error",
+      }) === true;
+    if (handled) {
       return;
     }
     if (!state.roaming) {
@@ -81,14 +77,21 @@ class DitchTraversalService {
 
   getModeContext(state) {
     if (!state) {
-      return { mode: null, bankRunPhase: null };
+      return { mode: null, modeContext: null };
     }
+    const modeContext = callModeHook({
+      modeHandlers: this.modeHandlers,
+      mode: state.mode,
+      hookName: "getModeLogContext",
+      payload: state,
+      fallback: null,
+      api: this.api,
+      errorEvent: "bot_mode_log_context_error",
+    });
     return {
       mode: state.mode ?? null,
-      bankRunPhase:
-        state.mode === this.behaviorMode.BANK_RUN
-          ? state.bankRun?.phase ?? null
-          : null,
+      modeContext:
+        modeContext && typeof modeContext === "object" ? modeContext : null,
     };
   }
 
@@ -364,12 +367,22 @@ class DitchTraversalService {
     state.roaming.nextWalkAt = readyAt;
     state.nextDitchAttemptAt = readyAt;
 
-    if (state.mode === this.behaviorMode.BANK_RUN && state.bankRun) {
-      state.bankRun.nextActionAt = Math.min(
-        Number(state.bankRun.nextActionAt ?? readyAt),
-        readyAt
-      );
-    }
+    callModeHook({
+      modeHandlers: this.modeHandlers,
+      mode: state.mode,
+      hookName: "onPostTraversalRetryScheduled",
+      payload: {
+        player,
+        state,
+        readyAt,
+        transition,
+        reason,
+        nowMs,
+      },
+      fallback: false,
+      api: this.api,
+      errorEvent: "bot_mode_post_traversal_retry_error",
+    });
 
     this.clearMovementQueue(player);
 

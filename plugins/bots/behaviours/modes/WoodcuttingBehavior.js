@@ -5,7 +5,11 @@ const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model
 const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag");
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
-const { setModeBankRun, setModeFiremaking } = require("../state/PlayerBotState");
+const {
+  setModeBankRun,
+  setModeFiremaking,
+  setModeWoodcutting,
+} = require("../state/PlayerBotState");
 const {
   queueRouteAndFlagAppearance,
   randomInRange,
@@ -39,6 +43,113 @@ class WoodcuttingBehavior {
         }
       }
     }
+  }
+
+  activateMode({ player, state }) {
+    if (!player || !state) {
+      return false;
+    }
+    setModeWoodcutting(player, state, this.behaviorMode);
+    if (state.woodcutting) {
+      state.woodcutting.nextActionAt = 0;
+    }
+    return true;
+  }
+
+  startMode({ player, state, nowMs, activeForMs, reason = "auto_switch" }) {
+    if (!this.activateMode({ player, state })) {
+      return false;
+    }
+    if (!state.autonomy) {
+      state.autonomy = {
+        nextDecisionAt: 0,
+        modeEndsAt: 0,
+        pvpCooldownUntil: 0,
+        manualMode: null,
+      };
+    }
+    if (Number.isInteger(nowMs) && Number.isInteger(activeForMs) && activeForMs > 0) {
+      state.autonomy.modeEndsAt = nowMs + activeForMs;
+    }
+    this.api?.log?.("bot_mode_switch", {
+      username: player.getUsername?.(),
+      mode: this.behaviorMode.WOODCUTTING,
+      reason,
+      activeForMs: Number.isInteger(activeForMs) ? activeForMs : null,
+    });
+    return true;
+  }
+
+  onBankRunResume({ state, nowMs, bankRun }) {
+    if (!state?.woodcutting) {
+      return false;
+    }
+    const resumeTarget = bankRun?.resumeWoodcuttingTarget
+      ? {
+          objectId: bankRun.resumeWoodcuttingTarget.objectId,
+          x: bankRun.resumeWoodcuttingTarget.x,
+          y: bankRun.resumeWoodcuttingTarget.y,
+          z: bankRun.resumeWoodcuttingTarget.z,
+        }
+      : null;
+    state.woodcutting.target = resumeTarget;
+    state.woodcutting.nextActionAt = nowMs;
+    state.woodcutting.nextSearchAt = nowMs;
+    return true;
+  }
+
+  getTraversalTarget(state) {
+    return state?.woodcutting?.target ?? null;
+  }
+
+  setTraversalTarget(stateOrPayload, maybeTarget) {
+    const state = stateOrPayload?.state ?? stateOrPayload;
+    const target = stateOrPayload?.target ?? maybeTarget;
+    if (!state?.woodcutting) {
+      return false;
+    }
+    state.woodcutting.target = target;
+    return true;
+  }
+
+  handleBlocked({
+    player,
+    state,
+    event,
+    nowMs,
+    traversalService,
+    blockedRetargetMinDelayMs,
+    blockedRetargetMaxDelayMs,
+  }) {
+    const target = state?.woodcutting?.target;
+    if (!target) {
+      return true;
+    }
+
+    const traversalObject = traversalService.findObjectOnRoute(
+      player,
+      event.from,
+      target
+    );
+    if (!traversalObject) {
+      state.woodcutting.target = null;
+      state.woodcutting.nextSearchAt = nowMs + blockedRetargetMaxDelayMs;
+      state.woodcutting.nextActionAt = nowMs + blockedRetargetMinDelayMs;
+      return true;
+    }
+
+    const currentY = player.getLocation().getY();
+    const targetY = target.y;
+    const objectY = traversalObject.getLocation().getY();
+    if (!traversalService.isObjectBetween(currentY, targetY, objectY)) {
+      state.woodcutting.target = null;
+      state.woodcutting.nextSearchAt = nowMs + blockedRetargetMaxDelayMs;
+      state.woodcutting.nextActionAt = nowMs + blockedRetargetMinDelayMs;
+      return true;
+    }
+
+    traversalService.requestCross(player, state, traversalObject, nowMs);
+    return true;
   }
 
   tick(context) {

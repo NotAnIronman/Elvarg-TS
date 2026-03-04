@@ -24,28 +24,46 @@ class PlayerBotBehaviorTreeFactory {
     this.botHomeRadius = options.botHomeRadius;
     this.blockedRetargetMinDelayMs = options.blockedRetargetMinDelayMs;
     this.botWalkRadius = options.botWalkRadius;
-    this.roamingBehavior = new RoamingBehavior(botStatesByName, {
-      behaviorMode: this.behaviorMode,
-      endpointLingerMs: this.endpointLingerMs,
-      botWalkRadius: this.botWalkRadius,
-    });
-    this.sparringBehavior = new SparringBehavior(botStatesByName, api, {
-      behaviorMode: this.behaviorMode,
-    });
-    this.woodcuttingBehavior = new WoodcuttingBehavior(botStatesByName, api, {
-      behaviorMode: this.behaviorMode,
-      botWalkRadius: this.botWalkRadius,
-    });
-    this.miningBehavior = new MiningBehavior(botStatesByName, api, {
-      behaviorMode: this.behaviorMode,
-      botWalkRadius: this.botWalkRadius,
-    });
-    this.bankRunBehavior = new BankRunBehavior(botStatesByName, api, {
-      behaviorMode: this.behaviorMode,
-    });
-    this.firemakingBehavior = new FiremakingBehavior(botStatesByName, api, {
-      behaviorMode: this.behaviorMode,
-    });
+    this.roamingMinMs = options.roamingMinMs;
+    this.roamingMaxMs = options.roamingMaxMs;
+    this.modeBehaviors = options.modeBehaviors ?? {};
+    this.roamingBehavior =
+      this.modeBehaviors.roaming ??
+      new RoamingBehavior(botStatesByName, {
+        api,
+        behaviorMode: this.behaviorMode,
+        endpointLingerMs: this.endpointLingerMs,
+        botWalkRadius: this.botWalkRadius,
+        roamingMinMs: this.roamingMinMs,
+        roamingMaxMs: this.roamingMaxMs,
+      });
+    this.sparringBehavior =
+      this.modeBehaviors.sparring ??
+      new SparringBehavior(botStatesByName, api, {
+        behaviorMode: this.behaviorMode,
+      });
+    this.woodcuttingBehavior =
+      this.modeBehaviors.woodcutting ??
+      new WoodcuttingBehavior(botStatesByName, api, {
+        behaviorMode: this.behaviorMode,
+        botWalkRadius: this.botWalkRadius,
+      });
+    this.miningBehavior =
+      this.modeBehaviors.mining ??
+      new MiningBehavior(botStatesByName, api, {
+        behaviorMode: this.behaviorMode,
+        botWalkRadius: this.botWalkRadius,
+      });
+    this.bankRunBehavior =
+      this.modeBehaviors.bankRun ??
+      new BankRunBehavior(botStatesByName, api, {
+        behaviorMode: this.behaviorMode,
+      });
+    this.firemakingBehavior =
+      this.modeBehaviors.firemaking ??
+      new FiremakingBehavior(botStatesByName, api, {
+        behaviorMode: this.behaviorMode,
+      });
   }
 
   create(cooldownMs, initialDelayMs) {
