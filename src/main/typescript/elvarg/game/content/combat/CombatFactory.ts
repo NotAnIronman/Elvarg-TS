@@ -13,7 +13,7 @@ import { CombatMethod } from "./method/CombatMethod";
 import { MagicCombatMethod } from "./method/impl/MagicCombatMethod";
 import { MeleeCombatMethod } from "./method/impl/MeleeCombatMethod";
 import { RangedCombatMethod } from "./method/impl/RangedCombatMethod";
-import { Ammunition, RangedData, RangedWeapon, RangedWeaponType } from "./ranged/RangedData";
+import { Ammunition, RangedData, RangedWeapon } from "./ranged/RangedData";
 import { Mobile } from "../../entity/impl/Mobile";
 import type { NPC } from "../../entity/impl/npc/NPC";
 import { CoordinateState, NPCMovementCoordinator } from "../../entity/impl/npc/NPCMovementCoordinator";
@@ -946,9 +946,13 @@ export class CombatFactory {
             return false;
         }
 
-        if (rangedWeapon.getType() === RangedWeaponType.KNIFE || rangedWeapon.getType() === RangedWeaponType.DART
-            || rangedWeapon.getType() === RangedWeaponType.TOKTZ_XIL_UL
-            || rangedWeapon.getType() === RangedWeaponType.MORRIGANS_JAVELIN) {
+        if (CombatFactory.usesWeaponSlotAmmo(rangedWeapon)) {
+            const weaponSlotItem = player.getEquipment().getItems()[Equipment.WEAPON_SLOT];
+            if (weaponSlotItem.getId() == -1 || weaponSlotItem.getAmount() < amountRequired) {
+                player.getPacketSender().sendMessage("You don't have the required amount of ammunition to fire that.");
+                player.getCombat().reset();
+                return false;
+            }
             return true;
         }
 
@@ -991,11 +995,8 @@ export class CombatFactory {
         // Determine which slot we are decrementing ammo from.
         let slot = Equipment.AMMUNITION_SLOT;
 
-        // Is the weapon using a throw weapon?
-        // The ammo should be dropped from the weapon slot.
-        if (rangedWeapon.getType() == RangedWeaponType.KNIFE || rangedWeapon.getType() == RangedWeaponType.DART
-            || rangedWeapon.getType() == RangedWeaponType.TOKTZ_XIL_UL
-            || rangedWeapon.getType() == RangedWeaponType.MORRIGANS_JAVELIN) {
+        // Thrown weapons consume ammunition from the weapon slot.
+        if (CombatFactory.usesWeaponSlotAmmo(rangedWeapon)) {
             slot = Equipment.WEAPON_SLOT;
         }
 
@@ -1042,6 +1043,21 @@ export class CombatFactory {
 
         // Refresh the equipment interface.
         player.getEquipment().refreshItems();
+    }
+
+    private static usesWeaponSlotAmmo(rangedWeapon: RangedWeapon): boolean {
+        if (!rangedWeapon) {
+            return false;
+        }
+
+        const ammunitionData = rangedWeapon.getAmmunitionData();
+        const weaponIds = rangedWeapon.getWeaponIds();
+        if (!Array.isArray(ammunitionData) || ammunitionData.length !== 1 || !Array.isArray(weaponIds)) {
+            return false;
+        }
+
+        const baseThrownItemId = ammunitionData[0]?.getItemId?.();
+        return Number.isInteger(baseThrownItemId) && weaponIds.includes(baseThrownItemId);
     }
 
 }

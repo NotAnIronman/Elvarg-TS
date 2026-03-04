@@ -10,7 +10,6 @@ import { PrayerHandler } from "../../../game/content/PrayerHandler";
 // import { WeaponInterfaces } from '../../../game/content/combat/WeaponInterfaces';
 // import { Autocasting } from '../../../game/content/combat/magic/Autocasting';
 // import { EffectSpells } from '../../../game/content/combat/magic/EffectSpells';
-// import { Presetables } from '../../../game/content/presets/Presetables';
 // import { QuestHandler, Quests } from '../../../game/content/quests/QuestHandler';
 // import { Player } from '../../../game/entity/impl/player/Player';
 // import { Bank } from '../../../game/model/container/impl/Bank';
@@ -61,8 +60,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
   // Close buttons
   private static readonly CLOSE_BUTTON_1: number = 18247;
   private static readonly CLOSE_BUTTON_2: number = 38117;
-  // Presets
-  private static readonly OPEN_PRESETS: number = 31015;
   // Settings tab
   private static readonly OPEN_ADVANCED_OPTIONS: number = 42524;
   private static readonly OPEN_KEY_BINDINGS: number = 42552;
@@ -102,9 +99,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
   //     return true;
   //   }
   //   if (Smithing.handleButton(player, button)) {
-  //     return true;
-  //   }
-  //   if (Presetables.handleButton(player, button)) {
   //     return true;
   //   }
   //   if (Quests.handleQuestButtonClick(player, button)) {
@@ -168,13 +162,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
     }
 
     switch (button) {
-      case ButtonClickPacketListener.OPEN_PRESETS:
-        if (player.busy()) {
-          player.getPacketSender().sendInterfaceRemoval();
-        }
-        // Presetables.opens(player);
-        break;
-
       case ButtonClickPacketListener.OPEN_WORLD_MAP:
         if (player.busy()) {
           player.getPacketSender().sendInterfaceRemoval();

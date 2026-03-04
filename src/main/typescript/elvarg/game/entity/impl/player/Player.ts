@@ -12,7 +12,6 @@ import { BountyHunter } from "../../../content/combat/bountyhunter/BountyHunter"
 import { PendingHit } from "../../../content/combat/hit/PendingHit";
 import { Autocasting } from "../../../content/combat/magic/Autocasting";
 import { Presetable } from "../../../content/presets/Presetable";
-import { Presetables } from "../../../content/presets/Presetables";
 import { SkillManager } from "../../../content/skill/SkillManager";
 import { ItemDefinition } from "../../../definition/ItemDefinition";
 import { Mobile } from "../Mobile";
@@ -64,6 +63,7 @@ import { World } from "../../../World";
 import { PluginManager } from "../../../../plugins/PluginManager";
 
 export class Player extends Mobile {
+    private static readonly MAX_PLAYER_PRESETS = 10;
     getSize(): number {
         return 1;
     }
@@ -102,7 +102,7 @@ export class Player extends Mobile {
     public dialogueManager = new DialogueManager(this);
     // Presets
     private currentPreset: Presetable;
-    public presets: Presetable[] = new Array(Presetables.MAX_PRESETS);
+    public presets: Presetable[] = new Array(Player.MAX_PLAYER_PRESETS);
     private openPresetsOnDeath = true;
 
     public username: string;

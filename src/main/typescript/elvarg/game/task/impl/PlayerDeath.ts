@@ -1,7 +1,6 @@
 import { GameConstants } from "../../GameConstants";
 import { CombatFactory } from "../../content/combat/CombatFactory";
 import { Emblem } from "../../content/combat/bountyhunter/Emblem";
-import { Presetables } from "../../content/presets/Presetables";
 import { ItemDefinition } from "../../definition/ItemDefinition";
 import { ItemOnGroundManager } from "../../entity/impl/grounditem/ItemOnGroundManager";
 import { Player } from "../../entity/impl/player/Player";
@@ -14,11 +13,9 @@ import { Location } from "../../model/Location";
 import { BrokenItem } from "../../model/BrokenItem";
 import { Animation } from "../../model/Animation";
 import { PluginManager } from "../../../plugins/PluginManager";
-import { TaskManager } from "../TaskManager";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 
 export class PlayerDeathTask extends Task {
-    private static readonly OPEN_PRESETS_DELAY_TICKS = 2;
     private player: Player;
     private killer: Player | undefined;
     private loseItems = true;
@@ -166,11 +163,6 @@ export class PlayerDeathTask extends Task {
 
                     if (!handledDeath) {
                         this.player.moveTo(GameConstants.DEFAULT_LOCATION);
-                        if (this.loseItems) {
-                            if (this.player.isOpenPresetsOnDeath()) {
-                                this.openPresetsAfterDeath();
-                            }
-                        }
                     }
 
                     // Stop the event..
@@ -263,23 +255,5 @@ export class PlayerDeathTask extends Task {
             itemId === Emblem.MYSTERIOUS_EMBLEM_9.id ||
             itemId === Emblem.MYSTERIOUS_EMBLEM_10.id
         );
-    }
-
-    private openPresetsAfterDeath(): void {
-        const player = this.player;
-        // Delay preset UI opening until after death teleport/region packets settle.
-        TaskManager.submit(new (class extends Task {
-            constructor() {
-                super(PlayerDeathTask.OPEN_PRESETS_DELAY_TICKS, false);
-            }
-
-            public execute(): void {
-                this.stop();
-                if (!player || !player.isRegistered() || player.getHitpoints() <= 0) {
-                    return;
-                }
-                Presetables.opens(player);
-            }
-        })());
     }
 }

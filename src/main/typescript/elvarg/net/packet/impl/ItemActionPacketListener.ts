@@ -7,7 +7,6 @@ import { PluginManager } from "../../../plugins/PluginManager";
 // import { TeleportTablets } from '../../../game/model/teleportation/TeleportTablets'
 // import { TeleportType } from "../../../game/model/teleportation/TeleportType";
 // import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
-// import { PotionConsumable } from '../../../game/content/PotionConsumable'
 // import { Animation } from "../../../game/model/Animation";
 // import { Task } from "../../../game/task/Task";
 // import { TaskManager } from "../../../game/task/TaskManager";
@@ -245,11 +244,6 @@ export class ItemActionPacketListener implements PacketExecutor {
 
     // // Prayer
     // if (Prayer.buryBone(player, itemId)) {
-    //     return;
-    // }
-
-    // // Drinking potions..
-    // if (PotionConsumable.drink(player, itemId, slot)) {
     //     return;
     // }
 
