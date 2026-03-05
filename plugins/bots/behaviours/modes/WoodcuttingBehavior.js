@@ -3,7 +3,6 @@ const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/enti
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag");
-const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 const {
   setModeBankRun,
@@ -41,6 +40,7 @@ class WoodcuttingBehavior {
     this.api = api;
     this.behaviorMode = options.behaviorMode;
     this.searchWalkRadius = options.botWalkRadius ?? 6;
+    this.objectSearch = options.objectSearch ?? null;
     this.treeTierByObjectId = new Map();
     for (const tree of Woodcutting.TREES) {
       for (const objectId of tree.objectIds ?? []) {
@@ -236,7 +236,6 @@ class WoodcuttingBehavior {
           username: player.getUsername(),
           level: this.getWoodcuttingLevel(player),
           visibleTrees,
-          loadedObjectBuckets: MapObjects.mapObjects.size,
         });
         return "running";
       }
@@ -345,66 +344,40 @@ class WoodcuttingBehavior {
       return null;
     }
     this.pruneAvoidedTargets(state, nowMs);
-    this.ensureNearbyRegionsLoaded(player);
     const loc = player.getLocation();
     const privateArea = player.getPrivateArea();
-    const treeIds = new Set(treeTier.objectIds);
-    const currentRegionX = loc.getX() >> 6;
-    const currentRegionY = loc.getY() >> 6;
+    const treeIds = new Set(treeTier.objectIds ?? []);
     let bestObject = null;
     let bestDistSq = Number.MAX_SAFE_INTEGER;
 
-    for (const objects of MapObjects.mapObjects.values()) {
-      if (!objects || objects.length === 0) {
+    const candidateObjects =
+      this.objectSearch?.findCandidatesByIds?.(player, [...treeIds], {
+        regionRadius: TREE_SEARCH_REGION_RADIUS,
+        z: loc.getZ(),
+        privateArea,
+      }) ?? [];
+
+    for (const object of candidateObjects) {
+      if (!object || !treeIds.has(object.getId())) {
         continue;
       }
-      for (const object of objects) {
-        if (!object || !treeIds.has(object.getId())) {
-          continue;
-        }
-        if (object.getPrivateArea() !== privateArea) {
-          continue;
-        }
-        const objectLoc = object.getLocation();
-        if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
-          continue;
-        }
-        const objectRegionX = objectLoc.getX() >> 6;
-        const objectRegionY = objectLoc.getY() >> 6;
-        if (
-          Math.abs(objectRegionX - currentRegionX) > 1 ||
-          Math.abs(objectRegionY - currentRegionY) > 1
-        ) {
-          continue;
-        }
-        const dx = objectLoc.getX() - loc.getX();
-        const dy = objectLoc.getY() - loc.getY();
-        const distSq = dx * dx + dy * dy;
-        if (this.isTreeTemporarilyAvoided(state, object, nowMs)) {
-          continue;
-        }
-        if (distSq < bestDistSq) {
-          bestDistSq = distSq;
-          bestObject = object;
-        }
+      const objectLoc = object.getLocation();
+      if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
+        continue;
+      }
+      const dx = objectLoc.getX() - loc.getX();
+      const dy = objectLoc.getY() - loc.getY();
+      const distSq = dx * dx + dy * dy;
+      if (this.isTreeTemporarilyAvoided(state, object, nowMs)) {
+        continue;
+      }
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        bestObject = object;
       }
     }
 
     return bestObject;
-  }
-
-  ensureNearbyRegionsLoaded(player) {
-    const loc = player?.getLocation?.();
-    if (!loc) {
-      return;
-    }
-    const baseX = loc.getX();
-    const baseY = loc.getY();
-    for (let rx = -TREE_SEARCH_REGION_RADIUS; rx <= TREE_SEARCH_REGION_RADIUS; rx++) {
-      for (let ry = -TREE_SEARCH_REGION_RADIUS; ry <= TREE_SEARCH_REGION_RADIUS; ry++) {
-        RegionManager.loadMapFiles(baseX + rx * 64, baseY + ry * 64);
-      }
-    }
   }
 
   equipBestAxeForWoodcutting(player) {
@@ -582,26 +555,24 @@ class WoodcuttingBehavior {
     }
 
     let count = 0;
-    for (const objects of MapObjects.mapObjects.values()) {
-      if (!objects || objects.length === 0) {
+    const candidateObjects =
+      this.objectSearch?.findCandidatesByIds?.(player, [...treeIds], {
+        regionRadius: TREE_SEARCH_REGION_RADIUS,
+        z: loc.getZ(),
+        privateArea,
+      }) ?? [];
+    for (const object of candidateObjects) {
+      if (!object || !treeIds.has(object.getId())) {
         continue;
       }
-      for (const object of objects) {
-        if (!object || !treeIds.has(object.getId())) {
-          continue;
-        }
-        if (object.getPrivateArea() !== privateArea) {
-          continue;
-        }
-        const objectLoc = object.getLocation();
-        if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
-          continue;
-        }
-        const dx = objectLoc.getX() - loc.getX();
-        const dy = objectLoc.getY() - loc.getY();
-        if (dx * dx + dy * dy <= radiusSq) {
-          count++;
-        }
+      const objectLoc = object.getLocation();
+      if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
+        continue;
+      }
+      const dx = objectLoc.getX() - loc.getX();
+      const dy = objectLoc.getY() - loc.getY();
+      if (dx * dx + dy * dy <= radiusSq) {
+        count++;
       }
     }
     return count;

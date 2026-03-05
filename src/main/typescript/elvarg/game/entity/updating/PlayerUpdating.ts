@@ -17,7 +17,7 @@ import * as path from "path";
 export class PlayerUpdating {
     private static MAX_NEW_PLAYERS_PER_CYCLE = 25;
     private static readonly DEBUG_ENABLED =
-        (process.env.PLAYER_UPDATE_DEBUG ?? "1") === "1";
+        (process.env.PLAYER_UPDATE_DEBUG ?? "0") === "1";
     private static readonly DEBUG_RECEIVER_FILTER = (
         process.env.PLAYER_UPDATE_DEBUG_RECEIVER ?? "happysham31"
     )

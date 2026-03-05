@@ -5,6 +5,10 @@ const { Location } = require("../../src/main/typescript/elvarg/game/model/Locati
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const {
+  isPresetActive,
+  restorePresetSnapshot,
+} = require("../interface/PresetsState");
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
 
@@ -26,6 +30,14 @@ function tryCrossWildernessDitch(player, ditchY, sourceY) {
     ? sourceY
     : player.getLocation().getY();
   const yOffset = approachY < thresholdY ? 3 : -3;
+  if (yOffset < 0 && isPresetActive(player)) {
+    const restored = restorePresetSnapshot(player, { preserveLocation: true });
+    if (restored) {
+      player
+        .getPacketSender()
+        .sendMessage("Preset cleared. Your original character state has been restored.");
+    }
+  }
   const crossDitch = new Location(0, yOffset);
   const forceMovement = new ForceMovement(
     player.getLocation().clone(),

@@ -106,12 +106,14 @@ export class ServerLogger {
     }
     ServerLogger.installed = true;
 
-    fs.mkdirSync(path.dirname(logFile), { recursive: true });
-    fs.appendFileSync(
-      logFile,
-      `${new Date().toISOString()} [INFO] ===== server_bootstrap pid=${process.pid} =====\n`,
-      { encoding: "utf8" }
-    );
+    if (GameConstants.SERVER_LOG_WRITES_ENABLED) {
+      fs.mkdirSync(path.dirname(logFile), { recursive: true });
+      fs.appendFileSync(
+        logFile,
+        `${new Date().toISOString()} [INFO] ===== server_bootstrap pid=${process.pid} =====\n`,
+        { encoding: "utf8" }
+      );
+    }
 
     ServerLogger.enabledLevels = ServerLogger.parseLevels();
     const enabledFromEnv = ServerLogger.parseCsvEnv("LOG_ENABLED_TYPES").map((v) =>
@@ -154,6 +156,9 @@ export class ServerLogger {
     };
 
     const write = (level: LogLevel, fn: LoggerFn, ...args: any[]) => {
+      if (!GameConstants.SERVER_LOG_WRITES_ENABLED) {
+        return;
+      }
       if (!ServerLogger.enabledLevels.has(level)) {
         return;
       }
@@ -220,5 +225,9 @@ export class ServerLogger {
 
   public static getDisabledTypes(): string[] {
     return Array.from(ServerLogger.disabledTypes.values());
+  }
+
+  public static isWriteEnabled(): boolean {
+    return GameConstants.SERVER_LOG_WRITES_ENABLED;
   }
 }

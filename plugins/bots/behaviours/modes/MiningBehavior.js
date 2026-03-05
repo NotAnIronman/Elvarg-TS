@@ -3,7 +3,6 @@ const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/enti
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag");
-const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 const { setModeBankRun, setModeMining } = require("../state/PlayerBotState");
 const {
@@ -33,6 +32,7 @@ class MiningBehavior {
     this.api = api;
     this.behaviorMode = options.behaviorMode;
     this.searchWalkRadius = options.botWalkRadius ?? 6;
+    this.objectSearch = options.objectSearch ?? null;
     this.rockSearchCacheByArea = new Map();
   }
 
@@ -366,7 +366,6 @@ class MiningBehavior {
     if (!player || !rockTier) {
       return null;
     }
-    this.ensureNearbyRegionsLoaded(player);
     const loc = player.getLocation();
     const privateArea = player.getPrivateArea();
     const rockIds = new Set(rockTier.objectIds);
@@ -442,20 +441,6 @@ class MiningBehavior {
     return candidates[pickIndex].object;
   }
 
-  ensureNearbyRegionsLoaded(player) {
-    const loc = player?.getLocation?.();
-    if (!loc) {
-      return;
-    }
-    const baseX = loc.getX();
-    const baseY = loc.getY();
-    for (let rx = -ROCK_SEARCH_REGION_RADIUS; rx <= ROCK_SEARCH_REGION_RADIUS; rx++) {
-      for (let ry = -ROCK_SEARCH_REGION_RADIUS; ry <= ROCK_SEARCH_REGION_RADIUS; ry++) {
-        RegionManager.loadMapFiles(baseX + rx * 64, baseY + ry * 64);
-      }
-    }
-  }
-
   getCachedCandidateRocks(player, rockIds, rockIdKey, nowMs = Date.now()) {
     const loc = player?.getLocation?.();
     if (!loc || !rockIds || rockIds.size === 0) {
@@ -475,25 +460,12 @@ class MiningBehavior {
       return cached.objects;
     }
 
-    const objects = [];
-    for (const bucket of MapObjects.mapObjects.values()) {
-      if (!bucket || bucket.length === 0) {
-        continue;
-      }
-      for (const object of bucket) {
-        if (!object || !rockIds.has(object.getId())) {
-          continue;
-        }
-        if (object.getPrivateArea() !== privateArea) {
-          continue;
-        }
-        const objectLoc = object.getLocation();
-        if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
-          continue;
-        }
-        objects.push(object);
-      }
-    }
+    const objects =
+      this.objectSearch?.findCandidatesByIds?.(player, [...rockIds], {
+        regionRadius: ROCK_SEARCH_REGION_RADIUS,
+        z: loc.getZ(),
+        privateArea,
+      }) ?? [];
 
     if (areaCache.size >= ROCK_SEARCH_CACHE_MAX_KEYS) {
       areaCache.clear();

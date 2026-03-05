@@ -37,7 +37,7 @@ export class NPCDeathTask extends Task {
                 this.npc.setMobileInteraction(null);
                 break;
             case 0:
-                if (this.killer !== undefined) {
+                if (this.killer != null) {
                     if (this.killer.getArea() !== null) {
                         this.killer.getArea().defeated(this.killer, this.npc);
                     }

@@ -20,6 +20,7 @@ import { TreeMap } from 'treemap'
 import { Task } from './task/Task';
 import { GameSyncTask } from './entity/updating/sync/GameSyncTask';
 import { PluginManager } from '../plugins/PluginManager';
+import { ServerPerf } from '../util/ServerPerf';
 
 interface GameSyncTaskInterface {
     isParallel: boolean;
@@ -294,170 +295,194 @@ export class World {
 
     public static process() {
         World.activeNpcsForUpdate = [];
+        const timed = <T>(phase: string, fn: () => T): T =>
+            ServerPerf.measurePhase(`world.${phase}`, fn);
 
         // Process all active {@link Task}s..
-        try {
-            TaskManager.process();
-        } catch (e) {
-            console.error("[World] TaskManager.process failure", e);
-        }
+        timed("task_manager", () => {
+            try {
+                TaskManager.process();
+            } catch (e) {
+                console.error("[World] TaskManager.process failure", e);
+            }
+        });
 
         // Process all ground items..
-        try {
-            ItemOnGroundManager.process();
-        } catch (e) {
-            console.error("[World] ItemOnGroundManager.process failure", e);
-        }
+        timed("ground_items", () => {
+            try {
+                ItemOnGroundManager.process();
+            } catch (e) {
+                console.error("[World] ItemOnGroundManager.process failure", e);
+            }
+        });
 
         // Add pending players..
-        for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
-            let player = World.addPlayerQueue.shift();
-            if (!player)
-                break;
-            // Kick any copies before adding the new player
-            let existingPlayer = World.getPlayerByName(player.username);
-            if (existingPlayer) {
-                existingPlayer.requestLogout();
+        timed("queue_add_players", () => {
+            for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
+                let player = World.addPlayerQueue.shift();
+                if (!player)
+                    break;
+                // Kick any copies before adding the new player
+                let existingPlayer = World.getPlayerByName(player.username);
+                if (existingPlayer) {
+                    existingPlayer.requestLogout();
+                }
+                World.players.add(player);
             }
-            World.players.add(player);
-        }
+        });
 
         // Deregister queued players.
         // If a player's transport is already closed, force removal immediately.
-        let amount = 0;
-        for (let index = World.removePlayerQueue.length - 1; index >= 0; index--) {
-            if (amount >= GameConstants.QUEUED_LOOP_THRESHOLD) {
-                break;
+        timed("queue_remove_players", () => {
+            let amount = 0;
+            for (let index = World.removePlayerQueue.length - 1; index >= 0; index--) {
+                if (amount >= GameConstants.QUEUED_LOOP_THRESHOLD) {
+                    break;
+                }
+                const player = World.removePlayerQueue[index];
+                if (!player) {
+                    World.removePlayerQueue.splice(index, 1);
+                    continue;
+                }
+                const disconnected = !World.isPlayerSessionConnected(player);
+                if (disconnected || player.canLogout() || player.forcedLogoutTimer.finished() || Server.isUpdating()) {
+                    World.players.remove(player);
+                    World.removePlayerQueue.splice(index, 1);
+                }
+                amount++;
             }
-            const player = World.removePlayerQueue[index];
-            if (!player) {
-                World.removePlayerQueue.splice(index, 1);
-                continue;
-            }
-            const disconnected = !World.isPlayerSessionConnected(player);
-            if (disconnected || player.canLogout() || player.forcedLogoutTimer.finished() || Server.isUpdating()) {
-                World.players.remove(player);
-                World.removePlayerQueue.splice(index, 1);
-            }
-            amount++;
-        }
+        });
         // Add pending Npcs..
-        for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
-            let npc = World.addNPCQueue.shift();
-            if (!npc)
-                break;
-            const added = World.npcs.add(npc);
-            if (!added) {
-                console.warn("[world:npc] add_queue_failed", {
-                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
-                    npcIndex: typeof npc.getIndex === "function" ? npc.getIndex() : null,
-                    registered: typeof npc.isRegistered === "function" ? npc.isRegistered() : null,
-                    worldNpcCount: World.npcs.sizeReturn(),
-                    worldNpcCapacity: World.npcs.capacityReturn(),
-                    addNpcQueueSize: World.addNPCQueue.length,
-                });
-                continue;
-            }
-            if (typeof npc.isPet === "function" && npc.isPet()) {
-                const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
-                const ownerName = owner && typeof owner.getUsername === "function"
-                    ? owner.getUsername()
-                    : null;
-                console.info("[world:npc] add_queue_pet", {
-                    owner: ownerName,
-                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
-                    npcIndex: typeof npc.getIndex === "function" ? npc.getIndex() : null,
-                    addNpcQueueSize: World.addNPCQueue.length,
-                });
-            }
-        }
-
-        // Removing pending npcs..
-        for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
-            let npc = World.removeNPCQueue.shift();
-            if (!npc)
-                break;
-            const wasRegistered =
-                typeof npc.isRegistered === "function" ? npc.isRegistered() : null;
-            const indexBefore = typeof npc.getIndex === "function" ? npc.getIndex() : null;
-            World.npcs.remove(npc);
-            if (typeof npc.isPet === "function" && npc.isPet()) {
-                const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
-                const ownerName = owner && typeof owner.getUsername === "function"
-                    ? owner.getUsername()
-                    : null;
-                console.info("[world:npc] remove_queue_pet", {
-                    owner: ownerName,
-                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
-                    npcIndex: indexBefore,
-                    wasRegistered,
-                    nowRegistered:
-                        typeof npc.isRegistered === "function" ? npc.isRegistered() : null,
-                    removeNpcQueueSize: World.removeNPCQueue.length,
-                });
-            } else if (wasRegistered === false) {
-                console.warn("[world:npc] remove_queue_unregistered", {
-                    npcId: typeof npc.getId === "function" ? npc.getId() : null,
-                    npcIndex: indexBefore,
-                    removeNpcQueueSize: World.removeNPCQueue.length,
-                });
-            }
-        }
-
-        // Sequential processing to avoid null-slot crashes during bring-up.
-        World.players.forEach((player) => {
-            try {
-                player.process();
-                PluginManager.emitPlayerProcess({ player });
-            } catch (e) {
-                console.error(e);
-                player.requestLogout();
+        timed("queue_add_npcs", () => {
+            for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
+                let npc = World.addNPCQueue.shift();
+                if (!npc)
+                    break;
+                const added = World.npcs.add(npc);
+                if (!added) {
+                    console.warn("[world:npc] add_queue_failed", {
+                        npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                        npcIndex: typeof npc.getIndex === "function" ? npc.getIndex() : null,
+                        registered: typeof npc.isRegistered === "function" ? npc.isRegistered() : null,
+                        worldNpcCount: World.npcs.sizeReturn(),
+                        worldNpcCapacity: World.npcs.capacityReturn(),
+                        addNpcQueueSize: World.addNPCQueue.length,
+                    });
+                    continue;
+                }
+                if (typeof npc.isPet === "function" && npc.isPet()) {
+                    const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
+                    const ownerName = owner && typeof owner.getUsername === "function"
+                        ? owner.getUsername()
+                        : null;
+                    console.info("[world:npc] add_queue_pet", {
+                        owner: ownerName,
+                        npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                        npcIndex: typeof npc.getIndex === "function" ? npc.getIndex() : null,
+                        addNpcQueueSize: World.addNPCQueue.length,
+                    });
+                }
             }
         });
 
-        const activeNpcRegions = GameConstants.PROCESS_NPCS_BY_ACTIVE_REGIONS
-            ? World.buildActiveNpcRegionKeys()
-            : null;
-        World.npcs.forEach((npc) => {
-            try {
-                if (!World.shouldProcessNpc(npc, activeNpcRegions)) {
-                    return;
+        // Removing pending npcs..
+        timed("queue_remove_npcs", () => {
+            for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
+                let npc = World.removeNPCQueue.shift();
+                if (!npc)
+                    break;
+                const wasRegistered =
+                    typeof npc.isRegistered === "function" ? npc.isRegistered() : null;
+                const indexBefore = typeof npc.getIndex === "function" ? npc.getIndex() : null;
+                World.npcs.remove(npc);
+                if (typeof npc.isPet === "function" && npc.isPet()) {
+                    const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
+                    const ownerName = owner && typeof owner.getUsername === "function"
+                        ? owner.getUsername()
+                        : null;
+                    console.info("[world:npc] remove_queue_pet", {
+                        owner: ownerName,
+                        npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                        npcIndex: indexBefore,
+                        wasRegistered,
+                        nowRegistered:
+                            typeof npc.isRegistered === "function" ? npc.isRegistered() : null,
+                        removeNpcQueueSize: World.removeNPCQueue.length,
+                    });
+                } else if (wasRegistered === false) {
+                    console.warn("[world:npc] remove_queue_unregistered", {
+                        npcId: typeof npc.getId === "function" ? npc.getId() : null,
+                        npcIndex: indexBefore,
+                        removeNpcQueueSize: World.removeNPCQueue.length,
+                    });
                 }
-                World.activeNpcsForUpdate.push(npc);
-                npc.process();
-            } catch (e) {
-                console.error(e);
             }
+        });
+
+        // Sequential processing to avoid null-slot crashes during bring-up.
+        timed("process_players", () => {
+            World.players.forEach((player) => {
+                try {
+                    player.process();
+                    PluginManager.emitPlayerProcess({ player });
+                } catch (e) {
+                    console.error(e);
+                    player.requestLogout();
+                }
+            });
+        });
+
+        timed("process_npcs", () => {
+            const activeNpcRegions = GameConstants.PROCESS_NPCS_BY_ACTIVE_REGIONS
+                ? World.buildActiveNpcRegionKeys()
+                : null;
+            World.npcs.forEach((npc) => {
+                try {
+                    if (!World.shouldProcessNpc(npc, activeNpcRegions)) {
+                        return;
+                    }
+                    World.activeNpcsForUpdate.push(npc);
+                    npc.process();
+                } catch (e) {
+                    console.error(e);
+                }
+            });
         });
 
         // Enable player movement updates only. (NPC updating remains disabled for now.)
-        World.players.forEach((player) => {
-            try {
-                PlayerUpdating.update(player);
-                NPCUpdating.update(player);
-            } catch (e) {
-                console.error("[World] Player/NPC updating failure", e);
-                player.requestLogout();
-            }
+        timed("update_players_npcs", () => {
+            World.players.forEach((player) => {
+                try {
+                    PlayerUpdating.update(player);
+                    NPCUpdating.update(player);
+                } catch (e) {
+                    console.error("[World] Player/NPC updating failure", e);
+                    player.requestLogout();
+                }
+            });
         });
 
-        World.players.forEach((player) => {
-            try {
-                player.resetUpdating();
-                player.setCachedUpdateBlock(null);
-                player.getSession().flush();
-            } catch (e) {
-                console.log(e);
-                player.requestLogout();
-            }
+        timed("flush_players", () => {
+            World.players.forEach((player) => {
+                try {
+                    player.resetUpdating();
+                    player.setCachedUpdateBlock(null);
+                    player.getSession().flush();
+                } catch (e) {
+                    console.log(e);
+                    player.requestLogout();
+                }
+            });
         });
 
-        World.npcs.forEach((npc) => {
-            try {
-                npc.resetUpdating();
-            } catch (e) {
-                console.log(e);
-            }
+        timed("reset_npcs", () => {
+            World.npcs.forEach((npc) => {
+                try {
+                    npc.resetUpdating();
+                } catch (e) {
+                    console.log(e);
+                }
+            });
         });
     }
 

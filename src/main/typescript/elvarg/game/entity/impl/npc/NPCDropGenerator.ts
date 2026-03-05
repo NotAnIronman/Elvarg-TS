@@ -44,6 +44,9 @@ export class NPCDropGenerator {
         // Drop "always" items..
         if (this.def.getAlwaysDrops() != null) {
             for (let drop of this.def.getAlwaysDrops()) {
+                if (!drop || typeof (drop as any).toItem !== "function") {
+                    continue;
+                }
                 items.push(drop.toItem(random));
             }
         }
@@ -58,7 +61,13 @@ export class NPCDropGenerator {
             let slot = Math.floor(Math.random() * slots);
             if (slot < rdtLength) {
                 let rdtDrop = RDT[slot];
-                if (Math.floor(Math.random() * rdtDrop.getChance()) == 0) {
+                if (
+                    rdtDrop &&
+                    typeof (rdtDrop as any).getChance === "function" &&
+                    typeof (rdtDrop as any).getItemId === "function" &&
+                    typeof (rdtDrop as any).getAmount === "function" &&
+                    Math.floor(Math.random() * Math.max(1, rdtDrop.getChance())) == 0
+                ) {
                     items.push(new Item(rdtDrop.getItemId(), rdtDrop.getAmount()));
                     return items;
                 }
@@ -75,7 +84,12 @@ export class NPCDropGenerator {
             if (this.def.getSpecialDrops() != null && !parsedTables.includes(DropTable.SPECIAL)) {
                 if (this.def.getSpecialDrops().length > 0) {
                   const drop = this.def.getSpecialDrops()[Math.floor(random.getRandom() * this.def.getSpecialDrops().length)];
-                  if (Math.floor(random.getRandom() * drop.getChance()) === 0) {
+                  if (
+                    drop &&
+                    typeof (drop as any).getChance === "function" &&
+                    typeof (drop as any).toItem === "function" &&
+                    Math.floor(random.getRandom() * Math.max(1, drop.getChance())) === 0
+                  ) {
                     items.push(drop.toItem(random));
                     parsedTables.push(DropTable.SPECIAL);
                     continue;
@@ -121,6 +135,9 @@ export class NPCDropGenerator {
                     }
                     // Get a random drop from the table..
                     let npcDrop = dropTableItems[Math.floor(random.getRandom() * dropTableItems.length)];
+                    if (!npcDrop || typeof (npcDrop as any).toItem !== "function") {
+                        continue;
+                    }
 
                     // Add the drop to the drop list.
                     items.push(npcDrop.toItem(random));

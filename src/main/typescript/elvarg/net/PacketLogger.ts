@@ -1,11 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
+import { GameConstants } from "../game/GameConstants";
 
 const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "packets.log");
 let initialized = false;
 
 function ensureLogFile() {
+  if (!GameConstants.SERVER_LOG_WRITES_ENABLED) {
+    return;
+  }
   if (initialized) {
     return;
   }
@@ -55,6 +59,9 @@ function formatEntry(meta: PacketLogMeta): string {
 }
 
 function writeEntry(meta: PacketLogMeta) {
+  if (!GameConstants.SERVER_LOG_WRITES_ENABLED) {
+    return;
+  }
   try {
     ensureLogFile();
     fs.appendFileSync(LOG_FILE, formatEntry(meta) + "\n", { encoding: "utf8" });

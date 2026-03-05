@@ -19,6 +19,9 @@ import {
   getExpectedOutboundPacketType,
 } from "./OutboundPacketProfile";
 import type { Player } from "../game/entity/impl/player/Player";
+import { GameConstants } from "../game/GameConstants";
+
+const PACKET_OUT_LOGGING_ENABLED = process.env.PACKET_OUT_LOGGING === "1";
 
 export interface OutboundPacketMeta {
   opcode: number;
@@ -171,7 +174,11 @@ export class PlayerSession {
           }
         }
         // Log outgoing packets to help diagnose client desyncs.
-        if (!this.shouldLogPacketOut || this.shouldLogPacketOut()) {
+        if (
+          PACKET_OUT_LOGGING_ENABLED &&
+          GameConstants.SERVER_LOG_WRITES_ENABLED &&
+          (!this.shouldLogPacketOut || this.shouldLogPacketOut())
+        ) {
           try {
             console.log(
               `${new Date().toISOString()} [packet.out] opcode=${opcode} enc=${encOpcode} type=${packetType} len=${payload.length} player=${this.player?.getUsername?.() ?? "unknown"}`

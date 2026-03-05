@@ -3,8 +3,14 @@ const path = require("path");
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
+const { ServerPerf } = require("../../src/main/typescript/elvarg/util/ServerPerf");
 
 const PLUGIN_PERF_LOG_FILE = path.join(process.cwd(), "logs", "plugin-performance.log");
+const SERVER_PERF_SNAPSHOT_FILE = path.join(
+  process.cwd(),
+  "logs",
+  "server-performance.snapshot.log"
+);
 const DEFAULT_LIMIT = 5;
 const DEFAULT_INTERVAL_MS = 10000;
 const MAX_LIMIT = 15;
@@ -62,6 +68,43 @@ function streamPluginPerfToPlayer(player, limit = DEFAULT_LIMIT) {
   }
 
   appendPluginPerfLog(logLines);
+}
+
+function streamServerPerfToPlayer(player, limitTicks = 60) {
+  const summary = ServerPerf.getSummary(limitTicks);
+  const timestamp = new Date().toISOString();
+  const lines = [];
+
+  if (!summary || summary.ticks <= 0) {
+    player.getPacketSender().sendMessage("[serverperf] No tick samples yet.");
+    lines.push(`${timestamp} [serverperf] No tick samples yet.`);
+    fs.mkdirSync(path.dirname(SERVER_PERF_SNAPSHOT_FILE), { recursive: true });
+    fs.appendFileSync(SERVER_PERF_SNAPSHOT_FILE, `${lines.join("\n")}\n`, "utf8");
+    return;
+  }
+
+  const header1 = `[serverperf] ticks=${summary.ticks} avgTick=${summary.avgTickMs.toFixed(
+    1
+  )}ms maxTick=${summary.maxTickMs.toFixed(1)}ms avgDrift=${summary.avgDriftMs.toFixed(
+    1
+  )}ms maxDrift=${summary.maxDriftMs.toFixed(1)}ms`;
+  const header2 = `[serverperf] lastTick=${summary.lastTickNumber} players=${summary.lastPlayers} npcs=${summary.lastNpcs} tasks=${summary.lastTasks}`;
+
+  player.getPacketSender().sendMessage(header1);
+  player.getPacketSender().sendMessage(header2);
+  lines.push(`${timestamp} ${header1}`);
+  lines.push(`${timestamp} ${header2}`);
+
+  for (const phase of summary.topPhases) {
+    const line = `[serverperf] ${phase.name}: total=${phase.totalMs.toFixed(1)}ms avg=${phase.avgMs.toFixed(
+      1
+    )}ms max=${phase.maxMs.toFixed(1)}ms`;
+    player.getPacketSender().sendMessage(line);
+    lines.push(`${timestamp} ${line}`);
+  }
+
+  fs.mkdirSync(path.dirname(SERVER_PERF_SNAPSHOT_FILE), { recursive: true });
+  fs.appendFileSync(SERVER_PERF_SNAPSHOT_FILE, `${lines.join("\n")}\n`, "utf8");
 }
 
 module.exports = {
@@ -146,6 +189,17 @@ module.exports = {
       player
         .getPacketSender()
         .sendMessage("Usage: ::pluginperf [once|on|off|reset] [limit] [intervalMs]");
+      return true;
+    });
+
+    api.registerCommand("serverperf", ({ player, parts }) => {
+      if (!adminOrAbove(player)) {
+        player.getPacketSender().sendMessage("You do not have permission to use this command.");
+        return true;
+      }
+      const ticksArg = parseIntArg(parts[1]);
+      const ticks = ticksArg && ticksArg > 0 ? Math.min(ticksArg, 300) : 60;
+      streamServerPerfToPlayer(player, ticks);
       return true;
     });
   },

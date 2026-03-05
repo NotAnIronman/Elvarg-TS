@@ -35,6 +35,8 @@ const {
 const { RoamingBehavior } = require("./behaviours/modes/RoamingBehavior");
 const { WoodcuttingBehavior } = require("./behaviours/modes/WoodcuttingBehavior");
 const { MiningBehavior } = require("./behaviours/modes/MiningBehavior");
+const WoodcuttingSkill = require("../skills/Woodcutting.plugin");
+const MiningSkill = require("../skills/Mining.plugin");
 const { BankRunBehavior } = require("./behaviours/modes/BankRunBehavior");
 const { FiremakingBehavior } = require("./behaviours/modes/FiremakingBehavior");
 const { SparringBehavior } = require("./behaviours/modes/SparringBehavior");
@@ -51,6 +53,7 @@ const { registerBotEvents } = require("./runtime/registerBotEvents");
 
 const BOT_COUNT = 60;
 const BOT_WALK_RADIUS = 6;
+const BOT_RESOURCE_INDEX_REGION_RADIUS = 1;
 const BOT_DECISION_TICKS = 1;
 const BOT_BASE_COOLDOWN_MS = 1200;
 const BOT_JITTER_MS = 300;
@@ -150,6 +153,11 @@ const REQUIRED_MODE_HOOKS_BY_MODE = Object.freeze({
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
 const PLAYER_BOTS_LOG_PATH = path.join(process.cwd(), "logs", "player-bots.log");
+const BOT_RUNTIME_EVENT_LOGGING_ENABLED =
+  (process.env.BOT_RUNTIME_EVENT_LOGGING ?? "0") === "1";
+const BOT_FILE_LOG_WRITES_ENABLED =
+  (process.env.BOT_FILE_LOG_WRITES_ENABLED ??
+    (GameConstants.SERVER_LOG_WRITES_ENABLED ? "1" : "0")) === "1";
 const BOT_STATUS_INTERACTION_SLOT = 1;
 const BOT_STATUS_OPTION_LABEL = "Status";
 const BOT_STATUS_RECENT_LOG_LIMIT = 24;
@@ -345,6 +353,9 @@ module.exports = {
       rememberRecentBotLog(username, `[${timestamp}] ${message}${suffix}`);
     };
     const writeBotLog = (message, extra) => {
+      if (!BOT_RUNTIME_EVENT_LOGGING_ENABLED) {
+        return;
+      }
       try {
         const timestamp = new Date().toISOString();
         const suffix =
@@ -352,11 +363,13 @@ module.exports = {
             ? ` ${JSON.stringify(extra)}`
             : "";
         const line = `[${timestamp}] ${message}${suffix}\n`;
-        if (botLogStream) {
-          botLogStream.write(line);
-        } else {
-          // Fallback path before stream init completes.
-          fs.appendFileSync(PLAYER_BOTS_LOG_PATH, line);
+        if (BOT_FILE_LOG_WRITES_ENABLED) {
+          if (botLogStream) {
+            botLogStream.write(line);
+          } else {
+            // Fallback path before stream init completes.
+            fs.appendFileSync(PLAYER_BOTS_LOG_PATH, line);
+          }
         }
         trackRecentBotLog(message, extra, timestamp);
       } catch (_) {
@@ -366,23 +379,28 @@ module.exports = {
 
     const botApi = Object.create(api);
     botApi.log = (message, extra) => {
+      if (!BOT_RUNTIME_EVENT_LOGGING_ENABLED) {
+        return;
+      }
       api.log(message, extra);
       writeBotLog(message, extra);
     };
 
-    try {
-      fs.mkdirSync(path.dirname(PLAYER_BOTS_LOG_PATH), { recursive: true });
-      fs.writeFileSync(PLAYER_BOTS_LOG_PATH, "");
-      botLogStream = fs.createWriteStream(PLAYER_BOTS_LOG_PATH, {
-        flags: "a",
-        encoding: "utf8",
-      });
-      writeBotLog("log_reset");
-    } catch (err) {
-      api.log("bot_log_init_failed", {
-        path: PLAYER_BOTS_LOG_PATH,
-        error: String(err?.message ?? err),
-      });
+    if (BOT_RUNTIME_EVENT_LOGGING_ENABLED && BOT_FILE_LOG_WRITES_ENABLED) {
+      try {
+        fs.mkdirSync(path.dirname(PLAYER_BOTS_LOG_PATH), { recursive: true });
+        fs.writeFileSync(PLAYER_BOTS_LOG_PATH, "");
+        botLogStream = fs.createWriteStream(PLAYER_BOTS_LOG_PATH, {
+          flags: "a",
+          encoding: "utf8",
+        });
+        writeBotLog("log_reset");
+      } catch (err) {
+        api.log("bot_log_init_failed", {
+          path: PLAYER_BOTS_LOG_PATH,
+          error: String(err?.message ?? err),
+        });
+      }
     }
 
     const spawn = GameConstants.DEFAULT_LOCATION.clone();
@@ -392,6 +410,41 @@ module.exports = {
     const entries = [];
     const entriesByUsername = new Map();
     const modeHandlers = {};
+    const trackedTraversalObjectIds = new Set([WILDERNESS_DITCH_OBJECT_ID]);
+    for (const tree of WoodcuttingSkill.TREES ?? []) {
+      for (const objectId of tree?.objectIds ?? []) {
+        if (Number.isFinite(objectId)) {
+          trackedTraversalObjectIds.add(objectId);
+        }
+      }
+    }
+    for (const rock of MiningSkill.ROCKS ?? []) {
+      for (const objectId of rock?.objectIds ?? []) {
+        if (Number.isFinite(objectId)) {
+          trackedTraversalObjectIds.add(objectId);
+        }
+      }
+    }
+    for (const [name, objectId] of Object.entries(ObjectIds)) {
+      if (
+        typeof name === "string" &&
+        name.includes("BANK_BOOTH") &&
+        Number.isFinite(objectId)
+      ) {
+        trackedTraversalObjectIds.add(objectId);
+      }
+    }
+    const traversalAssist = createTraversalAssist(botApi, {
+      objectIds: [...trackedTraversalObjectIds],
+    });
+    // One-time boot warmup: preload nearby regions and build tracked
+    // tree/rock/ditch object index before bots start ticking.
+    traversalAssist.preloadRegionsAround(
+      spawn.getX(),
+      spawn.getY(),
+      BOT_RESOURCE_INDEX_REGION_RADIUS
+    );
+    traversalAssist.rebuildTrackedIndexFromLoadedMapObjects();
 
     const roamingBehavior = new RoamingBehavior(botStatesByName, {
       api: botApi,
@@ -404,17 +457,21 @@ module.exports = {
     const woodcuttingBehavior = new WoodcuttingBehavior(botStatesByName, botApi, {
       behaviorMode: BOT_BEHAVIOR_MODE,
       botWalkRadius: BOT_WALK_RADIUS,
+      objectSearch: traversalAssist,
     });
     const miningBehavior = new MiningBehavior(botStatesByName, botApi, {
       behaviorMode: BOT_BEHAVIOR_MODE,
       botWalkRadius: BOT_WALK_RADIUS,
+      objectSearch: traversalAssist,
     });
     const bankRunBehavior = new BankRunBehavior(botStatesByName, botApi, {
       behaviorMode: BOT_BEHAVIOR_MODE,
       modeHandlers,
+      objectSearch: traversalAssist,
     });
     const firemakingBehavior = new FiremakingBehavior(botStatesByName, botApi, {
       behaviorMode: BOT_BEHAVIOR_MODE,
+      objectSearch: traversalAssist,
     });
     const sparringBehavior = new SparringBehavior(botStatesByName, botApi, {
       behaviorMode: BOT_BEHAVIOR_MODE,
@@ -433,9 +490,6 @@ module.exports = {
       "player_bots_mode_handlers"
     );
 
-    const traversalAssist = createTraversalAssist(botApi, {
-      objectIds: [WILDERNESS_DITCH_OBJECT_ID],
-    });
     const traversalService = new DitchTraversalService({
       api: botApi,
       traversalAssist,
@@ -628,7 +682,9 @@ module.exports = {
       }
 
       const history = username ? recentBotLogsByUsername.get(username) ?? [] : [];
-      if (history.length === 0) {
+      if (!BOT_RUNTIME_EVENT_LOGGING_ENABLED) {
+        viewerSender.sendMessage("[Bot Status] Bot runtime logging is disabled.");
+      } else if (history.length === 0) {
         viewerSender.sendMessage("[Bot Status] No recent per-bot logs captured.");
       } else {
         viewerSender.sendMessage(

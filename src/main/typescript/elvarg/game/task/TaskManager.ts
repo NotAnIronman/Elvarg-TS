@@ -1,4 +1,5 @@
 import { Task } from './Task';
+import { ServerPerf } from '../../util/ServerPerf';
  
 export class TaskManager {
     private static pendingTasks: Task[] = [];
@@ -19,7 +20,11 @@ export class TaskManager {
     
             for (let i = 0; i < TaskManager.activeTasks.length; i++) {
                 t = TaskManager.activeTasks[i];
-                if (!t.tick()) {
+                const taskName = t?.constructor?.name ?? "UnknownTask";
+                const startedAt = Date.now();
+                const keepRunning = t.tick();
+                ServerPerf.addPhaseDuration(`task.${taskName}`, Date.now() - startedAt);
+                if (!keepRunning) {
                     TaskManager.activeTasks.splice(i, 1);
                     i--;
                 }

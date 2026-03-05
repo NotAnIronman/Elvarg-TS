@@ -80,6 +80,9 @@ export class GameConstants {
     public static readonly PLAYER_BOT_PASSWORD: string = "wirfunerpro4n!1";
     public static readonly PLAYER_BOT_OVERRIDE: number[] = [PlayerRights.MODERATOR.getSpriteId(), PlayerRights.ADMINISTRATOR.getSpriteId(), PlayerRights.DEVELOPER.getSpriteId(), PlayerRights.OWNER.getSpriteId()];
     // Centralized server logging controls (runtime mutable via admin commands).
+    // Master switch: when false, suppress all server log writing/output.
+    // Can also be overridden via env LOG_WRITES_ENABLED=0|1.
+    public static SERVER_LOG_WRITES_ENABLED: boolean = true;
     public static SERVER_LOG_LEVELS: string[] = ["info", "warn", "error"];
     public static SERVER_LOG_ENABLED_TYPES: string[] = [];
     public static SERVER_LOG_DISABLED_TYPES: string[] = ["plugin", "npc.face", "Combat"];

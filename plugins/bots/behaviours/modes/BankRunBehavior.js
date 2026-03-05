@@ -37,6 +37,7 @@ class BankRunBehavior {
     this.api = api;
     this.behaviorMode = options.behaviorMode;
     this.modeHandlers = options.modeHandlers ?? {};
+    this.objectSearch = options.objectSearch ?? null;
     this.bankBoothSearchCacheByArea = new Map();
   }
 
@@ -563,6 +564,14 @@ class BankRunBehavior {
     if (!loc) {
       return;
     }
+    if (this.objectSearch?.preloadRegionsAround) {
+      this.objectSearch.preloadRegionsAround(
+        loc.getX(),
+        loc.getY(),
+        BANK_SEARCH_REGION_RADIUS
+      );
+      return;
+    }
     const baseX = loc.getX();
     const baseY = loc.getY();
     for (let rx = -BANK_SEARCH_REGION_RADIUS; rx <= BANK_SEARCH_REGION_RADIUS; rx++) {
@@ -635,25 +644,16 @@ class BankRunBehavior {
       return cached.objects;
     }
 
-    const objects = [];
-    for (const bucket of MapObjects.mapObjects.values()) {
-      if (!bucket || bucket.length === 0) {
-        continue;
-      }
-      for (const object of bucket) {
-        if (!object || !BANK_BOOTH_IDS.has(object.getId())) {
-          continue;
+    const objects =
+      this.objectSearch?.findCandidatesByIds?.(
+        player,
+        [...BANK_BOOTH_IDS],
+        {
+          regionRadius: BANK_SEARCH_REGION_RADIUS,
+          z: loc.getZ(),
+          privateArea,
         }
-        if (object.getPrivateArea() !== privateArea) {
-          continue;
-        }
-        const objectLoc = object.getLocation();
-        if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
-          continue;
-        }
-        objects.push(object);
-      }
-    }
+      ) ?? [];
 
     if (areaCache.size >= BANK_BOOTH_CACHE_MAX_KEYS) {
       areaCache.clear();

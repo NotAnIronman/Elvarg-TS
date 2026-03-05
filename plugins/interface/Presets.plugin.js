@@ -7,6 +7,7 @@ const { Autocasting } = require("../../src/main/typescript/elvarg/game/content/c
 const { Presetable } = require("../../src/main/typescript/elvarg/game/content/presets/Presetable");
 const { PredefinedPresets } = require("../../src/main/typescript/elvarg/game/content/presets/PredefinedPresets");
 const { SkillManager } = require("../../src/main/typescript/elvarg/game/content/skill/SkillManager");
+const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
 const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
@@ -16,6 +17,10 @@ const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/ri
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
+const {
+  isPresetActive,
+  markPresetActiveWithSnapshot,
+} = require("./PresetsState");
 
 const MAX_PRESETS = 10;
 const PRESET_INTERFACE_ID = 45000;
@@ -229,6 +234,10 @@ function applyPreset(player, preset) {
     sender.sendMessage("You can't load a preset during a duel!");
     return false;
   }
+  const alreadyPresetActive = isPresetActive(player);
+  const prePresetSnapshot = alreadyPresetActive
+    ? null
+    : PlayerSave.fromPlayer(player);
 
   let movedToBank = false;
   const carriedItems = [
@@ -354,6 +363,12 @@ function applyPreset(player, preset) {
   player.setSpecialPercentage(100);
   CombatSpecial.updateBar(player);
   player.getUpdateFlag().flag(Flag.APPEARANCE);
+  if (!alreadyPresetActive) {
+    markPresetActiveWithSnapshot(player, {
+      snapshot: prePresetSnapshot,
+      setFlag: true,
+    });
+  }
   return true;
 }
 
