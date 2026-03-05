@@ -2,7 +2,6 @@ import { Location } from "../Location";
 import { Mobile } from "../../entity/impl/Mobile";
 import { Area, BasicAttackResponse } from "./Area";
 import { CanAttackResponse } from "../../content/combat/CombatFactory";
-import { PluginManager } from "../../../plugins/PluginManager";
 
 export class AreaManager {
     public static areas: Area[] = [];
@@ -77,13 +76,6 @@ export class AreaManager {
      */
     public static canAttack(attacker: Mobile, target: Mobile): CanAttackResponse | BasicAttackResponse {
         if (attacker.getPrivateArea() != target.getPrivateArea()) {
-            return CanAttackResponse.CANT_ATTACK_IN_AREA;
-        }
-
-        if (PluginManager.emitCanAttack(attacker, target) === true) {
-            return CanAttackResponse.CAN_ATTACK;
-        }
-        if (PluginManager.emitCanAttack(attacker, target) === false) {
             return CanAttackResponse.CANT_ATTACK_IN_AREA;
         }
 

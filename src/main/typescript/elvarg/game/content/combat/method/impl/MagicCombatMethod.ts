@@ -3,15 +3,13 @@ import { Graphic } from "../../../../model/Graphic";
 import { Sounds } from "../../../../Sounds";
 import { Sound } from "../../../../Sound";
 import { World } from "../../../../World";
-import { CanAttackResponse } from "../../CombatFactory";;
+import { CombatFactory } from "../../CombatFactory";
 import { CombatType } from "../../CombatType";
 import { PendingHit } from "../../hit/PendingHit";
-import { CombatAncientSpell } from "../../magic/CombatAncientSpell";
 import { Mobile } from "../../../../entity/impl/Mobile";
-import { NPC } from "../../../../entity/impl/npc/NPC";
 import { Player } from "../../../../entity/impl/player/Player";
 import { GraphicHeight } from "../../../../model/GraphicHeight";
-import { AreaManager } from "../../../../model/areas/AreaManager";
+import { MagicSpellbook } from "../../../../model/MagicSpellbook";
 
 
 export class MagicCombatMethod extends CombatMethod {
@@ -41,7 +39,12 @@ export class MagicCombatMethod extends CombatMethod {
         for (let hit of hits) {
             spell.onHitCalc(hit);
 
-            if (!hit.isAccurate() || !(spell instanceof CombatAncientSpell) || spell.spellRadius() <= 0) {
+            const spellRadius =
+                spell.getSpellbook() === MagicSpellbook.ANCIENT && typeof (spell as any).spellRadius === "function"
+                    ? (spell as any).spellRadius()
+                    : 0;
+            const isAncientSpell = spell.getSpellbook() === MagicSpellbook.ANCIENT;
+            if (!hit.isAccurate() || !isAncientSpell || spellRadius <= 0) {
                 continue;
             }
 
@@ -57,7 +60,7 @@ export class MagicCombatMethod extends CombatMethod {
             }
 
             for (let next of it) {
-                if (!next || (next.isNpc() && !(next as unknown as NPC).getCurrentDefinition().isAttackable()) || (next.isPlayer() && AreaManager.canAttack(character, next as Player) != CanAttackResponse.CAN_ATTACK) || !AreaManager.inMulti(next as Player) || !next.getLocation().isWithinDistance(target.getLocation(), spell.spellRadius()) || next == character || next == target || next.getHitpoints() <= 0) {
+                if (!CombatFactory.canAttackSecondaryTarget(character, target, next, spellRadius)) {
                     continue;
                 }
                 let pendingHit: PendingHit = new PendingHit(character, next, this, 3, false);

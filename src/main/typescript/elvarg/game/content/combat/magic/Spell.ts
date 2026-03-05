@@ -5,8 +5,6 @@ import { Equipment } from "../../../model/container/impl/Equipment";
 import { Item } from "../../../model/Item";
 import { MagicSpellbook } from "../../../model/MagicSpellbook";
 import { Skill } from "../../../model/Skill";
-import { Autocasting } from "./Autocasting";
-import { CombatSpells } from "./CombatSpells";
 import { PlayerMagicStaff } from "./PlayerMagicStaff";
 import { PluginManager } from "../../../../plugins/PluginManager";
 
@@ -56,6 +54,7 @@ export abstract class Spell {
         }
 
         if (player.getSpellbook() !== this.getSpellbook()) {
+            const { Autocasting } = require("./Autocasting");
             Autocasting.setAutocast(player, null);
             player.getCombat().setCastSpell(null);
             player.getCombat().reset();

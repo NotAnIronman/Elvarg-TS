@@ -12,95 +12,86 @@ import { Skill } from "../../../model/Skill";
 import { Sound } from "../../../Sound";
 import { PoisonType } from "../../../task/impl/CombatPoisonEffect";
 import { PrayerHandler } from "../../PrayerHandler";
-import { CombatFactory } from "../CombatFactory";
-import { PendingHit } from "../hit/PendingHit";
-import { CombatAncientSpell } from "./CombatAncientSpell";
 import { CombatEffectSpell } from "./CombatEffectSpell";
 import { CombatNormalSpell } from "./CombatNormalSpell";
 import { CombatSpell } from "./CombatSpell";
 
-export class CombatAncientSpellExtend implements CombatAncientSpell {
-    constructor(private readonly castAnimationFuntion: Function, private readonly startGraphicFunction: Function, private readonly spellEffectOnHitCalcFunction: Function, private readonly spellRadiusFunction: Function, private readonly castProjectileFunction: Function, private readonly endGraphicFunction: Function, private readonly maximumHitFunction: Function, private readonly baseExperienceFunction: Function, private readonly itemsRequiredFunction: Function, private readonly levelRequiredFunction: Function, private readonly spellIdFucntion: Function, private readonly impactSoundFunction?: Function) {
-    }
-    public getSpellbook(): MagicSpellbook {
-        throw new Error("Method not implemented.");
-    }
-    public equipmentRequired(player: Player): Item[] {
-        throw new Error("Method not implemented.");
-    }
-    canCast(player: Player): any {
-        throw new Error("Method not implemented.");
+const getCombatFactory = () =>
+    require("../CombatFactory").CombatFactory as typeof import("../CombatFactory").CombatFactory;
+
+export class CombatAncientSpellExtend extends CombatSpell {
+    constructor(private readonly castAnimationFunction: Function, private readonly startGraphicFunction: Function, private readonly spellEffectOnHitCalcFunction: Function, private readonly spellRadiusFunction: Function, private readonly castProjectileFunction: Function, private readonly endGraphicFunction: Function, private readonly maximumHitFunction: Function, private readonly baseExperienceFunction: Function, private readonly itemsRequiredFunction: Function, private readonly levelRequiredFunction: Function, private readonly spellIdFunction: Function, private readonly impactSoundFunction?: Function) {
+        super();
     }
 
-    public finishCast(cast: Mobile, castOn: Mobile, accurate: boolean, damage: number): void {
-        throw new Error("Method not implemented.");
-    }
-
-    public spellEffect(cast: Mobile, castOn: Mobile, damage: number): void {
-        throw new Error("Method not implemented.");
-    }
     public spellRadius(): number {
         return this.spellRadiusFunction();
     }
-    public startCast(cast: Mobile, castOn: Mobile): void {
-        throw new Error("Method not implemented.");
+
+    public getSpellbook(): MagicSpellbook {
+        return MagicSpellbook.ANCIENT;
     }
-    public getAttackSpeed(): number {
-        throw new Error("Method not implemented.");
+
+    public equipmentRequired(player: Player): Item[] {
+        return null;
     }
+
+    public finishCast(cast: Mobile, castOn: Mobile, accurate: boolean, damage: number): void {
+        if (!accurate || damage <= 0) {
+            return;
+        }
+        this.spellEffect(cast, castOn, damage);
+    }
+
+    public spellEffect(cast: Mobile, castOn: Mobile, damage: number): void {}
+
     spellId(): number {
-        return this.spellIdFucntion();
+        return this.spellIdFunction();
     }
+
     maximumHit(): number {
         return this.maximumHitFunction();
     }
+
     castAnimation(): Animation {
-        return this.castAnimationFuntion();
+        return this.castAnimationFunction();
     }
+
     startGraphic(): Graphic {
         return this.startGraphicFunction();
     }
+
     castProjectile(cast: Mobile, castOn: Mobile): Projectile {
-        return this.castProjectileFunction();
+        return this.castProjectileFunction(cast, castOn);
     }
+
     endGraphic(): Graphic {
         return this.endGraphicFunction();
     }
-    public onHitCalc(hit: PendingHit): void {
-        throw new Error("Method not implemented.");
-    }
+
     public spellEffectOnHitCalc(cast: Mobile, castOn: Mobile, damage: number): void {
-        return this.spellEffectOnHitCalcFunction();
+        this.spellEffectOnHitCalcFunction(cast, castOn, damage);
     }
+
     public impactSound(): Sound {
-        return this.impactSoundFunction();
+        return this.impactSoundFunction ? this.impactSoundFunction() : null;
     }
 
-    delete: boolean;
-
-    public baseExperience() {
+    public baseExperience(): number {
         return this.baseExperienceFunction();
     }
-    public itemsRequired() {
-        return this.itemsRequiredFunction();
+
+    public itemsRequired(player: Player): Item[] {
+        return this.itemsRequiredFunction(player);
     }
 
-    public levelRequired() {
+    public levelRequired(): number {
         return this.levelRequiredFunction();
     }
 
-    private readonly spell: CombatSpell;
-
-    /**
-    
-    Gets the spell attached to this element.
-    @return the spell.
-    */
     public getSpell(): CombatSpell {
-        return this.spell;
+        return this;
     }
-
-
 }
 
 
@@ -480,7 +471,7 @@ export class CombatSpells {
         },
 
         spellEffect: (cast, castOn) => {
-            CombatFactory.freeze(castOn, 5);
+            getCombatFactory().freeze(castOn, 5);
         },
 
         endGraphic: () => {
@@ -759,7 +750,7 @@ export class CombatSpells {
             return Projectile.createProjectile(cast, castOn, 178, 0, 20, 43, 31);
         },
         spellEffect(cast, castOn) {
-            CombatFactory.freeze(castOn, 10);
+            getCombatFactory().freeze(castOn, 10);
         },
         endGraphic() {
             return new Graphic(180, GraphicHeight.HIGH);
@@ -1237,7 +1228,7 @@ export class CombatSpells {
             return Projectile.createProjectile(cast, castOn, 178, 0, 20, 43, 31);
         },
         spellEffect(cast, castOn) {
-            CombatFactory.freeze(castOn, 15);
+            getCombatFactory().freeze(castOn, 15);
         },
         endGraphic() {
             return new Graphic(179, GraphicHeight.HIGH);
@@ -1368,7 +1359,7 @@ export class CombatSpells {
     public static SMOKE_RUSH = new CombatAncientSpellExtend(
         () => { return new Animation(1978); },
         () => { return null; },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.poisonEntity(castOn, PoisonType.MILD); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.MILD); },
         () => { return 0; },
         (cast: Mobile, castOn: Mobile) => { return Projectile.createProjectile(cast, castOn, 384, 0, 20, 43, 31); },
         () => { return new Graphic(385); },
@@ -1431,7 +1422,7 @@ export class CombatSpells {
     public static ICE_RUSH = new CombatAncientSpellExtend(
         () => { return new Animation(1978); },
         () => { },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.freeze(castOn, 5); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().freeze(castOn, 5); },
         () => { return 0; },
         (cast: Mobile, castOn: Mobile) => { return Projectile.createProjectile(cast, castOn, 360, 0, 20, 43, 31); },
         () => { return new Graphic(361); },
@@ -1451,7 +1442,7 @@ export class CombatSpells {
     public static SMOKE_BURST = new CombatAncientSpellExtend(
         () => { return new Animation(1979); },
         () => { },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.poisonEntity(castOn, PoisonType.MILD); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.MILD); },
         () => { return 1; },
         () => { return null; },
         () => { return new Graphic(389); },
@@ -1511,7 +1502,7 @@ export class CombatSpells {
 
         () => { return new Animation(1979); },
         () => { },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.freeze(castOn, 10); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().freeze(castOn, 10); },
         () => { return 1; },
         () => { return null; },
         () => { return new Graphic(363) },
@@ -1533,7 +1524,7 @@ export class CombatSpells {
 
         () => { return new Animation(1978); },
         () => { return null; },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.poisonEntity(castOn, PoisonType.EXTRA); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.EXTRA); },
         () => { return 0; },
         (cast: Mobile, castOn: Mobile) => { return Projectile.createProjectile(cast, castOn, 386, 0, 20, 43, 31); },
         () => { return new Graphic(387) },
@@ -1593,7 +1584,7 @@ export class CombatSpells {
 
         () => { return new Animation(1978); },
         () => { return new Graphic(366, 6553600); },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.freeze(castOn, 15); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().freeze(castOn, 15); },
         () => { return 0; },
         (cast: Mobile, castOn: Mobile) => { return null; },
         () => { return new Graphic(367) },
@@ -1609,7 +1600,7 @@ export class CombatSpells {
 
         () => { return new Animation(1979); },
         () => { return null; },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.poisonEntity(castOn, PoisonType.SUPER); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.SUPER); },
         () => { return 1; },
         (cast: Mobile, castOn: Mobile) => { return null; },
         () => { return new Graphic(391) },
@@ -1671,7 +1662,7 @@ export class CombatSpells {
 
         () => { return new Animation(1979); },
         () => { return null; },
-        (cast: Mobile, castOn: Mobile, damage: number) => { CombatFactory.freeze(castOn, 20); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().freeze(castOn, 20); },
         () => { return 1; },
         (cast: Mobile, castOn: Mobile) => { return null; },
         () => { return new Graphic(369) },

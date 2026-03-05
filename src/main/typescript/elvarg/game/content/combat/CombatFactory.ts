@@ -49,6 +49,7 @@ import { PoisonType } from "../../task/impl/CombatPoisonEffect";
 import { CombatConstants } from "./CombatConstants";
 import { Wilderness } from "../wilderness/Wilderness";
 import { ZaryteCrossbowCombatMethod } from "./method/impl/specials/ZaryteCrossbowCombatMethod";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 const normalizeAreaResponse = (response: CanAttackResponse | BasicAttackResponse): CanAttackResponse => {
     if (response === BasicAttackResponse.CAN_ATTACK) {
@@ -433,8 +434,8 @@ export class CombatFactory {
             }
         }
 
-        // Check if we can attack in this area.
-        const areaResponse = normalizeAreaResponse(AreaManager.canAttack(attacker, target));
+        // Check plugin and area attack policy.
+        const areaResponse = CombatFactory.canAttackByPolicy(attacker, target);
         if (areaResponse != CanAttackResponse.CAN_ATTACK) {
             return areaResponse;
         }
@@ -481,6 +482,48 @@ export class CombatFactory {
         }
 
         return CanAttackResponse.CAN_ATTACK;
+    }
+
+    public static canAttackByPolicy(attacker: Mobile, target: Mobile): CanAttackResponse {
+        const pluginCanAttack = PluginManager.emitCanAttack(attacker, target);
+        if (pluginCanAttack === true) {
+            return CanAttackResponse.CAN_ATTACK;
+        }
+        if (pluginCanAttack === false) {
+            return CanAttackResponse.CANT_ATTACK_IN_AREA;
+        }
+        return normalizeAreaResponse(AreaManager.canAttack(attacker, target));
+    }
+
+    /**
+     * Ancient spells evaluate possible splash victims outside the main attack start flow.
+     * Keep those secondary-target checks centralized here so magic doesn't duplicate policy checks.
+     */
+    public static canAttackSecondaryTarget(
+        attacker: Mobile,
+        primaryTarget: Mobile,
+        candidate: Mobile,
+        spellRadius: number
+    ): boolean {
+        if (!candidate || candidate === attacker || candidate === primaryTarget) {
+            return false;
+        }
+        if (candidate.getHitpoints() <= 0) {
+            return false;
+        }
+        if (!candidate.getLocation().isWithinDistance(primaryTarget.getLocation(), spellRadius)) {
+            return false;
+        }
+        if (!AreaManager.inMulti(candidate)) {
+            return false;
+        }
+        if (candidate.isNpc() && !candidate.getAsNpc().getCurrentDefinition().isAttackable()) {
+            return false;
+        }
+        if (candidate.isPlayer() && CombatFactory.canAttackByPolicy(attacker, candidate) !== CanAttackResponse.CAN_ATTACK) {
+            return false;
+        }
+        return true;
     }
 
     public static addPendingHit(qHit: PendingHit) {
