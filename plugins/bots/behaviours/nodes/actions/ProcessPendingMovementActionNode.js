@@ -5,6 +5,9 @@ const {
   peekMovementRequest,
 } = require("../../navigation/BotNavigation");
 
+const MOVEMENT_DISPATCH_LOG_INTERVAL_MS = 4000;
+const lastMovementDispatchLogByUsername = new Map();
+
 class ProcessPendingMovementActionNode {
   constructor(botStatesByName, api) {
     this.botStatesByName = botStatesByName;
@@ -58,15 +61,23 @@ class ProcessPendingMovementActionNode {
     }
 
     if (this.api?.log) {
-      this.api.log("bot_movement_node_dispatch", {
-        username: player.getUsername?.(),
-        targetX: request.x,
-        targetY: request.y,
-        targetZ: request.z,
-        segmentX: segmentTarget.x,
-        segmentY: segmentTarget.y,
-        reason: request.reason ?? null,
-      });
+      const username = player.getUsername?.();
+      const nowMs = Number.isFinite(resolved?.nowMs) ? resolved.nowMs : Date.now();
+      const lastLogAt = username ? lastMovementDispatchLogByUsername.get(username) ?? 0 : 0;
+      if (!username || nowMs - lastLogAt >= MOVEMENT_DISPATCH_LOG_INTERVAL_MS) {
+        if (username) {
+          lastMovementDispatchLogByUsername.set(username, nowMs);
+        }
+        this.api.log("bot_movement_node_dispatch", {
+          username: username ?? null,
+          targetX: request.x,
+          targetY: request.y,
+          targetZ: request.z,
+          segmentX: segmentTarget.x,
+          segmentY: segmentTarget.y,
+          reason: request.reason ?? null,
+        });
+      }
     }
     return "running";
   }

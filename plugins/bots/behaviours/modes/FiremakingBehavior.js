@@ -22,6 +22,8 @@ const BANK_SEARCH_REGION_RADIUS = 2;
 const LIGHT_TILE_SEARCH_MAX_RADIUS = 8;
 const LIGHT_TILE_SEARCH_MAX_RADIUS_FROM_BANK = 15;
 const LIGHT_TILE_MIN_DIST_FROM_BANK = 3;
+const BANK_BOOTH_CACHE_TTL_MS = 1200;
+const BANK_BOOTH_CACHE_MAX_KEYS = 256;
 
 const BANK_BOOTH_IDS = new Set(
   Object.entries(ObjectIds)
@@ -43,6 +45,7 @@ class FiremakingBehavior {
     this.botStatesByName = botStatesByName;
     this.api = api;
     this.behaviorMode = options.behaviorMode;
+    this.bankBoothSearchCacheByArea = new Map();
   }
 
   registerEvents({ api }) {
@@ -670,15 +673,58 @@ class FiremakingBehavior {
     if (!loc) {
       return null;
     }
-    const privateArea = player.getPrivateArea();
+    const bankBooths = this.getCachedBankBooths(player);
+    if (!bankBooths || bankBooths.length === 0) {
+      return null;
+    }
     let nearest = null;
     let bestDistSq = Number.MAX_SAFE_INTEGER;
 
-    for (const objects of MapObjects.mapObjects.values()) {
-      if (!objects || objects.length === 0) {
+    for (const object of bankBooths) {
+      if (!object || !BANK_BOOTH_IDS.has(object.getId())) {
         continue;
       }
-      for (const object of objects) {
+      const objectLoc = object.getLocation();
+      if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
+        continue;
+      }
+      const dx = objectLoc.getX() - loc.getX();
+      const dy = objectLoc.getY() - loc.getY();
+      const distSq = dx * dx + dy * dy;
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        nearest = object;
+      }
+    }
+
+    return nearest;
+  }
+
+  getCachedBankBooths(player, nowMs = Date.now()) {
+    const loc = player?.getLocation?.();
+    if (!loc) {
+      return [];
+    }
+    const privateArea = player.getPrivateArea?.() ?? null;
+    const areaKey = privateArea == null ? "__global__" : String(privateArea);
+    let areaCache = this.bankBoothSearchCacheByArea.get(areaKey);
+    if (!areaCache) {
+      areaCache = new Map();
+      this.bankBoothSearchCacheByArea.set(areaKey, areaCache);
+    }
+
+    const cacheKey = `${loc.getX() >> 6}:${loc.getY() >> 6}:${loc.getZ()}`;
+    const cached = areaCache.get(cacheKey);
+    if (cached && cached.expiresAt > nowMs) {
+      return cached.objects;
+    }
+
+    const objects = [];
+    for (const bucket of MapObjects.mapObjects.values()) {
+      if (!bucket || bucket.length === 0) {
+        continue;
+      }
+      for (const object of bucket) {
         if (!object || !BANK_BOOTH_IDS.has(object.getId())) {
           continue;
         }
@@ -689,17 +735,18 @@ class FiremakingBehavior {
         if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
           continue;
         }
-        const dx = objectLoc.getX() - loc.getX();
-        const dy = objectLoc.getY() - loc.getY();
-        const distSq = dx * dx + dy * dy;
-        if (distSq < bestDistSq) {
-          bestDistSq = distSq;
-          nearest = object;
-        }
+        objects.push(object);
       }
     }
 
-    return nearest;
+    if (areaCache.size >= BANK_BOOTH_CACHE_MAX_KEYS) {
+      areaCache.clear();
+    }
+    areaCache.set(cacheKey, {
+      expiresAt: nowMs + BANK_BOOTH_CACHE_TTL_MS,
+      objects,
+    });
+    return objects;
   }
 }
 

@@ -320,6 +320,7 @@ module.exports = {
   name: "PlayerBots",
   dependsOn: ["ReplaceMapRegions"],
   register(api) {
+    let botLogStream = null;
     const recentBotLogsByUsername = new Map();
     const rememberRecentBotLog = (username, line) => {
       if (!username || typeof line !== "string") {
@@ -350,7 +351,13 @@ module.exports = {
           extra && Object.keys(extra).length > 0
             ? ` ${JSON.stringify(extra)}`
             : "";
-        fs.appendFileSync(PLAYER_BOTS_LOG_PATH, `[${timestamp}] ${message}${suffix}\n`);
+        const line = `[${timestamp}] ${message}${suffix}\n`;
+        if (botLogStream) {
+          botLogStream.write(line);
+        } else {
+          // Fallback path before stream init completes.
+          fs.appendFileSync(PLAYER_BOTS_LOG_PATH, line);
+        }
         trackRecentBotLog(message, extra, timestamp);
       } catch (_) {
         // Keep bot behavior running even if file logging fails.
@@ -366,6 +373,10 @@ module.exports = {
     try {
       fs.mkdirSync(path.dirname(PLAYER_BOTS_LOG_PATH), { recursive: true });
       fs.writeFileSync(PLAYER_BOTS_LOG_PATH, "");
+      botLogStream = fs.createWriteStream(PLAYER_BOTS_LOG_PATH, {
+        flags: "a",
+        encoding: "utf8",
+      });
       writeBotLog("log_reset");
     } catch (err) {
       api.log("bot_log_init_failed", {

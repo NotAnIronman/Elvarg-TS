@@ -61,6 +61,21 @@ type PluginLoadCandidate = {
   dependsOn: string[];
 };
 
+type PluginPerfEventStat = {
+  calls: number;
+  errors: number;
+  totalNs: bigint;
+  maxNs: bigint;
+};
+
+type PluginPerfStat = {
+  calls: number;
+  errors: number;
+  totalNs: bigint;
+  maxNs: bigint;
+  events: Map<string, PluginPerfEventStat>;
+};
+
 export class PluginManager {
   private static readonly MAX_PLUGIN_DEPTH = 2;
   private static initialized = false;
@@ -113,6 +128,147 @@ export class PluginManager {
   private static combatDamageProviderOwner: string | null = null;
   private static combatMethodResolvers: PluginCombatMethodResolver[] = [];
   private static npcCombatMethodProviders: PluginNpcCombatMethodProviderEntry[] = [];
+  private static pluginPerfEnabled = false;
+  private static pluginPerfStats = new Map<string, PluginPerfStat>();
+
+  private static executeHook<T>(
+    hook: PluginHook<T>,
+    event: T,
+    errorLabel: string,
+    profileEventName: string
+  ): void {
+    if (!PluginManager.pluginPerfEnabled) {
+      try {
+        hook.handler(event);
+      } catch (err) {
+        console.error(`[plugins] ${errorLabel} hook failed (${hook.pluginName})`, err);
+      }
+      return;
+    }
+
+    const start = process.hrtime.bigint();
+    let failed = false;
+    try {
+      hook.handler(event);
+    } catch (err) {
+      failed = true;
+      console.error(`[plugins] ${errorLabel} hook failed (${hook.pluginName})`, err);
+    } finally {
+      PluginManager.recordHookTiming(
+        hook.pluginName,
+        profileEventName,
+        process.hrtime.bigint() - start,
+        failed
+      );
+    }
+  }
+
+  private static recordHookTiming(
+    pluginName: string,
+    eventName: string,
+    durationNs: bigint,
+    failed: boolean
+  ): void {
+    let pluginStat = PluginManager.pluginPerfStats.get(pluginName);
+    if (!pluginStat) {
+      pluginStat = {
+        calls: 0,
+        errors: 0,
+        totalNs: 0n,
+        maxNs: 0n,
+        events: new Map<string, PluginPerfEventStat>(),
+      };
+      PluginManager.pluginPerfStats.set(pluginName, pluginStat);
+    }
+
+    pluginStat.calls++;
+    pluginStat.totalNs += durationNs;
+    if (durationNs > pluginStat.maxNs) {
+      pluginStat.maxNs = durationNs;
+    }
+    if (failed) {
+      pluginStat.errors++;
+    }
+
+    let eventStat = pluginStat.events.get(eventName);
+    if (!eventStat) {
+      eventStat = { calls: 0, errors: 0, totalNs: 0n, maxNs: 0n };
+      pluginStat.events.set(eventName, eventStat);
+    }
+    eventStat.calls++;
+    eventStat.totalNs += durationNs;
+    if (durationNs > eventStat.maxNs) {
+      eventStat.maxNs = durationNs;
+    }
+    if (failed) {
+      eventStat.errors++;
+    }
+  }
+
+  public static setPluginPerformanceProfilingEnabled(enabled: boolean): void {
+    PluginManager.pluginPerfEnabled = enabled === true;
+  }
+
+  public static isPluginPerformanceProfilingEnabled(): boolean {
+    return PluginManager.pluginPerfEnabled;
+  }
+
+  public static resetPluginPerformanceStats(): void {
+    PluginManager.pluginPerfStats.clear();
+  }
+
+  public static getPluginPerformanceSnapshot(limit = 10): Array<{
+    pluginName: string;
+    calls: number;
+    errors: number;
+    totalMs: number;
+    avgMs: number;
+    maxMs: number;
+    topEventName: string;
+    topEventTotalMs: number;
+    topEventAvgMs: number;
+  }> {
+    const rows: Array<{
+      pluginName: string;
+      calls: number;
+      errors: number;
+      totalMs: number;
+      avgMs: number;
+      maxMs: number;
+      topEventName: string;
+      topEventTotalMs: number;
+      topEventAvgMs: number;
+    }> = [];
+
+    for (const [pluginName, stat] of PluginManager.pluginPerfStats.entries()) {
+      let topEventName = "n/a";
+      let topEventTotalNs = 0n;
+      let topEventCalls = 0;
+      for (const [eventName, eventStat] of stat.events.entries()) {
+        if (eventStat.totalNs > topEventTotalNs) {
+          topEventName = eventName;
+          topEventTotalNs = eventStat.totalNs;
+          topEventCalls = eventStat.calls;
+        }
+      }
+
+      const totalMs = Number(stat.totalNs) / 1_000_000;
+      rows.push({
+        pluginName,
+        calls: stat.calls,
+        errors: stat.errors,
+        totalMs,
+        avgMs: stat.calls > 0 ? totalMs / stat.calls : 0,
+        maxMs: Number(stat.maxNs) / 1_000_000,
+        topEventName,
+        topEventTotalMs: Number(topEventTotalNs) / 1_000_000,
+        topEventAvgMs: topEventCalls > 0 ? (Number(topEventTotalNs) / 1_000_000) / topEventCalls : 0,
+      });
+    }
+
+    rows.sort((a, b) => b.totalMs - a.totalMs);
+    return rows.slice(0, Math.max(1, limit));
+  }
 
   public static loadFromDirectory(
     pluginDirectory = path.join(process.cwd(), "plugins")
@@ -191,27 +347,13 @@ export class PluginManager {
 
   public static emitPacketReceived(event: PluginPacketEvent): void {
     for (const hook of PluginManager.packetHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] packet hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "packet", "packet_received");
     }
   }
 
   public static emitPlayerLogin(event: PluginPlayerLoginEvent): void {
     for (const hook of PluginManager.loginHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] login hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "login", "player_login");
     }
 
     // Do not flood login with non-visible replacement regions.
@@ -220,79 +362,37 @@ export class PluginManager {
 
   public static emitPlayerDisconnect(event: PluginPlayerDisconnectEvent): void {
     for (const hook of PluginManager.disconnectHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] disconnect hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "disconnect", "player_disconnect");
     }
   }
 
   public static emitPlayerLogout(event: PluginPlayerLogoutEvent): void {
     for (const hook of PluginManager.logoutHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] logout hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "logout", "player_logout");
     }
   }
 
   public static emitPlayerProcess(event: PluginPlayerProcessEvent): void {
     for (const hook of PluginManager.playerProcessHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] player_process hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "player_process", "player_process");
     }
   }
 
   public static emitPlayerLevelUp(event: PluginPlayerLevelUpEvent): void {
     for (const hook of PluginManager.playerLevelUpHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] player_level_up hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "player_level_up", "player_level_up");
     }
   }
 
   public static emitRegionLoaded(event: PluginRegionLoadedEvent): void {
     for (const hook of PluginManager.regionLoadedHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] region_loaded hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "region_loaded", "region_loaded");
     }
   }
 
   public static emitPathBlocked(event: PluginPathBlockedEvent): void {
     for (const hook of PluginManager.pathBlockedHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] path_blocked hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "path_blocked", "path_blocked");
     }
   }
 
@@ -307,14 +407,12 @@ export class PluginManager {
       if (event.handled) {
         break;
       }
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] object_interaction hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "object_interaction",
+        "object_interaction"
+      );
     }
     return event.handled === true;
   }
@@ -324,28 +422,14 @@ export class PluginManager {
   // consumers do not have to repeat the same checks in every handler.
   public static emitNpcInteraction(event: PluginNpcInteractionEvent): boolean {
     for (const hook of PluginManager.npcInteractionHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] npc_interaction hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "npc_interaction", "npc_interaction");
     }
     return event.handled === true;
   }
 
   public static emitNpcDeath(event: PluginNpcDeathEvent): void {
     for (const hook of PluginManager.npcDeathHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] npc_death hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "npc_death", "npc_death");
     }
   }
 
@@ -355,14 +439,7 @@ export class PluginManager {
   ): boolean | null {
     const event: PluginCanAttackEvent = { attacker, target, allow: null };
     for (const hook of PluginManager.canAttackHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] can_attack hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "can_attack", "can_attack");
       if (event.allow !== null) {
         return event.allow;
       }
@@ -373,14 +450,7 @@ export class PluginManager {
   public static emitCanTeleport(player: any): boolean | null {
     const event: PluginCanTeleportEvent = { player, allow: null };
     for (const hook of PluginManager.canTeleportHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] can_teleport hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "can_teleport", "can_teleport");
       if (event.allow !== null) {
         return event.allow;
       }
@@ -391,14 +461,7 @@ export class PluginManager {
   public static emitCanEat(player: any, itemId: number): boolean | null {
     const event: PluginCanEatEvent = { player, itemId, allow: null };
     for (const hook of PluginManager.canEatHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] can_eat hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "can_eat", "can_eat");
       if (event.allow !== null) {
         return event.allow;
       }
@@ -417,14 +480,12 @@ export class PluginManager {
       if (event.handled) {
         break;
       }
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] firemaking_blocked hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "firemaking_blocked",
+        "firemaking_blocked"
+      );
     }
     return event.handled === true;
   }
@@ -432,14 +493,7 @@ export class PluginManager {
   public static emitCanDrink(player: any, itemId: number): boolean | null {
     const event: PluginCanDrinkEvent = { player, itemId, allow: null };
     for (const hook of PluginManager.canDrinkHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] can_drink hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "can_drink", "can_drink");
       if (event.allow !== null) {
         return event.allow;
       }
@@ -450,14 +504,7 @@ export class PluginManager {
   public static emitCanTrade(player: any, target: any): boolean | null {
     const event: PluginCanTradeEvent = { player, target, allow: null };
     for (const hook of PluginManager.canTradeHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] can_trade hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "can_trade", "can_trade");
       if (event.allow !== null) {
         return event.allow;
       }
@@ -468,14 +515,7 @@ export class PluginManager {
   public static emitCanEquip(player: any, slot: number, item: any): boolean | null {
     const event: PluginCanEquipEvent = { player, slot, item, allow: null };
     for (const hook of PluginManager.canEquipHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] can_equip hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "can_equip", "can_equip");
       if (event.allow !== null) {
         return event.allow;
       }
@@ -495,14 +535,12 @@ export class PluginManager {
       disabled: null,
     };
     for (const hook of PluginManager.spellDisabledHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] spell_disabled hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "spell_disabled",
+        "spell_disabled"
+      );
       if (event.disabled !== null) {
         return event.disabled;
       }
@@ -520,14 +558,12 @@ export class PluginManager {
       override: null,
     };
     for (const hook of PluginManager.npcAggressionToleranceHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] npc_aggression_tolerance hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "npc_aggression_tolerance",
+        "npc_aggression_tolerance"
+      );
       if (event.override !== null) {
         return event.override;
       }
@@ -538,14 +574,7 @@ export class PluginManager {
   public static emitPlayerDefeated(killer: any, victim: any): void {
     const event: PluginPlayerDefeatedEvent = { killer, victim };
     for (const hook of PluginManager.playerDefeatedHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] player_defeated hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "player_defeated", "player_defeated");
     }
   }
 
@@ -567,28 +596,14 @@ export class PluginManager {
 
   public static emitItemOnObject(event: PluginItemOnObjectEvent): boolean {
     for (const hook of PluginManager.itemOnObjectHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] item_on_object hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "item_on_object", "item_on_object");
     }
     return event.handled === true;
   }
 
   public static emitItemOnItem(event: PluginItemOnItemEvent): boolean {
     for (const hook of PluginManager.itemOnItemHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] item_on_item hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "item_on_item", "item_on_item");
     }
     return event.handled === true;
   }
@@ -597,14 +612,12 @@ export class PluginManager {
     event: PluginItemOnGroundItemEvent
   ): boolean {
     for (const hook of PluginManager.itemOnGroundItemHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] item_on_ground_item hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "item_on_ground_item",
+        "item_on_ground_item"
+      );
     }
     return event.handled === true;
   }
@@ -620,42 +633,26 @@ export class PluginManager {
       if (event.handled) {
         break;
       }
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] ground_item_interaction hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "ground_item_interaction",
+        "ground_item_interaction"
+      );
     }
     return event.handled === true;
   }
 
   public static emitItemAction(event: PluginItemActionEvent): boolean {
     for (const hook of PluginManager.itemActionHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] item_action hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "item_action", "item_action");
     }
     return event.handled === true;
   }
 
   public static emitItemDrop(event: PluginItemDropEvent): boolean {
     for (const hook of PluginManager.itemDropHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] item_drop hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "item_drop", "item_drop");
     }
     return event.handled === true;
   }
@@ -674,14 +671,7 @@ export class PluginManager {
       if (event.handled) {
         break;
       }
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] button_click hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "button_click", "button_click");
     }
     return event.handled === true;
   }
@@ -703,28 +693,19 @@ export class PluginManager {
       if (event.handled) {
         break;
       }
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] interface_action_click hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "interface_action_click",
+        "interface_action_click"
+      );
     }
     return event.handled === true;
   }
 
   public static emitCommand(event: PluginCommandEvent): boolean {
     for (const hook of PluginManager.commandHooks) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] command hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "command", "command_any");
     }
 
     if (event.handled) {
@@ -737,14 +718,7 @@ export class PluginManager {
     }
 
     for (const hook of baseHandlers) {
-      try {
-        hook.handler(event);
-      } catch (err) {
-        console.error(
-          `[plugins] command hook failed (${hook.pluginName})`,
-          err
-        );
-      }
+      PluginManager.executeHook(hook, event, "command", `command:${event.base}`);
     }
 
     return event.handled;

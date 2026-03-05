@@ -6,6 +6,8 @@ const {
 } = require("../navigation/BotNavigation");
 const { setModeReturnHome } = require("../state/PlayerBotState");
 
+const PATH_BLOCKED_HANDLE_MIN_INTERVAL_MS = 200;
+
 class PathBlockedHandler {
   constructor({ botStatesByName, traversalService, api, modeHandlers = {}, options }) {
     this.botStatesByName = botStatesByName;
@@ -24,6 +26,13 @@ class PathBlockedHandler {
     if (!state || state.awaitingDitchTransition) {
       return;
     }
+    if (
+      Number.isInteger(state.lastPathBlockedHandledAt) &&
+      nowMs - state.lastPathBlockedHandledAt < PATH_BLOCKED_HANDLE_MIN_INTERVAL_MS
+    ) {
+      return;
+    }
+    state.lastPathBlockedHandledAt = nowMs;
     if (nowMs < (state.roaming?.nextWalkAt ?? 0)) {
       return;
     }

@@ -24,6 +24,8 @@ const SEARCH_WALK_ATTEMPTS = 12;
 const ROCK_SELECTION_POOL_SIZE = 4;
 const ROCK_SELECTION_CROWD_PENALTY_SQ = 36;
 const ROCK_SELECTION_JITTER_SQ = 8;
+const ROCK_SEARCH_CACHE_TTL_MS = 1200;
+const ROCK_SEARCH_CACHE_MAX_KEYS = 512;
 
 class MiningBehavior {
   constructor(botStatesByName, api, options) {
@@ -31,6 +33,7 @@ class MiningBehavior {
     this.api = api;
     this.behaviorMode = options.behaviorMode;
     this.searchWalkRadius = options.botWalkRadius ?? 6;
+    this.rockSearchCacheByArea = new Map();
   }
 
   activateMode({ player, state }) {
@@ -367,6 +370,7 @@ class MiningBehavior {
     const loc = player.getLocation();
     const privateArea = player.getPrivateArea();
     const rockIds = new Set(rockTier.objectIds);
+    const rockIdKey = (rockTier.objectIds ?? []).join(",");
     const currentRegionX = loc.getX() >> 6;
     const currentRegionY = loc.getY() >> 6;
     const maxDistSq = MAX_ROCK_TARGET_DISTANCE_TILES * MAX_ROCK_TARGET_DISTANCE_TILES;
@@ -377,58 +381,55 @@ class MiningBehavior {
       ? this.botStatesByName?.get?.(playerUsername)
       : null;
 
-    for (const objects of MapObjects.mapObjects.values()) {
-      if (!objects || objects.length === 0) {
+    const candidateObjects = this.getCachedCandidateRocks(
+      player,
+      rockIds,
+      rockIdKey
+    );
+    for (const object of candidateObjects) {
+      if (!object || !rockIds.has(object.getId())) {
         continue;
       }
-      for (const object of objects) {
-        if (!object || !rockIds.has(object.getId())) {
-          continue;
-        }
-        if (object.getPrivateArea() !== privateArea) {
-          continue;
-        }
-        const objectLoc = object.getLocation();
-        if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
-          continue;
-        }
-        const objectRegionX = objectLoc.getX() >> 6;
-        const objectRegionY = objectLoc.getY() >> 6;
-        if (
-          Math.abs(objectRegionX - currentRegionX) > 1 ||
-          Math.abs(objectRegionY - currentRegionY) > 1
-        ) {
-          continue;
-        }
-        const dx = objectLoc.getX() - loc.getX();
-        const dy = objectLoc.getY() - loc.getY();
-        const distSq = dx * dx + dy * dy;
-        if (distSq > maxDistSq) {
-          continue;
-        }
-
-        const key = this.rockTargetKey(
-          object.getId(),
-          objectLoc.getX(),
-          objectLoc.getY(),
-          objectLoc.getZ()
-        );
-        let crowdCount = targetCounts.get(key) ?? 0;
-        const selfTarget = selfState?.mining?.target;
-        if (
-          selfTarget &&
-          selfTarget.objectId === object.getId() &&
-          selfTarget.x === objectLoc.getX() &&
-          selfTarget.y === objectLoc.getY() &&
-          selfTarget.z === objectLoc.getZ()
-        ) {
-          crowdCount = Math.max(0, crowdCount - 1);
-        }
-
-        const jitter = randomInRange(0, ROCK_SELECTION_JITTER_SQ);
-        const score = distSq + crowdCount * ROCK_SELECTION_CROWD_PENALTY_SQ + jitter;
-        candidates.push({ object, score });
+      const objectLoc = object.getLocation();
+      if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
+        continue;
       }
+      const objectRegionX = objectLoc.getX() >> 6;
+      const objectRegionY = objectLoc.getY() >> 6;
+      if (
+        Math.abs(objectRegionX - currentRegionX) > 1 ||
+        Math.abs(objectRegionY - currentRegionY) > 1
+      ) {
+        continue;
+      }
+      const dx = objectLoc.getX() - loc.getX();
+      const dy = objectLoc.getY() - loc.getY();
+      const distSq = dx * dx + dy * dy;
+      if (distSq > maxDistSq) {
+        continue;
+      }
+
+      const key = this.rockTargetKey(
+        object.getId(),
+        objectLoc.getX(),
+        objectLoc.getY(),
+        objectLoc.getZ()
+      );
+      let crowdCount = targetCounts.get(key) ?? 0;
+      const selfTarget = selfState?.mining?.target;
+      if (
+        selfTarget &&
+        selfTarget.objectId === object.getId() &&
+        selfTarget.x === objectLoc.getX() &&
+        selfTarget.y === objectLoc.getY() &&
+        selfTarget.z === objectLoc.getZ()
+      ) {
+        crowdCount = Math.max(0, crowdCount - 1);
+      }
+
+      const jitter = randomInRange(0, ROCK_SELECTION_JITTER_SQ);
+      const score = distSq + crowdCount * ROCK_SELECTION_CROWD_PENALTY_SQ + jitter;
+      candidates.push({ object, score });
     }
 
     if (candidates.length === 0) {
@@ -453,6 +454,55 @@ class MiningBehavior {
         RegionManager.loadMapFiles(baseX + rx * 64, baseY + ry * 64);
       }
     }
+  }
+
+  getCachedCandidateRocks(player, rockIds, rockIdKey, nowMs = Date.now()) {
+    const loc = player?.getLocation?.();
+    if (!loc || !rockIds || rockIds.size === 0) {
+      return [];
+    }
+    const privateArea = player.getPrivateArea?.() ?? null;
+    const areaKey = privateArea == null ? "__global__" : String(privateArea);
+    let areaCache = this.rockSearchCacheByArea.get(areaKey);
+    if (!areaCache) {
+      areaCache = new Map();
+      this.rockSearchCacheByArea.set(areaKey, areaCache);
+    }
+
+    const cacheKey = `${loc.getX() >> 6}:${loc.getY() >> 6}:${loc.getZ()}:${rockIdKey}`;
+    const cached = areaCache.get(cacheKey);
+    if (cached && cached.expiresAt > nowMs) {
+      return cached.objects;
+    }
+
+    const objects = [];
+    for (const bucket of MapObjects.mapObjects.values()) {
+      if (!bucket || bucket.length === 0) {
+        continue;
+      }
+      for (const object of bucket) {
+        if (!object || !rockIds.has(object.getId())) {
+          continue;
+        }
+        if (object.getPrivateArea() !== privateArea) {
+          continue;
+        }
+        const objectLoc = object.getLocation();
+        if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
+          continue;
+        }
+        objects.push(object);
+      }
+    }
+
+    if (areaCache.size >= ROCK_SEARCH_CACHE_MAX_KEYS) {
+      areaCache.clear();
+    }
+    areaCache.set(cacheKey, {
+      expiresAt: nowMs + ROCK_SEARCH_CACHE_TTL_MS,
+      objects,
+    });
+    return objects;
   }
 
   resolveTargetRockObject(player, state) {

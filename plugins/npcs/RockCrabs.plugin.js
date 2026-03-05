@@ -5,6 +5,7 @@ const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIde
 const AGGRESSION_DISTANCE = 1;
 const KEEP_AWAKE_DISTANCE = 2;
 const SLEEP_AFTER_IDLE_MS = 5000;
+const PLAYER_PROCESS_INTERVAL_MS = 600;
 
 const ROCK_CRAB_VARIANTS = Object.freeze([
   {
@@ -200,19 +201,13 @@ function processRockCrab(npc, player, tracker, nowMs, api) {
     return;
   }
 
-  const nearbyAggroCandidates = (npc.getPlayersWithinDistance?.(AGGRESSION_DISTANCE) ?? []).filter(
-    (candidate) => isValidPlayerTarget(candidate)
-  );
-  if (nearbyAggroCandidates.length > 0) {
-    const target = nearbyAggroCandidates[0];
-    tryAggroPlayer(npc, target, tracker, nowMs, api, "nearby_player_scan");
+  if (playerDistance <= KEEP_AWAKE_DISTANCE) {
+    markActive(tracker, npc, nowMs);
     return;
   }
 
-  const nearbyPlayers = (npc.getPlayersWithinDistance?.(KEEP_AWAKE_DISTANCE) ?? []).filter(
-    (candidate) => isValidPlayerTarget(candidate)
-  );
-  if (nearbyPlayers.length > 0) {
+  const interacting = npc.getMobileInteraction?.();
+  if (isValidPlayerTarget(interacting)) {
     markActive(tracker, npc, nowMs);
     return;
   }
@@ -227,6 +222,7 @@ module.exports = {
   name: "RockCrabs",
   register(api) {
     const npcState = new WeakMap();
+    const playerProcessAt = new WeakMap();
 
     api.onNpcInteraction((event) => {
       const npc = event?.npc;
@@ -281,6 +277,11 @@ module.exports = {
         return;
       }
       const nowMs = Date.now();
+      const lastProcessAt = playerProcessAt.get(player) ?? 0;
+      if (nowMs - lastProcessAt < PLAYER_PROCESS_INTERVAL_MS) {
+        return;
+      }
+      playerProcessAt.set(player, nowMs);
       const localNpcs = player.getLocalNpcs?.();
       if (!Array.isArray(localNpcs) || localNpcs.length === 0) {
         return;

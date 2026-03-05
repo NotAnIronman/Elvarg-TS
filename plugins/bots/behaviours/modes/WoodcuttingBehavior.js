@@ -21,7 +21,9 @@ const RETRY_SEARCH_MS = 1500;
 const WALK_COMMAND_COOLDOWN_MS = 900;
 const DROP_LOGS_RETRY_MS = 650;
 const MAX_NEXT_TREE_DISTANCE_TILES = 10;
-const MAX_TREE_TARGET_DISTANCE_TILES = 18;
+// Keep target acquisition aligned with local region scanning so bots can
+// actually walk to visible trees rather than rejecting nearly all targets.
+const MAX_TREE_TARGET_DISTANCE_TILES = 64;
 const TOO_FAR_STREAK_WINDOW_MS = 12000;
 const TOO_FAR_STREAK_THRESHOLD = 4;
 const TOO_FAR_AVOID_MS = 25000;
@@ -347,6 +349,8 @@ class WoodcuttingBehavior {
     const loc = player.getLocation();
     const privateArea = player.getPrivateArea();
     const treeIds = new Set(treeTier.objectIds);
+    const currentRegionX = loc.getX() >> 6;
+    const currentRegionY = loc.getY() >> 6;
     let bestObject = null;
     let bestDistSq = Number.MAX_SAFE_INTEGER;
 
@@ -363,6 +367,14 @@ class WoodcuttingBehavior {
         }
         const objectLoc = object.getLocation();
         if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
+          continue;
+        }
+        const objectRegionX = objectLoc.getX() >> 6;
+        const objectRegionY = objectLoc.getY() >> 6;
+        if (
+          Math.abs(objectRegionX - currentRegionX) > 1 ||
+          Math.abs(objectRegionY - currentRegionY) > 1
+        ) {
           continue;
         }
         const dx = objectLoc.getX() - loc.getX();

@@ -2,7 +2,30 @@ const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag
 const { PathFinder } = require("../../../../src/main/typescript/elvarg/game/model/movement/path/PathFinder");
 
 const MAX_ROUTE_SEGMENT_TILES = 24;
+const PATH_BLOCKED_LOG_THROTTLE_MS = 2500;
 const pendingMovementByPlayer = new WeakMap();
+const pathBlockedLogStateByUsername = new Map();
+
+function consumePathBlockedLogBudget(username, nowMs) {
+  if (!username) {
+    return { shouldLog: true, suppressedCount: 0 };
+  }
+  const state =
+    pathBlockedLogStateByUsername.get(username) ?? {
+      lastLogAt: 0,
+      suppressedCount: 0,
+    };
+  if (nowMs - state.lastLogAt < PATH_BLOCKED_LOG_THROTTLE_MS) {
+    state.suppressedCount += 1;
+    pathBlockedLogStateByUsername.set(username, state);
+    return { shouldLog: false, suppressedCount: state.suppressedCount };
+  }
+  const suppressedCount = state.suppressedCount;
+  state.lastLogAt = nowMs;
+  state.suppressedCount = 0;
+  pathBlockedLogStateByUsername.set(username, state);
+  return { shouldLog: true, suppressedCount };
+}
 
 function randomInRange(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -194,6 +217,8 @@ function retargetAfterBlocked(
   if (!state.roaming) {
     return false;
   }
+  const username = player.getUsername?.();
+  const logBudget = consumePathBlockedLogBudget(username, nowMs);
 
   const previousTarget = state.roaming.target
     ? {
@@ -208,13 +233,16 @@ function retargetAfterBlocked(
   if (!nextTarget) {
     state.roaming.target = null;
     state.roaming.nextWalkAt = nowMs + blockedRetargetMaxDelayMs;
-    api.log("path_blocked_retarget_failed", {
-      username: player.getUsername(),
-      reason,
-      previousTarget,
-      from: event?.from ?? null,
-      to: event?.to ?? null,
-    });
+    if (logBudget.shouldLog) {
+      api.log("path_blocked_retarget_failed", {
+        username,
+        reason,
+        previousTarget,
+        from: event?.from ?? null,
+        to: event?.to ?? null,
+        suppressed: logBudget.suppressedCount,
+      });
+    }
     return false;
   }
 
@@ -224,15 +252,18 @@ function retargetAfterBlocked(
     blockedRetargetMaxDelayMs
   );
   state.roaming.nextWalkAt = nowMs + retryInMs;
-  api.log("path_blocked_retarget", {
-    username: player.getUsername(),
-    reason,
-    previousTarget,
-    nextTarget,
-    retryInMs,
-    from: event?.from ?? null,
-    to: event?.to ?? null,
-  });
+  if (logBudget.shouldLog) {
+    api.log("path_blocked_retarget", {
+      username,
+      reason,
+      previousTarget,
+      nextTarget,
+      retryInMs,
+      from: event?.from ?? null,
+      to: event?.to ?? null,
+      suppressed: logBudget.suppressedCount,
+    });
+  }
   return true;
 }
 

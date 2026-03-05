@@ -17,6 +17,45 @@ const { DonatorRights } = require("../../src/main/typescript/elvarg/game/model/r
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 
+function fsyncDirectorySafe(directoryPath) {
+  let dirFd = null;
+  try {
+    dirFd = fs.openSync(directoryPath, "r");
+    fs.fsyncSync(dirFd);
+  } catch (_error) {
+    // Directory fsync is best-effort and can be unsupported on some platforms/filesystems.
+  } finally {
+    if (dirFd !== null) {
+      try {
+        fs.closeSync(dirFd);
+      } catch (_error) {
+        // no-op
+      }
+    }
+  }
+}
+
+function writeFileAtomically(filePath, content) {
+  const directory = path.dirname(filePath);
+  const tempFilePath = path.join(
+    directory,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${Math.floor(Math.random() * 1_000_000)}.tmp`
+  );
+  let tempFd = null;
+  try {
+    tempFd = fs.openSync(tempFilePath, "w");
+    fs.writeFileSync(tempFd, content, "utf8");
+    fs.fsyncSync(tempFd);
+  } finally {
+    if (tempFd !== null) {
+      fs.closeSync(tempFd);
+    }
+  }
+
+  fs.renameSync(tempFilePath, filePath);
+  fsyncDirectorySafe(directory);
+}
+
 class JsonPlayerPersistence extends PlayerPersistence {
   static SAVE_DIRECTORY = path.join(
     process.cwd(),
@@ -50,13 +89,11 @@ class JsonPlayerPersistence extends PlayerPersistence {
     }
 
     const save = PlayerSave.fromPlayer(player);
+    const serialized = JSON.stringify(save, this.replacer.bind(this), 2);
+    this.validateSerializedSave(serialized, player.getUsername());
     const filePath = this.resolveFilePath(player.getUsername());
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(
-      filePath,
-      JSON.stringify(save, this.replacer.bind(this), 2),
-      "utf8"
-    );
+    writeFileAtomically(filePath, serialized);
   }
 
   exists(username) {
@@ -448,6 +485,78 @@ class JsonPlayerPersistence extends PlayerPersistence {
       }
     }
     return fallback;
+  }
+
+  validateSerializedSave(serialized, username) {
+    let parsed;
+    try {
+      parsed = JSON.parse(serialized);
+    } catch (error) {
+      throw new Error(
+        `Refusing to save invalid JSON for ${username}: ${error?.message ?? error}`
+      );
+    }
+
+    const assertFiniteNumber = (value, pathLabel) => {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new Error(
+          `Refusing to save ${username}: ${pathLabel} must be a finite number`
+        );
+      }
+    };
+
+    const assertObject = (value, pathLabel) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error(`Refusing to save ${username}: ${pathLabel} must be an object`);
+      }
+    };
+
+    const assertItemArray = (value, expectedLength, pathLabel) => {
+      if (!Array.isArray(value) || value.length !== expectedLength) {
+        throw new Error(
+          `Refusing to save ${username}: ${pathLabel} must be an array of length ${expectedLength}`
+        );
+      }
+      for (let i = 0; i < value.length; i++) {
+        const entry = value[i];
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          throw new Error(
+            `Refusing to save ${username}: ${pathLabel}[${i}] must be an object`
+          );
+        }
+        assertFiniteNumber(entry.id, `${pathLabel}[${i}].id`);
+        assertFiniteNumber(entry.amount, `${pathLabel}[${i}].amount`);
+      }
+    };
+
+    const assertNumericArray = (value, expectedLength, pathLabel) => {
+      if (!Array.isArray(value) || value.length !== expectedLength) {
+        throw new Error(
+          `Refusing to save ${username}: ${pathLabel} must be an array of length ${expectedLength}`
+        );
+      }
+      for (let i = 0; i < value.length; i++) {
+        assertFiniteNumber(value[i], `${pathLabel}[${i}]`);
+      }
+    };
+
+    assertObject(parsed, "root");
+    assertObject(parsed.position, "position");
+    assertFiniteNumber(parsed.position.x, "position.x");
+    assertFiniteNumber(parsed.position.y, "position.y");
+    assertFiniteNumber(parsed.position.z, "position.z");
+
+    assertItemArray(parsed.inventory, 28, "inventory");
+    assertItemArray(parsed.equipment, 14, "equipment");
+
+    assertObject(parsed.skills, "skills");
+    assertNumericArray(parsed.skills.level, SkillManager.AMOUNT_OF_SKILLS, "skills.level");
+    assertNumericArray(parsed.skills.maxLevel, SkillManager.AMOUNT_OF_SKILLS, "skills.maxLevel");
+    assertNumericArray(
+      parsed.skills.experience,
+      SkillManager.AMOUNT_OF_SKILLS,
+      "skills.experience"
+    );
   }
 }
 

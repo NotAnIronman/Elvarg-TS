@@ -778,13 +778,6 @@ module.exports = {
       summonOwnedPetOnBotLogin(player);
     });
 
-    api.onPlayerProcess(({ player }) => {
-      if (!player) {
-        return;
-      }
-      summonOwnedPetOnBotLogin(player);
-    });
-
     api.log("registered", {
       pets: PETS.length,
       skillingPets: SKILLING_PETS.length,

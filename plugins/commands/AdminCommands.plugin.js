@@ -25,6 +25,7 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { ClanChatManager } = require("../../src/main/typescript/elvarg/game/content/clan/ClanChatManager");
 const { NpcDropDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader");
 const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
 const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
 const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
 const { ServerLogger } = require("../../src/main/typescript/elvarg/util/ServerLogger");
@@ -199,6 +200,24 @@ function queueNpcSpawn(player, id, amount = 1) {
   }
 
   return spawned;
+}
+
+function fallbackSaveFilePathForUsername(username) {
+  const raw = String(username ?? "").trim().toLowerCase();
+  const safe = raw
+    .replace(/[^a-z0-9]/gi, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const normalized = safe.length > 0 ? safe : "player";
+  return path.join(process.cwd(), "data", "saves", "characters", `${normalized}.json`);
+}
+
+function resolveSaveFilePathForUsername(username) {
+  const persistence = GameConstants.PLAYER_PERSISTENCE;
+  if (persistence && typeof persistence.resolveFilePath === "function") {
+    return persistence.resolveFilePath(username);
+  }
+  return fallbackSaveFilePathForUsername(username);
 }
 
 class UpdateTask extends Task {
@@ -688,6 +707,90 @@ module.exports = {
       }
       GameConstants.PLAYER_PERSISTENCE.save(player);
       player.getPacketSender().sendMessage("Saved player.");
+      return true;
+    });
+
+    api.registerCommand("reprocorruptsave", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+
+      const requested = commandTail(raw, parts);
+      const targetName = requested.length > 0 ? requested : player.getUsername();
+      if (!targetName) {
+        player.getPacketSender().sendMessage("Usage: ::reprocorruptsave [username]");
+        return true;
+      }
+
+      const corruptTargetSave = (overrideJson = null) => {
+        const filePath = resolveSaveFilePathForUsername(targetName);
+        if (!fs.existsSync(filePath)) {
+          player
+            .getPacketSender()
+            .sendMessage(`No save file found for ${targetName} at ${filePath}.`);
+          return;
+        }
+
+        const backupPath = `${filePath}.repro.bak.${Date.now()}`;
+        const original = fs.readFileSync(filePath, "utf8");
+        if (original.length < 4) {
+          player
+            .getPacketSender()
+            .sendMessage(`Save file is too small to corrupt safely: ${filePath}`);
+          return;
+        }
+
+        fs.writeFileSync(backupPath, original, "utf8");
+        const sourceJson = overrideJson ?? original;
+        const partialLength = Math.max(1, Math.floor(sourceJson.length * 0.45));
+        const partialJson = sourceJson.slice(0, partialLength);
+        // Simulate legacy non-atomic truncate+partial write interruption.
+        const fd = fs.openSync(filePath, "w");
+        try {
+          fs.writeFileSync(fd, partialJson, "utf8");
+          fs.fsyncSync(fd);
+        } finally {
+          fs.closeSync(fd);
+        }
+
+        ServerLogger.info(
+          `[admin] reprocorruptsave target=${targetName} mode=partial_non_atomic file=${filePath} backup=${backupPath} bytes=${partialLength}/${sourceJson.length}`
+        );
+
+        player.getPacketSender().sendMessage(
+          `Simulated interrupted save for ${targetName}. Backup: ${backupPath}`
+        );
+        player.getPacketSender().sendMessage(
+          "Relog target to reproduce persistence_load_failed from partial JSON."
+        );
+      };
+
+      const onlineTarget = World.getPlayerByName(targetName);
+      if (onlineTarget) {
+        const serializedLiveSave = JSON.stringify(PlayerSave.fromPlayer(onlineTarget), null, 2);
+        player
+          .getPacketSender()
+          .sendMessage(
+            `Forcing ${targetName} logout, then simulating interrupted non-atomic save write...`
+          );
+        onlineTarget.requestLogout();
+        TaskManager.submit(
+          new UpdateTask(2, () => {
+            if (World.getPlayerByName(targetName)) {
+              player
+                .getPacketSender()
+                .sendMessage(
+                  `Target ${targetName} is still online. Run ::reprocorruptsave again in a moment.`
+                );
+              return;
+            }
+            corruptTargetSave(serializedLiveSave);
+          })
+        );
+        return true;
+      }
+
+      corruptTargetSave();
       return true;
     });
 
