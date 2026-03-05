@@ -25,6 +25,24 @@ export class PacketBuilder {
     private buffers = Buffer.alloc(4096);
     private offset = 0;
 
+    private ensureCapacity(additionalBytes: number): void {
+        if (additionalBytes <= 0) {
+            return;
+        }
+        const required = this.offset + additionalBytes;
+        if (required <= this.buffers.length) {
+            return;
+        }
+
+        let nextSize = this.buffers.length;
+        while (nextSize < required) {
+            nextSize = nextSize << 1;
+        }
+        const next = Buffer.alloc(nextSize);
+        this.buffers.copy(next, 0, 0, this.offset);
+        this.buffers = next;
+    }
+
     constructor(opcodeOrType?: number | PacketType, type?: PacketType) {
         if (typeof opcodeOrType === 'number') {
             this.opcode = opcodeOrType;
@@ -37,6 +55,7 @@ export class PacketBuilder {
 
     public writeBuffer(buffer: string | Buffer): PacketBuilder {
         const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+        this.ensureCapacity(buf.length);
         buf.copy(this.buffers, this.offset);
         this.offset += buf.length;
         return this;
@@ -226,6 +245,7 @@ export class PacketBuilder {
     }
 
     public puts(value: number, type: ValueType) {
+        this.ensureCapacity(1);
         switch (type) {
             case ValueType.A:
                 value += 128;

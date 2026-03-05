@@ -90,6 +90,8 @@ class LoginSession {
   }> = [];
   private recentKeepAliveCount = 0;
   private recentKeepAliveAt: string | null = null;
+  private loginInitialRegionId: number | null = null;
+  private loginReplacementsSent = false;
   private pendingInboundPacket: {
     opcode: number;
     encOpcode: number;
@@ -355,13 +357,16 @@ class LoginSession {
       ])
     );
     // Encrypted initial packets
-    this.sendInitialPackets(player);
+    const initialRegionId = this.sendInitialPackets(player);
     this.sendInitialNpcs(player);
     PluginManager.emitPlayerLogin({
       player: gamePlayer,
       username: gamePlayer.getUsername(),
     });
     this.stage = "ESTABLISHED";
+
+    this.loginInitialRegionId = initialRegionId;
+    this.loginReplacementsSent = false;
   }
 
   private loadPersistedPlayer(gamePlayer: Player, loginPassword: string): boolean {
@@ -609,7 +614,7 @@ class LoginSession {
     }
   }
 
-  private sendInitialPackets(player: PlayerState) {
+  private sendInitialPackets(player: PlayerState): number {
     const { location, appearance, username, index } = player;
     // Match Java PacketSender#sendMapRegion semantics:
     // wire values are location.getRegionX()+6 where getRegionX() is (x>>3)-6 => (x>>3).
@@ -625,16 +630,20 @@ class LoginSession {
     mapPayload.writeUInt8(((regionY >> 8) & 0xff) >>> 0, 2);
     mapPayload.writeUInt8((regionY & 0xff) >>> 0, 3);
 
-    // Stream visible replacement regions before map load to avoid showing vanilla terrain first.
+    const currentRegionId = ((location.x >> 6) << 8) | (location.y >> 6);
+
+    // Send current-region replacement immediately so the first load pass can
+    // apply it without an extra client-side loadRegion() pass.
     if (this.gamePlayer) {
       try {
-        MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
+        MapRegionReplacementManager.sendReplacementToPlayer(
           this.gamePlayer,
-          location.x,
-          location.y
+          currentRegionId,
+          false
         );
       } catch (err) {
-        this.log("visible_region_replacements_failed", {
+        this.log("initial_current_region_replacement_failed", {
+          regionId: currentRegionId,
           err: (err as Error)?.message ?? String(err),
         });
       }
@@ -749,6 +758,7 @@ class LoginSession {
     this.sendPacket(104, follow, PacketType.VARIABLE, "follow_option");
     this.sendPacket(104, trade, PacketType.VARIABLE, "trade_option");
 
+    return currentRegionId;
   }
 
   private buildPlayerUpdate(
@@ -1130,6 +1140,9 @@ class LoginSession {
 
       const isIdleKeepAlive = opcode === 0 && size === 0;
       if (!isIdleKeepAlive) {
+        if (opcode === PacketConstants.FINALIZED_MAP_REGION_OPCODE) {
+          this.sendLoginDeferredVisibleReplacements();
+        }
         this.log("packet_received", {
           opcode,
           encOpcode,
@@ -1215,6 +1228,35 @@ class LoginSession {
       }
     }
     this.recvBuffer = data.subarray(offset);
+  }
+
+  private sendLoginDeferredVisibleReplacements(): void {
+    if (this.loginReplacementsSent) {
+      return;
+    }
+    const player = this.gamePlayer;
+    if (!player || this.stage !== "ESTABLISHED") {
+      return;
+    }
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    this.loginReplacementsSent = true;
+    try {
+      const loc = player.getLocation();
+      MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
+        player,
+        loc.getX(),
+        loc.getY(),
+        6,
+        this.loginInitialRegionId != null ? [this.loginInitialRegionId] : [],
+        true
+      );
+    } catch (err) {
+      this.log("visible_region_replacements_failed", {
+        err: (err as Error)?.message ?? String(err),
+      });
+    }
   }
 
   private handleAppearanceChange(payload: Buffer) {

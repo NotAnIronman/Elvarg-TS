@@ -4,7 +4,7 @@ import { PacketType } from "./packet/PacketType";
 // Mirrors the web client PacketConstants.PACKET_SIZES to guarantee framing parity.
 export const OUTBOUND_PACKET_SIZES: number[] = [
   0, 0, 0, 1, 6, 0, 0, 0, 4, 4, // 0
-  6, 2, -1, 1, 1, -1, 1, 0, 0, 0, // 10
+  6, 2, -2, 1, 1, -1, 1, 0, 0, 0, // 10
   0, 0, 0, 0, 1, 0, 0, -1, 1, 1, // 20
   0, 0, 0, 0, -2, 4, 3, 0, 2, 0, // 30
   0, 0, 0, 0, 7, 8, 0, 6, 0, 0, // 40
