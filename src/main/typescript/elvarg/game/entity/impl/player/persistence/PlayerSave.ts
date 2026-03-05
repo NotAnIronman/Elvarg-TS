@@ -97,6 +97,7 @@ export class PlayerSave {
     private presets: Presetable[];
     private questPoints: number;
     private questProgress: Map<number, number>;
+    private flags: string[];
 
     public getPasswordHashWithSalt(): string {
         return this.passwordHashWithSalt;
@@ -499,6 +500,14 @@ export class PlayerSave {
         this.questProgress = questProgress;
     }
 
+    getFlags(): string[] {
+        return this.flags;
+    }
+
+    setFlags(flags: string[]) {
+        this.flags = flags;
+    }
+
     private static normalizeRelationListToBigInt(
         values: Array<number | string | bigint> | null | undefined,
         max: number
@@ -534,6 +543,26 @@ export class PlayerSave {
         return PlayerSave
             .normalizeRelationListToBigInt(values, max)
             .map((value) => value.toString());
+    }
+
+    private static normalizeFlags(values: unknown): string[] {
+        if (!Array.isArray(values) || values.length === 0) {
+            return [];
+        }
+        const out: string[] = [];
+        const seen = new Set<string>();
+        for (const raw of values) {
+            if (typeof raw !== "string") {
+                continue;
+            }
+            const normalized = raw.trim();
+            if (normalized.length === 0 || seen.has(normalized)) {
+                continue;
+            }
+            seen.add(normalized);
+            out.push(normalized);
+        }
+        return out;
     }
 
     private static toFiniteInt(value: unknown, fallback: number): number {
@@ -662,6 +691,7 @@ export class PlayerSave {
         player.getQuickPrayers().setPrayers(this.quickPrayers);
         player.setQuestPoints(this.questPoints);
         player.setQuestProgress(this.questProgress);
+        player.setFlags(PlayerSave.normalizeFlags(this.flags));
 
         if (this.presets != null) {
             player.setPresets(this.presets);
@@ -757,6 +787,7 @@ export class PlayerSave {
         playerSave.quickPrayers = player.getQuickPrayers().getPrayers();
         playerSave.questPoints = player.getQuestPoints();
         playerSave.questProgress = player.getQuestProgress();
+        playerSave.flags = PlayerSave.normalizeFlags(player.getFlags());
 
         playerSave.friends = PlayerSave.normalizeRelationListToStrings(
             player.getRelations().getFriendList(),

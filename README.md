@@ -38,9 +38,18 @@ Java remains the behavior reference. The TS server prioritizes parity with Java 
 
 Server logging is centralized and all `console.log/info/warn/error/debug` calls go through one logger.
 
+Log filename convention:
+
+`kebab-case semantic-name.log`
+
 Logs are written to:
 
 `./logs/server.log`
+`./logs/packets.log`
+`./logs/movement.log`
+`./logs/player-bots.log`
+`./logs/plugin-performance.log`
+`./logs/player-update-bits.log`
 
 ### Default behavior
 

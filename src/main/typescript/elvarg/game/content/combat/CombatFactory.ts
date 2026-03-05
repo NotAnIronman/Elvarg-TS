@@ -701,14 +701,27 @@ export class CombatFactory {
 
     public static rewardExp(player: Player, hit: PendingHit) {
         const hitDamage = Number.isFinite(hit.getTotalDamage()) ? hit.getTotalDamage() : 0;
+        const hitSkills = hit.getSkills();
+        // Defensive autocast should split hit XP between Magic and Defence.
+        // Non-defensive magic keeps legacy magic-only hit XP behavior.
+        const defensiveMagicSplit =
+            hit.getCombatType() === CombatType.MAGIC &&
+            hitSkills.length > 1 &&
+            hitSkills.includes(Skill.MAGIC.getIndex()) &&
+            hitSkills.includes(Skill.DEFENCE.getIndex());
 
         // Add magic exp, even if total damage is 0.
         // Since spells have a base exp reward
         if (hit.getCombatType() === CombatType.MAGIC) {
             if (player.getCombat().getPreviousCast() != null) {
                 if (hit.isAccurate()) {
-                    player.getSkillManager().addExperience(Skill.MAGIC,
-                        Math.floor(hitDamage)/* + player.getCombat().getPreviousCast().baseExperience() */, true);
+                    if (!defensiveMagicSplit) {
+                        player.getSkillManager().addExperience(
+                            Skill.MAGIC,
+                            Math.floor(hitDamage)/* + player.getCombat().getPreviousCast().baseExperience() */,
+                            true
+                        );
+                    }
                 } else {
                     // Splash should only give 52 exp..
                     player.getSkillManager().addExperience(Skill.MAGIC, 52, false);
@@ -726,11 +739,21 @@ export class CombatFactory {
 
         // Magic xp was already added
         if (hit.getCombatType() === CombatType.MAGIC) {
+            if (!defensiveMagicSplit) {
+                return;
+            }
+            for (let i of hitSkills) {
+                let skill = Skill.values()[i];
+                if (!skill) {
+                    continue;
+                }
+                player.getSkillManager().addExperience(skill, Math.floor(hitDamage / hitSkills.length), true);
+            }
             return;
         }
 
         // Add all other skills xp
-        let exp = hit.getSkills();
+        let exp = hitSkills;
         for (let i of exp) {
             let skill = Skill.values()[i];
             if (!skill) {

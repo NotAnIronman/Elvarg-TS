@@ -3,11 +3,11 @@
 import { CombatSpells } from "./CombatSpells";
 import { Player } from "../../../entity/impl/player/Player";
 import { MagicSpellbook } from "../../../model/MagicSpellbook";
-import { Skill } from "../../../model/Skill";
 import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
 import { CombatSpell } from "./CombatSpell";
 import { Spell } from "./Spell";
 import { FightType } from "../FightType";
+import { FightStyle } from "../FightStyle";
 const getBonusManager = () => require("../../../model/equipment/BonusManager").BonusManager as typeof import("../../../model/equipment/BonusManager").BonusManager;
 const getWeaponInterfaces = () => require("../WeaponInterfaces").WeaponInterfaces as typeof import("../WeaponInterfaces").WeaponInterfaces;
 
@@ -49,6 +49,8 @@ export class Autocasting {
         [1845, CombatSpells.FIRE_WAVE],
         [13189, CombatSpells.SMOKE_RUSH],
         [13241, CombatSpells.SHADOW_RUSH],
+        // Web-client ancient autocast uses 13147 for Blood Rush.
+        [13147, CombatSpells.BLOOD_RUSH],
         [13247, CombatSpells.BLOOD_RUSH],
         [6162, CombatSpells.ICE_RUSH],
         [13215, CombatSpells.SMOKE_BURST],
@@ -95,6 +97,16 @@ export class Autocasting {
             return true;
         }
 
+        // Track autocast mode via staff fight style.
+        // Defensive autocast maps to STAFF_FOCUS, regular autocast maps to STAFF_POUND.
+        if (actionButtonId === Autocasting.DEFENSIVE_AUTOCAST_BUTTON) {
+            player.setFightType(FightType.STAFF_FOCUS);
+            player.getPacketSender().sendConfig(FightType.STAFF_FOCUS.getParentId(), FightType.STAFF_FOCUS.getChildId());
+        } else if (actionButtonId === Autocasting.REGULAR_AUTOCAST_BUTTON) {
+            player.setFightType(FightType.STAFF_POUND);
+            player.getPacketSender().sendConfig(FightType.STAFF_POUND.getParentId(), FightType.STAFF_POUND.getChildId());
+        }
+
         switch (player.getSpellbook()) {
             case MagicSpellbook.ANCIENT:
                 if (!Autocasting.ANCIENT_SPELL_AUTOCAST_STAFFS.has(player.getEquipment().getWeapon().getId()) && player.getEquipment().getWeapon().getId() != ItemIdentifiers.AHRIMS_STAFF) {
@@ -131,11 +143,6 @@ export class Autocasting {
         if (!cbSpell) {
             return false;
         }
-        if (cbSpell.levelRequired() > player.getSkillManager().getCurrentLevel(Skill.MAGIC)) {
-            player.getPacketSender().sendMessage("You need a Magic level of at least " + cbSpell.levelRequired() + " to cast this spell.");
-            Autocasting.setAutocast(player, null);
-            return true;
-        }
         if (player.getCombat().getAutocastSpell() != null && player.getCombat().getAutocastSpell() == cbSpell) {
 
             //Player is already autocasting this spell. Turn it off.
@@ -143,7 +150,8 @@ export class Autocasting {
 
         } else {
 
-            //Set the new autocast spell
+            // OSRS behavior: selecting an autocast spell is allowed even if current Magic
+            // level is below requirement. Cast checks happen when combat tries to cast.
             Autocasting.setAutocast(player, cbSpell);
 
         }
@@ -160,10 +168,20 @@ export class Autocasting {
             return;
         }
 
+        const defensiveAutocast = player.getFightType()?.getStyle?.() == FightStyle.DEFENSIVE;
+
         if (spell == null) {
-            player.getPacketSender().sendAutocastId(-1).sendConfig(108, 3);
+            // No autocast selected: clear both regular/defensive mode bits.
+            player.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
         } else {
-            player.getPacketSender().sendAutocastId(spell.spellId()).sendConfig(108, 1);
+            const autocastButtonId = Autocasting.resolveAutocastButtonId(spell);
+            // Interface cache truth (widgets 349/24111):
+            // 108 == 1 -> regular autocast button highlighted
+            // 108 == 2 -> defensive autocast button highlighted
+            // 108 == 3 -> no autocast selected
+            // Client highlights the currently selected autocast by matching this id
+            // against spell button widget ids in the autocast tab, not spell ids.
+            player.getPacketSender().sendAutocastId(autocastButtonId).sendConfig(108, defensiveAutocast ? 2 : 1);
         }
 
         getBonusManager().update(player);
@@ -172,10 +190,22 @@ export class Autocasting {
 
     private static updateConfigsOnAutocast(player: Player, autocast: boolean) {
         if (autocast) {
-            player.getPacketSender().sendConfig(FightType.STAFF_BASH.getParentId(), 3);
-            player.getPacketSender().sendConfig(FightType.STAFF_FOCUS.getParentId(), 3);
-            player.getPacketSender().sendConfig(FightType.STAFF_POUND.getParentId(), 3);
+            const currentStyle = player.getFightType()?.getChildId?.();
+            const childId = Number.isInteger(currentStyle) ? currentStyle : FightType.STAFF_POUND.getChildId();
+            // Keep the weapon style config aligned with selected autocast mode (regular vs defensive).
+            // Sending `3` here forces the plain autocast visual state in some client builds.
+            player.getPacketSender().sendConfig(FightType.STAFF_BASH.getParentId(), childId);
         }
+    }
+
+    private static resolveAutocastButtonId(spell: CombatSpell): number {
+        for (const [buttonId, mappedSpell] of Autocasting.AUTOCAST_SPELLS.entries()) {
+            if (mappedSpell === spell) {
+                return buttonId;
+            }
+        }
+        // Fallback keeps behavior stable if a spell is missing from the button map.
+        return spell?.spellId?.() ?? -1;
     }
 
 

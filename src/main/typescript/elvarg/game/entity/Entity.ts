@@ -11,6 +11,7 @@ export abstract class Entity {
      */
     private location: Location = (GameConstants?.DEFAULT_LOCATION?.clone?.() ?? new Location(0, 0));
     private area: Area | null = null;
+    private flags = new Set<string>();
     /**
      * The Entities constructor.
      *
@@ -66,5 +67,49 @@ export abstract class Entity {
 
     public getPrivateArea(): any {
         return this.area ?? null;
+    }
+
+    public hasFlag(flag: string): boolean {
+        return typeof flag === "string" && this.flags.has(flag);
+    }
+
+    public setFlag(flag: string, enabled = true): this {
+        if (typeof flag !== "string") {
+            return this;
+        }
+        const normalized = flag.trim();
+        if (normalized.length === 0) {
+            return this;
+        }
+        if (enabled) {
+            this.flags.add(normalized);
+        } else {
+            this.flags.delete(normalized);
+        }
+        return this;
+    }
+
+    public removeFlag(flag: string): this {
+        return this.setFlag(flag, false);
+    }
+
+    public getFlags(): string[] {
+        return Array.from(this.flags);
+    }
+
+    public setFlags(flags: Iterable<string> | null | undefined): this {
+        this.flags.clear();
+        if (flags == null) {
+            return this;
+        }
+        for (const flag of flags) {
+            this.setFlag(flag, true);
+        }
+        return this;
+    }
+
+    public clearFlags(): this {
+        this.flags.clear();
+        return this;
     }
 }

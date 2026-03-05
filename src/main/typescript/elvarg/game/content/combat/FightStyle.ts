@@ -15,8 +15,12 @@ export abstract class FightStyle {
 
     static DEFENSIVE = new class extends FightStyle {
         skill(type: CombatType) {
+            // Defensive combat styles split XP into offence + defence for ranged/magic.
+            // Melee defensive remains defence-only.
             return type === CombatType.RANGED
                 ? [Skill.RANGED.getIndex(), Skill.DEFENCE.getIndex()]
+                : type === CombatType.MAGIC
+                    ? [Skill.MAGIC.getIndex(), Skill.DEFENCE.getIndex()]
                 : [Skill.DEFENCE.getIndex()];
         }
     }

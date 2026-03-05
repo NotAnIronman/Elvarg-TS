@@ -31,7 +31,7 @@ export class PlayerUpdating {
     private static readonly DEBUG_LOG_DIR = path.join(process.cwd(), "logs");
     private static readonly DEBUG_LOG_FILE = path.join(
         PlayerUpdating.DEBUG_LOG_DIR,
-        "player_update_bits.log"
+        "player-update-bits.log"
     );
     private static debugReady = false;
     private static updateSequence = 0;

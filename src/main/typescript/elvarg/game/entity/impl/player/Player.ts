@@ -567,7 +567,8 @@ export class Player extends Mobile {
         if (autocastSpell != null && this.getEquipment().hasStaffEquipped()) {
             Autocasting.setAutocast(this, autocastSpell);
         } else {
-            this.getPacketSender().sendAutocastId(-1).sendConfig(108, 3);
+            // No autocast selected on login: clear regular/defensive autocast mode bits.
+            this.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
         }
 
         // Keep baseline right-click player interactions available outside wilderness/duel areas.
