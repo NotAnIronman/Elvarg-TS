@@ -9,6 +9,9 @@ const {
   queueRouteAndFlagAppearance,
   randomInRange,
 } = require("../navigation/BotNavigation");
+const {
+  handlePlayerAttackReaction,
+} = require("../policies/PlayerAttackReactionPolicy");
 const { Item } = require("../../../../src/main/typescript/elvarg/game/model/Item");
 const { ItemIds } = require("../../../../src/main/typescript/elvarg/util/IdEnums");
 const Mining = require("../../../skills/Mining.plugin");
@@ -45,6 +48,59 @@ class MiningBehavior {
       state.mining.nextActionAt = 0;
     }
     return true;
+  }
+  onNpcAggroAttempt({ event }) {
+    if (!event || event.allow !== null) {
+      return false;
+    }
+    event.allow = false;
+    return true;
+  }
+
+  onNpcCombatDetected({ player, combat, attacker, target }) {
+    const attackerIsNpc = attacker?.isNpc?.() === true;
+    const targetIsNpc = target?.isNpc?.() === true;
+    if (!attackerIsNpc && !targetIsNpc) {
+      return false;
+    }
+    combat?.reset?.();
+    player?.setFollowing?.(null);
+    player?.setMobileInteraction?.(null);
+    player?.setPositionToFace?.(null);
+    return true;
+  }
+
+  onPlayerAttackReaction(payload) {
+    return handlePlayerAttackReaction({
+      ...payload,
+      behaviorMode: this.behaviorMode,
+      api: this.api,
+    });
+  }
+
+  collectTrackedObjectIds() {
+    const ids = [];
+    for (const rock of Mining.ROCKS ?? []) {
+      for (const objectId of rock?.objectIds ?? []) {
+        if (Number.isFinite(objectId)) {
+          ids.push(objectId);
+        }
+      }
+    }
+    return ids;
+  }
+
+  appendStatusLines({ lines, state, nowMs, helpers = {} }) {
+    if (!Array.isArray(lines) || !state?.mining) {
+      return;
+    }
+    const formatPoint = helpers?.formatPoint ?? (() => "n/a");
+    const msRemainingLabel = helpers?.msRemainingLabel ?? (() => "n/a");
+    lines.push(
+      `mining target=${formatPoint(
+        state.mining.target
+      )} nextAction=${msRemainingLabel(state.mining.nextActionAt, nowMs)}`
+    );
   }
 
   startMode({ player, state, nowMs, activeForMs, reason = "auto_switch" }) {
@@ -540,7 +596,15 @@ class MiningBehavior {
 
 const MINING_MODE_DESCRIPTOR = Object.freeze({
   key: "mining",
+  assignable: true,
   modeProperty: "MINING",
+  autonomous: Object.freeze({
+    strategy: "start",
+    weight: 0.15,
+    minMs: 30000,
+    maxMs: 105000,
+    priority: 40,
+  }),
   requiredHooks: [
     "activateMode",
     "startMode",

@@ -9,6 +9,18 @@ const HOME_TELEPORT_START_ANIMATION = new Animation(714);
 const HOME_TELEPORT_END_ANIMATION = new Animation(715);
 const HOME_TELEPORT_START_GRAPHIC = new Graphic(308, 50);
 let BANK_RUN_SEQUENCE = 0;
+const DEFAULT_TRANSITION_PROFILE = Object.freeze({ resetTraversal: true });
+const MODE_TRANSITION_PROFILE_OVERRIDES = Object.freeze({
+  ROAMING: Object.freeze({ resetTraversal: false }),
+});
+const RESUMABLE_MODE_KEYS = Object.freeze([
+  "ROAMING",
+  "WOODCUTTING",
+  "MINING",
+  "SMELTING",
+  "FIREMAKING",
+  "SPARRING",
+]);
 
 function createRoamingBehaviorState() {
   return {
@@ -55,6 +67,17 @@ function createFiremakingBehaviorState() {
     nextActionAt: 0,
     bankTarget: null,
     lightTile: null,
+    travelTarget: null,
+  };
+}
+
+function createSmeltingBehaviorState() {
+  return {
+    phase: "withdraw",
+    nextActionAt: 0,
+    recipeBarId: null,
+    bankTarget: null,
+    furnaceTarget: null,
     travelTarget: null,
   };
 }
@@ -140,6 +163,18 @@ function clearFiremakingBehaviorState(state) {
   state.firemaking.travelTarget = null;
 }
 
+function clearSmeltingBehaviorState(state) {
+  if (!state?.smelting) {
+    return;
+  }
+  state.smelting.phase = "withdraw";
+  state.smelting.nextActionAt = 0;
+  state.smelting.recipeBarId = null;
+  state.smelting.bankTarget = null;
+  state.smelting.furnaceTarget = null;
+  state.smelting.travelTarget = null;
+}
+
 function clearBankRunBehaviorState(state) {
   if (!state?.bankRun) {
     return;
@@ -199,57 +234,94 @@ function clearAllBehaviorStates(state) {
   clearWoodcuttingBehaviorState(state);
   clearMiningBehaviorState(state);
   clearFiremakingBehaviorState(state);
+  clearSmeltingBehaviorState(state);
   clearBankRunBehaviorState(state);
   clearSparringBehaviorState(state);
+}
+
+function restoreSuppressedAutoRetaliate(player, state, nextMode) {
+  if (
+    !player ||
+    !state ||
+    state.bankRun?.suppressAutoRetaliate !== true ||
+    state.mode === nextMode
+  ) {
+    return;
+  }
+  const previousAutoRetaliate = state.bankRun.previousAutoRetaliate;
+  player.setAutoRetaliate(
+    typeof previousAutoRetaliate === "boolean" ? previousAutoRetaliate : true
+  );
+  state.bankRun.suppressAutoRetaliate = false;
+  state.bankRun.previousAutoRetaliate = null;
+}
+
+function clearCombatState(player) {
+  if (!player) {
+    return;
+  }
+  player.getCombat?.()?.reset?.();
+  player.setCombatFollowing?.(null);
+}
+
+function applyModeTransitionSideEffects(player, state, mode, options = {}) {
+  restoreSuppressedAutoRetaliate(player, state, mode);
+  if (options.resetMovement !== false) {
+    resetMovementState(player);
+  } else {
+    clearMovementRequest(player);
+  }
+  if (options.resetCombat !== false) {
+    clearCombatState(player);
+  }
+  if (options.clearFollow !== false) {
+    clearFollowState(player, state);
+  }
 }
 
 function applyModeTransition(player, state, mode, options = {}) {
   if (!state) {
     return;
   }
-  if (
-    player &&
-    state.bankRun?.suppressAutoRetaliate === true &&
-    state.mode !== mode
-  ) {
-    const previousAutoRetaliate = state.bankRun.previousAutoRetaliate;
-    player.setAutoRetaliate(
-      typeof previousAutoRetaliate === "boolean" ? previousAutoRetaliate : true
-    );
-    state.bankRun.suppressAutoRetaliate = false;
-    state.bankRun.previousAutoRetaliate = null;
-  }
-  clearMovementRequest(player);
-  const clearFollow = options.clearFollow !== false;
+  applyModeTransitionSideEffects(player, state, mode, options);
   const resetTraversal = options.resetTraversal === true;
   state.mode = mode;
-  if (clearFollow) {
-    clearFollowState(player, state);
-  }
   clearAllBehaviorStates(state);
   if (resetTraversal) {
     state.awaitingDitchTransition = null;
   }
 }
 
-function setModeRoaming(player, state, behaviorMode) {
-  if (!state) {
-    return;
+function resolveBehaviorModeValue(behaviorMode, modeKey) {
+  if (!behaviorMode || typeof modeKey !== "string" || modeKey.length === 0) {
+    return null;
   }
-  // Roaming state is isolated so other behavior families can be swapped in
-  // without changing the generic player-bot lifecycle structure.
-  applyModeTransition(player, state, behaviorMode.ROAMING, {
-    resetTraversal: false,
-  });
+  const mode = behaviorMode[modeKey];
+  return typeof mode === "string" && mode.length > 0 ? mode : null;
+}
+
+function transitionToMode(player, state, behaviorMode, modeKey, overrideOptions = null) {
+  if (!state) {
+    return false;
+  }
+  const mode = resolveBehaviorModeValue(behaviorMode, modeKey);
+  if (!mode) {
+    return false;
+  }
+  const profile =
+    overrideOptions ??
+    MODE_TRANSITION_PROFILE_OVERRIDES[modeKey] ??
+    DEFAULT_TRANSITION_PROFILE;
+  applyModeTransition(player, state, mode, profile);
+  return true;
+}
+
+function setModeRoaming(player, state, behaviorMode) {
+  transitionToMode(player, state, behaviorMode, "ROAMING");
 }
 
 function setModeReturnHome(player, state, behaviorMode) {
-  if (!state) {
-    return;
-  }
-  applyModeTransition(player, state, behaviorMode.RETURN_HOME, {
-    resetTraversal: true,
-  });
+  transitionToMode(player, state, behaviorMode, "RETURN_HOME");
 }
 
 function setModeFollowBack(
@@ -268,9 +340,9 @@ function setModeFollowBack(
     return false;
   }
 
-  applyModeTransition(player, state, behaviorMode.FOLLOW_BACK, {
-    resetTraversal: true,
-  });
+  if (!transitionToMode(player, state, behaviorMode, "FOLLOW_BACK")) {
+    return false;
+  }
   state.followTargetUsername = followTargetUsername;
   state.followUntilMs = nowMs + followBackDurationMs;
   state.nextFollowRepathAt = 0;
@@ -279,8 +351,6 @@ function setModeFollowBack(
     y: followTarget.getLocation().getY(),
     z: followTarget.getLocation().getZ(),
   };
-
-  resetMovementState(player);
   player.setFollowing(followTarget);
   player.setMobileInteraction(followTarget);
   player.setPositionToFace(followTarget.getLocation());
@@ -288,39 +358,27 @@ function setModeFollowBack(
 }
 
 function setModeWoodcutting(player, state, behaviorMode) {
-  if (!state) {
-    return;
-  }
-  applyModeTransition(player, state, behaviorMode.WOODCUTTING, {
-    resetTraversal: true,
-  });
+  transitionToMode(player, state, behaviorMode, "WOODCUTTING");
 }
 
 function setModeMining(player, state, behaviorMode) {
-  if (!state) {
-    return;
-  }
-  applyModeTransition(player, state, behaviorMode.MINING, {
-    resetTraversal: true,
-  });
+  transitionToMode(player, state, behaviorMode, "MINING");
 }
 
 function setModeFiremaking(player, state, behaviorMode) {
-  if (!state) {
-    return;
-  }
-  applyModeTransition(player, state, behaviorMode.FIREMAKING, {
-    resetTraversal: true,
-  });
+  transitionToMode(player, state, behaviorMode, "FIREMAKING");
+}
+
+function setModeSmelting(player, state, behaviorMode) {
+  transitionToMode(player, state, behaviorMode, "SMELTING");
 }
 
 function isResumableMode(mode, behaviorMode) {
-  return (
-    mode === behaviorMode.ROAMING ||
-    mode === behaviorMode.WOODCUTTING ||
-    mode === behaviorMode.MINING ||
-    mode === behaviorMode.FIREMAKING ||
-    mode === behaviorMode.SPARRING
+  if (!behaviorMode) {
+    return false;
+  }
+  return RESUMABLE_MODE_KEYS.some(
+    (modeKey) => resolveBehaviorModeValue(behaviorMode, modeKey) === mode
   );
 }
 
@@ -366,9 +424,9 @@ function setModeBankRun(player, state, behaviorMode, options = {}) {
       }
     : null;
 
-  applyModeTransition(player, state, behaviorMode.BANK_RUN, {
-    resetTraversal: true,
-  });
+  if (!transitionToMode(player, state, behaviorMode, "BANK_RUN")) {
+    return false;
+  }
   if (!state.bankRun) {
     state.bankRun = createBankRunBehaviorState();
   }
@@ -421,9 +479,9 @@ function setModeSparring(
     return false;
   }
 
-  applyModeTransition(player, state, behaviorMode.SPARRING, {
-    resetTraversal: true,
-  });
+  if (!transitionToMode(player, state, behaviorMode, "SPARRING")) {
+    return false;
+  }
   if (!state.sparring) {
     state.sparring = createSparringBehaviorState();
   }
@@ -431,8 +489,6 @@ function setModeSparring(
   state.sparring.targetUsername = targetUsername;
   state.sparring.endsAt = nowMs + durationMs;
   state.sparring.nextActionAt = nowMs;
-
-  resetMovementState(player);
   player.setFollowing(targetPlayer);
   player.setMobileInteraction(targetPlayer);
   player.setPositionToFace(targetPlayer.getLocation());
@@ -478,6 +534,7 @@ function createInitialState(home, behaviorMode) {
     woodcutting: createWoodcuttingBehaviorState(),
     mining: createMiningBehaviorState(),
     firemaking: createFiremakingBehaviorState(),
+    smelting: createSmeltingBehaviorState(),
     bankRun: createBankRunBehaviorState(),
     sparring: createSparringBehaviorState(),
     autonomy: createAutonomyState(),
@@ -514,6 +571,7 @@ module.exports = {
   setModeBankRun,
   setModeWoodcutting,
   setModeMining,
+  setModeSmelting,
   setModeFiremaking,
   teleportHome,
 };

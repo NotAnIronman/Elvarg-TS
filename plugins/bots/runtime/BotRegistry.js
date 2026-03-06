@@ -9,7 +9,7 @@ function createBotRegistry(options) {
     createBotPlayer,
     spawnLocationForIndex,
     createInitialState,
-    applyForcedModeForDiagnosis,
+    applyForcedModeForDiagnosis: applyForcedModeForDiagnosisFn,
     createController,
     ensureBehaviorTaskStarted,
     emitPlayerLogin,
@@ -24,6 +24,10 @@ function createBotRegistry(options) {
     entries: providedEntries,
     entriesByUsername: providedEntriesByUsername,
   } = options;
+  const applyForcedModeForDiagnosis =
+    typeof applyForcedModeForDiagnosisFn === "function"
+      ? applyForcedModeForDiagnosisFn
+      : () => {};
 
   const botStatesByName = providedBotStatesByName ?? new Map();
   const botmeUsernames = providedBotmeUsernames ?? new Set();

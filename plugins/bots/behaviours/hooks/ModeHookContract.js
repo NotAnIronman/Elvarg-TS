@@ -12,6 +12,11 @@ const KNOWN_MODE_HOOKS = Object.freeze([
   "onPostTraversalRetryScheduled",
   "getModeLogContext",
   "onBankRunResume",
+  "onNpcAggroAttempt",
+  "onNpcCombatDetected",
+  "onPlayerAttackReaction",
+  "collectTrackedObjectIds",
+  "appendStatusLines",
 ]);
 
 function validateModeHandlerContracts(

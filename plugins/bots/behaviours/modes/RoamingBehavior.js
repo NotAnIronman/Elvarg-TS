@@ -3,7 +3,11 @@ const {
   isAtTarget,
   queueRouteAndFlagAppearance,
   randomInRange,
+  retargetAfterBlocked,
 } = require("../navigation/BotNavigation");
+const {
+  handlePlayerAttackReaction,
+} = require("../policies/PlayerAttackReactionPolicy");
 const { clearFollowState, setModeRoaming } = require("../state/PlayerBotState");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 
@@ -51,6 +55,89 @@ class RoamingBehavior {
       reason,
       activeForMs: durationMs,
     });
+    return true;
+  }
+
+  onPlayerAttackReaction(payload) {
+    return handlePlayerAttackReaction({
+      ...payload,
+      behaviorMode: this.behaviorMode,
+      api: this.api,
+    });
+  }
+
+  appendStatusLines({ lines, state, nowMs, helpers = {} }) {
+    if (!Array.isArray(lines) || !state?.roaming) {
+      return;
+    }
+    const formatPoint = helpers?.formatPoint ?? (() => "n/a");
+    const msRemainingLabel = helpers?.msRemainingLabel ?? (() => "n/a");
+    lines.push(
+      `roaming target=${formatPoint(
+        state.roaming.target
+      )} nextWalk=${msRemainingLabel(state.roaming.nextWalkAt, nowMs)}`
+    );
+  }
+
+  handleBlocked({
+    player,
+    state,
+    event,
+    nowMs,
+    traversalService,
+    blockedRetargetMinDelayMs,
+    blockedRetargetMaxDelayMs,
+  }) {
+    if (!player || !state || !traversalService) {
+      return false;
+    }
+    if (!state.roaming?.target) {
+      const fallbackTarget = chooseNextTarget(player, state, this.botWalkRadius);
+      if (!fallbackTarget) {
+        return true;
+      }
+      state.roaming.target = fallbackTarget;
+    }
+
+    const traversalObject = traversalService.findObjectOnRoute(
+      player,
+      event?.from,
+      state.roaming.target
+    );
+    if (!traversalObject) {
+      retargetAfterBlocked(
+        player,
+        state,
+        this.api,
+        "no_ditch_on_route",
+        event,
+        nowMs,
+        blockedRetargetMinDelayMs,
+        blockedRetargetMaxDelayMs,
+        this.botWalkRadius
+      );
+      return true;
+    }
+
+    const currentY = player.getLocation().getY();
+    const targetY = state.roaming.target.y;
+    const objectY = traversalObject.getLocation().getY();
+    if (!traversalService.isObjectBetween(currentY, targetY, objectY)) {
+      retargetAfterBlocked(
+        player,
+        state,
+        this.api,
+        "ditch_not_between_current_and_target",
+        event,
+        nowMs,
+        blockedRetargetMinDelayMs,
+        blockedRetargetMaxDelayMs,
+        this.botWalkRadius
+      );
+      return true;
+    }
+
+    traversalService.requestCross(player, state, traversalObject, nowMs);
     return true;
   }
 
@@ -108,8 +195,16 @@ class RoamingBehavior {
 
 const ROAMING_MODE_DESCRIPTOR = Object.freeze({
   key: "roaming",
+  assignable: true,
   modeProperty: "ROAMING",
-  requiredHooks: ["activateMode", "startMode"],
+  autonomous: Object.freeze({
+    strategy: "start",
+    weight: 0.4,
+    minMs: 22000,
+    maxMs: 80000,
+    priority: 60,
+  }),
+  requiredHooks: ["activateMode", "startMode", "handleBlocked"],
   create({ botStatesByName, api, behaviorMode, options = {} }) {
     return new RoamingBehavior(botStatesByName, {
       api,

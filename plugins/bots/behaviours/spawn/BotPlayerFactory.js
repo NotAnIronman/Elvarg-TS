@@ -78,6 +78,7 @@ function createBotPlayer(username, spawn) {
   bot.setUsername(username);
   bot.setLongUsername(Misc.stringToLongBigInt(username));
   bot.setHostAddress("bot");
+  bot.setAutoRetaliate(false);
   bot.setRunning(false);
   bot.setLastKnownRegion(spawn.clone());
   bot.setRegionHeight(spawn.getZ());

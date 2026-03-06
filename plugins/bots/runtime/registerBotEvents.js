@@ -8,6 +8,7 @@ function registerBotEvents(options) {
     followBackTrigger,
     combatReactionTrigger,
     pathBlockedHandler,
+    npcAggroPolicyHandler,
   } = options;
 
   api.onPlayerDisconnect(({ player, username }) => {
@@ -55,6 +56,18 @@ function registerBotEvents(options) {
   api.onPlayerPathBlocked((event) => {
     pathBlockedHandler.handle(event, Date.now());
   });
+
+  if (npcAggroPolicyHandler) {
+    api.onCanAttack((event) => {
+      npcAggroPolicyHandler.handleCanAttack(event);
+    });
+    api.onPlayerProcess((event) => {
+      npcAggroPolicyHandler.handlePlayerProcess({
+        ...event,
+        nowMs: Date.now(),
+      });
+    });
+  }
 }
 
 module.exports = {

@@ -29,11 +29,10 @@ function resolveBotNodeContext(context, botStatesByName, options = {}) {
     return null;
   }
   if (requireNotInCombat) {
-    const combat = typeof player.getCombat === "function" ? player.getCombat() : null;
-    const hasTarget = combat && typeof combat.getTarget === "function" && combat.getTarget();
-    const hasAttacker = combat && typeof combat.getAttacker === "function" && combat.getAttacker();
-    const isCombatFollowing =
-      typeof player.getCombatFollowing === "function" && player.getCombatFollowing();
+    const combat = player.getCombat?.();
+    const hasTarget = combat?.getTarget?.();
+    const hasAttacker = combat?.getAttacker?.();
+    const isCombatFollowing = player.getCombatFollowing?.();
     if (hasTarget || hasAttacker || isCombatFollowing) {
       return null;
     }

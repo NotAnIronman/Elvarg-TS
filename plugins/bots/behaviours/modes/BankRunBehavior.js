@@ -7,6 +7,9 @@ const { ObjectIds } = require("../../../../src/main/typescript/elvarg/util/IdEnu
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 const { callModeHook } = require("../hooks/ModeHookContract");
 const { queueRouteAndFlagAppearance } = require("../navigation/BotNavigation");
+const {
+  handlePlayerAttackReaction,
+} = require("../policies/PlayerAttackReactionPolicy");
 
 const WALK_COMMAND_COOLDOWN_MS = 900;
 const RETRY_SEARCH_MS = 1500;
@@ -43,6 +46,56 @@ class BankRunBehavior {
 
   getTraversalTarget(state) {
     return state?.bankRun?.travelTarget ?? null;
+  }
+  onNpcAggroAttempt({ event }) {
+    if (!event || event.allow !== null) {
+      return false;
+    }
+    event.allow = false;
+    return true;
+  }
+
+  onNpcCombatDetected({ player, combat, attacker, target }) {
+    const attackerIsNpc = attacker?.isNpc?.() === true;
+    const targetIsNpc = target?.isNpc?.() === true;
+    if (!attackerIsNpc && !targetIsNpc) {
+      return false;
+    }
+    combat?.reset?.();
+    player?.setFollowing?.(null);
+    player?.setMobileInteraction?.(null);
+    player?.setPositionToFace?.(null);
+    return true;
+  }
+
+  onPlayerAttackReaction(payload) {
+    return handlePlayerAttackReaction({
+      ...payload,
+      behaviorMode: this.behaviorMode,
+      api: this.api,
+    });
+  }
+
+  collectTrackedObjectIds() {
+    return [...BANK_BOOTH_IDS];
+  }
+
+  appendStatusLines({ lines, state, nowMs, helpers = {} }) {
+    if (!Array.isArray(lines) || !state?.bankRun) {
+      return;
+    }
+    const formatPoint = helpers?.formatPoint ?? (() => "n/a");
+    const msRemainingLabel = helpers?.msRemainingLabel ?? (() => "n/a");
+    lines.push(
+      `bankRun id=${state.bankRun.id ?? "n/a"} phase=${
+        state.bankRun.phase ?? "n/a"
+      } next=${msRemainingLabel(
+        state.bankRun.nextActionAt,
+        nowMs
+      )} travel=${formatPoint(state.bankRun.travelTarget)} return=${formatPoint(
+        state.bankRun.returnTo
+      )}`
+    );
   }
 
   setTraversalTarget(stateOrPayload, maybeTarget) {

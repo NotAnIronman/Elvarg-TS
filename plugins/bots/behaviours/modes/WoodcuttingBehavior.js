@@ -13,6 +13,9 @@ const {
   queueRouteAndFlagAppearance,
   randomInRange,
 } = require("../navigation/BotNavigation");
+const {
+  handlePlayerAttackReaction,
+} = require("../policies/PlayerAttackReactionPolicy");
 const Woodcutting = require("../../../skills/Woodcutting.plugin");
 const {Item} = require("../../../../src/main/typescript/elvarg/game/model/Item");
 
@@ -62,6 +65,59 @@ class WoodcuttingBehavior {
       state.woodcutting.avoidedTargets = [];
     }
     return true;
+  }
+  onNpcAggroAttempt({ event }) {
+    if (!event || event.allow !== null) {
+      return false;
+    }
+    event.allow = false;
+    return true;
+  }
+
+  onNpcCombatDetected({ player, combat, attacker, target }) {
+    const attackerIsNpc = attacker?.isNpc?.() === true;
+    const targetIsNpc = target?.isNpc?.() === true;
+    if (!attackerIsNpc && !targetIsNpc) {
+      return false;
+    }
+    combat?.reset?.();
+    player?.setFollowing?.(null);
+    player?.setMobileInteraction?.(null);
+    player?.setPositionToFace?.(null);
+    return true;
+  }
+
+  onPlayerAttackReaction(payload) {
+    return handlePlayerAttackReaction({
+      ...payload,
+      behaviorMode: this.behaviorMode,
+      api: this.api,
+    });
+  }
+
+  collectTrackedObjectIds() {
+    const ids = [];
+    for (const tree of Woodcutting.TREES ?? []) {
+      for (const objectId of tree?.objectIds ?? []) {
+        if (Number.isFinite(objectId)) {
+          ids.push(objectId);
+        }
+      }
+    }
+    return ids;
+  }
+
+  appendStatusLines({ lines, state, nowMs, helpers = {} }) {
+    if (!Array.isArray(lines) || !state?.woodcutting) {
+      return;
+    }
+    const formatPoint = helpers?.formatPoint ?? (() => "n/a");
+    const msRemainingLabel = helpers?.msRemainingLabel ?? (() => "n/a");
+    lines.push(
+      `woodcutting target=${formatPoint(
+        state.woodcutting.target
+      )} nextAction=${msRemainingLabel(state.woodcutting.nextActionAt, nowMs)}`
+    );
   }
 
   startMode({ player, state, nowMs, activeForMs, reason = "auto_switch" }) {
@@ -674,7 +730,15 @@ class WoodcuttingBehavior {
 
 const WOODCUTTING_MODE_DESCRIPTOR = Object.freeze({
   key: "woodcutting",
+  assignable: true,
   modeProperty: "WOODCUTTING",
+  autonomous: Object.freeze({
+    strategy: "start",
+    weight: 0.3,
+    minMs: 30000,
+    maxMs: 105000,
+    priority: 30,
+  }),
   requiredHooks: [
     "activateMode",
     "startMode",

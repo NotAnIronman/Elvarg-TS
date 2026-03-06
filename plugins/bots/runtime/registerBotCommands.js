@@ -29,6 +29,10 @@ function registerBotCommands(options) {
       api: botApi,
       errorEvent: "bot_mode_activation_error",
     }) === true;
+  const supportedBehaviorList = [
+    ...Object.keys(assignableBehaviors ?? {}).sort((a, b) => a.localeCompare(b)),
+    "auto",
+  ].join("|");
 
   api.registerCommand("botme", ({ player, parts }) => {
     if (!hasAdminRights(player)) {
@@ -105,9 +109,7 @@ function registerBotCommands(options) {
     if (!usernameArg || !behaviorArg) {
       player
         .getPacketSender()
-        .sendMessage(
-          "Usage: ::bh <username> <roaming|woodcutting|mining|firemaking|auto>"
-        );
+        .sendMessage(`Usage: ::bh <username> <${supportedBehaviorList}>`);
       return true;
     }
 
@@ -116,9 +118,7 @@ function registerBotCommands(options) {
     if (!normalizedBehavior && !wantsAuto) {
       player
         .getPacketSender()
-        .sendMessage(
-          "Unknown behaviour. Supported: roaming, woodcutting, mining, firemaking, auto"
-        );
+        .sendMessage(`Unknown behaviour. Supported: ${supportedBehaviorList}`);
       return true;
     }
 

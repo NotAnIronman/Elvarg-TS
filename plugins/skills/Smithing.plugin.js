@@ -392,6 +392,8 @@ const EQUIPMENT_CONTAINER_ACTION_OPCODES = [
 ];
 
 let smithingTick = 0;
+const ACTIVE_SMITHING_SESSIONS = new Map();
+const ACTIVE_SMELTERS = new Set();
 
 function getSmithingLevel(player) {
   return player.getSkillManager().getCurrentLevel(Skill.SMITHING);
@@ -496,6 +498,7 @@ function stopSmithingSession(activeSessions, player, resetAnimation = true) {
     return;
   }
   activeSessions.delete(player);
+  ACTIVE_SMELTERS.delete(player);
   if (resetAnimation) {
     player.performAnimation(Animation.DEFAULT_RESET_ANIMATION);
   }
@@ -549,6 +552,7 @@ function startSmeltingSession(activeSessions, player, recipe, amount) {
     interval: SMELTING_INTERVAL_TICKS,
     nextActionTick: smithingTick + SMELTING_INTERVAL_TICKS,
   });
+  ACTIVE_SMELTERS.add(player);
   Sounds.sendSound(player, Sound.SMELTING);
   player.performAnimation(SMELT_ANIMATION);
   return true;
@@ -594,9 +598,18 @@ function startSmithingSession(activeSessions, player, smithable, amount) {
     interval: smithingInterval,
     nextActionTick: smithingTick + smithingInterval,
   });
+  ACTIVE_SMELTERS.delete(player);
   Sounds.sendSound(player, Sound.SMITHING);
   player.performAnimation(SMITH_ANIMATION);
   return true;
+}
+
+function startBotSmelting(player, recipe, amount) {
+  return startSmeltingSession(ACTIVE_SMITHING_SESSIONS, player, recipe, amount);
+}
+
+function isSmeltingActive(player) {
+  return ACTIVE_SMELTERS.has(player);
 }
 
 function handleSmeltingButton(activeSessions, player, buttonId) {
@@ -725,7 +738,7 @@ class SmithingTask extends Task {
 
     for (const [player, session] of this.activeSessions) {
       if (!player || !player.isRegistered?.() || player.getHitpoints() <= 0) {
-        this.activeSessions.delete(player);
+        stopSmithingSession(this.activeSessions, player, false);
         continue;
       }
 
@@ -916,15 +929,18 @@ function handleEquipmentContainerAction(activeSessions, player, opcode, payload)
 
 module.exports = {
   name: "Smithing",
+  FURNACE_OBJECT_IDS,
+  SMELTING_RECIPES,
+  startBotSmelting,
+  isSmeltingActive,
   register(api) {
-    const activeSessions = new Map();
-    TaskManager.submit(new SmithingTask(activeSessions));
+    TaskManager.submit(new SmithingTask(ACTIVE_SMITHING_SESSIONS));
 
     api.onPlayerDisconnect(({ player }) => {
-      stopSmithingSession(activeSessions, player, false);
+      stopSmithingSession(ACTIVE_SMITHING_SESSIONS, player, false);
     });
     api.onPlayerLevelUp(({ player }) => {
-      stopSmithingSession(activeSessions, player, false);
+      stopSmithingSession(ACTIVE_SMITHING_SESSIONS, player, false);
     });
 
     api.onObjectFirstClick([...FURNACE_OBJECT_IDS], ({ player }) => {
@@ -943,11 +959,11 @@ module.exports = {
     });
 
     api.onButton(SMELTING_BUTTON_IDS, ({ player, buttonId }) =>
-      handleSmeltingButton(activeSessions, player, buttonId)
+      handleSmeltingButton(ACTIVE_SMITHING_SESSIONS, player, buttonId)
     );
 
     api.onInterfaceActionButton(SMELTING_BUTTON_IDS, ({ player, buttonId }) =>
-      handleSmeltingButton(activeSessions, player, buttonId)
+      handleSmeltingButton(ACTIVE_SMITHING_SESSIONS, player, buttonId)
     );
 
     api.onEstablishedPacket(({ opcode, packet, player }) => {
@@ -955,7 +971,7 @@ module.exports = {
         return;
       }
       handleEquipmentContainerAction(
-        activeSessions,
+        ACTIVE_SMITHING_SESSIONS,
         player,
         opcode,
         packet.getBuffer()

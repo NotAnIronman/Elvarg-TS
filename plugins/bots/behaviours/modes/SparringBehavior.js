@@ -2,6 +2,9 @@ const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { randomInRange } = require("../navigation/BotNavigation");
 const {
+  handlePlayerAttackReaction,
+} = require("../policies/PlayerAttackReactionPolicy");
+const {
   resetMovementState,
   setModeRoaming,
   setModeSparring,
@@ -29,6 +32,27 @@ class SparringBehavior {
     return true;
   }
 
+  onPlayerAttackReaction(payload) {
+    return handlePlayerAttackReaction({
+      ...payload,
+      behaviorMode: this.behaviorMode,
+      api: this.api,
+    });
+  }
+
+  appendStatusLines({ lines, state, nowMs, helpers = {} }) {
+    if (!Array.isArray(lines) || !state?.sparring) {
+      return;
+    }
+    const msRemainingLabel = helpers?.msRemainingLabel ?? (() => "n/a");
+    lines.push(
+      `sparring target=${state.sparring.targetUsername ?? "n/a"} ends=${msRemainingLabel(
+        state.sparring.endsAt,
+        nowMs
+      )}`
+    );
+  }
+
   getModeLogContext(state) {
     return {
       targetUsername: state?.sparring?.targetUsername ?? null,
@@ -37,6 +61,9 @@ class SparringBehavior {
 
   behaviorRequirementsMet({ player, state, nowMs }) {
     if (!player || !state) {
+      return false;
+    }
+    if (state.mode !== this.behaviorMode.ROAMING) {
       return false;
     }
     if (!Wilderness.isIn(player)) {
@@ -77,6 +104,9 @@ class SparringBehavior {
     const sourcePlayer = entry?.player;
     const sourceState = entry?.state;
     if (!sourcePlayer || !sourceState) {
+      return false;
+    }
+    if (sourceState.mode !== this.behaviorMode.ROAMING) {
       return false;
     }
     if (!Wilderness.isIn(sourcePlayer)) {
@@ -271,6 +301,7 @@ class SparringBehavior {
       return false;
     }
     if (
+      candidateState.mode !== this.behaviorMode.ROAMING ||
       candidateState.mode === this.behaviorMode.FOLLOW_BACK ||
       candidateState.mode === this.behaviorMode.RETURN_HOME ||
       candidateState.mode === this.behaviorMode.SPARRING
@@ -471,6 +502,22 @@ class SparringBehavior {
 const SPARRING_MODE_DESCRIPTOR = Object.freeze({
   key: "sparring",
   modeProperty: "SPARRING",
+  autonomous: Object.freeze({
+    strategy: "try_start",
+    weight: 0.05,
+    params: Object.freeze({
+      sparringMinMs: SPARRING_DURATION_DEFAULT_MIN_MS,
+      sparringMaxMs: SPARRING_DURATION_DEFAULT_MAX_MS,
+      sparringMaxDistanceTiles: 16,
+      postSparringCooldownMinMs: POST_SPARRING_COOLDOWN_MIN_MS,
+      postSparringCooldownMaxMs: POST_SPARRING_COOLDOWN_MAX_MS,
+    }),
+    priority: 10,
+  }),
+  modeStopParams: Object.freeze({
+    postSparringCooldownMinMs: POST_SPARRING_COOLDOWN_MIN_MS,
+    postSparringCooldownMaxMs: POST_SPARRING_COOLDOWN_MAX_MS,
+  }),
   requiredHooks: [
     "behaviorRequirementsMet",
     "tryStartMode",

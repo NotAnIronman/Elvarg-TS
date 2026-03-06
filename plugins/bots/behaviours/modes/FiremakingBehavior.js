@@ -8,6 +8,9 @@ const { ObjectIds } = require("../../../../src/main/typescript/elvarg/util/IdEnu
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 const { queueRouteAndFlagAppearance } = require("../navigation/BotNavigation");
 const {
+  handlePlayerAttackReaction,
+} = require("../policies/PlayerAttackReactionPolicy");
+const {
   setModeFiremaking,
   setModeWoodcutting,
 } = require("../state/PlayerBotState");
@@ -76,7 +79,52 @@ class FiremakingBehavior {
     if (!inventory) {
       return false;
     }
-    return this.findBestLogId(inventory) != null || this.hasBankLogs(player);
+    return this.findBestLogId(player, inventory) != null || this.hasBankLogs(player);
+  }
+  onNpcAggroAttempt({ event }) {
+    if (!event || event.allow !== null) {
+      return false;
+    }
+    event.allow = false;
+    return true;
+  }
+
+  onNpcCombatDetected({ player, combat, attacker, target }) {
+    const attackerIsNpc = attacker?.isNpc?.() === true;
+    const targetIsNpc = target?.isNpc?.() === true;
+    if (!attackerIsNpc && !targetIsNpc) {
+      return false;
+    }
+    combat?.reset?.();
+    player?.setFollowing?.(null);
+    player?.setMobileInteraction?.(null);
+    player?.setPositionToFace?.(null);
+    return true;
+  }
+
+  onPlayerAttackReaction(payload) {
+    return handlePlayerAttackReaction({
+      ...payload,
+      behaviorMode: this.behaviorMode,
+      api: this.api,
+    });
+  }
+
+  collectTrackedObjectIds() {
+    return [...BANK_BOOTH_IDS];
+  }
+
+  appendStatusLines({ lines, state, nowMs, helpers = {} }) {
+    if (!Array.isArray(lines) || !state?.firemaking) {
+      return;
+    }
+    const formatPoint = helpers?.formatPoint ?? (() => "n/a");
+    const msRemainingLabel = helpers?.msRemainingLabel ?? (() => "n/a");
+    lines.push(
+      `firemaking phase=${state.firemaking.phase ?? "n/a"} lightTile=${formatPoint(
+        state.firemaking.lightTile
+      )} next=${msRemainingLabel(state.firemaking.nextActionAt, nowMs)}`
+    );
   }
 
   activateMode({ player, state }) {
@@ -281,7 +329,7 @@ class FiremakingBehavior {
       return "failure";
     }
 
-    const logId = this.findBestLogId(inventory);
+    const logId = this.findBestLogId(player, inventory);
     if (!logId) {
       return this.acquireLogsFromBank(player, state, nowMs);
     }
@@ -335,10 +383,14 @@ class FiremakingBehavior {
     }
   }
 
-  findBestLogId(inventory) {
+  findBestLogId(player, inventory) {
     for (let i = Woodcutting.TREE_LOG_IDS.length - 1; i >= 0; i--) {
       const logId = Woodcutting.TREE_LOG_IDS[i];
-      if (inventory.contains(logId) && Firemaking.isWoodcuttingLog?.(logId)) {
+      if (
+        inventory.contains(logId) &&
+        Firemaking.isWoodcuttingLog?.(logId) &&
+        Firemaking.canPlayerBurnLog?.(player, logId)
+      ) {
         return logId;
       }
     }
@@ -348,6 +400,9 @@ class FiremakingBehavior {
   hasBankLogs(player) {
     for (let i = Woodcutting.TREE_LOG_IDS.length - 1; i >= 0; i--) {
       const logId = Woodcutting.TREE_LOG_IDS[i];
+      if (!Firemaking.canPlayerBurnLog?.(player, logId)) {
+        continue;
+      }
       const tab = Bank.getTabForItem(player, logId);
       const bank = player.getBank?.(tab);
       if ((bank?.getAmount?.(logId) ?? 0) > 0) {
@@ -499,6 +554,9 @@ class FiremakingBehavior {
       if (!Firemaking.isWoodcuttingLog?.(logId)) {
         continue;
       }
+      if (!Firemaking.canPlayerBurnLog?.(player, logId)) {
+        continue;
+      }
       const tab = Bank.getTabForItem(player, logId);
       const bank = player.getBank?.(tab);
       const available = bank?.getAmount?.(logId) ?? 0;
@@ -517,7 +575,7 @@ class FiremakingBehavior {
 
   moveToLightTile(player, state, nowMs) {
     const firemaking = state.firemaking;
-    if (!this.findBestLogId(player.getInventory?.())) {
+    if (!this.findBestLogId(player, player.getInventory?.())) {
       firemaking.phase = "to_bank";
       firemaking.lightTile = null;
       firemaking.travelTarget = null;
@@ -752,7 +810,15 @@ class FiremakingBehavior {
 
 const FIREMAKING_MODE_DESCRIPTOR = Object.freeze({
   key: "firemaking",
+  assignable: true,
   modeProperty: "FIREMAKING",
+  autonomous: Object.freeze({
+    strategy: "start",
+    weight: 0.15,
+    minMs: 22000,
+    maxMs: 70000,
+    priority: 20,
+  }),
   requiredHooks: [
     "registerEvents",
     "behaviorRequirementsMet",

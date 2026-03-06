@@ -54,6 +54,11 @@ class PlayerBotBehaviorTreeFactory {
       this.behaviorMode.MINING,
       "MINING"
     );
+    this.smeltingBehavior = requireModeBehavior(
+      this.modeHandlers,
+      this.behaviorMode.SMELTING,
+      "SMELTING"
+    );
     this.bankRunBehavior = requireModeBehavior(
       this.modeHandlers,
       this.behaviorMode.BANK_RUN,
@@ -113,6 +118,14 @@ class PlayerBotBehaviorTreeFactory {
           requiredMode: this.behaviorMode.MINING,
         }),
         new ActionNode((context) => this.miningBehavior.tick(context)),
+      ]),
+      new SequenceNode([
+        new BotReadyConditionNode(this.botStatesByName, {
+          requiredMode: this.behaviorMode.SMELTING,
+          requireNotInCombat: false,
+          requireNotBusy: false,
+        }),
+        new ActionNode((context) => this.smeltingBehavior.tick(context)),
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {

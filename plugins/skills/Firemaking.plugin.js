@@ -64,6 +64,14 @@ function getFiremakingMaxLevel(player) {
   return player.getSkillManager().getMaxLevel(Skill.FIREMAKING);
 }
 
+function canPlayerBurnLog(player, itemId) {
+  const log = LIGHTABLE_LOGS_BY_ID.get(itemId);
+  if (!player || !log) {
+    return false;
+  }
+  return getFiremakingLevel(player) >= log.requiredLevel;
+}
+
 function requiresTinderbox(player) {
   return !(player?.isPlayerBot?.() === true);
 }
@@ -578,9 +586,16 @@ function startBotInventoryFiremaking(player, preferredLogId = null) {
     if (log && !inventory.contains(log.itemId)) {
       log = null;
     }
+    if (log && !canPlayerBurnLog(player, log.itemId)) {
+      log = null;
+    }
   }
   if (!log) {
-    for (const candidate of LIGHTABLE_LOGS) {
+    for (let i = LIGHTABLE_LOGS.length - 1; i >= 0; i--) {
+      const candidate = LIGHTABLE_LOGS[i];
+      if (!canPlayerBurnLog(player, candidate.itemId)) {
+        continue;
+      }
       if (inventory.contains(candidate.itemId)) {
         log = candidate;
         break;
@@ -602,6 +617,7 @@ function startBotInventoryFiremaking(player, preferredLogId = null) {
 module.exports = {
   name: "Firemaking",
   startBotInventoryFiremaking,
+  canPlayerBurnLog,
   isFiremakingActive(player) {
     return !!(activeSessionsRef && player && activeSessionsRef.has(player));
   },
