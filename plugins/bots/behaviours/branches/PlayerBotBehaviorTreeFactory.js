@@ -5,73 +5,76 @@ const {
   SequenceNode,
 } = require("../../../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { FollowBackActionNode } = require("../nodes/actions/FollowBackActionNode");
+const { EatFoodActionNode } = require("../nodes/actions/EatFoodActionNode");
 const {
   ProcessPendingMovementActionNode,
 } = require("../nodes/actions/ProcessPendingMovementActionNode");
 const { ReturnHomeActionNode } = require("../nodes/actions/ReturnHomeActionNode");
 const { BotReadyConditionNode } = require("../nodes/conditions/BotReadyConditionNode");
-const { RoamingBehavior } = require("../modes/RoamingBehavior");
-const { SparringBehavior } = require("../modes/SparringBehavior");
-const { WoodcuttingBehavior } = require("../modes/WoodcuttingBehavior");
-const { MiningBehavior } = require("../modes/MiningBehavior");
-const { FiremakingBehavior } = require("../modes/FiremakingBehavior");
-const { BankRunBehavior } = require("../modes/BankRunBehavior");
+
+function requireModeBehavior(modeHandlers, modeValue, label) {
+  const behavior = modeHandlers?.[modeValue];
+  if (!behavior || typeof behavior.tick !== "function") {
+    throw new Error(
+      `PlayerBotBehaviorTreeFactory missing mode handler for ${label} (${modeValue}) with tick(context).`
+    );
+  }
+  return behavior;
+}
 
 class PlayerBotBehaviorTreeFactory {
   constructor(botStatesByName, api, options) {
     this.botStatesByName = botStatesByName;
     this.api = api;
     this.behaviorMode = options.behaviorMode;
-    this.endpointLingerMs = options.endpointLingerMs;
     this.followRepathIntervalMs = options.followRepathIntervalMs;
+    this.botEatLowHpRatio = options.botEatLowHpRatio;
+    this.botEatHealMin = options.botEatHealMin;
+    this.botEatHealMax = options.botEatHealMax;
     this.botHomeRadius = options.botHomeRadius;
     this.blockedRetargetMinDelayMs = options.blockedRetargetMinDelayMs;
-    this.botWalkRadius = options.botWalkRadius;
-    this.roamingMinMs = options.roamingMinMs;
-    this.roamingMaxMs = options.roamingMaxMs;
-    this.modeBehaviors = options.modeBehaviors ?? {};
-    this.roamingBehavior =
-      this.modeBehaviors.roaming ??
-      new RoamingBehavior(botStatesByName, {
-        api,
-        behaviorMode: this.behaviorMode,
-        endpointLingerMs: this.endpointLingerMs,
-        botWalkRadius: this.botWalkRadius,
-        roamingMinMs: this.roamingMinMs,
-        roamingMaxMs: this.roamingMaxMs,
-      });
-    this.sparringBehavior =
-      this.modeBehaviors.sparring ??
-      new SparringBehavior(botStatesByName, api, {
-        behaviorMode: this.behaviorMode,
-      });
-    this.woodcuttingBehavior =
-      this.modeBehaviors.woodcutting ??
-      new WoodcuttingBehavior(botStatesByName, api, {
-        behaviorMode: this.behaviorMode,
-        botWalkRadius: this.botWalkRadius,
-      });
-    this.miningBehavior =
-      this.modeBehaviors.mining ??
-      new MiningBehavior(botStatesByName, api, {
-        behaviorMode: this.behaviorMode,
-        botWalkRadius: this.botWalkRadius,
-      });
-    this.bankRunBehavior =
-      this.modeBehaviors.bankRun ??
-      new BankRunBehavior(botStatesByName, api, {
-        behaviorMode: this.behaviorMode,
-      });
-    this.firemakingBehavior =
-      this.modeBehaviors.firemaking ??
-      new FiremakingBehavior(botStatesByName, api, {
-        behaviorMode: this.behaviorMode,
-      });
+    this.modeHandlers = options.modeHandlers;
+    this.roamingBehavior = requireModeBehavior(
+      this.modeHandlers,
+      this.behaviorMode.ROAMING,
+      "ROAMING"
+    );
+    this.sparringBehavior = requireModeBehavior(
+      this.modeHandlers,
+      this.behaviorMode.SPARRING,
+      "SPARRING"
+    );
+    this.woodcuttingBehavior = requireModeBehavior(
+      this.modeHandlers,
+      this.behaviorMode.WOODCUTTING,
+      "WOODCUTTING"
+    );
+    this.miningBehavior = requireModeBehavior(
+      this.modeHandlers,
+      this.behaviorMode.MINING,
+      "MINING"
+    );
+    this.bankRunBehavior = requireModeBehavior(
+      this.modeHandlers,
+      this.behaviorMode.BANK_RUN,
+      "BANK_RUN"
+    );
+    this.firemakingBehavior = requireModeBehavior(
+      this.modeHandlers,
+      this.behaviorMode.FIREMAKING,
+      "FIREMAKING"
+    );
+    this.eatFoodActionNode = new EatFoodActionNode(botStatesByName, api, {
+      lowHpRatio: this.botEatLowHpRatio,
+      minHeal: this.botEatHealMin,
+      maxHeal: this.botEatHealMax,
+    });
   }
 
   create(cooldownMs, initialDelayMs) {
     return new SelectorNode([
       new ProcessPendingMovementActionNode(this.botStatesByName, this.api),
+      new ActionNode((context) => this.eatFoodActionNode.tick(context)),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {
           requiredMode: this.behaviorMode.RETURN_HOME,

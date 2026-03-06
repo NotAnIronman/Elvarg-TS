@@ -2,6 +2,7 @@ const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/
 const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { ItemContainerActionPacketListener } = require("../../src/main/typescript/elvarg/net/packet/impl/ItemContainerActionPacketListener");
+const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { handleBankContainerAction } = require("./BankBooths.plugin");
 
@@ -80,6 +81,10 @@ function decodeDepositAction(opcode, payload) {
 }
 
 function handleDepositContainerAction(player, opcode, payload) {
+  if (PluginManager.emitCanBank(player) === false) {
+    return true;
+  }
+
   const decoded = decodeDepositAction(opcode, payload);
   if (!decoded || decoded.iface !== CONTAINER) return false;
 
@@ -97,6 +102,9 @@ function handleDepositContainerAction(player, opcode, payload) {
 
 function handleDepositButton(player, button) {
   if (!player || player.getInterfaceId?.() !== IFACE) return false;
+  if (PluginManager.emitCanBank(player) === false) {
+    return true;
+  }
   if (BTN_DEPOSIT.has(button)) {
     Bank.depositItems(player, player.getInventory(), true);
     refresh(player);
@@ -120,6 +128,10 @@ module.exports = {
   register(api) {
     api.onObjectFirstClick(DEPOSIT_BOX_IDS, (event) => {
       if (!isDepositBooth(event)) return;
+      if (PluginManager.emitCanBank(event.player) === false) {
+        event.handled = true;
+        return;
+      }
       open(event.player);
       event.handled = true;
     });

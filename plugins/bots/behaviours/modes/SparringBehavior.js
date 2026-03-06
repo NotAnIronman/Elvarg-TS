@@ -468,6 +468,24 @@ class SparringBehavior {
   }
 }
 
+const SPARRING_MODE_DESCRIPTOR = Object.freeze({
+  key: "sparring",
+  modeProperty: "SPARRING",
+  requiredHooks: [
+    "behaviorRequirementsMet",
+    "tryStartMode",
+    "stopMode",
+    "isModeStateValid",
+    "handleBlocked",
+  ],
+  create({ botStatesByName, api, behaviorMode }) {
+    return new SparringBehavior(botStatesByName, api, {
+      behaviorMode,
+    });
+  },
+});
+
 module.exports = {
   SparringBehavior,
+  SPARRING_MODE_DESCRIPTOR,
 };

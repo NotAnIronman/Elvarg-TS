@@ -737,7 +737,7 @@ export class PlayerSave {
         playerSave.title = player.getLoyaltyTitle();
         playerSave.rights = player.getRights();
         playerSave.donatorRights = player.getDonatorRights();
-        playerSave.position = player.getLocation();
+        playerSave.position = player.getLocation()?.clone?.() ?? new Location(3089, 3524, 0);
         playerSave.spellBook = player.getSpellbook();
         playerSave.fightType = player.getFightType();
         playerSave.autocastSpellId = player.getCombat().getAutocastSpell()?.spellId?.() ?? -1;
@@ -771,22 +771,31 @@ export class PlayerSave {
         playerSave.normalKills = player.getNormalKills();
         playerSave.killstreak = player.getKillstreak();
         playerSave.highestKillstreak = player.getHighestKillstreak();
-        playerSave.recentKills = player.getRecentKills();
+        playerSave.recentKills = [...(player.getRecentKills() ?? [])];
         playerSave.deaths = player.getDeaths();
         playerSave.points = player.getPoints();
         playerSave.poisonDamage = player.getPoisonDamage();
         playerSave.blowpipeScales = player.getBlowpipeScales();
 
         // RC pouches
-        playerSave.pouches = player.getPouches();
+        playerSave.pouches = (player.getPouches() ?? []).map((pouchState: any) => ({
+            pouch: pouchState?.pouch ? { ...pouchState.pouch } : pouchState?.pouch,
+            runeEssenceAmt: Number.isFinite(pouchState?.runeEssenceAmt) ? pouchState.runeEssenceAmt : 0,
+            pureEssenceAmt: Number.isFinite(pouchState?.pureEssenceAmt) ? pouchState.pureEssenceAmt : 0,
+        }));
 
-        playerSave.inventory = player.getInventory().getItems();
-        playerSave.equipment = player.getEquipment().getItems();
+        playerSave.inventory = player.getInventory().getCopiedItems();
+        playerSave.equipment = player.getEquipment().getCopiedItems();
         playerSave.appearance = PlayerSave.sanitizeAppearance(player.getAppearance().getLook());
-        playerSave.skills = player.getSkillManager().getSkills();
-        playerSave.quickPrayers = player.getQuickPrayers().getPrayers();
+        const liveSkills = player.getSkillManager().getSkills();
+        const clonedSkills = new Skills();
+        clonedSkills.level = [...(liveSkills?.level ?? clonedSkills.level)];
+        clonedSkills.maxLevel = [...(liveSkills?.maxLevel ?? clonedSkills.maxLevel)];
+        clonedSkills.experience = [...(liveSkills?.experience ?? clonedSkills.experience)];
+        playerSave.skills = clonedSkills;
+        playerSave.quickPrayers = [...(player.getQuickPrayers().getPrayers() ?? [])];
         playerSave.questPoints = player.getQuestPoints();
-        playerSave.questProgress = player.getQuestProgress();
+        playerSave.questProgress = new Map(player.getQuestProgress()?.entries?.() ?? []);
         playerSave.flags = PlayerSave.normalizeFlags(player.getFlags());
 
         playerSave.friends = PlayerSave.normalizeRelationListToStrings(
@@ -798,7 +807,7 @@ export class PlayerSave {
             PlayerSave.MAX_IGNORES
         );
 
-        playerSave.presets = player.getPresets();
+        playerSave.presets = [...(player.getPresets() ?? [])];
 
         let banks = new Map<number, Item[]>();
 
@@ -808,7 +817,13 @@ export class PlayerSave {
                 continue;
             }
             if (player.getBank(i) !== null) {
-                banks.set(i, player.getBank(i).getValidItems());
+                banks.set(
+                    i,
+                    player
+                        .getBank(i)
+                        .getValidItems()
+                        .map((item) => item?.clone?.() ?? new Item(item?.getId?.() ?? -1, item?.getAmount?.() ?? 0))
+                );
             }
         }
         playerSave.banks = banks;

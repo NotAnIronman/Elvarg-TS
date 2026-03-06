@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { GameConstants } from "../game/GameConstants";
 import { MapRegionReplacementManager } from "../game/collision/MapRegionReplacementManager";
+import { MultiChatboxPrompt } from "../game/model/menu/MultiChatboxPrompt";
 import { PacketExecutor } from "../net/packet/PacketExecutor";
 import {
   PluginApi,
@@ -33,6 +34,11 @@ import {
   PluginRegionLoadedEvent,
   PluginSpellDisabledEvent,
   PluginCanTradeEvent,
+  PluginCanBankEvent,
+  PluginCanShopEvent,
+  PluginShouldDropItemsOnDeathEvent,
+  PluginShouldKeepItemOnDeathEvent,
+  PluginPlayerDeathItemDropEvent,
   PluginCombatDamageProvider,
   PluginCombatEngine,
   PluginCombatMethodResolver,
@@ -97,6 +103,11 @@ export class PluginManager {
   private static firemakingBlockedHooks: PluginHook<PluginFiremakingBlockedEvent>[] = [];
   private static canDrinkHooks: PluginHook<PluginCanDrinkEvent>[] = [];
   private static canTradeHooks: PluginHook<PluginCanTradeEvent>[] = [];
+  private static canBankHooks: PluginHook<PluginCanBankEvent>[] = [];
+  private static canShopHooks: PluginHook<PluginCanShopEvent>[] = [];
+  private static shouldDropItemsOnDeathHooks: PluginHook<PluginShouldDropItemsOnDeathEvent>[] = [];
+  private static shouldKeepItemOnDeathHooks: PluginHook<PluginShouldKeepItemOnDeathEvent>[] = [];
+  private static playerDeathItemDropHooks: PluginHook<PluginPlayerDeathItemDropEvent>[] = [];
   private static canEquipHooks: PluginHook<PluginCanEquipEvent>[] = [];
   private static spellDisabledHooks: PluginHook<PluginSpellDisabledEvent>[] = [];
   private static npcAggressionToleranceHooks: PluginHook<PluginNpcAggressionToleranceEvent>[] = [];
@@ -512,6 +523,94 @@ export class PluginManager {
     return null;
   }
 
+  public static emitCanBank(player: any): boolean | null {
+    const event: PluginCanBankEvent = { player, allow: null };
+    for (const hook of PluginManager.canBankHooks) {
+      PluginManager.executeHook(hook, event, "can_bank", "can_bank");
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitCanShop(player: any, shopId: number | null = null): boolean | null {
+    const event: PluginCanShopEvent = { player, shopId, allow: null };
+    for (const hook of PluginManager.canShopHooks) {
+      PluginManager.executeHook(hook, event, "can_shop", "can_shop");
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitShouldDropItemsOnDeath(player: any, killer: any): boolean | null {
+    const event: PluginShouldDropItemsOnDeathEvent = {
+      player,
+      killer,
+      shouldDrop: null,
+    };
+    for (const hook of PluginManager.shouldDropItemsOnDeathHooks) {
+      PluginManager.executeHook(
+        hook,
+        event,
+        "should_drop_items_on_death",
+        "should_drop_items_on_death"
+      );
+      if (event.shouldDrop !== null) {
+        return event.shouldDrop;
+      }
+    }
+    return null;
+  }
+
+  public static emitShouldKeepItemOnDeath(player: any, item: any): boolean | null {
+    const event: PluginShouldKeepItemOnDeathEvent = {
+      player,
+      item,
+      keep: null,
+    };
+    for (const hook of PluginManager.shouldKeepItemOnDeathHooks) {
+      PluginManager.executeHook(
+        hook,
+        event,
+        "should_keep_item_on_death",
+        "should_keep_item_on_death"
+      );
+      if (event.keep !== null) {
+        return event.keep;
+      }
+    }
+    return null;
+  }
+
+  public static emitPlayerDeathItemDrop(
+    event: PluginPlayerDeathItemDropEvent
+  ): boolean {
+    if (
+      !event ||
+      !event.player ||
+      !event.item ||
+      event.handled
+    ) {
+      return false;
+    }
+
+    for (const hook of PluginManager.playerDeathItemDropHooks) {
+      if (event.handled) {
+        break;
+      }
+      PluginManager.executeHook(
+        hook,
+        event,
+        "player_death_item_drop",
+        "player_death_item_drop"
+      );
+    }
+    return event.handled === true;
+  }
+
   public static emitCanEquip(player: any, slot: number, item: any): boolean | null {
     const event: PluginCanEquipEvent = { player, slot, item, allow: null };
     for (const hook of PluginManager.canEquipHooks) {
@@ -650,7 +749,7 @@ export class PluginManager {
     return event.handled === true;
   }
 
-  public static emitItemDrop(event: PluginItemDropEvent): boolean {
+  public static emitItemDropPolicy(event: PluginItemDropEvent): boolean {
     for (const hook of PluginManager.itemDropHooks) {
       PluginManager.executeHook(hook, event, "item_drop", "item_drop");
     }
@@ -665,6 +764,11 @@ export class PluginManager {
       !Number.isInteger(event.buttonId)
     ) {
       return false;
+    }
+
+    if (MultiChatboxPrompt.handleButtonClick(event)) {
+      event.handled = true;
+      return true;
     }
 
     for (const hook of PluginManager.buttonClickHooks) {
@@ -687,6 +791,11 @@ export class PluginManager {
       !Number.isInteger(event.action)
     ) {
       return false;
+    }
+
+    if (MultiChatboxPrompt.handleInterfaceActionClick(event)) {
+      event.handled = true;
+      return true;
     }
 
     for (const hook of PluginManager.interfaceActionClickHooks) {
@@ -1392,6 +1501,76 @@ export class PluginManager {
           },
         });
       },
+      onCanBank: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canBankHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanShop: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canShopHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onShouldDropItemsOnDeath: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.shouldDropItemsOnDeathHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onShouldKeepItemOnDeath: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.shouldKeepItemOnDeathHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.item) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerDeathItemDrop: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerDeathItemDropHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.item) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onCanEquip: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -1607,7 +1786,7 @@ export class PluginManager {
           },
         });
       },
-      onItemDrop: (handler) => {
+      onItemDropPolicy: (handler) => {
         if (typeof handler !== "function") {
           return;
         }
@@ -1670,6 +1849,20 @@ export class PluginManager {
             handler(event);
           },
         });
+      },
+      sendMultiChatboxPrompt: (
+        player,
+        title,
+        ...optionCallbackPairs: Array<
+          string | ((player: any, optionIndex: number, optionText: string) => void)
+        >
+      ) => {
+        return MultiChatboxPrompt.showPrompt(
+          pluginName,
+          player,
+          title,
+          optionCallbackPairs
+        );
       },
       onButton: (buttonIds, handler) => {
         registerButtonHook(buttonIds, handler, "button");

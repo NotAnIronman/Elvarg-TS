@@ -37,12 +37,7 @@ class FollowBackTrigger {
   }
 
   handleEstablishedPacket({ opcode, packet, player }, nowMs = Date.now()) {
-    if (
-      (opcode !== PacketConstants.FOLLOW_PLAYER_OPCODE &&
-        opcode !== PacketConstants.ATTACK_PLAYER_OPCODE) ||
-      !packet ||
-      !player
-    ) {
+    if (opcode !== PacketConstants.FOLLOW_PLAYER_OPCODE || !packet || !player) {
       return;
     }
 
@@ -65,35 +60,11 @@ class FollowBackTrigger {
       return;
     }
 
-    if (opcode === PacketConstants.FOLLOW_PLAYER_OPCODE) {
-      if (state.mode !== this.behaviorMode.ROAMING) {
-        const behaviorLabel = this.formatBehaviorLabel(state.mode);
-        followed?.sendChat?.(`Sorry, busy with: ${behaviorLabel}.`);
-        return;
-      }
-      if (
-        !setModeFollowBack(
-          followed,
-          state,
-          player,
-          nowMs,
-          this.followBackDurationMs,
-          this.behaviorMode
-        )
-      ) {
-        return;
-      }
-
-      this.api.log("follow_back_started", {
-        bot: followedUsername,
-        follower: player.getUsername?.() ?? null,
-        durationMs: this.followBackDurationMs,
-      });
+    if (state.mode !== this.behaviorMode.ROAMING) {
+      const behaviorLabel = this.formatBehaviorLabel(state.mode);
+      followed?.sendChat?.(`Sorry, busy with: ${behaviorLabel}.`);
       return;
     }
-
-    // Attack packets should immediately pull bots out of roaming and into
-    // follow/retaliation state so roaming pathing never competes with combat.
     if (
       !setModeFollowBack(
         followed,
@@ -106,26 +77,9 @@ class FollowBackTrigger {
     ) {
       return;
     }
-
-    const botCombat = followed.getCombat?.();
-    if (botCombat && followed.getHitpoints?.() > 0 && player.getHitpoints?.() > 0) {
-      // Avoid pre-emptive attack on raw ATTACK_PLAYER packet.
-      // Let normal combat state establish first (under-attack / queued hit),
-      // otherwise bots can be treated as initiators and get incorrectly skulled.
-      const alreadyUnderAttackByPlayer = botCombat.getAttacker?.() === player;
-      const alreadyHasDamageFromPlayer = botCombat.damageMapContains?.(player) === true;
-      if (
-        (alreadyUnderAttackByPlayer || alreadyHasDamageFromPlayer) &&
-        botCombat.getTarget?.() !== player
-      ) {
-        followed.getMovementQueue?.().reset?.();
-        botCombat.attack(player);
-      }
-    }
-
-    this.api.log("follow_back_started_by_attack", {
+    this.api.log("follow_back_started", {
       bot: followedUsername,
-      attacker: player.getUsername?.() ?? null,
+      follower: player.getUsername?.() ?? null,
       durationMs: this.followBackDurationMs,
     });
   }

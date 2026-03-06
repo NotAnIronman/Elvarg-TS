@@ -17,6 +17,8 @@ import { DialogueOption } from "../../dialogues/DialogueOption";
 import { EnteredSyntaxAction } from "../../EnteredSyntaxAction";
 import { DialogueOptionAction } from "../../dialogues/DialogueOptionAction";
 import { exec } from "child_process";
+const getPluginManager = () =>
+    require("../../../../plugins/PluginManager").PluginManager as typeof import("../../../../plugins/PluginManager").PluginManager;
 
 export class Bank extends ItemContainer {
     full(): ItemContainer;
@@ -573,6 +575,10 @@ export class Bank extends ItemContainer {
     }
 
     public open(): Bank {
+        const pluginCanBank = getPluginManager().emitCanBank(this.getPlayer());
+        if (pluginCanBank === false) {
+            return this;
+        }
 
         // Update player status
         this.getPlayer().setStatus(PlayerStatus.BANKING);
@@ -747,4 +753,3 @@ class bankEntered implements EnteredSyntaxAction{
     }
 
 }
-

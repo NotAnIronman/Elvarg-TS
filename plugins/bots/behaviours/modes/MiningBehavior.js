@@ -538,6 +538,27 @@ class MiningBehavior {
   }
 }
 
+const MINING_MODE_DESCRIPTOR = Object.freeze({
+  key: "mining",
+  modeProperty: "MINING",
+  requiredHooks: [
+    "activateMode",
+    "startMode",
+    "onBankRunResume",
+    "getTraversalTarget",
+    "setTraversalTarget",
+    "handleBlocked",
+  ],
+  create({ botStatesByName, api, behaviorMode, options = {}, objectSearch }) {
+    return new MiningBehavior(botStatesByName, api, {
+      behaviorMode,
+      botWalkRadius: options.botWalkRadius,
+      objectSearch,
+    });
+  },
+});
+
 module.exports = {
   MiningBehavior,
+  MINING_MODE_DESCRIPTOR,
 };

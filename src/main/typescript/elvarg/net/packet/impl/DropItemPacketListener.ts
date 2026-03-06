@@ -8,6 +8,7 @@ import { Sounds } from "../../../game/Sounds";
 import { PlayerRights } from "../../../game/model/rights/PlayerRights";
 import { Wilderness } from "../../../game/content/wilderness/Wilderness";
 import { PluginManager } from "../../../plugins/PluginManager";
+import { PluginItemDropEvent } from "../../../plugins/PluginTypes";
 
 export class DropItemPacketListener implements PacketExecutor {
   public static destroyItemInterface(player: any, item: any) {
@@ -63,25 +64,29 @@ export class DropItemPacketListener implements PacketExecutor {
     // Stop skilling..
     player.getSkillManager().stopSkillable();
 
-    const pluginHandled = PluginManager.emitItemDrop({
+    const dropEvent: PluginItemDropEvent = {
       player,
       interfaceId,
       item,
       itemId: id,
       slot: itemSlot,
+      dropToGround: true,
       handled: false,
-    });
+    };
+    const pluginHandled = PluginManager.emitItemDropPolicy(dropEvent);
     if (pluginHandled) {
       Sounds.sendSound(player, Sound.DROP_ITEM);
       return;
     }
 
     if (item.getDefinition().isDropable()) {
-      const toFloor = new Item(item.getId(), item.getAmount());
-      if (Wilderness.isIn(player)) {
-        ItemOnGroundManager.registerGlobal(player, toFloor);
-      } else {
-        ItemOnGroundManager.registers(player, toFloor);
+      if (dropEvent.dropToGround !== false) {
+        const toFloor = new Item(item.getId(), item.getAmount());
+        if (Wilderness.isIn(player)) {
+          ItemOnGroundManager.registerGlobal(player, toFloor);
+        } else {
+          ItemOnGroundManager.registers(player, toFloor);
+        }
       }
 
       player.getInventory().setItem(itemSlot, new Item(-1, 0)).refreshItems();

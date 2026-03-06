@@ -93,7 +93,18 @@ class JsonPlayerPersistence extends PlayerPersistence {
     }
 
     const save = PlayerSave.fromPlayer(player);
-    if (player.hasFlag?.(PlayerFlags.PRESET_ACTIVE)) {
+    const persistedFlags = Array.isArray(save.getFlags?.())
+      ? save.getFlags().filter((flag) => flag !== PlayerFlags.PRESET_ACTIVE)
+      : [];
+    save.setFlags?.(persistedFlags);
+
+    const presetSnapshot = player.getAttribute?.(PlayerFlagAttributes.PRESET_SNAPSHOT);
+    const presetActiveByFlag = player.hasFlag?.(PlayerFlags.PRESET_ACTIVE) === true;
+    const presetActiveBySnapshot =
+      presetSnapshot != null && typeof presetSnapshot === "object";
+    const presetActive = presetActiveByFlag || presetActiveBySnapshot;
+
+    if (presetActive) {
       const baselineSave = this.resolvePresetBaselineSave(player);
       if (baselineSave) {
         this.preservePresetSensitiveState(save, baselineSave);

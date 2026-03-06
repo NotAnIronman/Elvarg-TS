@@ -19,7 +19,10 @@ const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/Task
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const {
   isPresetActive,
+  hasPresetSnapshot,
+  clearPresetState,
   markPresetActiveWithSnapshot,
+  restorePresetSnapshot,
 } = require("./PresetsState");
 
 const MAX_PRESETS = 10;
@@ -27,6 +30,7 @@ const PRESET_INTERFACE_ID = 45000;
 const OPEN_PRESETS_BUTTON = 31015;
 const TOGGLE_OPEN_ON_DEATH_BUTTON = 45060;
 const EDIT_PRESET_BUTTON = 45061;
+const CLEAR_PRESET_BUTTON = 45062;
 const LOAD_PRESET_BUTTON = 45064;
 const GLOBAL_PRESET_BUTTON_START = 45070;
 const GLOBAL_PRESET_BUTTON_END = 45079;
@@ -68,6 +72,7 @@ const PRESET_BUTTON_IDS = [
   OPEN_PRESETS_BUTTON,
   TOGGLE_OPEN_ON_DEATH_BUTTON,
   EDIT_PRESET_BUTTON,
+  CLEAR_PRESET_BUTTON,
   LOAD_PRESET_BUTTON,
   ...rangeInclusive(GLOBAL_PRESET_BUTTON_START, GLOBAL_PRESET_BUTTON_END),
   ...rangeInclusive(CUSTOM_PRESET_BUTTON_START, CUSTOM_PRESET_BUTTON_END),
@@ -234,7 +239,7 @@ function applyPreset(player, preset) {
     sender.sendMessage("You can't load a preset during a duel!");
     return false;
   }
-  const alreadyPresetActive = isPresetActive(player);
+  const alreadyPresetActive = isPresetActive(player) && hasPresetSnapshot(player);
   const prePresetSnapshot = alreadyPresetActive
     ? null
     : PlayerSave.fromPlayer(player);
@@ -363,12 +368,10 @@ function applyPreset(player, preset) {
   player.setSpecialPercentage(100);
   CombatSpecial.updateBar(player);
   player.getUpdateFlag().flag(Flag.APPEARANCE);
-  if (!alreadyPresetActive) {
-    markPresetActiveWithSnapshot(player, {
-      snapshot: prePresetSnapshot,
-      setFlag: true,
-    });
-  }
+  markPresetActiveWithSnapshot(player, {
+    snapshot: alreadyPresetActive ? undefined : prePresetSnapshot,
+    setFlag: true,
+  });
   return true;
 }
 
@@ -489,7 +492,25 @@ function handlePresetButton(player, buttonId) {
         .sendConfig(987, player.isOpenPresetsOnDeath() ? 0 : 1);
       return true;
     case EDIT_PRESET_BUTTON:
-      return promptEditCurrentPreset(player);
+    case CLEAR_PRESET_BUTTON: {
+      if (!isPresetActive(player)) {
+        player.getPacketSender().sendMessage("No active preset to clear.");
+        return true;
+      }
+      const restored = restorePresetSnapshot(player, { preserveLocation: true });
+      if (restored) {
+        player
+          .getPacketSender()
+          .sendMessage("Preset cleared. Your original character state has been restored.");
+        player.setCurrentPreset(null);
+        openPresetInterface(player, null);
+      } else {
+        player
+          .getPacketSender()
+          .sendMessage("Unable to clear preset: no preset snapshot was found.");
+      }
+      return true;
+    }
     case LOAD_PRESET_BUTTON: {
       const currentPreset = player.getCurrentPreset();
       if (!currentPreset) {
@@ -556,9 +577,68 @@ function isAtDefaultRespawn(player) {
   );
 }
 
+function handlePresetTradeRestriction(player, target) {
+  const playerPresetActive = isPresetActive(player);
+  const targetPresetActive = isPresetActive(target);
+  if (!playerPresetActive && !targetPresetActive) {
+    return false;
+  }
+
+  player
+    ?.getPacketSender?.()
+    ?.sendMessage?.("You cannot trade while a Preset is active.");
+
+  if (targetPresetActive) {
+    const requesterName = player?.getUsername?.() ?? "A player";
+    target
+      ?.getPacketSender?.()
+      ?.sendMessage?.(
+        `${requesterName} wants to trade with you, but you cannot trade while a Preset is active.`
+      );
+  }
+
+  return true;
+}
+
+function handlePresetBankRestriction(player) {
+  if (!isPresetActive(player)) {
+    return false;
+  }
+  player
+    ?.getPacketSender?.()
+    ?.sendMessage?.("You cannot open the bank while a Preset is active.");
+  return true;
+}
+
+function handlePresetShopRestriction(player) {
+  if (!isPresetActive(player)) {
+    return false;
+  }
+  player
+    ?.getPacketSender?.()
+    ?.sendMessage?.("You cannot open shops while a Preset is active.");
+  return true;
+}
+
+function applyPresetItemDropPolicy(event) {
+  const player = event?.player;
+  if (!isPresetActive(player)) {
+    return;
+  }
+  // Preset mode still allows drop actions, but dropped items must not enter the
+  // world economy. Let core remove the item and suppress the ground spawn only.
+  event.dropToGround = false;
+}
+
 module.exports = {
   name: "Presets",
   register(api) {
+    api.onPlayerLogin(({ player }) => {
+      if (isPresetActive(player) && !hasPresetSnapshot(player)) {
+        clearPresetState(player);
+      }
+    });
+
     api.onButton(PRESET_BUTTON_IDS, ({ player, buttonId }) =>
       handlePresetButton(player, buttonId)
     );
@@ -567,8 +647,42 @@ module.exports = {
       handlePresetButton(player, buttonId)
     );
 
+    api.onCanTrade((event) => {
+      if (handlePresetTradeRestriction(event.player, event.target)) {
+        event.allow = false;
+      }
+    });
+
+    api.onCanBank((event) => {
+      if (handlePresetBankRestriction(event.player)) {
+        event.allow = false;
+      }
+    });
+
+    api.onCanShop((event) => {
+      if (handlePresetShopRestriction(event.player)) {
+        event.allow = false;
+      }
+    });
+
+    api.onItemDropPolicy((event) => {
+      applyPresetItemDropPolicy(event);
+    });
+
+    api.onShouldDropItemsOnDeath((event) => {
+      if (isPresetActive(event.player)) {
+        event.shouldDrop = false;
+      }
+    });
+
     api.onPlayerDefeated(({ victim }) => {
-      if (!victim?.isOpenPresetsOnDeath?.()) {
+      if (!victim) {
+        return;
+      }
+
+      const shouldRestorePreset = isPresetActive(victim);
+      const shouldOpenPresetInterface = victim.isOpenPresetsOnDeath?.() === true;
+      if (!shouldRestorePreset && !shouldOpenPresetInterface) {
         return;
       }
 
@@ -583,10 +697,14 @@ module.exports = {
             if (!victim || !victim.isRegistered?.() || victim.getHitpoints?.() <= 0) {
               return;
             }
-            if (!isAtDefaultRespawn(victim)) {
-              return;
+
+            if (shouldRestorePreset) {
+              restorePresetSnapshot(victim, { preserveLocation: true });
             }
-            openPresetInterface(victim, victim.getCurrentPreset?.() ?? null);
+
+            if (shouldOpenPresetInterface && isAtDefaultRespawn(victim)) {
+              openPresetInterface(victim, victim.getCurrentPreset?.() ?? null);
+            }
           }
         })()
       );

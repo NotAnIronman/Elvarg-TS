@@ -1,6 +1,5 @@
 import { GameConstants } from "../../GameConstants";
 import { CombatFactory } from "../../content/combat/CombatFactory";
-import { Emblem } from "../../content/combat/bountyhunter/Emblem";
 import { ItemDefinition } from "../../definition/ItemDefinition";
 import { ItemOnGroundManager } from "../../entity/impl/grounditem/ItemOnGroundManager";
 import { Player } from "../../entity/impl/player/Player";
@@ -43,22 +42,47 @@ export class PlayerDeathTask extends Task {
                     if (this.player.getArea() != null) {
                         this.loseItems = this.player.getArea().dropItemsOnDeath(this.player, this.killer);
                     }
+                    const pluginShouldDropItems =
+                        this.loseItems
+                            ? PluginManager.emitShouldDropItemsOnDeath(this.player, this.killer ?? null)
+                            : null;
+                    const shouldDropItemsOnDeath =
+                        pluginShouldDropItems == null ? true : pluginShouldDropItems;
                     const droppedItems: Item[] = [];
                     const deathPosition = this.player.getLocation();
-                    // Always drop player bones on death.
+                    // Always drop player bones on death, independent of item-drop policy.
                     ItemOnGroundManager.registerLocation(
                         this.killer ? this.killer : this.player,
                         new Item(ItemIdentifiers.BONES),
                         deathPosition
                     );
                     if (this.loseItems) {
-                        const itemsToKeep = PlayerDeathTask.getItemsToKeep(this.player);
+                        const itemsToKeep = shouldDropItemsOnDeath
+                            ? PlayerDeathTask.getItemsToKeep(this.player)
+                            : [];
                         this.itemsToKeep = Array.isArray(itemsToKeep) ? itemsToKeep : [];
                         const playerItems = this.player.getInventory().getValidItems().concat(this.player.getEquipment().getValidItems());
                         const position = deathPosition;
                         let dropped = false;
 
                         for (let item of playerItems) {
+                            if (
+                                PluginManager.emitPlayerDeathItemDrop({
+                                    player: this.player,
+                                    killer: this.killer ?? null,
+                                    item,
+                                    location: position,
+                                    shouldDropItems: shouldDropItemsOnDeath,
+                                    handled: false,
+                                })
+                            ) {
+                                continue;
+                            }
+
+                            if (!shouldDropItemsOnDeath) {
+                                // Remove all carried items on death without ground spawns.
+                                continue;
+                            }
                             // Keep tradeable items
                             if (!item.getDefinition().isTradeable() || this.itemsToKeep.includes(item)) {
                                 if (!this.itemsToKeep.includes(item)) {
@@ -71,53 +95,17 @@ export class PlayerDeathTask extends Task {
                                 break;
                             }
 
-                            // Drop emblems but downgrade them a tier.
-                            if (
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_1.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_2.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_3.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_4.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_5.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_6.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_7.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_8.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_9.id ||
-                                item.getId() === Emblem.MYSTERIOUS_EMBLEM_10.id
-                            ) {
-                                // Tier 1 shouldnt be dropped cause it cant be downgraded
-                                if (item.getId() === Emblem.MYSTERIOUS_EMBLEM_1.id) {
-                                    continue;
-                                }
-                                if (this.killer) {
-                                    const lowerEmblem =
-                                        item.getId() === Emblem.MYSTERIOUS_EMBLEM_2.id ? item.getId() - 2 : item.getId() - 1;
-                                    ItemOnGroundManager.registerNonGlobals(
-                                        this.killer,
-                                        new Item(lowerEmblem),
-                                        position
-                                    );
-                                    this.killer.getPacketSender().sendMessage(
-                                        "@red@" +
-                                        this.player.getUsername() +
-                                        " dropped a " +
-                                        ItemDefinition.forId(lowerEmblem).getName() +
-                                        "!"
-                                    );
-                                    dropped = true;
-                                }
-
-                                continue;
-                            }
-
                             droppedItems.push(item);
 
-                            // Drop item
-                            ItemOnGroundManager.registerLocation(
-                                this.killer ? this.killer : this.player,
-                                item,
-                                position
-                            );
-                            dropped = true;
+                            if (shouldDropItemsOnDeath) {
+                                // Drop item
+                                ItemOnGroundManager.registerLocation(
+                                    this.killer ? this.killer : this.player,
+                                    item,
+                                    position
+                                );
+                                dropped = true;
+                            }
                         }
 
                         // Handle defeat..
@@ -125,8 +113,7 @@ export class PlayerDeathTask extends Task {
                             if (this.killer.getArea() != null) {
                                 this.killer.getArea().defeated(this.killer, this.player);
                             }
-                            PluginManager.emitPlayerDefeated(this.killer, this.player);
-                            if (!dropped) {
+                            if (shouldDropItemsOnDeath && !dropped) {
                                 this.killer.getPacketSender().sendMessage(`${this.player.getUsername()} had no valuable items to be dropped.`);
                             }
                         }
@@ -154,6 +141,10 @@ export class PlayerDeathTask extends Task {
                             this.itemsToKeep.length = 0;
                         }
                     }
+
+                    // Notify defeat hooks for all deaths so plugins can apply
+                    // post-death cleanup even when no killer is present.
+                    PluginManager.emitPlayerDefeated(this.killer ?? null, this.player);
 
                     let handledDeath: boolean = false;
 
@@ -232,7 +223,7 @@ export class PlayerDeathTask extends Task {
             ) {
                 continue;
             }
-            if (PlayerDeathTask.isMysteriousEmblem(item.getId())) {
+            if (PluginManager.emitShouldKeepItemOnDeath(player, item) === false) {
                 continue;
             }
             items.push(item);
@@ -240,20 +231,5 @@ export class PlayerDeathTask extends Task {
 
         items.sort((a: Item, b: Item) => b.getDefinition().getValue() - a.getDefinition().getValue());
         return items.slice(0, PlayerDeathTask.getAmountToKeep(player));
-    }
-
-    private static isMysteriousEmblem(itemId: number): boolean {
-        return (
-            itemId === Emblem.MYSTERIOUS_EMBLEM_1.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_2.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_3.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_4.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_5.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_6.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_7.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_8.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_9.id ||
-            itemId === Emblem.MYSTERIOUS_EMBLEM_10.id
-        );
     }
 }

@@ -6,6 +6,7 @@ function registerBotEvents(options) {
     playerPersistence,
     manualControlPacketOpcodes,
     followBackTrigger,
+    combatReactionTrigger,
     pathBlockedHandler,
   } = options;
 
@@ -29,6 +30,7 @@ function registerBotEvents(options) {
   api.onEstablishedPacket((event) => {
     const nowMs = Date.now();
     followBackTrigger.handleEstablishedPacket(event, nowMs);
+    combatReactionTrigger.handleEstablishedPacket(event, nowMs);
 
     const { opcode, player } = event;
     if (!manualControlPacketOpcodes.has(opcode)) {

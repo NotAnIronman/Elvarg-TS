@@ -679,6 +679,32 @@ class BankRunBehavior {
   }
 }
 
+const BANK_RUN_MODE_DESCRIPTOR = Object.freeze({
+  key: "bankRun",
+  modeProperty: "BANK_RUN",
+  requiredHooks: [
+    "getTraversalTarget",
+    "setTraversalTarget",
+    "handleBlocked",
+    "onPostTraversalRetryScheduled",
+    "getModeLogContext",
+  ],
+  create({
+    botStatesByName,
+    api,
+    behaviorMode,
+    modeHandlers = {},
+    objectSearch,
+  }) {
+    return new BankRunBehavior(botStatesByName, api, {
+      behaviorMode,
+      modeHandlers,
+      objectSearch,
+    });
+  },
+});
+
 module.exports = {
   BankRunBehavior,
+  BANK_RUN_MODE_DESCRIPTOR,
 };

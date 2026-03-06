@@ -672,6 +672,27 @@ class WoodcuttingBehavior {
   }
 }
 
+const WOODCUTTING_MODE_DESCRIPTOR = Object.freeze({
+  key: "woodcutting",
+  modeProperty: "WOODCUTTING",
+  requiredHooks: [
+    "activateMode",
+    "startMode",
+    "onBankRunResume",
+    "getTraversalTarget",
+    "setTraversalTarget",
+    "handleBlocked",
+  ],
+  create({ botStatesByName, api, behaviorMode, options = {}, objectSearch }) {
+    return new WoodcuttingBehavior(botStatesByName, api, {
+      behaviorMode,
+      botWalkRadius: options.botWalkRadius,
+      objectSearch,
+    });
+  },
+});
+
 module.exports = {
   WoodcuttingBehavior,
+  WOODCUTTING_MODE_DESCRIPTOR,
 };

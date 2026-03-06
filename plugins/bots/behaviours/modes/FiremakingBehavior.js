@@ -750,6 +750,28 @@ class FiremakingBehavior {
   }
 }
 
+const FIREMAKING_MODE_DESCRIPTOR = Object.freeze({
+  key: "firemaking",
+  modeProperty: "FIREMAKING",
+  requiredHooks: [
+    "registerEvents",
+    "behaviorRequirementsMet",
+    "activateMode",
+    "startMode",
+    "onBankRunResume",
+    "handleBlocked",
+    "getTraversalTarget",
+    "setTraversalTarget",
+  ],
+  create({ botStatesByName, api, behaviorMode, objectSearch }) {
+    return new FiremakingBehavior(botStatesByName, api, {
+      behaviorMode,
+      objectSearch,
+    });
+  },
+});
+
 module.exports = {
   FiremakingBehavior,
+  FIREMAKING_MODE_DESCRIPTOR,
 };

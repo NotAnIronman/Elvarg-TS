@@ -12,6 +12,7 @@ const { ShopIdentifiers } = require("../../src/main/typescript/elvarg/util/ShopI
 const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
+const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 
 const SHOPS_PATH = path.resolve(__dirname, "../../data/definitions/shops.json");
 
@@ -823,6 +824,14 @@ function openShopById(player, shopId, resetScroll = true) {
   const shop = shopsById.get(shopId);
   if (!player || !shop) {
     return false;
+  }
+
+  const pluginCanShop = PluginManager.emitCanShop(player, shopId);
+  if (pluginCanShop === false) {
+    // Opening was intentionally denied by plugin policy (e.g. presets).
+    // Report as handled so NPC interactions don't fall through to the generic
+    // "Nothing interesting happens." message.
+    return true;
   }
 
   setActiveShop(player, shopId);

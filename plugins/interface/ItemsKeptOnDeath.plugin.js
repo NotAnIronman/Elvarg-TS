@@ -1,4 +1,4 @@
-const { Emblem } = require("../../src/main/typescript/elvarg/game/content/combat/bountyhunter/Emblem");
+const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { SkullType } = require("../../src/main/typescript/elvarg/game/model/SkullType");
 
@@ -9,19 +9,6 @@ const ITEMS_KEPT_START_SLOT = 17108;
 const ITEMS_KEPT_END_SLOT = 17152;
 const ITEMS_KEPT_KEPT_START_SLOT = 17108;
 const ITEMS_KEPT_OTHER_START_SLOT = 17112;
-
-const EMBLEM_IDS = new Set([
-  Emblem.MYSTERIOUS_EMBLEM_1.id,
-  Emblem.MYSTERIOUS_EMBLEM_2.id,
-  Emblem.MYSTERIOUS_EMBLEM_3.id,
-  Emblem.MYSTERIOUS_EMBLEM_4.id,
-  Emblem.MYSTERIOUS_EMBLEM_5.id,
-  Emblem.MYSTERIOUS_EMBLEM_6.id,
-  Emblem.MYSTERIOUS_EMBLEM_7.id,
-  Emblem.MYSTERIOUS_EMBLEM_8.id,
-  Emblem.MYSTERIOUS_EMBLEM_9.id,
-  Emblem.MYSTERIOUS_EMBLEM_10.id,
-]);
 
 function getAmountToKeep(player) {
   if (player.getSkullTimer() > 0 && player.getSkullType() === SkullType.RED_SKULL) {
@@ -47,7 +34,7 @@ function getItemsToKeep(player) {
     ) {
       continue;
     }
-    if (EMBLEM_IDS.has(item.getId())) {
+    if (PluginManager.emitShouldKeepItemOnDeath(player, item) === false) {
       continue;
     }
     items.push(item);
@@ -116,4 +103,3 @@ module.exports = {
     });
   },
 };
-

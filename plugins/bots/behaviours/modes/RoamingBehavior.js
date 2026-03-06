@@ -106,6 +106,23 @@ class RoamingBehavior {
   }
 }
 
+const ROAMING_MODE_DESCRIPTOR = Object.freeze({
+  key: "roaming",
+  modeProperty: "ROAMING",
+  requiredHooks: ["activateMode", "startMode"],
+  create({ botStatesByName, api, behaviorMode, options = {} }) {
+    return new RoamingBehavior(botStatesByName, {
+      api,
+      behaviorMode,
+      endpointLingerMs: options.endpointLingerMs,
+      botWalkRadius: options.botWalkRadius,
+      roamingMinMs: options.roamingMinMs,
+      roamingMaxMs: options.roamingMaxMs,
+    });
+  },
+});
+
 module.exports = {
   RoamingBehavior,
+  ROAMING_MODE_DESCRIPTOR,
 };

@@ -124,6 +124,38 @@ export interface PluginCanTradeEvent {
   allow: boolean | null;
 }
 
+export interface PluginCanBankEvent {
+  player: any;
+  allow: boolean | null;
+}
+
+export interface PluginCanShopEvent {
+  player: any;
+  shopId: number | null;
+  allow: boolean | null;
+}
+
+export interface PluginShouldDropItemsOnDeathEvent {
+  player: any;
+  killer: any;
+  shouldDrop: boolean | null;
+}
+
+export interface PluginShouldKeepItemOnDeathEvent {
+  player: any;
+  item: any;
+  keep: boolean | null;
+}
+
+export interface PluginPlayerDeathItemDropEvent {
+  player: any;
+  killer: any;
+  item: any;
+  location: any;
+  shouldDropItems: boolean;
+  handled: boolean;
+}
+
 export interface PluginCanEquipEvent {
   player: any;
   slot: number;
@@ -206,6 +238,7 @@ export interface PluginItemDropEvent {
   item: any;
   itemId: number;
   slot: number;
+  dropToGround: boolean;
   handled: boolean;
 }
 
@@ -293,6 +326,17 @@ export interface PluginApi {
   ): void;
   onCanDrink(handler: (event: PluginCanDrinkEvent) => void): void;
   onCanTrade(handler: (event: PluginCanTradeEvent) => void): void;
+  onCanBank(handler: (event: PluginCanBankEvent) => void): void;
+  onCanShop(handler: (event: PluginCanShopEvent) => void): void;
+  onShouldDropItemsOnDeath(
+    handler: (event: PluginShouldDropItemsOnDeathEvent) => void
+  ): void;
+  onShouldKeepItemOnDeath(
+    handler: (event: PluginShouldKeepItemOnDeathEvent) => void
+  ): void;
+  onPlayerDeathItemDrop(
+    handler: (event: PluginPlayerDeathItemDropEvent) => void
+  ): void;
   onCanEquip(handler: (event: PluginCanEquipEvent) => void): void;
   onSpellDisabled(handler: (event: PluginSpellDisabledEvent) => void): void;
   onNpcAggressionTolerance(
@@ -322,11 +366,18 @@ export interface PluginApi {
   onItemOnItem(handler: (event: PluginItemOnItemEvent) => void): void;
   onItemOnGroundItem(handler: (event: PluginItemOnGroundItemEvent) => void): void;
   onItemAction(handler: (event: PluginItemActionEvent) => void): void;
-  onItemDrop(handler: (event: PluginItemDropEvent) => void): void;
+  onItemDropPolicy(handler: (event: PluginItemDropEvent) => void): void;
   onItemFirstAction(
     handler: (event: PluginItemActionEvent) => void | boolean
   ): void;
   onButtonClick(handler: (event: PluginButtonClickEvent) => void): void;
+  sendMultiChatboxPrompt(
+    player: any,
+    title: string,
+    ...optionCallbackPairs: Array<
+      string | ((player: any, optionIndex: number, optionText: string) => void)
+    >
+  ): boolean;
   onButton(
     buttonIds: number | number[],
     handler: (event: PluginButtonClickEvent) => void | boolean

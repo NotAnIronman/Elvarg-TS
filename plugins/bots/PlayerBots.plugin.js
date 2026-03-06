@@ -32,27 +32,27 @@ const {
 const {
   PlayerBotBehaviorTreeFactory,
 } = require("./behaviours/branches/PlayerBotBehaviorTreeFactory");
-const { RoamingBehavior } = require("./behaviours/modes/RoamingBehavior");
-const { WoodcuttingBehavior } = require("./behaviours/modes/WoodcuttingBehavior");
-const { MiningBehavior } = require("./behaviours/modes/MiningBehavior");
 const WoodcuttingSkill = require("../skills/Woodcutting.plugin");
 const MiningSkill = require("../skills/Mining.plugin");
-const { BankRunBehavior } = require("./behaviours/modes/BankRunBehavior");
-const { FiremakingBehavior } = require("./behaviours/modes/FiremakingBehavior");
-const { SparringBehavior } = require("./behaviours/modes/SparringBehavior");
 const { BotBehaviorTask } = require("./behaviours/task/BotBehaviorTask");
 const { DitchTraversalService } = require("./behaviours/traversal/DitchTraversalService");
 const { PathBlockedHandler } = require("./behaviours/traversal/PathBlockedHandler");
 const { FollowBackTrigger } = require("./behaviours/handlers/FollowBackTrigger");
 const {
+  CombatReactionTrigger,
+} = require("./behaviours/handlers/CombatReactionTrigger");
+const {
   validateModeHandlerContracts,
 } = require("./behaviours/hooks/ModeHookContract");
+const {
+  createModeHandlers,
+} = require("./behaviours/factory/BotModeFactory");
 const { createBotRegistry } = require("./runtime/BotRegistry");
 const { registerBotCommands } = require("./runtime/registerBotCommands");
 const { registerBotEvents } = require("./runtime/registerBotEvents");
 
-const BOT_COUNT = 60;
-const BOT_WALK_RADIUS = 6;
+const BOT_COUNT = 80;
+const BOT_WALK_RADIUS = 10;
 const BOT_RESOURCE_INDEX_REGION_RADIUS = 1;
 const BOT_DECISION_TICKS = 1;
 const BOT_BASE_COOLDOWN_MS = 1200;
@@ -69,6 +69,10 @@ const BOT_SPAWN_MIN_DISTANCE = 2;
 const BOT_SPAWN_MAX_ATTEMPTS = 80;
 const BOT_HOME_RADIUS = BOT_WALK_RADIUS;
 const FOLLOW_BACK_DURATION_MS = 3 * 60 * 1000;
+const PLAYER_ATTACK_FLEE_CHANCE = 0.5;
+const BOT_EAT_LOW_HP_RATIO = 0.45;
+const BOT_EAT_HEAL_MIN = 12;
+const BOT_EAT_HEAL_MAX = 18;
 const FOLLOW_REPATH_INTERVAL_MS = 500;
 const FOLLOW_BLOCKED_RETRY_MS = 200;
 const AUTO_MODE_DECISION_MIN_MS = 4500;
@@ -106,49 +110,6 @@ const ASSIGNABLE_BEHAVIORS = Object.freeze({
   woodcutting: BOT_BEHAVIOR_MODE.WOODCUTTING,
   mining: BOT_BEHAVIOR_MODE.MINING,
   firemaking: BOT_BEHAVIOR_MODE.FIREMAKING,
-});
-const REQUIRED_MODE_HOOKS_BY_MODE = Object.freeze({
-  [BOT_BEHAVIOR_MODE.ROAMING]: ["activateMode", "startMode"],
-  [BOT_BEHAVIOR_MODE.WOODCUTTING]: [
-    "activateMode",
-    "startMode",
-    "onBankRunResume",
-    "getTraversalTarget",
-    "setTraversalTarget",
-    "handleBlocked",
-  ],
-  [BOT_BEHAVIOR_MODE.MINING]: [
-    "activateMode",
-    "startMode",
-    "onBankRunResume",
-    "getTraversalTarget",
-    "setTraversalTarget",
-    "handleBlocked",
-  ],
-  [BOT_BEHAVIOR_MODE.BANK_RUN]: [
-    "getTraversalTarget",
-    "setTraversalTarget",
-    "handleBlocked",
-    "onPostTraversalRetryScheduled",
-    "getModeLogContext",
-  ],
-  [BOT_BEHAVIOR_MODE.FIREMAKING]: [
-    "registerEvents",
-    "behaviorRequirementsMet",
-    "activateMode",
-    "startMode",
-    "onBankRunResume",
-    "handleBlocked",
-    "getTraversalTarget",
-    "setTraversalTarget",
-  ],
-  [BOT_BEHAVIOR_MODE.SPARRING]: [
-    "behaviorRequirementsMet",
-    "tryStartMode",
-    "stopMode",
-    "isModeStateValid",
-    "handleBlocked",
-  ],
 });
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
@@ -214,6 +175,100 @@ const AUTONOMOUS_MODE_DEFINITIONS = Object.freeze([
     maxMs: AUTO_MODE_ROAMING_MAX_MS,
   },
 ]);
+
+const BOT_MODE_OPTIONS_DEFAULTS = Object.freeze({
+  endpointLingerMs: 500,
+  botWalkRadius: 6,
+  roamingMinMs: 22000,
+  roamingMaxMs: 80000,
+});
+
+const BOT_TREE_OPTIONS_DEFAULTS = Object.freeze({
+  followRepathIntervalMs: 500,
+  botEatLowHpRatio: 0.45,
+  botEatHealMin: 12,
+  botEatHealMax: 18,
+  botHomeRadius: 6,
+  blockedRetargetMinDelayMs: 450,
+});
+
+function resolvePositiveInt(value, fallback, min = 1) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.max(min, Math.floor(numeric));
+}
+
+function resolveRatio(value, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.max(0.05, Math.min(0.95, numeric));
+}
+
+function resolveBotModeOptions(options = {}) {
+  const endpointLingerMs = resolvePositiveInt(
+    options.endpointLingerMs,
+    BOT_MODE_OPTIONS_DEFAULTS.endpointLingerMs
+  );
+  const botWalkRadius = resolvePositiveInt(
+    options.botWalkRadius,
+    BOT_MODE_OPTIONS_DEFAULTS.botWalkRadius
+  );
+  const roamingMinMs = resolvePositiveInt(
+    options.roamingMinMs,
+    BOT_MODE_OPTIONS_DEFAULTS.roamingMinMs
+  );
+  const roamingMaxMs = resolvePositiveInt(
+    options.roamingMaxMs,
+    BOT_MODE_OPTIONS_DEFAULTS.roamingMaxMs
+  );
+
+  return {
+    endpointLingerMs,
+    botWalkRadius,
+    roamingMinMs,
+    roamingMaxMs: Math.max(roamingMaxMs, roamingMinMs),
+  };
+}
+
+function resolveBotTreeOptions(options = {}) {
+  const followRepathIntervalMs = resolvePositiveInt(
+    options.followRepathIntervalMs,
+    BOT_TREE_OPTIONS_DEFAULTS.followRepathIntervalMs
+  );
+  const botEatLowHpRatio = resolveRatio(
+    options.botEatLowHpRatio,
+    BOT_TREE_OPTIONS_DEFAULTS.botEatLowHpRatio
+  );
+  const botEatHealMin = resolvePositiveInt(
+    options.botEatHealMin,
+    BOT_TREE_OPTIONS_DEFAULTS.botEatHealMin
+  );
+  const botEatHealMax = resolvePositiveInt(
+    options.botEatHealMax,
+    BOT_TREE_OPTIONS_DEFAULTS.botEatHealMax
+  );
+  const botHomeRadius = resolvePositiveInt(
+    options.botHomeRadius,
+    BOT_TREE_OPTIONS_DEFAULTS.botHomeRadius
+  );
+  const blockedRetargetMinDelayMs = resolvePositiveInt(
+    options.blockedRetargetMinDelayMs,
+    BOT_TREE_OPTIONS_DEFAULTS.blockedRetargetMinDelayMs
+  );
+
+  return {
+    followRepathIntervalMs,
+    botEatLowHpRatio,
+    botEatHealMin,
+    botEatHealMax: Math.max(botEatHealMax, botEatHealMin),
+    botHomeRadius,
+    blockedRetargetMinDelayMs,
+  };
+}
 
 function randomizedCooldownMs() {
   return BOT_BASE_COOLDOWN_MS + randomInRange(-BOT_JITTER_MS, BOT_JITTER_MS);
@@ -446,46 +501,24 @@ module.exports = {
     );
     traversalAssist.rebuildTrackedIndexFromLoadedMapObjects();
 
-    const roamingBehavior = new RoamingBehavior(botStatesByName, {
-      api: botApi,
-      behaviorMode: BOT_BEHAVIOR_MODE,
+    const modeBehaviorOptions = resolveBotModeOptions({
       endpointLingerMs: ENDPOINT_LINGER_MS,
       botWalkRadius: BOT_WALK_RADIUS,
       roamingMinMs: AUTO_MODE_ROAMING_MIN_MS,
       roamingMaxMs: AUTO_MODE_ROAMING_MAX_MS,
     });
-    const woodcuttingBehavior = new WoodcuttingBehavior(botStatesByName, botApi, {
-      behaviorMode: BOT_BEHAVIOR_MODE,
-      botWalkRadius: BOT_WALK_RADIUS,
-      objectSearch: traversalAssist,
-    });
-    const miningBehavior = new MiningBehavior(botStatesByName, botApi, {
-      behaviorMode: BOT_BEHAVIOR_MODE,
-      botWalkRadius: BOT_WALK_RADIUS,
-      objectSearch: traversalAssist,
-    });
-    const bankRunBehavior = new BankRunBehavior(botStatesByName, botApi, {
+    const { requiredHooksByMode } = createModeHandlers({
+      botStatesByName,
+      api: botApi,
       behaviorMode: BOT_BEHAVIOR_MODE,
       modeHandlers,
       objectSearch: traversalAssist,
+      options: modeBehaviorOptions,
     });
-    const firemakingBehavior = new FiremakingBehavior(botStatesByName, botApi, {
-      behaviorMode: BOT_BEHAVIOR_MODE,
-      objectSearch: traversalAssist,
-    });
-    const sparringBehavior = new SparringBehavior(botStatesByName, botApi, {
-      behaviorMode: BOT_BEHAVIOR_MODE,
-    });
-    modeHandlers[BOT_BEHAVIOR_MODE.ROAMING] = roamingBehavior;
-    modeHandlers[BOT_BEHAVIOR_MODE.WOODCUTTING] = woodcuttingBehavior;
-    modeHandlers[BOT_BEHAVIOR_MODE.MINING] = miningBehavior;
-    modeHandlers[BOT_BEHAVIOR_MODE.BANK_RUN] = bankRunBehavior;
-    modeHandlers[BOT_BEHAVIOR_MODE.FIREMAKING] = firemakingBehavior;
-    modeHandlers[BOT_BEHAVIOR_MODE.SPARRING] = sparringBehavior;
 
     validateModeHandlerContracts(
       modeHandlers,
-      REQUIRED_MODE_HOOKS_BY_MODE,
+      requiredHooksByMode,
       botApi,
       "player_bots_mode_handlers"
     );
@@ -507,21 +540,15 @@ module.exports = {
 
     const treeFactory = new PlayerBotBehaviorTreeFactory(botStatesByName, botApi, {
       behaviorMode: BOT_BEHAVIOR_MODE,
-      endpointLingerMs: ENDPOINT_LINGER_MS,
-      followRepathIntervalMs: FOLLOW_REPATH_INTERVAL_MS,
-      botHomeRadius: BOT_HOME_RADIUS,
-      blockedRetargetMinDelayMs: BLOCKED_RETARGET_MIN_DELAY_MS,
-      botWalkRadius: BOT_WALK_RADIUS,
-      roamingMinMs: AUTO_MODE_ROAMING_MIN_MS,
-      roamingMaxMs: AUTO_MODE_ROAMING_MAX_MS,
-      modeBehaviors: {
-        roaming: roamingBehavior,
-        woodcutting: woodcuttingBehavior,
-        mining: miningBehavior,
-        bankRun: bankRunBehavior,
-        firemaking: firemakingBehavior,
-        sparring: sparringBehavior,
-      },
+      ...resolveBotTreeOptions({
+        followRepathIntervalMs: FOLLOW_REPATH_INTERVAL_MS,
+        botEatLowHpRatio: BOT_EAT_LOW_HP_RATIO,
+        botEatHealMin: BOT_EAT_HEAL_MIN,
+        botEatHealMax: BOT_EAT_HEAL_MAX,
+        botHomeRadius: BOT_HOME_RADIUS,
+        blockedRetargetMinDelayMs: BLOCKED_RETARGET_MIN_DELAY_MS,
+      }),
+      modeHandlers,
     });
 
     const pathBlockedHandler = new PathBlockedHandler({
@@ -800,6 +827,16 @@ module.exports = {
         followBackDurationMs: FOLLOW_BACK_DURATION_MS,
       },
     });
+    const combatReactionTrigger = new CombatReactionTrigger({
+      botStatesByName: runtime.botStatesByName,
+      playerBotUsernames: runtime.playerBotUsernames,
+      api: botApi,
+      options: {
+        behaviorMode: BOT_BEHAVIOR_MODE,
+        followBackDurationMs: FOLLOW_BACK_DURATION_MS,
+        playerRunAwayChance: PLAYER_ATTACK_FLEE_CHANCE,
+      },
+    });
 
     for (const [mode, handler] of Object.entries(modeHandlers)) {
       if (typeof handler?.registerEvents !== "function") {
@@ -843,6 +880,7 @@ module.exports = {
       playerPersistence: GameConstants.PLAYER_PERSISTENCE,
       manualControlPacketOpcodes: MANUAL_CONTROL_PACKET_OPCODES,
       followBackTrigger,
+      combatReactionTrigger,
       pathBlockedHandler,
     });
 

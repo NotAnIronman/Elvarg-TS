@@ -719,7 +719,7 @@ module.exports = {
   register(api) {
     pluginApi = api;
 
-    api.onItemDrop((event) => {
+    api.onItemDropPolicy((event) => {
       if (!event || !event.player) {
         return;
       }

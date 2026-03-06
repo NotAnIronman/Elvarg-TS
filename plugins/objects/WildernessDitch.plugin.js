@@ -7,37 +7,75 @@ const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const {
   isPresetActive,
+  resolvePresetSnapshot,
   restorePresetSnapshot,
 } = require("../interface/PresetsState");
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
+function openPresetDitchPrompt(api, player, ditchY, sourceY) {
+  if (!api || !player) {
+    return;
+  }
+  const presetSnapshot = resolvePresetSnapshot(player);
+  const snapshotOverride =
+    presetSnapshot && typeof presetSnapshot.applyToPlayer === "function"
+      ? presetSnapshot
+      : null;
 
-function tryCrossWildernessDitch(player, ditchY, sourceY) {
+  api.sendMultiChatboxPrompt(
+    player,
+    "Presets Forbidden",
+    "Remove the preset and cross",
+    () => {
+      const restored = restorePresetSnapshot(player, {
+        preserveLocation: true,
+        snapshotOverride,
+      });
+      if (!restored) {
+        player
+          .getPacketSender()
+          .sendMessage("Unable to remove your active preset right now.");
+        return;
+      }
+      player
+        .getPacketSender()
+        .sendMessage(
+          "Preset cleared. Your original character state has been restored."
+        );
+      tryCrossWildernessDitch(player, ditchY, sourceY, {
+        skipPresetPrompt: true,
+      });
+    },
+    "I'll stay here for now",
+    () => {}
+  );
+}
+
+function resolveDitchYOffset(player, ditchY, sourceY) {
+  const thresholdY = Number.isInteger(ditchY) ? ditchY + 1 : 3522;
+  const approachY = Number.isInteger(sourceY)
+    ? sourceY
+    : player.getLocation().getY();
+  return approachY < thresholdY ? 3 : -3;
+}
+
+function tryCrossWildernessDitch(player, ditchY, sourceY, options = {}) {
   if (!player || player.getForceMovement() != null) {
     return { crossed: false, reason: "force_movement_active" };
   }
+
   const clickDelay = player.getClickDelay();
   const elapsed = clickDelay ? clickDelay.elapsed() : -1;
   if (!clickDelay || !clickDelay.elapsedTime(250)) {
     return { crossed: false, reason: "click_delay", elapsed };
   }
 
-  // Derive crossing direction from the clicked ditch tile instead of a
-  // hardcoded world Y threshold. Treat the ditch tile itself as the
-  // south-side approach so south->north clicks don't bounce back south.
-  const thresholdY = Number.isInteger(ditchY) ? ditchY + 1 : 3522;
-  const approachY = Number.isInteger(sourceY)
-    ? sourceY
-    : player.getLocation().getY();
-  const yOffset = approachY < thresholdY ? 3 : -3;
-  if (yOffset < 0 && isPresetActive(player)) {
-    const restored = restorePresetSnapshot(player, { preserveLocation: true });
-    if (restored) {
-      player
-        .getPacketSender()
-        .sendMessage("Preset cleared. Your original character state has been restored.");
-    }
+  const yOffset = resolveDitchYOffset(player, ditchY, sourceY);
+  if (yOffset < 0 && options.skipPresetPrompt !== true && isPresetActive(player)) {
+    openPresetDitchPrompt(options.promptApi, player, ditchY, sourceY);
+    return { crossed: false, reason: "preset_confirmation_required", elapsed };
   }
+
   const crossDitch = new Location(0, yOffset);
   const forceMovement = new ForceMovement(
     player.getLocation().clone(),
@@ -56,10 +94,13 @@ function tryCrossWildernessDitch(player, ditchY, sourceY) {
 
 module.exports = {
   name: "WildernessDitch",
-  register: (api) =>
+  register: (api) => {
     api.onObjectFirstClick(
       WILDERNESS_DITCH_OBJECT_ID,
       ({ player, location, sourceLocation }) =>
-        tryCrossWildernessDitch(player, location?.y, sourceLocation?.y)
-    ),
+        tryCrossWildernessDitch(player, location?.y, sourceLocation?.y, {
+          promptApi: api,
+        })
+    );
+  },
 };

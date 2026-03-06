@@ -76,6 +76,8 @@ function createBankRunBehaviorState() {
     phaseTimeoutCount: 0,
     lastHeartbeatAt: 0,
     lastStuckWarningAt: 0,
+    suppressAutoRetaliate: false,
+    previousAutoRetaliate: null,
   };
 }
 
@@ -157,6 +159,8 @@ function clearBankRunBehaviorState(state) {
   state.bankRun.phaseTimeoutCount = 0;
   state.bankRun.lastHeartbeatAt = 0;
   state.bankRun.lastStuckWarningAt = 0;
+  state.bankRun.suppressAutoRetaliate = false;
+  state.bankRun.previousAutoRetaliate = null;
 }
 
 function resetMovementState(player) {
@@ -202,6 +206,18 @@ function clearAllBehaviorStates(state) {
 function applyModeTransition(player, state, mode, options = {}) {
   if (!state) {
     return;
+  }
+  if (
+    player &&
+    state.bankRun?.suppressAutoRetaliate === true &&
+    state.mode !== mode
+  ) {
+    const previousAutoRetaliate = state.bankRun.previousAutoRetaliate;
+    player.setAutoRetaliate(
+      typeof previousAutoRetaliate === "boolean" ? previousAutoRetaliate : true
+    );
+    state.bankRun.suppressAutoRetaliate = false;
+    state.bankRun.previousAutoRetaliate = null;
   }
   clearMovementRequest(player);
   const clearFollow = options.clearFollow !== false;
@@ -298,6 +314,30 @@ function setModeFiremaking(player, state, behaviorMode) {
   });
 }
 
+function isResumableMode(mode, behaviorMode) {
+  return (
+    mode === behaviorMode.ROAMING ||
+    mode === behaviorMode.WOODCUTTING ||
+    mode === behaviorMode.MINING ||
+    mode === behaviorMode.FIREMAKING ||
+    mode === behaviorMode.SPARRING
+  );
+}
+
+function resolveBankRunResumeMode(state, behaviorMode) {
+  if (!behaviorMode) {
+    return null;
+  }
+  if (isResumableMode(state?.mode, behaviorMode)) {
+    return state.mode;
+  }
+  const manualMode = state?.autonomy?.manualMode;
+  if (isResumableMode(manualMode, behaviorMode)) {
+    return manualMode;
+  }
+  return behaviorMode.ROAMING;
+}
+
 function setModeBankRun(player, state, behaviorMode, options = {}) {
   if (!state) {
     return false;
@@ -306,7 +346,8 @@ function setModeBankRun(player, state, behaviorMode, options = {}) {
   const fallbackReturn = loc
     ? { x: loc.getX(), y: loc.getY(), z: loc.getZ() }
     : null;
-  const returnMode = options.returnMode ?? behaviorMode.ROAMING;
+  const returnMode =
+    options.returnMode ?? resolveBankRunResumeMode(state, behaviorMode);
   const returnTo = options.returnTo ?? fallbackReturn;
   const resumeWoodcuttingTarget = options.resumeWoodcuttingTarget
     ? {
@@ -350,6 +391,17 @@ function setModeBankRun(player, state, behaviorMode, options = {}) {
   state.bankRun.phaseTimeoutCount = 0;
   state.bankRun.lastHeartbeatAt = 0;
   state.bankRun.lastStuckWarningAt = 0;
+  state.bankRun.suppressAutoRetaliate = options.suppressAutoRetaliate === true;
+  state.bankRun.previousAutoRetaliate = null;
+  if (
+    state.bankRun.suppressAutoRetaliate &&
+    player &&
+    typeof player.autoRetaliateReturn === "function" &&
+    typeof player.setAutoRetaliate === "function"
+  ) {
+    state.bankRun.previousAutoRetaliate = player.autoRetaliateReturn();
+    player.setAutoRetaliate(false);
+  }
   return true;
 }
 
@@ -453,6 +505,7 @@ module.exports = {
   createInitialState,
   isInsideHomeArea,
   markResumeSoon,
+  resolveBankRunResumeMode,
   resetMovementState,
   setModeFollowBack,
   setModeSparring,
