@@ -2,6 +2,7 @@ const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameCon
 const { PrayerData, PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
+const { CombatSpells } = require("../../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells");
 const { BountyHunter } = require("../../src/main/typescript/elvarg/game/content/combat/bountyhunter/BountyHunter");
 const { Autocasting } = require("../../src/main/typescript/elvarg/game/content/combat/magic/Autocasting");
 const { Presetable } = require("../../src/main/typescript/elvarg/game/content/presets/Presetable");
@@ -150,6 +151,29 @@ function captureCombatStats(player) {
   return COMBAT_SKILLS.map((skill) => skills.getMaxLevel(skill));
 }
 
+function resolvePresetAutocastSpellId(preset) {
+  const value =
+    preset?.getAutocastSpellId?.() ??
+    (Number.isInteger(preset?.autocastSpellId) ? preset.autocastSpellId : -1);
+  return Number.isInteger(value) && value > 0 ? value : -1;
+}
+
+function applyPresetAutocastIfDefined(player, preset) {
+  const autocastSpellId = resolvePresetAutocastSpellId(preset);
+  if (autocastSpellId <= 0) {
+    return;
+  }
+
+  try {
+    const spell = CombatSpells.getCombatSpell(autocastSpellId);
+    if (spell) {
+      Autocasting.setAutocast(player, spell);
+    }
+  } catch (_error) {
+    // Ignore invalid/missing spell ids for backwards compatibility with older saves.
+  }
+}
+
 function loadoutToPreset(name, player) {
   return new Presetable(
     name,
@@ -157,7 +181,8 @@ function loadoutToPreset(name, player) {
     player.getEquipment().copyValidItemsArray(),
     captureCombatStats(player),
     player.getSpellbook(),
-    false
+    false,
+    player.getCombat()?.getAutocastSpell?.()?.spellId?.() ?? -1
   );
 }
 
@@ -336,7 +361,7 @@ function applyPreset(player, preset) {
   }
 
   player.setSpellbook(preset.getSpellbook());
-  Autocasting.setAutocast(player, null);
+  applyPresetAutocastIfDefined(player, preset);
 
   let totalExp = 0;
   const presetStats = Array.isArray(preset.getStats()) ? preset.getStats() : [];
@@ -437,7 +462,8 @@ function promptCreatePreset(player, index) {
         equipment,
         captureCombatStats(player),
         player.getSpellbook(),
-        false
+        false,
+        player.getCombat()?.getAutocastSpell?.()?.spellId?.() ?? -1
       );
       player.setCurrentPreset(presets[index]);
       openPresetInterface(player, presets[index]);

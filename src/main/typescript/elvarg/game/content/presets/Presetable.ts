@@ -32,7 +32,21 @@ export class Presetable {
      */
     private readonly isGlobal: boolean;
 
-    constructor(name: string, inventory: Item[], equipment: Item[], stats: number[], spellbook, isGlobal: boolean) {
+    /**
+     * Optional autocast spell id to apply when this preset is loaded.
+     * Use -1 to indicate no preset autocast preference.
+     */
+    private autocastSpellId: number;
+
+    constructor(
+        name: string,
+        inventory: Item[],
+        equipment: Item[],
+        stats: number[],
+        spellbook,
+        isGlobal: boolean,
+        autocastSpellId: number = -1
+    ) {
         this.isGlobal = false;
         this.name = name;
         this.inventory = inventory;
@@ -40,6 +54,7 @@ export class Presetable {
         this.stats = stats;
         this.spellbook = spellbook;
         this.isGlobal = isGlobal;
+        this.autocastSpellId = Number.isInteger(autocastSpellId) ? autocastSpellId : -1;
     }
 
     public getAmount(itemId: number): number {
@@ -95,6 +110,14 @@ export class Presetable {
 
     public getIsGlobal(): boolean {
         return this.isGlobal;
+    }
+
+    public getAutocastSpellId(): number {
+        return Number.isInteger(this.autocastSpellId) ? this.autocastSpellId : -1;
+    }
+
+    public setAutocastSpellId(autocastSpellId: number): void {
+        this.autocastSpellId = Number.isInteger(autocastSpellId) ? autocastSpellId : -1;
     }
 
 }

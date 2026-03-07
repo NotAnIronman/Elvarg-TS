@@ -3,6 +3,8 @@ import { Item } from "../../model/Item";
 import { MagicSpellbook } from "../../model/MagicSpellbook";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 
+const ICE_BARRAGE_SPELL_ID = 12891;
+
 export class PredefinedPresets {
     public static readonly ATT_60_ZERKER_94: Presetable = new Presetable ("60Att. Zerker", [
             new Item(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SUPER_ATTACK_4_), new Item(ItemIdentifiers.SUPER_STRENGTH_4_),
@@ -168,7 +170,8 @@ export class PredefinedPresets {
         ],
         [99, 99, 99, 99, 99, 99, 99],
         MagicSpellbook.ANCIENT,
-        true
+        true,
+        ICE_BARRAGE_SPELL_ID
     );
 
     public static MAIN_RUNE_126: Presetable = new Presetable("Main Rune", [
@@ -281,6 +284,7 @@ export class PredefinedPresets {
         /* atk, def, str, hp, range, pray, mage */
         [99, 99, 99, 99, 99, 99, 99],
         MagicSpellbook.ANCIENT,
-        true
+        true,
+        ICE_BARRAGE_SPELL_ID
     );
 }

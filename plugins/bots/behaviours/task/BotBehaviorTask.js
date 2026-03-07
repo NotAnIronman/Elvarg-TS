@@ -2,6 +2,7 @@ const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task"
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { randomInRange } = require("../navigation/BotNavigation");
 const { callModeHook } = require("../hooks/ModeHookContract");
+const { clearBotActivePreset } = require("../state/PlayerBotState");
 
 class BotBehaviorTask extends Task {
   constructor(entries, traversalService, decisionTicks, options = {}) {
@@ -463,6 +464,8 @@ class BotBehaviorTask extends Task {
     }
 
     if (state.deathResetApplied) {
+      // Clear any active preset after respawn, not during the death animation.
+      clearBotActivePreset(player);
       state.deathResetApplied = false;
       this.scheduleNextDecision(state, nowMs);
     }

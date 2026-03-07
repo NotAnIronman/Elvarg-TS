@@ -11,21 +11,39 @@ export class Projectile {
     private startHeight: number;
     private endHeight: number;
     private lockon: Mobile;
+    private lockonTargetIndex: number;
     private delay: number;
     private privateArea: PrivateArea;
 
     constructor(start: Location, end: Location, lockon: Mobile, projectileId: number, delay: number, speed: number,
         startHeight: number, endHeight: number, privateArea: PrivateArea) {
-        this.start = start;
+        // Freeze packet coordinates at fire time so later movement/retargets do not
+        // mutate the projectile trajectory unexpectedly for observers.
+        this.start = start?.clone?.() ?? start;
         this.lockon = lockon;
-        this.end = end;
+        this.end = end?.clone?.() ?? end;
         this.projectileId = projectileId;
         this.delay = delay;
         this.speed = speed;
         this.startHeight = startHeight;
         this.endHeight = endHeight;
         this.privateArea = privateArea;
+        this.lockonTargetIndex = Projectile.resolveLockonTargetIndex(lockon);
         }
+
+        private static resolveLockonTargetIndex(lockon: Mobile): number {
+        if (!lockon) {
+            return 0;
+        }
+        if (typeof (lockon as any).getIndex !== "function" || typeof (lockon as any).isPlayer !== "function") {
+            return 0;
+        }
+        const index = (lockon as any).getIndex();
+        if (!Number.isInteger(index) || index < 0) {
+            return 0;
+        }
+        return (lockon as any).isPlayer() ? -(index + 1) : index + 1;
+    }
 
         static createProjectile(source: Mobile, victim: Mobile, projectileId: number, delay: number, speed: number,
                             startHeight: number, endHeight: number) {
@@ -78,7 +96,19 @@ export class Projectile {
                 return;
             }
             recipients++;
-            player.getPacketSender().sendProjectile(this.start, this.end, 0, resolvedSpeed, this.projectileId, this.startHeight, this.endHeight, this.lockon, resolvedDelay);
+            player
+                .getPacketSender()
+                .sendProjectile(
+                    this.start,
+                    this.end,
+                    0,
+                    resolvedSpeed,
+                    this.projectileId,
+                    this.startHeight,
+                    this.endHeight,
+                    this.lockonTargetIndex,
+                    resolvedDelay
+                );
         });
         if (process.env.PROJECTILE_DEBUG === "1") {
             console.log(

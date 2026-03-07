@@ -279,6 +279,13 @@ function clearBotActivePreset(player) {
   if (!player || player.isPlayerBot?.() !== true) {
     return false;
   }
+  // Avoid visually clearing gear mid-death animation. We clear presets once
+  // the bot is alive again in the post-death reset flow.
+  const deadOrDying =
+    (player.getHitpoints?.() ?? 0) <= 0 || player.isDyingReturn?.() === true;
+  if (deadOrDying) {
+    return false;
+  }
   if (!isPresetActive(player)) {
     return false;
   }

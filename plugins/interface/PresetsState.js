@@ -1,6 +1,7 @@
 const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
+const { Autocasting } = require("../../src/main/typescript/elvarg/game/content/combat/magic/Autocasting");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
 const {
@@ -108,6 +109,8 @@ function restorePresetSnapshot(player, options = {}) {
   // packets so tabs (especially equipment) are redrawn immediately client-side.
   player.getInventory?.()?.refreshItems?.();
   player.getEquipment?.()?.refreshItems?.();
+  // Clearing a preset should always clear active/default autocast selection.
+  Autocasting.setAutocast?.(player, null);
   WeaponInterfaces.assign?.(player);
   BonusManager.update?.(player);
 

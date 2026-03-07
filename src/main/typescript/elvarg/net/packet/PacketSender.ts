@@ -1141,11 +1141,8 @@ export class PacketSender {
     out.put(end.getX() - start.getX());
     out.put(end.getY() - start.getY());
 
-    if (lockon != null && typeof lockon.getIndex === "function" && typeof lockon.isPlayer === "function") {
-      out.putShort(lockon.isPlayer() ? -(lockon.getIndex() + 1) : lockon.getIndex() + 1);
-    } else {
-      out.putShort(0);
-    }
+    const targetIndex = this.resolveProjectileTargetIndex(lockon);
+    out.putShort(targetIndex);
 
     out.putShort(projectileId);
     out.put(startHeight);
@@ -1156,10 +1153,6 @@ export class PacketSender {
     out.put(distanceOffset);
     if (process.env.PROJECTILE_DEBUG === "1") {
       try {
-        const targetIndex =
-          lockon != null && typeof lockon.getIndex === "function" && typeof lockon.isPlayer === "function"
-            ? (lockon.isPlayer() ? -(lockon.getIndex() + 1) : lockon.getIndex() + 1)
-            : 0;
         console.log(
           `[projectile.out] id=${projectileId} start=(${start.getX()},${start.getY()},${start.getZ?.() ?? 0}) end=(${end.getX()},${end.getY()},${end.getZ?.() ?? 0}) d=(${end.getX() - start.getX()},${end.getY() - start.getY()}) lockon=${targetIndex} delay=${delay} speed=${speed}`
         );
@@ -1169,6 +1162,26 @@ export class PacketSender {
     }
     this.player.getSession().write(out);
     return this;
+  }
+
+  private resolveProjectileTargetIndex(lockon: any): number {
+    // Allow projectiles to pass a pre-resolved lock-on index so target binding
+    // is stable even if the original lock-on entity reference later changes.
+    if (Number.isInteger(lockon)) {
+      return lockon;
+    }
+    if (
+      lockon != null &&
+      typeof lockon.getIndex === "function" &&
+      typeof lockon.isPlayer === "function"
+    ) {
+      const index = lockon.getIndex();
+      if (!Number.isInteger(index) || index < 0) {
+        return 0;
+      }
+      return lockon.isPlayer() ? -(index + 1) : index + 1;
+    }
+    return 0;
   }
 
   // Additional stubs for gameplay code.
