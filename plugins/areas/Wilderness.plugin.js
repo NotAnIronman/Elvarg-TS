@@ -4,6 +4,9 @@ const { Obelisks } = require("../../src/main/typescript/elvarg/game/content/Obel
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 
 function addToWildList(player) {
+  if (player?.isPlayerBot?.()) {
+    return;
+  }
   if (!BountyHunter.PLAYERS_IN_WILD.includes(player)) {
     BountyHunter.PLAYERS_IN_WILD.push(player);
   }
@@ -22,6 +25,9 @@ module.exports = {
     const inWildState = new Map();
 
     api.onPlayerProcess(({ player }) => {
+      if (player?.isPlayerBot?.()) {
+        return;
+      }
       const username = player?.getUsername?.();
       if (!username) {
         return;

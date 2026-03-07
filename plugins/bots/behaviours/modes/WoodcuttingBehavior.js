@@ -22,10 +22,13 @@ const {Item} = require("../../../../src/main/typescript/elvarg/game/model/Item")
 const RETRY_SEARCH_MS = 1500;
 const WALK_COMMAND_COOLDOWN_MS = 900;
 const DROP_LOGS_RETRY_MS = 650;
+const GAME_TICK_MS = 600;
 const MAX_NEXT_TREE_DISTANCE_TILES = 10;
 // Keep target acquisition aligned with local region scanning so bots can
 // actually walk to visible trees rather than rejecting nearly all targets.
 const MAX_TREE_TARGET_DISTANCE_TILES = 64;
+const RESPAWN_WAIT_LOOK_ELSEWHERE_CHANCE = 1 / 7;
+const RESPAWN_WAIT_NEARBY_DISTANCE_TILES = 8;
 const TOO_FAR_STREAK_WINDOW_MS = 12000;
 const TOO_FAR_STREAK_THRESHOLD = 4;
 const TOO_FAR_AVOID_MS = 25000;
@@ -255,6 +258,9 @@ class WoodcuttingBehavior {
       if (nowMs < (state.woodcutting.nextSearchAt ?? 0)) {
         return "running";
       }
+      if (this.scheduleRespawnWaitIfNear(player, state, nowMs)) {
+        return "running";
+      }
       state.woodcutting.nextSearchAt = nowMs + RETRY_SEARCH_MS;
 
       const treeTiers = this.resolveBestTreeTiersForLevel(
@@ -463,6 +469,47 @@ class WoodcuttingBehavior {
     const location = player.getLocation().clone();
     location.set(target.x, target.y, target.z);
     return MapObjects.get(target.objectId, location, player.getPrivateArea());
+  }
+
+  scheduleRespawnWaitIfNear(player, state, nowMs) {
+    const target = state?.woodcutting?.target;
+    if (!player || !target) {
+      return false;
+    }
+    const treeTier = this.treeTierByObjectId.get(target.objectId);
+    if (!treeTier) {
+      return false;
+    }
+    const loc = player.getLocation();
+    if (!loc || loc.getZ() !== target.z) {
+      return false;
+    }
+    const dx = Math.abs(loc.getX() - target.x);
+    const dy = Math.abs(loc.getY() - target.y);
+    const distance = Math.max(dx, dy);
+    if (distance > RESPAWN_WAIT_NEARBY_DISTANCE_TILES) {
+      return false;
+    }
+
+    if (Math.random() < RESPAWN_WAIT_LOOK_ELSEWHERE_CHANCE) {
+      state.woodcutting.target = null;
+      return false;
+    }
+
+    const respawnTicks = Math.max(1, Number(treeTier.respawnTicks ?? 1));
+    const waitMs = Math.max(RETRY_SEARCH_MS, respawnTicks * GAME_TICK_MS);
+    state.woodcutting.nextActionAt = nowMs + waitMs;
+    state.woodcutting.nextSearchAt = nowMs + waitMs;
+    this.api?.log?.("woodcutting_waiting_for_respawn", {
+      username: player.getUsername?.(),
+      objectId: target.objectId,
+      x: target.x,
+      y: target.y,
+      z: target.z,
+      respawnTicks,
+      waitMs,
+    });
+    return true;
   }
 
   getDistanceToTree(player, treeObject) {

@@ -60,6 +60,19 @@ const GLOBAL_PRESETS = [
   PredefinedPresets.MAIN_TRIBRID_126,
 ];
 
+function getGlobalPresetPool() {
+  return GLOBAL_PRESETS.filter((preset) => preset != null);
+}
+
+function pickRandomGlobalPreset() {
+  const pool = getGlobalPresetPool();
+  if (pool.length === 0) {
+    return null;
+  }
+  const index = Math.floor(Math.random() * pool.length);
+  return pool[index] ?? null;
+}
+
 function rangeInclusive(start, end) {
   const values = [];
   for (let i = start; i <= end; i++) {
@@ -375,6 +388,21 @@ function applyPreset(player, preset) {
   return true;
 }
 
+function applyRandomGlobalPreset(player) {
+  if (!player) {
+    return null;
+  }
+  const preset = pickRandomGlobalPreset();
+  if (!preset) {
+    return null;
+  }
+  player.setCurrentPreset?.(preset);
+  if (!applyPreset(player, preset)) {
+    return null;
+  }
+  return preset;
+}
+
 function promptCreatePreset(player, index) {
   player.setEnteredSyntaxAction({
     execute: (rawInput) => {
@@ -632,6 +660,9 @@ function applyPresetItemDropPolicy(event) {
 
 module.exports = {
   name: "Presets",
+  applyPreset,
+  applyRandomGlobalPreset,
+  getGlobalPresetPool,
   register(api) {
     api.onPlayerLogin(({ player }) => {
       if (isPresetActive(player) && !hasPresetSnapshot(player)) {

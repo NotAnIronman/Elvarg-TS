@@ -114,7 +114,9 @@ function registerBotCommands(options) {
     }
 
     const wantsAuto = behaviorArg === "auto";
-    const normalizedBehavior = assignableBehaviors[behaviorArg];
+    const normalizedBehavior =
+      assignableBehaviors[behaviorArg] ??
+      (behaviorArg === "sparring" ? assignableBehaviors.pvp : null);
     if (!normalizedBehavior && !wantsAuto) {
       player
         .getPacketSender()

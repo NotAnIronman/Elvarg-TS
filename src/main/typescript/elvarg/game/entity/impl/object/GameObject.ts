@@ -51,33 +51,27 @@ export class GameObject extends Entity {
     }
 
     public performAnimation(animation: Animation): void {
-        for (const player of World.getPlayers()) {
-            if (player == null) {
-                continue;
-            }
+        World.forEachNetworkPlayer((player) => {
             if (player.getPrivateArea() !== this.getPrivateArea()) {
-                continue;
+                return;
             }
             if (!player.getLocation().isViewableFrom(this.getLocation())) {
-                continue;
+                return;
             }
             player.getPacketSender().sendObjectAnimation(this, animation);
-        }
+        });
     }
 
     public performGraphic(graphic: Graphic): void {
-        for (const player of World.getPlayers()) {
-            if (player == null) {
-                continue;
-            }
+        World.forEachNetworkPlayer((player) => {
             if (player.getPrivateArea() !== this.getPrivateArea()) {
-                continue;
+                return;
             }
             if (!player.getLocation().isViewableFrom(this.getLocation())) {
-                continue;
+                return;
             }
             player.getPacketSender().sendGraphic(graphic, this.getLocation());
-        }
+        });
     }
 
     public getSize(): number {

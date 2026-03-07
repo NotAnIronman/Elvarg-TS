@@ -13,10 +13,15 @@ import * as path from "path";
 
 export class PathFinder {
     private static readonly ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
+    private static readonly PATH_BLOCKED_EVENT_DEBOUNCE_MS = 650;
     private static LOG_DIR = path.join(process.cwd(), "logs");
     private static LOG_FILE = path.join(PathFinder.LOG_DIR, "movement.log");
     private static LOG_READY = false;
     private static LOG_ENABLED = false;
+    private static blockedEventTracker = new WeakMap<Mobile, {
+        signature: string;
+        lastEmittedAtMs: number;
+    }>();
 
     private static log(line: string) {
         if (!PathFinder.LOG_ENABLED) {
@@ -34,6 +39,26 @@ export class PathFinder {
         } catch (e) {
             // Ignore file logging errors.
         }
+    }
+
+    private static shouldEmitPathBlockedEvent(
+        entity: Mobile,
+        signature: string,
+        nowMs: number
+    ): boolean {
+        const previous = PathFinder.blockedEventTracker.get(entity);
+        if (
+            previous &&
+            previous.signature === signature &&
+            nowMs - previous.lastEmittedAtMs < PathFinder.PATH_BLOCKED_EVENT_DEBOUNCE_MS
+        ) {
+            return false;
+        }
+        PathFinder.blockedEventTracker.set(entity, {
+            signature,
+            lastEmittedAtMs: nowMs,
+        });
+        return true;
     }
     static WEST = 0x1280108;
     static EAST = 0x1280180;
@@ -419,27 +444,41 @@ export class PathFinder {
             if (!entity.getMovementQueue().hasRoute()) {
                 Server.logDebug("error.. no path found... path probably not reachable.");
                 PathFinder.log(`no path found to ${destX},${destY}`);
-                PluginManager.emitPathBlocked({
-                    entity,
-                    isPlayer: entity.isPlayer(),
-                    username: entity.isPlayer() ? (entity.getAsPlayer()?.getUsername() ?? null) : null,
-                    from: {
-                        x: entity.getLocation().getX(),
-                        y: entity.getLocation().getY(),
-                        z: height,
-                    },
-                    to: {
-                        x: destX,
-                        y: destY,
-                        z: height,
-                    },
-                    basicPather,
-                    requestedSize: size,
-                    xLength,
-                    yLength,
-                    direction,
-                    blockingMask,
-                });
+                const fromX = entity.getLocation().getX();
+                const fromY = entity.getLocation().getY();
+                const signature = [
+                    `${fromX},${fromY},${height}`,
+                    `${destX},${destY},${height}`,
+                    `b:${basicPather ? 1 : 0}`,
+                    `s:${size}`,
+                    `xl:${xLength}`,
+                    `yl:${yLength}`,
+                    `d:${direction}`,
+                    `m:${blockingMask}`,
+                ].join("|");
+                if (PathFinder.shouldEmitPathBlockedEvent(entity, signature, Date.now())) {
+                    PluginManager.emitPathBlocked({
+                        entity,
+                        isPlayer: entity.isPlayer(),
+                        username: entity.isPlayer() ? (entity.getAsPlayer()?.getUsername() ?? null) : null,
+                        from: {
+                            x: fromX,
+                            y: fromY,
+                            z: height,
+                        },
+                        to: {
+                            x: destX,
+                            y: destY,
+                            z: height,
+                        },
+                        basicPather,
+                        requestedSize: size,
+                        xLength,
+                        yLength,
+                        direction,
+                        blockingMask,
+                    });
+                }
                 return 0;
             }
         }

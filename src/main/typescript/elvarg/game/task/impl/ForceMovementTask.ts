@@ -8,12 +8,14 @@ export class ForceMovementTask extends Task {
     private player: Player;
     private end: Location;
     private start: Location;
+    private forceMovement: ForceMovement;
 
     constructor(player: Player, delay: number, forceM: ForceMovement) {
         super(delay, player as any);
         this.player = player;
         this.start = (forceM.getStart() as any).clone();
         this.end = (forceM.getEnd() as any).clone();
+        this.forceMovement = forceM;
     
         player.getCombat().reset();
         player.getMovementQueue().reset();
@@ -31,5 +33,14 @@ export class ForceMovementTask extends Task {
         );
         this.player.setForceMovement(null);
         this.stop();
+    }
+
+    public stop() {
+        // If this task is canceled before execute(), clear only the force movement
+        // instance that this task owns so we don't leave stale force movement state.
+        if (this.player.getForceMovement() === this.forceMovement) {
+            this.player.setForceMovement(null);
+        }
+        super.stop();
     }
 }

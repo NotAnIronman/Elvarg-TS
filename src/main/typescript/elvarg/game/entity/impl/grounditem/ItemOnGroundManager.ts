@@ -40,11 +40,9 @@ export class ItemOnGroundManager {
                 }
                 break;
             case State.SEEN_BY_EVERYONE:
-                for (let player of World.getPlayers()) {
-                    if (player) {
-                        ItemOnGroundManager.performPlayer(player, item, type)
-                    }
-                }
+                World.forEachNetworkPlayer((player) => {
+                    ItemOnGroundManager.performPlayer(player, item, type);
+                });
                 break;
             default:
                 break;
@@ -53,6 +51,9 @@ export class ItemOnGroundManager {
     public static performPlayer(player: Player, item: ItemOnGround, type?: OperationType): void {
         if (item.isPendingRemoval()) {
             type = OperationType.DELETE;
+        }
+        if (player?.isPlayerBot?.() === true) {
+            return;
         }
         // Skip stale/disconnected sessions to avoid write-time crashes while broadcasting ground-item updates.
         if (!World.isPlayerSessionConnected(player)) {

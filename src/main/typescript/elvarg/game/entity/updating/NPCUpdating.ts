@@ -196,7 +196,10 @@ export class NPCUpdating {
         if (flag.flagged(Flag.DOUBLE_HIT)) {
             mask |= 0x40;
         }
-        if (flag.flagged(Flag.APPEARANCE) && npc.getNpcTransformationId() != -1) {
+        // Keep mask and payload in lockstep: APPEARANCE may be flagged when
+        // clearing a transformation (id -> -1). We must still set bit 0x2 or
+        // the client decodes subsequent bytes as the wrong update fields.
+        if (flag.flagged(Flag.APPEARANCE)) {
             mask |= 0x2;
         }
         if (flag.flagged(Flag.FACE_POSITION) && npc.getPositionToFace() != null) {
@@ -230,7 +233,7 @@ export class NPCUpdating {
         if (flag.flagged(Flag.DOUBLE_HIT)) {
             NPCUpdating.updateDoubleHit(block, npc);
         }
-        if (flag.flagged(Flag.APPEARANCE)) {
+        if ((mask & 0x2) !== 0) {
 
             let transform = npc.getNpcTransformationId() !== -1;
 

@@ -866,6 +866,9 @@ module.exports = {
     });
 
     api.onPlayerProcess(({ player }) => {
+      if (player?.isPlayerBot?.()) {
+        return;
+      }
       if (activeShopByPlayer.has(player) && !isViewingShop(player)) {
         clearActiveShop(player);
       }

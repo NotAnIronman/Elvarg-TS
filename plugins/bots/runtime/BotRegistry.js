@@ -2,6 +2,7 @@ function createBotRegistry(options) {
   const {
     botApi,
     botCount,
+    fullTimePvpBotCount = 0,
     botBaseCooldownMs,
     spawn,
     spawnOffsets,
@@ -35,6 +36,7 @@ function createBotRegistry(options) {
   const entries = providedEntries ?? [];
   const entriesByUsername = providedEntriesByUsername ?? new Map();
   let spawned = 0;
+  let fullTimePvpAssigned = 0;
 
   function addEntry(username, entry) {
     entry.entryIndex = entries.length;
@@ -124,6 +126,16 @@ function createBotRegistry(options) {
         },
         behaviorMode
       );
+      if (i <= fullTimePvpBotCount) {
+        if (!state.autonomy) {
+          state.autonomy = {};
+        }
+        state.autonomy.fullTimePvp = true;
+        state.autonomy.pvpCooldownUntil = 0;
+        state.autonomy.modeEndsAt = 0;
+        state.autonomy.nextDecisionAt = 0;
+        fullTimePvpAssigned++;
+      }
       applyForcedModeForDiagnosis(bot, state);
       botStatesByName.set(username, state);
       playerBotUsernames.add(username);
@@ -144,7 +156,11 @@ function createBotRegistry(options) {
       spawned++;
     }
 
-    botApi.log("spawn_complete", { spawned, configured: botCount });
+    botApi.log("spawn_complete", {
+      spawned,
+      configured: botCount,
+      fullTimePvpAssigned,
+    });
     ensureBehaviorTaskStarted();
   }
 

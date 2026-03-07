@@ -7,6 +7,14 @@ const STUCK_THRESHOLDS_MS = Object.freeze({
   bankRunPhase: 20000,
 });
 
+const HISTORY_LOOP_THRESHOLDS = Object.freeze({
+  ditchRequested: 8,
+  ditchCompleted: 3,
+  ditchRetargets: 3,
+  bankBlockedNoTraversal: 6,
+  ditchPostRetryWaitMs: 9000,
+});
+
 function msRemainingLabel(targetMs, nowMs) {
   if (!Number.isFinite(targetMs) || targetMs <= 0) {
     return "n/a";
@@ -73,8 +81,10 @@ function resolveModeActionAt(state) {
       return state?.smelting?.nextActionAt ?? null;
     case "bank_run":
       return state?.bankRun?.nextActionAt ?? null;
+    case "pvp":
+      return state?.pvp?.nextActionAt ?? null;
     case "sparring":
-      return state?.sparring?.nextActionAt ?? null;
+      return state?.pvp?.nextActionAt ?? null;
     default:
       return null;
   }
@@ -89,8 +99,92 @@ function resolveQueueSize(queue) {
   return Number.isFinite(size) ? size : 0;
 }
 
+function parseHistoryEntry(entry) {
+  if (typeof entry !== "string" || entry.length === 0) {
+    return null;
+  }
+  const eventMatch = entry.match(/^\[[^\]]+\]\s+([^\s]+)/);
+  if (!eventMatch) {
+    return null;
+  }
+  const event = eventMatch[1];
+  const jsonStart = entry.indexOf("{");
+  let payload = null;
+  if (jsonStart >= 0) {
+    try {
+      payload = JSON.parse(entry.slice(jsonStart));
+    } catch (_) {
+      payload = null;
+    }
+  }
+  return { event, payload };
+}
+
+function getHistorySignals(recentHistory) {
+  const signals = {
+    ditchRequested: 0,
+    ditchCompleted: 0,
+    ditchRetargets: 0,
+    bankBlockedNoTraversal: 0,
+    ditchTimeoutSeen: false,
+    maxDitchPostRetryWaitMs: 0,
+  };
+
+  if (!Array.isArray(recentHistory) || recentHistory.length === 0) {
+    return signals;
+  }
+
+  for (const line of recentHistory) {
+    const parsed = parseHistoryEntry(line);
+    if (!parsed) {
+      continue;
+    }
+    const { event, payload } = parsed;
+
+    if (event === "ditch_cross_requested") {
+      signals.ditchRequested += 1;
+      continue;
+    }
+    if (event === "ditch_cross_completed_delay_retry_walk") {
+      signals.ditchCompleted += 1;
+      continue;
+    }
+    if (event === "ditch_cross_timeout_delay_retry_walk") {
+      signals.ditchTimeoutSeen = true;
+      continue;
+    }
+    if (event === "ditch_post_delay_retry_waiting") {
+      const waitedMs = Number(payload?.waitedMs ?? 0);
+      if (Number.isFinite(waitedMs) && waitedMs > signals.maxDitchPostRetryWaitMs) {
+        signals.maxDitchPostRetryWaitMs = waitedMs;
+      }
+      continue;
+    }
+    if (event === "path_blocked_retarget") {
+      const reason = String(payload?.reason ?? "");
+      if (reason.startsWith("ditch_")) {
+        signals.ditchRetargets += 1;
+      }
+      continue;
+    }
+    if (event === "bank_run_blocked_no_traversal_object") {
+      signals.bankBlockedNoTraversal += 1;
+    }
+  }
+
+  return signals;
+}
+
 function buildStuckDiagnosis(snapshot) {
-  const { state, nowMs, queue, pendingMovement, awaitingDitch, autonomy } = snapshot;
+  const {
+    state,
+    nowMs,
+    queue,
+    pendingMovement,
+    awaitingDitch,
+    autonomy,
+    recentHistory,
+  } = snapshot;
   const moving = isQueueMoving(queue);
   const queueSize = resolveQueueSize(queue);
 
@@ -141,6 +235,39 @@ function buildStuckDiagnosis(snapshot) {
         };
       }
     }
+  }
+
+  const signals = getHistorySignals(recentHistory);
+  if (signals.ditchTimeoutSeen) {
+    return {
+      stuck: true,
+      reason: "ditch transition timed out recently",
+    };
+  }
+  if (signals.maxDitchPostRetryWaitMs >= HISTORY_LOOP_THRESHOLDS.ditchPostRetryWaitMs) {
+    return {
+      stuck: true,
+      reason: `ditch retry wait reached ${signals.maxDitchPostRetryWaitMs}ms`,
+    };
+  }
+  if (
+    signals.ditchRequested >= HISTORY_LOOP_THRESHOLDS.ditchRequested &&
+    signals.ditchCompleted >= HISTORY_LOOP_THRESHOLDS.ditchCompleted &&
+    signals.ditchRetargets >= HISTORY_LOOP_THRESHOLDS.ditchRetargets
+  ) {
+    return {
+      stuck: true,
+      reason: `ditch loop detected (requests=${signals.ditchRequested}, completed=${signals.ditchCompleted}, retargets=${signals.ditchRetargets})`,
+    };
+  }
+  if (
+    state?.mode === "bank_run" &&
+    signals.bankBlockedNoTraversal >= HISTORY_LOOP_THRESHOLDS.bankBlockedNoTraversal
+  ) {
+    return {
+      stuck: true,
+      reason: `bank run repeatedly blocked (no traversal object x${signals.bankBlockedNoTraversal})`,
+    };
   }
 
   const nextActionAt = Number(resolveModeActionAt(state));

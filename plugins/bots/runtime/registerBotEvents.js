@@ -61,12 +61,6 @@ function registerBotEvents(options) {
     api.onCanAttack((event) => {
       npcAggroPolicyHandler.handleCanAttack(event);
     });
-    api.onPlayerProcess((event) => {
-      npcAggroPolicyHandler.handlePlayerProcess({
-        ...event,
-        nowMs: Date.now(),
-      });
-    });
   }
 }
 

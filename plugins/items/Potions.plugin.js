@@ -783,6 +783,9 @@ module.exports = {
     });
 
     api.onPlayerProcess(({ player }) => {
+      if (player?.isPlayerBot?.()) {
+        return;
+      }
       processStamina(player);
       processDivine(player);
     });

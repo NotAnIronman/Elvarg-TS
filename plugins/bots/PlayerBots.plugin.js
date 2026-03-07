@@ -20,7 +20,9 @@ const BOT_BEHAVIOR_MODE = Object.freeze({
   SMELTING: "smelting",
   FIREMAKING: "firemaking",
   BANK_RUN: "bank_run",
-  SPARRING: "sparring",
+  PVP: "pvp",
+  // Backward-compat alias for in-flight references.
+  SPARRING: "pvp",
   FOLLOW_BACK: "follow_back",
   RETURN_HOME: "return_home",
 });
@@ -47,13 +49,15 @@ const BOT_TREE_OPTIONS = Object.freeze({
   botEatLowHpRatio: 0.45,
   botEatHealMin: 12,
   botEatHealMax: 18,
+  botEatMaxCharges: 16,
   botHomeRadius: 10,
   blockedRetargetMinDelayMs: 450,
 });
 
 const BOT_CONFIG = Object.freeze({
   behaviorMode: BOT_BEHAVIOR_MODE,
-  botCount: 80,
+  botCount: 130,
+  fullTimePvpBotCount: 65,
   botWalkRadius: 10,
   botResourceIndexRegionRadius: 1,
   botDecisionTicks: 1,
@@ -64,6 +68,15 @@ const BOT_CONFIG = Object.freeze({
   ditchPostCrossRetryDelayMs: 0,
   blockedRetargetMinDelayMs: 450,
   blockedRetargetMaxDelayMs: 900,
+  // Path-blocked mitigation:
+  // - dedupe repeated identical block events
+  // - only re-run heavy recovery on meaningful state changes
+  // - cap repeated retries with exponential backoff
+  pathBlockedDuplicateEventWindowMs: 650,
+  pathBlockedMeaningfulRecheckMs: 1500,
+  pathBlockedMaxRepeatBeforeBackoff: 4,
+  pathBlockedBackoffBaseMs: 400,
+  pathBlockedBackoffMaxMs: 8000,
   botSpawnRadius: 14,
   botSpawnMinDistance: 2,
   botSpawnMaxAttempts: 80,
@@ -72,12 +85,29 @@ const BOT_CONFIG = Object.freeze({
   followBlockedRetryMs: 200,
   autoModeDecisionMinMs: 4500,
   autoModeDecisionMaxMs: 14000,
+  // Throttle heavy BT work for calm/idle bots:
+  // 1 = every bot every cycle, 2 = every second cycle, 3 = every third, etc.
+  // Combat/traversal/transient bots still run every cycle.
+  modeValidationIntervalMs: 1200,
+  idleEntryStride: 3,
+  // Bot LOD simulation:
+  // Near real players, bots tick every cycle for responsiveness.
+  // Further away, bot behavior-tree work is downsampled.
+  lodConfig: Object.freeze({
+    enabled: true,
+    refreshIntervalMs: 900,
+    nearDistanceTiles: 32,
+    mediumDistanceTiles: 96,
+    nearStride: 1,
+    mediumStride: 2,
+    farStride: 4,
+  }),
   wildernessDitchObjectId: ObjectIds.WILDERNESS_DITCH,
   manualControlPacketOpcodes: MANUAL_CONTROL_PACKET_OPCODES,
   logging: Object.freeze({
     logPath: path.join(process.cwd(), "logs", "player-bots.log"),
     runtimeEventLoggingEnabled:
-      (process.env.BOT_RUNTIME_EVENT_LOGGING ?? "0") === "1",
+      (process.env.BOT_RUNTIME_EVENT_LOGGING ?? "1") === "1",
     fileLogWritesEnabled:
       (process.env.BOT_FILE_LOG_WRITES_ENABLED ??
         (GameConstants.SERVER_LOG_WRITES_ENABLED ? "1" : "0")) === "1",
@@ -87,6 +117,7 @@ const BOT_CONFIG = Object.freeze({
     interactionSlot: 1,
     optionLabel: "Status",
     recentLogLines: 8,
+    diagnoseLogPath: path.join(process.cwd(), "logs", "diagnose-stuck-bot.log"),
   }),
   modeBehaviorOptions: BOT_MODE_BEHAVIOR_OPTIONS,
   treeOptions: BOT_TREE_OPTIONS,
@@ -146,6 +177,7 @@ module.exports = {
     botApi.log("registered", {
       spawned: boot.runtime.getSpawnedCount(),
       totalConfigured: BOT_CONFIG.botCount,
+      fullTimePvpBotCount: BOT_CONFIG.fullTimePvpBotCount,
       walkRadius: BOT_CONFIG.botWalkRadius,
       decisionTicks: BOT_CONFIG.botDecisionTicks,
       baseCooldownMs: BOT_CONFIG.botBaseCooldownMs,

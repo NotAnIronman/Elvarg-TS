@@ -151,6 +151,11 @@ function bootPlayerBotsRuntime(options = {}) {
     options: {
       blockedRetargetMinDelayMs: config.blockedRetargetMinDelayMs,
       blockedRetargetMaxDelayMs: config.blockedRetargetMaxDelayMs,
+      duplicateEventWindowMs: config.pathBlockedDuplicateEventWindowMs,
+      meaningfulRecheckMs: config.pathBlockedMeaningfulRecheckMs,
+      maxRepeatBeforeBackoff: config.pathBlockedMaxRepeatBeforeBackoff,
+      backoffBaseMs: config.pathBlockedBackoffBaseMs,
+      backoffMaxMs: config.pathBlockedBackoffMaxMs,
     },
   });
   const npcAggroPolicyHandler = new NpcAggroPolicyHandler({
@@ -197,6 +202,10 @@ function bootPlayerBotsRuntime(options = {}) {
           behaviorMode.BANK_RUN,
         ],
         modeStopParamsByMode: modeRegistries.modeStopParamsByMode,
+        npcAggroPolicyHandler,
+        modeValidationIntervalMs: config.modeValidationIntervalMs,
+        idleEntryStride: config.idleEntryStride,
+        lodConfig: config.lodConfig,
       })
     );
     behaviorTaskStarted = true;
@@ -205,6 +214,7 @@ function bootPlayerBotsRuntime(options = {}) {
   runtime = createBotRegistry({
     botApi,
     botCount: config.botCount,
+    fullTimePvpBotCount: config.fullTimePvpBotCount,
     botBaseCooldownMs: config.botBaseCooldownMs,
     spawn,
     spawnOffsets,
@@ -227,13 +237,24 @@ function bootPlayerBotsRuntime(options = {}) {
     entriesByUsername,
   });
 
+  const botStatusReporter = new BotStatusReporter({
+    api: botApi,
+    botStatesByName,
+    recentBotLogsByUsername,
+    runtimeEventLoggingEnabled,
+    recentLogLines: statusRecentLogLines,
+    diagnoseLogPath: config.status?.diagnoseLogPath,
+    peekMovementRequest,
+  });
+
   const followBackTrigger = new FollowBackTrigger({
     botStatesByName: runtime.botStatesByName,
     playerBotUsernames: runtime.playerBotUsernames,
+    modeHandlers,
     api: botApi,
     options: {
       behaviorMode,
-      followBackDurationMs: config.followBackDurationMs,
+      botStatusReporter,
     },
   });
   const combatReactionTrigger = new CombatReactionTrigger({
@@ -268,15 +289,6 @@ function bootPlayerBotsRuntime(options = {}) {
   }
 
   runtime.scheduleInitialSpawn();
-
-  const botStatusReporter = new BotStatusReporter({
-    api: botApi,
-    botStatesByName,
-    recentBotLogsByUsername,
-    runtimeEventLoggingEnabled,
-    recentLogLines: statusRecentLogLines,
-    peekMovementRequest,
-  });
 
   return {
     runtime,

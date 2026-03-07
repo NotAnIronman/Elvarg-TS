@@ -19,6 +19,9 @@ export class BountyHunter {
     private static TARGET_ABANDON_DELAY_SECONDS = 120;
 
     static process(player: Player) {
+        if (!player || player.isPlayerBot?.()) {
+            return;
+        }
         const target: Player | undefined = BountyHunter.getTargetFor(player);
         if (Wilderness.isIn(player)) {
             if (!target) {
@@ -359,6 +362,7 @@ export class BountyHunter {
         return (
             p != null &&
             p.isRegistered() &&
+            !p.isPlayerBot?.() &&
             Wilderness.isIn(p) &&
             p.getWildernessLevel() > 0 &&
             !p.isUntargetable() &&

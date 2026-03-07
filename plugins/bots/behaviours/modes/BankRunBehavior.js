@@ -6,7 +6,10 @@ const { Location } = require("../../../../src/main/typescript/elvarg/game/model/
 const { ObjectIds } = require("../../../../src/main/typescript/elvarg/util/IdEnums");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 const { callModeHook } = require("../hooks/ModeHookContract");
-const { queueRouteAndFlagAppearance } = require("../navigation/BotNavigation");
+const {
+  queueRouteAndFlagAppearance,
+  requestMovement,
+} = require("../navigation/BotNavigation");
 const {
   handlePlayerAttackReaction,
 } = require("../policies/PlayerAttackReactionPolicy");
@@ -22,6 +25,8 @@ const BANK_RUN_HEARTBEAT_MS = 4000;
 const BANK_RUN_STUCK_LOG_INTERVAL_MS = 5000;
 const BANK_BOOTH_CACHE_TTL_MS = 1200;
 const BANK_BOOTH_CACHE_MAX_KEYS = 256;
+const BLOCKED_BOOTH_FAILURE_THRESHOLD = 3;
+const BLOCKED_BOOTH_BLACKLIST_MS = 25000;
 
 const BANK_BOOTH_IDS = new Set(
   Object.entries(ObjectIds)
@@ -154,6 +159,19 @@ class BankRunBehavior {
       target
     );
     if (!traversalObject) {
+      let queuedRepath = false;
+      let blacklistedBooth = false;
+      if (bankRun.phase === "to_bank") {
+        blacklistedBooth = this.recordBlockedBooth(bankRun, target, nowMs);
+        bankRun.bankTarget = null;
+        bankRun.travelTarget = null;
+      } else {
+        queuedRepath = requestMovement(player, target.x, target.y, {
+          nowMs,
+          reason: "bank_run_non_traversal_repath",
+          basicPather: true,
+        });
+      }
       this.api.log("bank_run_blocked_no_traversal_object", {
         username: player.getUsername?.(),
         bankRunId: bankRun?.id ?? null,
@@ -164,9 +182,18 @@ class BankRunBehavior {
         fromX: event?.from?.x ?? null,
         fromY: event?.from?.y ?? null,
         fromZ: event?.from?.z ?? null,
+        queuedRepath,
+        blacklistedBooth,
       });
-      if (bankRun.phase === "to_bank") {
-        bankRun.bankTarget = null;
+      if (blacklistedBooth) {
+        this.api?.log?.("bank_run_booth_blacklisted", {
+          username: player.getUsername?.(),
+          bankRunId: bankRun?.id ?? null,
+          x: target.x,
+          y: target.y,
+          z: target.z,
+          blockedUntil: nowMs + BLOCKED_BOOTH_BLACKLIST_MS,
+        });
       }
       bankRun.nextActionAt = nowMs + blockedRetargetMinDelayMs;
       return true;
@@ -260,10 +287,16 @@ class BankRunBehavior {
   processToBankPhase(player, state, nowMs) {
     const bankRun = state.bankRun;
     this.setPhase(player, state, "to_bank", nowMs);
-    let bankBooth = this.resolveTargetBankBooth(player, bankRun.bankTarget);
+    this.cleanupBlockedBooths(bankRun, nowMs);
+    let bankBooth = this.resolveTargetBankBooth(
+      player,
+      bankRun.bankTarget,
+      bankRun,
+      nowMs
+    );
     if (!bankBooth) {
       this.ensureNearbyRegionsLoaded(player);
-      bankBooth = this.findNearestBankBooth(player);
+      bankBooth = this.findNearestBankBooth(player, bankRun, nowMs);
       if (!bankBooth) {
         bankRun.bankTarget = null;
         bankRun.travelTarget = null;
@@ -634,11 +667,14 @@ class BankRunBehavior {
     }
   }
 
-  resolveTargetBankBooth(player, target) {
+  resolveTargetBankBooth(player, target, bankRun, nowMs = Date.now()) {
     if (!player || !target) {
       return null;
     }
     const loc = new Location(target.x, target.y, target.z);
+    if (this.isBoothBlockedForRun(bankRun, loc, nowMs)) {
+      return null;
+    }
     const object = MapObjects.get(target.objectId, loc, player.getPrivateArea());
     if (!object || !BANK_BOOTH_IDS.has(object.getId())) {
       return null;
@@ -646,7 +682,7 @@ class BankRunBehavior {
     return object;
   }
 
-  findNearestBankBooth(player) {
+  findNearestBankBooth(player, bankRun, nowMs = Date.now()) {
     const loc = player?.getLocation?.();
     if (!loc) {
       return null;
@@ -655,8 +691,10 @@ class BankRunBehavior {
     if (!bankBooths || bankBooths.length === 0) {
       return null;
     }
-    let nearest = null;
-    let bestDistSq = Number.MAX_SAFE_INTEGER;
+    const currentRegionX = loc.getX() >> 6;
+    const currentRegionY = loc.getY() >> 6;
+    const sameRegion = [];
+    const otherRegions = [];
 
     for (const object of bankBooths) {
       if (!object || !BANK_BOOTH_IDS.has(object.getId())) {
@@ -666,16 +704,91 @@ class BankRunBehavior {
       if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
         continue;
       }
-      const dx = objectLoc.getX() - loc.getX();
-      const dy = objectLoc.getY() - loc.getY();
+      if (this.isBoothBlockedForRun(bankRun, objectLoc, nowMs)) {
+        continue;
+      }
+      const regionX = objectLoc.getX() >> 6;
+      const regionY = objectLoc.getY() >> 6;
+      if (regionX === currentRegionX && regionY === currentRegionY) {
+        sameRegion.push(object);
+      } else {
+        otherRegions.push(object);
+      }
+    }
+
+    const localPick = this.findNearestObjectByDistance(loc, sameRegion);
+    if (localPick) {
+      return localPick;
+    }
+    return this.findNearestObjectByDistance(loc, otherRegions);
+  }
+
+  findNearestObjectByDistance(originLoc, objects) {
+    if (!originLoc || !Array.isArray(objects) || objects.length === 0) {
+      return null;
+    }
+    let nearest = null;
+    let bestDistSq = Number.MAX_SAFE_INTEGER;
+    for (const object of objects) {
+      const objectLoc = object?.getLocation?.();
+      if (!objectLoc) {
+        continue;
+      }
+      const dx = objectLoc.getX() - originLoc.getX();
+      const dy = objectLoc.getY() - originLoc.getY();
       const distSq = dx * dx + dy * dy;
       if (distSq < bestDistSq) {
         bestDistSq = distSq;
         nearest = object;
       }
     }
-
     return nearest;
+  }
+
+  cleanupBlockedBooths(bankRun, nowMs) {
+    if (!bankRun || !bankRun.blockedBoothsByKey) {
+      return;
+    }
+    for (const [key, record] of Object.entries(bankRun.blockedBoothsByKey)) {
+      if (!record || Number(record.blockedUntil) <= nowMs) {
+        delete bankRun.blockedBoothsByKey[key];
+      }
+    }
+  }
+
+  isBoothBlockedForRun(bankRun, loc, nowMs) {
+    if (!bankRun || !loc || !bankRun.blockedBoothsByKey) {
+      return false;
+    }
+    const key = `${loc.getX()},${loc.getY()},${loc.getZ()}`;
+    const record = bankRun.blockedBoothsByKey[key];
+    if (!record) {
+      return false;
+    }
+    return Number(record.blockedUntil) > nowMs;
+  }
+
+  recordBlockedBooth(bankRun, target, nowMs) {
+    if (!bankRun || !target) {
+      return false;
+    }
+    const key = `${target.x},${target.y},${target.z}`;
+    if (!bankRun.blockedBoothsByKey) {
+      bankRun.blockedBoothsByKey = {};
+    }
+    const current = bankRun.blockedBoothsByKey[key] ?? {
+      failures: 0,
+      blockedUntil: 0,
+    };
+    current.failures = Number(current.failures) + 1;
+    let blacklisted = false;
+    if (current.failures >= BLOCKED_BOOTH_FAILURE_THRESHOLD) {
+      current.failures = 0;
+      current.blockedUntil = nowMs + BLOCKED_BOOTH_BLACKLIST_MS;
+      blacklisted = true;
+    }
+    bankRun.blockedBoothsByKey[key] = current;
+    return blacklisted;
   }
 
   getCachedBankBooths(player, nowMs = Date.now()) {

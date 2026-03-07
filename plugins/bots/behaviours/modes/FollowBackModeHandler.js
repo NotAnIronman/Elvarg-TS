@@ -55,4 +55,3 @@ class FollowBackModeHandler {
 module.exports = {
   FollowBackModeHandler,
 };
-

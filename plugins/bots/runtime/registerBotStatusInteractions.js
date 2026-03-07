@@ -1,4 +1,5 @@
 const { World } = require("../../../src/main/typescript/elvarg/game/World");
+const { Packet } = require("../../../src/main/typescript/elvarg/net/packet/Packet");
 const { PacketConstants } = require("../../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const {
   PlayerOptionPacketListener,
@@ -16,24 +17,71 @@ function registerBotStatusInteractions(options = {}) {
   }
 
   const corePlayerOptionListener = new PlayerOptionPacketListener();
+  const clonePacket = (packet) => {
+    if (!packet?.getOpcode || !packet?.getBuffer) {
+      return null;
+    }
+    const opcode = packet.getOpcode();
+    const buffer = packet.getBuffer();
+    if (!Number.isInteger(opcode) || !Buffer.isBuffer(buffer)) {
+      return null;
+    }
+    return new Packet(opcode, Buffer.from(buffer));
+  };
+
+  const resolveTargetFromPacket = (packet) => {
+    const probe = clonePacket(packet);
+    if (!probe) {
+      return null;
+    }
+    const opcode = probe.getOpcode();
+    let targetIndex = Number.NaN;
+    switch (opcode) {
+      case PacketConstants.PLAYER_OPTION_1_OPCODE:
+      case PacketConstants.PLAYER_OPTION_2_OPCODE:
+        targetIndex = probe.readShort() & 0xffff;
+        break;
+      case PacketConstants.PLAYER_OPTION_3_OPCODE:
+        targetIndex = probe.readLEShortA() & 0xffff;
+        break;
+      default:
+        return null;
+    }
+    if (!Number.isInteger(targetIndex)) {
+      return null;
+    }
+    return World.getPlayers().get(targetIndex);
+  };
+
   api.registerPacketListener(PacketConstants.PLAYER_OPTION_1_OPCODE, {
     execute: (player, packet) => {
-      const payload = packet?.getBuffer?.();
-      const targetIndex =
-        payload && payload.length >= 2 ? payload.readUInt16BE(0) : Number.NaN;
-
-      if (!Number.isInteger(targetIndex)) {
-        corePlayerOptionListener.execute(player, packet);
-        return;
-      }
-
-      const target = World.getPlayers().get(targetIndex);
+      const target = resolveTargetFromPacket(packet);
       if (!target?.isPlayerBot?.()) {
         corePlayerOptionListener.execute(player, packet);
         return;
       }
 
       botStatusReporter.sendStatus(player, target);
+    },
+  });
+
+  api.registerPacketListener(PacketConstants.PLAYER_OPTION_2_OPCODE, {
+    execute: (player, packet) => {
+      const target = resolveTargetFromPacket(packet);
+      if (target?.isPlayerBot?.()) {
+        botStatusReporter.dumpToDiagnoseLog(player, target, "follow_click");
+      }
+      corePlayerOptionListener.execute(player, packet);
+    },
+  });
+
+  api.registerPacketListener(PacketConstants.PLAYER_OPTION_3_OPCODE, {
+    execute: (player, packet) => {
+      const target = resolveTargetFromPacket(packet);
+      if (target?.isPlayerBot?.()) {
+        botStatusReporter.dumpToDiagnoseLog(player, target, "follow_click");
+      }
+      corePlayerOptionListener.execute(player, packet);
     },
   });
 

@@ -131,8 +131,8 @@ export class Player extends Mobile {
     public forceMovement: ForceMovement;
     private currentPet: NPC;
     private skillAnimation: number;
-    private drainingPrayer: boolean;
-    private prayerPointDrain: number;
+    private drainingPrayer = false;
+    private prayerPointDrain = 0;
     private spellbook: MagicSpellbook;
     private destroyItem = -1;
     private updateInventory: boolean; // Updates inventory on next tick
@@ -400,7 +400,9 @@ export class Player extends Mobile {
         AreaManager.process(this);
 
         // Process Bounty Hunter
-        BountyHunter.process(this);
+        if (!this.isPlayerBot()) {
+            BountyHunter.process(this);
+        }
 
         // Updates inventory if an update
         // has been requested

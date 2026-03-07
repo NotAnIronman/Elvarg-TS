@@ -62,7 +62,13 @@ function streamPluginPerfToPlayer(player, limit = DEFAULT_LIMIT) {
   logLines.push(`${timestamp} [pluginperf] Top ${rows.length} plugins (total/avg/max ms)`);
 
   for (const row of rows) {
-    const line = `[pluginperf] ${row.pluginName}: ${row.totalMs.toFixed(1)}/${row.avgMs.toFixed(3)}/${row.maxMs.toFixed(3)} calls=${row.calls} top=${row.topEventName}(${row.topEventTotalMs.toFixed(1)}ms)`;
+    const line = `${row.pluginName}: ${row.totalMs.toFixed(1)}/${row.avgMs.toFixed(
+      3
+    )}/${row.maxMs.toFixed(3)} calls=${row.calls} top=${row.topEventName}(tot=${row.topEventTotalMs.toFixed(
+      1
+    )}ms c=${row.topEventCalls} avg=${row.topEventAvgMs.toFixed(
+      3
+    )}ms p95=${row.topEventP95Ms.toFixed(3)}ms)`;
     player.getPacketSender().sendMessage(line);
     logLines.push(`${timestamp} ${line}`);
   }

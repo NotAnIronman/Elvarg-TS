@@ -31,6 +31,7 @@ class PlayerBotBehaviorTreeFactory {
     this.botEatLowHpRatio = options.botEatLowHpRatio;
     this.botEatHealMin = options.botEatHealMin;
     this.botEatHealMax = options.botEatHealMax;
+    this.botEatMaxCharges = options.botEatMaxCharges;
     this.botHomeRadius = options.botHomeRadius;
     this.blockedRetargetMinDelayMs = options.blockedRetargetMinDelayMs;
     this.modeHandlers = options.modeHandlers;
@@ -39,10 +40,10 @@ class PlayerBotBehaviorTreeFactory {
       this.behaviorMode.ROAMING,
       "ROAMING"
     );
-    this.sparringBehavior = requireModeBehavior(
+    this.pvpBehavior = requireModeBehavior(
       this.modeHandlers,
-      this.behaviorMode.SPARRING,
-      "SPARRING"
+      this.behaviorMode.PVP,
+      "PVP"
     );
     this.woodcuttingBehavior = requireModeBehavior(
       this.modeHandlers,
@@ -73,6 +74,7 @@ class PlayerBotBehaviorTreeFactory {
       lowHpRatio: this.botEatLowHpRatio,
       minHeal: this.botEatHealMin,
       maxHeal: this.botEatHealMax,
+      maxCharges: this.botEatMaxCharges,
     });
   }
 
@@ -137,11 +139,11 @@ class PlayerBotBehaviorTreeFactory {
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.SPARRING,
+          requiredMode: this.behaviorMode.PVP,
           requireNotInCombat: false,
           requireNotBusy: false,
         }),
-        new ActionNode((context) => this.sparringBehavior.tick(context)),
+        new ActionNode((context) => this.pvpBehavior.tick(context)),
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {

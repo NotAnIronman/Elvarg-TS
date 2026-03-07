@@ -398,7 +398,10 @@ export class PrayerHandler {
         player.setDrainingPrayer(true);
         let task = new PlayerHandlerTask(player,  () => {
             let drainPerTick = 0;
-            let pointDrain = player.getPrayerPointDrain();
+            let pointDrain = Number(player.getPrayerPointDrain());
+            if (!Number.isFinite(pointDrain) || pointDrain < 0) {
+                pointDrain = 0;
+            }
             for (let i = 0; i < player.getPrayerActive().length; i++) {
                 if (!player.getPrayerActive()[i]) {
                     continue;

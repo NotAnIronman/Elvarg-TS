@@ -4,6 +4,11 @@ const { Graphic } = require("../../../../src/main/typescript/elvarg/game/model/G
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { TaskManager } = require("../../../../src/main/typescript/elvarg/game/task/TaskManager");
 const { clearMovementRequest } = require("../navigation/BotNavigation");
+const {
+  clearPresetState,
+  isPresetActive,
+  restorePresetSnapshot,
+} = require("../../../interface/PresetsState");
 
 const HOME_TELEPORT_START_ANIMATION = new Animation(714);
 const HOME_TELEPORT_END_ANIMATION = new Animation(715);
@@ -19,7 +24,7 @@ const RESUMABLE_MODE_KEYS = Object.freeze([
   "MINING",
   "SMELTING",
   "FIREMAKING",
-  "SPARRING",
+  "PVP",
 ]);
 
 function createRoamingBehaviorState() {
@@ -104,21 +109,23 @@ function createBankRunBehaviorState() {
   };
 }
 
-function createSparringBehaviorState() {
+function createPvpBehaviorState() {
   return {
+    phase: "idle",
     targetUsername: null,
     endsAt: 0,
     nextActionAt: 0,
   };
 }
 
-function clearSparringBehaviorState(state) {
-  if (!state?.sparring) {
+function clearPvpBehaviorState(state) {
+  if (!state?.pvp) {
     return;
   }
-  state.sparring.targetUsername = null;
-  state.sparring.endsAt = 0;
-  state.sparring.nextActionAt = 0;
+  state.pvp.phase = "idle";
+  state.pvp.targetUsername = null;
+  state.pvp.endsAt = 0;
+  state.pvp.nextActionAt = 0;
 }
 
 function createAutonomyState() {
@@ -203,10 +210,14 @@ function resetMovementState(player) {
     return;
   }
   clearMovementRequest(player);
-  try {
-    TaskManager.cancelTasks(player);
-  } catch (_) {
-    // Ignore task cancellation issues in plugin flow.
+  // Avoid canceling player-keyed tasks while a force movement is active
+  // (e.g. wilderness ditch), otherwise the movement task can be interrupted.
+  if (player.getForceMovement?.() == null) {
+    try {
+      TaskManager.cancelTasks(player);
+    } catch (_) {
+      // Ignore task cancellation issues in plugin flow.
+    }
   }
   player.getMovementQueue().walkToReset();
   player.getMovementQueue().reset();
@@ -236,7 +247,7 @@ function clearAllBehaviorStates(state) {
   clearFiremakingBehaviorState(state);
   clearSmeltingBehaviorState(state);
   clearBankRunBehaviorState(state);
-  clearSparringBehaviorState(state);
+  clearPvpBehaviorState(state);
 }
 
 function restoreSuppressedAutoRetaliate(player, state, nextMode) {
@@ -264,7 +275,22 @@ function clearCombatState(player) {
   player.setCombatFollowing?.(null);
 }
 
+function clearBotActivePreset(player) {
+  if (!player || player.isPlayerBot?.() !== true) {
+    return false;
+  }
+  if (!isPresetActive(player)) {
+    return false;
+  }
+  const restored = restorePresetSnapshot(player, { preserveLocation: true });
+  if (!restored) {
+    clearPresetState(player);
+  }
+  return true;
+}
+
 function applyModeTransitionSideEffects(player, state, mode, options = {}) {
+  clearBotActivePreset(player);
   restoreSuppressedAutoRetaliate(player, state, mode);
   if (options.resetMovement !== false) {
     resetMovementState(player);
@@ -300,6 +326,25 @@ function resolveBehaviorModeValue(behaviorMode, modeKey) {
   return typeof mode === "string" && mode.length > 0 ? mode : null;
 }
 
+function isPlayerInCombat(player) {
+  if (!player) {
+    return false;
+  }
+  const hitpoints = player.getHitpoints?.();
+  if (Number.isFinite(hitpoints) && hitpoints <= 0) {
+    return false;
+  }
+  if (player.isDyingReturn?.() === true) {
+    return false;
+  }
+  const combat = player.getCombat?.();
+  return !!(
+    combat?.getTarget?.() ||
+    combat?.getAttacker?.() ||
+    player.getCombatFollowing?.()
+  );
+}
+
 function transitionToMode(player, state, behaviorMode, modeKey, overrideOptions = null) {
   if (!state) {
     return false;
@@ -312,6 +357,13 @@ function transitionToMode(player, state, behaviorMode, modeKey, overrideOptions 
     overrideOptions ??
     MODE_TRANSITION_PROFILE_OVERRIDES[modeKey] ??
     DEFAULT_TRANSITION_PROFILE;
+  if (
+    state.mode !== mode &&
+    profile?.allowInCombatTransition !== true &&
+    isPlayerInCombat(player)
+  ) {
+    return false;
+  }
   applyModeTransition(player, state, mode, profile);
   return true;
 }
@@ -463,7 +515,7 @@ function setModeBankRun(player, state, behaviorMode, options = {}) {
   return true;
 }
 
-function setModeSparring(
+function setModePvp(
   player,
   state,
   targetPlayer,
@@ -479,20 +531,32 @@ function setModeSparring(
     return false;
   }
 
-  if (!transitionToMode(player, state, behaviorMode, "SPARRING")) {
+  if (!transitionToMode(player, state, behaviorMode, "PVP")) {
     return false;
   }
-  if (!state.sparring) {
-    state.sparring = createSparringBehaviorState();
+  if (!state.pvp) {
+    state.pvp = createPvpBehaviorState();
   }
 
-  state.sparring.targetUsername = targetUsername;
-  state.sparring.endsAt = nowMs + durationMs;
-  state.sparring.nextActionAt = nowMs;
+  state.pvp.phase = "seeking";
+  state.pvp.targetUsername = targetUsername;
+  state.pvp.endsAt = nowMs + durationMs;
+  state.pvp.nextActionAt = nowMs;
   player.setFollowing(targetPlayer);
   player.setMobileInteraction(targetPlayer);
   player.setPositionToFace(targetPlayer.getLocation());
   return true;
+}
+
+function setModeSparring(
+  player,
+  state,
+  targetPlayer,
+  nowMs,
+  durationMs,
+  behaviorMode
+) {
+  return setModePvp(player, state, targetPlayer, nowMs, durationMs, behaviorMode);
 }
 
 function isInsideHomeArea(player, state, botHomeRadius) {
@@ -536,7 +600,7 @@ function createInitialState(home, behaviorMode) {
     firemaking: createFiremakingBehaviorState(),
     smelting: createSmeltingBehaviorState(),
     bankRun: createBankRunBehaviorState(),
-    sparring: createSparringBehaviorState(),
+    pvp: createPvpBehaviorState(),
     autonomy: createAutonomyState(),
     followTargetUsername: null,
     followUntilMs: 0,
@@ -565,6 +629,7 @@ module.exports = {
   resolveBankRunResumeMode,
   resetMovementState,
   setModeFollowBack,
+  setModePvp,
   setModeSparring,
   setModeReturnHome,
   setModeRoaming,
@@ -574,4 +639,5 @@ module.exports = {
   setModeSmelting,
   setModeFiremaking,
   teleportHome,
+  clearBotActivePreset,
 };

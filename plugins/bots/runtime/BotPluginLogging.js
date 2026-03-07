@@ -1,6 +1,16 @@
 const fs = require("fs");
 const path = require("path");
 
+const HOT_EVENT_THROTTLES_MS = Object.freeze({
+  bot_movement_node_dispatch: 3000,
+  path_blocked_retarget: 2500,
+  path_blocked_backoff_applied: 1500,
+  bank_run_target_booth_selected: 2000,
+  bank_run_blocked_no_traversal_object: 2500,
+  bank_run_heartbeat: 3000,
+  ditch_post_delay_retry_waiting: 2500,
+});
+
 function createBotPluginLogging(options = {}) {
   const api = options.api;
   const logPath = options.logPath;
@@ -12,6 +22,25 @@ function createBotPluginLogging(options = {}) {
 
   let botLogStream = null;
   const recentBotLogsByUsername = new Map();
+  const lastHotEventAtByKey = new Map();
+
+  const shouldThrottleHotEvent = (message, extra, nowMs) => {
+    const throttleMs = Number(HOT_EVENT_THROTTLES_MS[message] ?? 0);
+    if (throttleMs <= 0) {
+      return false;
+    }
+    const username =
+      typeof extra?.username === "string" && extra.username.length > 0
+        ? extra.username
+        : "__global__";
+    const key = `${message}|${username}`;
+    const lastAt = Number(lastHotEventAtByKey.get(key) ?? 0);
+    if (nowMs - lastAt < throttleMs) {
+      return true;
+    }
+    lastHotEventAtByKey.set(key, nowMs);
+    return false;
+  };
 
   const rememberRecentBotLog = (username, line) => {
     if (!username || typeof line !== "string") {
@@ -40,7 +69,11 @@ function createBotPluginLogging(options = {}) {
       return;
     }
     try {
-      const timestamp = new Date().toISOString();
+      const nowMs = Date.now();
+      if (shouldThrottleHotEvent(message, extra, nowMs)) {
+        return;
+      }
+      const timestamp = new Date(nowMs).toISOString();
       const suffix =
         extra && Object.keys(extra).length > 0 ? ` ${JSON.stringify(extra)}` : "";
       const line = `[${timestamp}] ${message}${suffix}\n`;

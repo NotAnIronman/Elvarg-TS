@@ -112,6 +112,18 @@ export class World {
         return true;
     }
 
+    public static forEachNetworkPlayer(consumer: (player: Player) => void): void {
+        if (typeof consumer !== "function") {
+            return;
+        }
+        World.players.forEach((player) => {
+            if (!World.shouldRunNetworkUpdates(player)) {
+                return;
+            }
+            consumer(player);
+        });
+    }
+
     /**
     * Broadcasts a message to all players in the game.
     *
@@ -119,7 +131,9 @@ export class World {
     *            The message to broadcast.
     */
     public static sendMessage(message: string) {
-        World.players.forEach(p => p.getPacketSender().sendMessage(message));
+        World.forEachNetworkPlayer((player) =>
+            player.getPacketSender().sendMessage(message)
+        );
     }
 
     /**
@@ -129,13 +143,11 @@ export class World {
     *            The message to broadcast.
     */
     public static sendStaffMessage(message: string) {
-        const players = [];
-        World.players.forEach(p => {
-            if (p && p.isStaff()) {
-                players.push(p);
+        World.forEachNetworkPlayer((player) => {
+            if (player.isStaff()) {
+                player.getPacketSender().sendMessage(message);
             }
         });
-        players.forEach(p => p.getPacketSender().sendMessage(message));
     }
 
     /**
@@ -218,6 +230,21 @@ export class World {
         return activeRegionKeys.has(World.getRegionKey(loc.getX(), loc.getY(), loc.getZ()));
     }
 
+    private static shouldRunNetworkUpdates(player: Player): boolean {
+        if (!player) {
+            return false;
+        }
+        // Bots have no real client session and do not need to receive world update packets.
+        // Keeping them out of update-recipient loops avoids O(players^2) visibility work.
+        if (player.isPlayerBot?.() === true) {
+            return false;
+        }
+        if (!World.isPlayerSessionConnected(player)) {
+            return false;
+        }
+        return true;
+    }
+
     public static getPlayerBots(): TreeMap<string, any> {
         // TODO: Re-enable player bot map once bot lifecycle is implemented again.
         return this.playerBots;
@@ -260,11 +287,11 @@ export class World {
 
 
     public static sendLocalGraphics(id: number, position: Location): void {
-        for (const player of World.players) {
-            if (player && player.getLocation().isWithinDistance(position, 32)) {
+        World.forEachNetworkPlayer((player) => {
+            if (player.getLocation().isWithinDistance(position, 32)) {
                 player.getPacketSender().sendGraphic(new Graphic(id), position);
             }
-        }
+        });
     }
 
 
@@ -274,13 +301,15 @@ export class World {
     }
 
     public sendMessage(message: string) {
-        World.players.forEach(p => p.getPacketSender().sendMessage(message));
+        World.forEachNetworkPlayer((player) =>
+            player.getPacketSender().sendMessage(message)
+        );
     }
 
     public sendStaffMessage(message: string): void {
-        World.players.forEach(p => {
-            if (p && p !== null && p.isStaff()) {
-                p.getPacketSender().sendMessage(message);
+        World.forEachNetworkPlayer((player) => {
+            if (player.isStaff()) {
+                player.getPacketSender().sendMessage(message);
             }
         });
     }
@@ -451,7 +480,7 @@ export class World {
 
         // Enable player movement updates only. (NPC updating remains disabled for now.)
         timed("update_players_npcs", () => {
-            World.players.forEach((player) => {
+            World.forEachNetworkPlayer((player) => {
                 try {
                     PlayerUpdating.update(player);
                     NPCUpdating.update(player);
@@ -467,7 +496,9 @@ export class World {
                 try {
                     player.resetUpdating();
                     player.setCachedUpdateBlock(null);
-                    player.getSession().flush();
+                    if (World.shouldRunNetworkUpdates(player)) {
+                        player.getSession().flush();
+                    }
                 } catch (e) {
                     console.log(e);
                     player.requestLogout();
@@ -519,6 +550,9 @@ class PlayerSyncTask implements GameSyncTaskInterface {
 
     execute(index: number) {
         let player = World.getPlayers().get(index);
+        if (!player || player.isPlayerBot?.() === true || !World.isPlayerSessionConnected(player)) {
+            return;
+        }
         try {
             PlayerUpdating.update(player);
             NPCUpdating.update(player);

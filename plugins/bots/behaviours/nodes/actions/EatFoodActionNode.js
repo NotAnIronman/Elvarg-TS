@@ -12,6 +12,7 @@ class EatFoodActionNode {
     this.lowHpRatio = Math.max(0.05, Math.min(0.95, Number(options.lowHpRatio ?? 0.45)));
     this.minHeal = Math.max(1, Number(options.minHeal ?? 12));
     this.maxHeal = Math.max(this.minHeal, Number(options.maxHeal ?? 18));
+    this.maxCharges = Math.max(1, Math.floor(Number(options.maxCharges ?? 16)));
   }
 
   randomHealAmount() {
@@ -32,9 +33,9 @@ class EatFoodActionNode {
       return "failure";
     }
 
-    const { player } = resolved;
+    const { player, state, nowMs } = resolved;
     const skillManager = player.getSkillManager?.();
-    if (!skillManager) {
+    if (!skillManager || !state) {
       return "failure";
     }
 
@@ -46,6 +47,25 @@ class EatFoodActionNode {
 
     const lowHpThreshold = Math.max(1, Math.ceil(maxHp * this.lowHpRatio));
     if (currentHp > lowHpThreshold) {
+      return "failure";
+    }
+
+    if (!Number.isFinite(state.virtualFoodChargesRemaining)) {
+      state.virtualFoodChargesRemaining = this.maxCharges;
+    }
+    if (!Number.isFinite(state.nextNoFoodLogAt)) {
+      state.nextNoFoodLogAt = 0;
+    }
+    if (state.virtualFoodChargesRemaining <= 0) {
+      if ((nowMs ?? Date.now()) >= state.nextNoFoodLogAt) {
+        this.api?.log?.("bot_imaginary_food_empty", {
+          username: player.getUsername?.(),
+          currentHp,
+          maxHp,
+          threshold: lowHpThreshold,
+        });
+        state.nextNoFoodLogAt = (nowMs ?? Date.now()) + 10000;
+      }
       return "failure";
     }
 
@@ -61,6 +81,10 @@ class EatFoodActionNode {
     player.performAnimation?.(EAT_ANIMATION);
 
     const healAmount = this.randomHealAmount();
+    state.virtualFoodChargesRemaining = Math.max(
+      0,
+      Number(state.virtualFoodChargesRemaining) - 1
+    );
     player.heal?.(healAmount);
     const nextHp = Number(skillManager.getCurrentLevel?.(Skill.HITPOINTS) ?? currentHp);
     this.api?.log?.("bot_imaginary_food_eat", {
@@ -68,6 +92,7 @@ class EatFoodActionNode {
       currentHp,
       nextHp,
       healAmount,
+      chargesRemaining: state.virtualFoodChargesRemaining,
       maxHp,
       threshold: lowHpThreshold,
     });

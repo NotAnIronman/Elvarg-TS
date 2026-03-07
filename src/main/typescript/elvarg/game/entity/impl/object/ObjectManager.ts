@@ -126,21 +126,19 @@ export class ObjectManager {
         switch (type) {
             case OperationType.SPAWN:
             case OperationType.DESPAWN:
-                for (let player of World.getPlayers()) {
-                    if (player == null)
-                        continue;
+                World.forEachNetworkPlayer((player) => {
                     if (player.getPrivateArea() != object.getPrivateArea()) {
-                        continue;
+                        return;
                     }
                     if (!player.getLocation().isWithinDistance(object.getLocation(), 64)) {
-                        continue;
+                        return;
                     }
                     if (type == OperationType.SPAWN) {
                         player.getPacketSender().sendObject(object);
                     } else {
                         player.getPacketSender().sendObjectRemoval(object);
                     }
-                }
+                });
                 break;
         }
     }

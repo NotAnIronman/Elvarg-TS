@@ -1,4 +1,5 @@
 const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task");
+const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { randomInRange } = require("../navigation/BotNavigation");
 const { callModeHook } = require("../hooks/ModeHookContract");
 
@@ -19,6 +20,119 @@ class BotBehaviorTask extends Task {
       : [];
     this.modeStopParamsByMode = options.modeStopParamsByMode ?? {};
     this.transientModes = new Set(options.transientModes ?? []);
+    this.npcAggroPolicyHandler = options.npcAggroPolicyHandler ?? null;
+    this.modeValidationIntervalMs = Number.isFinite(options.modeValidationIntervalMs)
+      ? Math.max(0, Math.floor(options.modeValidationIntervalMs))
+      : 1200;
+    this.idleEntryStride = Number.isFinite(options.idleEntryStride)
+      ? Math.max(1, Math.floor(options.idleEntryStride))
+      : 2;
+    this.lodConfig = this.resolveLodConfig(options.lodConfig ?? {});
+    this._nextLodRefreshAt = 0;
+    this._humanObservers = [];
+    this._cycleCounter = 0;
+  }
+
+  resolveLodConfig(rawConfig) {
+    const parseStride = (value, fallback) =>
+      Number.isFinite(value) ? Math.max(1, Math.floor(value)) : fallback;
+    const parseDistance = (value, fallback) =>
+      Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+    const parseInterval = (value, fallback) =>
+      Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+
+    const enabled = rawConfig?.enabled !== false;
+    const nearDistanceTiles = parseDistance(rawConfig?.nearDistanceTiles, 32);
+    const mediumDistanceTiles = Math.max(
+      nearDistanceTiles,
+      parseDistance(rawConfig?.mediumDistanceTiles, 96)
+    );
+
+    return {
+      enabled,
+      refreshIntervalMs: parseInterval(rawConfig?.refreshIntervalMs, 900),
+      nearDistanceTiles,
+      mediumDistanceTiles,
+      nearStride: parseStride(rawConfig?.nearStride, 1),
+      mediumStride: parseStride(rawConfig?.mediumStride, 2),
+      farStride: parseStride(rawConfig?.farStride, this.idleEntryStride),
+    };
+  }
+
+  refreshHumanObservers(nowMs) {
+    if (!this.lodConfig.enabled) {
+      this._humanObservers = [];
+      this._nextLodRefreshAt = nowMs + this.lodConfig.refreshIntervalMs;
+      return;
+    }
+    if (nowMs < this._nextLodRefreshAt) {
+      return;
+    }
+
+    const observers = [];
+    World.getPlayers().forEach((candidate) => {
+      if (!candidate || candidate.isPlayerBot?.() === true) {
+        return;
+      }
+      if (!World.isPlayerSessionConnected(candidate)) {
+        return;
+      }
+      const location = candidate.getLocation?.();
+      if (!location) {
+        return;
+      }
+      observers.push({
+        x: location.getX?.(),
+        y: location.getY?.(),
+        z: location.getZ?.(),
+      });
+    });
+
+    this._humanObservers = observers;
+    this._nextLodRefreshAt = nowMs + this.lodConfig.refreshIntervalMs;
+  }
+
+  resolveEntryStride(entry, nowMs) {
+    if (!this.lodConfig.enabled) {
+      return this.idleEntryStride;
+    }
+    this.refreshHumanObservers(nowMs);
+    if (!entry?.player || this._humanObservers.length === 0) {
+      return this.lodConfig.farStride;
+    }
+
+    const location = entry.player.getLocation?.();
+    if (!location) {
+      return this.lodConfig.farStride;
+    }
+    const x = location.getX?.();
+    const y = location.getY?.();
+    const z = location.getZ?.();
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      return this.lodConfig.farStride;
+    }
+
+    let bestChebyshevDistance = Number.POSITIVE_INFINITY;
+    for (const observer of this._humanObservers) {
+      if (!observer || observer.z !== z) {
+        continue;
+      }
+      const distance = Math.max(
+        Math.abs(observer.x - x),
+        Math.abs(observer.y - y)
+      );
+      if (distance < bestChebyshevDistance) {
+        bestChebyshevDistance = distance;
+      }
+      if (bestChebyshevDistance <= this.lodConfig.nearDistanceTiles) {
+        return this.lodConfig.nearStride;
+      }
+    }
+
+    if (bestChebyshevDistance <= this.lodConfig.mediumDistanceTiles) {
+      return this.lodConfig.mediumStride;
+    }
+    return this.lodConfig.farStride;
   }
 
   ensureAutonomyState(state) {
@@ -51,6 +165,17 @@ class BotBehaviorTask extends Task {
     );
   }
 
+  isTraversingBarrier(player, state) {
+    if (!player || !state) {
+      return false;
+    }
+    return (
+      state.awaitingDitchTransition != null ||
+      state.roaming?.pendingRetry != null ||
+      player.getForceMovement?.() != null
+    );
+  }
+
   scheduleNextDecision(state, nowMs) {
     const autonomy = this.ensureAutonomyState(state);
     if (!autonomy) {
@@ -59,6 +184,54 @@ class BotBehaviorTask extends Task {
     autonomy.nextDecisionAt =
       nowMs +
       randomInRange(this.autonomy.decisionDelayMinMs, this.autonomy.decisionDelayMaxMs);
+  }
+
+  ensureDecisionScheduled(state, nowMs) {
+    const autonomy = this.ensureAutonomyState(state);
+    if (!autonomy) {
+      return;
+    }
+    if (!Number.isFinite(autonomy.nextDecisionAt) || autonomy.nextDecisionAt <= nowMs) {
+      this.scheduleNextDecision(state, nowMs);
+    }
+  }
+
+  shouldProcessEntryHeavy(entry, nowMs) {
+    // Temporal sharding for performance: calm/idle bots skip heavy BT/autonomy
+    // work on some cycles. Urgent bots (combat, traversal, transient, pvp) are
+    // always processed every cycle for responsiveness.
+    const stride = this.resolveEntryStride(entry, nowMs);
+    if (stride <= 1) {
+      return true;
+    }
+    const player = entry?.player;
+    const state = entry?.state;
+    if (!player || !state) {
+      return true;
+    }
+    if (this.isInCombat(player)) {
+      return true;
+    }
+    if (state.awaitingDitchTransition != null || state.roaming?.pendingRetry != null) {
+      return true;
+    }
+    if (player.getForceMovement?.() != null) {
+      return true;
+    }
+    if (this.transientModes.has(state.mode)) {
+      return true;
+    }
+    if (state.mode === this.behaviorMode?.PVP) {
+      return true;
+    }
+    let shard = Number.isFinite(state.processingShard)
+      ? state.processingShard
+      : Number.NaN;
+    if (!Number.isFinite(shard) || shard < 0 || shard >= stride) {
+      shard = Math.floor(Math.random() * stride);
+      state.processingShard = shard;
+    }
+    return (this._cycleCounter + shard) % stride === 0;
   }
 
   behaviorRequirementsMet(mode, player, state, nowMs = Date.now()) {
@@ -184,6 +357,10 @@ class BotBehaviorTask extends Task {
     return this.autonomousModes.find((definition) => definition?.mode === mode) ?? null;
   }
 
+  isFullTimePvpBot(state) {
+    return state?.autonomy?.fullTimePvp === true;
+  }
+
   selectWeightedMode(definitions) {
     if (!Array.isArray(definitions) || definitions.length === 0) {
       return null;
@@ -264,7 +441,7 @@ class BotBehaviorTask extends Task {
       (player.getHitpoints?.() ?? 0) <= 0 ||
       player.isDyingReturn?.() === true;
 
-    // Ensure bot-specific temporary modes (follow-back/sparring/return-home)
+    // Ensure bot-specific temporary modes (follow-back/pvp/return-home)
     // are cleared after death so the bot resumes normal autonomous behavior.
     if (deadOrDying) {
       if (!state.deathResetApplied) {
@@ -273,6 +450,8 @@ class BotBehaviorTask extends Task {
           this.behaviorMode.ROAMING,
           "post_death_reset"
         );
+        state.virtualFoodChargesRemaining = null;
+        state.nextNoFoodLogAt = 0;
         autonomy.modeEndsAt = 0;
         autonomy.nextDecisionAt = 0;
         state.deathResetApplied = true;
@@ -320,38 +499,52 @@ class BotBehaviorTask extends Task {
         }
       }
 
-      autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
-      autonomy.modeEndsAt = Number.MAX_SAFE_INTEGER;
-      return;
-    }
-
-    if (this.transientModes.has(state.mode)) {
-      this.scheduleNextDecision(state, nowMs);
-      return;
-    }
-
-    if (!this.isModeStateValid(state.mode, entry, nowMs)) {
-      const stopParamsSource = this.modeStopParamsByMode[state.mode];
-      const stopParams =
-        typeof stopParamsSource === "function"
-          ? stopParamsSource({ entry, player, state, nowMs })
-          : stopParamsSource ?? {};
-      if (
-        !this.stopModeWithHandler(
-          entry,
-          state.mode,
-          nowMs,
-          "mode_state_invalid",
-          stopParams
-        )
-      ) {
-        this.startRoamingFallback(entry, nowMs, "mode_state_invalid");
+      if (autonomy.nextDecisionAt !== Number.MAX_SAFE_INTEGER) {
+        autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
+      }
+      if (autonomy.modeEndsAt !== Number.MAX_SAFE_INTEGER) {
+        autonomy.modeEndsAt = Number.MAX_SAFE_INTEGER;
       }
       return;
     }
 
+    if (this.transientModes.has(state.mode)) {
+      this.ensureDecisionScheduled(state, nowMs);
+      return;
+    }
+
+    if (this.isTraversingBarrier(player, state)) {
+      return;
+    }
+
+    const modeValidationDueAt = Number(autonomy.nextModeValidationAt ?? 0);
+    // Mode-state validation can be expensive (hook fan-out per bot), so we
+    // rate-limit it instead of running every cycle for every bot.
+    if (modeValidationDueAt <= nowMs) {
+      autonomy.nextModeValidationAt = nowMs + this.modeValidationIntervalMs;
+      if (!this.isModeStateValid(state.mode, entry, nowMs)) {
+        const stopParamsSource = this.modeStopParamsByMode[state.mode];
+        const stopParams =
+          typeof stopParamsSource === "function"
+            ? stopParamsSource({ entry, player, state, nowMs })
+            : stopParamsSource ?? {};
+        if (
+          !this.stopModeWithHandler(
+            entry,
+            state.mode,
+            nowMs,
+            "mode_state_invalid",
+            stopParams
+          )
+        ) {
+          this.startRoamingFallback(entry, nowMs, "mode_state_invalid");
+        }
+        return;
+      }
+    }
+
     if (this.isInCombat(player)) {
-      this.scheduleNextDecision(state, nowMs);
+      this.ensureDecisionScheduled(state, nowMs);
       return;
     }
 
@@ -362,11 +555,15 @@ class BotBehaviorTask extends Task {
       return;
     }
 
+    const forcePvpOnly = this.isFullTimePvpBot(state);
     const candidates = [];
     for (const definition of this.autonomousModes) {
       const mode = definition?.mode;
       const weight = Number(definition?.weight ?? 0);
       if (!mode || weight <= 0) {
+        continue;
+      }
+      if (forcePvpOnly && mode !== this.behaviorMode.PVP) {
         continue;
       }
       if (!this.behaviorRequirementsMet(mode, player, state, nowMs)) {
@@ -398,10 +595,20 @@ class BotBehaviorTask extends Task {
 
   execute() {
     const now = Date.now();
+    this._cycleCounter = (this._cycleCounter + 1) & 0x7fffffff;
     for (const entry of this.entries) {
       try {
         this.traversalService.processTransition(entry.player, entry.state, now);
         this.traversalService.processPendingRetry(entry.player, entry.state, now);
+        if (this.npcAggroPolicyHandler) {
+          this.npcAggroPolicyHandler.handlePlayerProcess({
+            player: entry.player,
+            nowMs: now,
+          });
+        }
+        if (!this.shouldProcessEntryHeavy(entry, now)) {
+          continue;
+        }
         this.processAutonomousMode(entry, now);
         entry.controller.tick(now);
       } catch (err) {

@@ -1,5 +1,6 @@
 const { queueRouteAndFlagAppearance } = require("../navigation/BotNavigation");
 const { callModeHook } = require("../hooks/ModeHookContract");
+const { clearBotActivePreset } = require("../state/PlayerBotState");
 
 const RETRY_WAIT_LOG_INTERVAL_MS = 3000;
 const TRANSITION_WAIT_LOG_INTERVAL_MS = 2500;
@@ -121,6 +122,7 @@ class DitchTraversalService {
     if (!player || !state || !traversalObject) {
       return false;
     }
+    clearBotActivePreset(player);
     const traversalTarget = this.getTraversalTarget(state);
     if (!traversalTarget) {
       return false;

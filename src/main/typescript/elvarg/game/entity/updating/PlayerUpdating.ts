@@ -133,6 +133,9 @@ export class PlayerUpdating {
     }
 
     public static update(player: Player) {
+        if (!player || player.isPlayerBot?.() === true) {
+            return;
+        }
         const updateId = this.nextUpdateId();
         const update = new PacketBuilder();
         const packet = new PacketBuilder(81, PacketType.VARIABLE_SHORT);

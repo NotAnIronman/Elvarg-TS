@@ -72,6 +72,7 @@ type PluginPerfEventStat = {
   errors: number;
   totalNs: bigint;
   maxNs: bigint;
+  recentDurationsNs: bigint[];
 };
 
 type PluginPerfStat = {
@@ -83,6 +84,7 @@ type PluginPerfStat = {
 };
 
 export class PluginManager {
+  private static readonly PERF_EVENT_SAMPLE_LIMIT = 128;
   private static readonly MAX_PLUGIN_DEPTH = 2;
   private static initialized = false;
   private static loadedPlugins: string[] = [];
@@ -203,7 +205,13 @@ export class PluginManager {
 
     let eventStat = pluginStat.events.get(eventName);
     if (!eventStat) {
-      eventStat = { calls: 0, errors: 0, totalNs: 0n, maxNs: 0n };
+      eventStat = {
+        calls: 0,
+        errors: 0,
+        totalNs: 0n,
+        maxNs: 0n,
+        recentDurationsNs: [],
+      };
       pluginStat.events.set(eventName, eventStat);
     }
     eventStat.calls++;
@@ -214,6 +222,30 @@ export class PluginManager {
     if (failed) {
       eventStat.errors++;
     }
+    PluginManager.pushPerfDurationSample(eventStat.recentDurationsNs, durationNs);
+  }
+
+  private static pushPerfDurationSample(samples: bigint[], durationNs: bigint): void {
+    if (!Array.isArray(samples)) {
+      return;
+    }
+    if (samples.length >= PluginManager.PERF_EVENT_SAMPLE_LIMIT) {
+      samples.shift();
+    }
+    samples.push(durationNs);
+  }
+
+  private static computePercentileNs(samples: bigint[], percentile: number): bigint {
+    if (!Array.isArray(samples) || samples.length === 0) {
+      return 0n;
+    }
+    const normalized = Number.isFinite(percentile)
+      ? Math.min(1, Math.max(0, percentile))
+      : 0.95;
+    const sorted = [...samples].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const rank = Math.ceil(normalized * sorted.length) - 1;
+    const index = Math.min(sorted.length - 1, Math.max(0, rank));
+    return sorted[index] ?? 0n;
   }
 
   public static setPluginPerformanceProfilingEnabled(enabled: boolean): void {
@@ -236,8 +268,10 @@ export class PluginManager {
     avgMs: number;
     maxMs: number;
     topEventName: string;
+    topEventCalls: number;
     topEventTotalMs: number;
     topEventAvgMs: number;
+    topEventP95Ms: number;
   }> {
     const rows: Array<{
       pluginName: string;
@@ -247,17 +281,21 @@ export class PluginManager {
       avgMs: number;
       maxMs: number;
       topEventName: string;
+      topEventCalls: number;
       topEventTotalMs: number;
       topEventAvgMs: number;
+      topEventP95Ms: number;
     }> = [];
 
     for (const [pluginName, stat] of PluginManager.pluginPerfStats.entries()) {
       let topEventName = "n/a";
+      let topEventStat: PluginPerfEventStat | null = null;
       let topEventTotalNs = 0n;
       let topEventCalls = 0;
       for (const [eventName, eventStat] of stat.events.entries()) {
         if (eventStat.totalNs > topEventTotalNs) {
           topEventName = eventName;
+          topEventStat = eventStat;
           topEventTotalNs = eventStat.totalNs;
           topEventCalls = eventStat.calls;
         }
@@ -272,8 +310,21 @@ export class PluginManager {
         avgMs: stat.calls > 0 ? totalMs / stat.calls : 0,
         maxMs: Number(stat.maxNs) / 1_000_000,
         topEventName,
+        topEventCalls,
         topEventTotalMs: Number(topEventTotalNs) / 1_000_000,
-        topEventAvgMs: topEventCalls > 0 ? (Number(topEventTotalNs) / 1_000_000) / topEventCalls : 0,
+        topEventAvgMs:
+          topEventCalls > 0
+            ? Number(topEventTotalNs) / 1_000_000 / topEventCalls
+            : 0,
+        topEventP95Ms:
+          topEventStat && topEventStat.recentDurationsNs.length > 0
+            ? Number(
+                PluginManager.computePercentileNs(
+                  topEventStat.recentDurationsNs,
+                  0.95
+                )
+              ) / 1_000_000
+            : 0,
       });
     }
 

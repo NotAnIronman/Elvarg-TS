@@ -106,6 +106,10 @@ function calculateStrictWalkRoute(player, targetX, targetY) {
   PathFinder.calculateRoute(player, 0, targetX, targetY, 0, 0, 0, 0, false);
 }
 
+function calculateWalkRoute(player, targetX, targetY) {
+  PathFinder.calculateWalkRoute(player, targetX, targetY);
+}
+
 function resolveSegmentTarget(
   player,
   targetX,
@@ -167,6 +171,7 @@ function requestMovement(player, targetX, targetY, options = {}) {
       options.maxRouteSegmentTiles > 0
         ? Math.floor(options.maxRouteSegmentTiles)
         : MAX_ROUTE_SEGMENT_TILES,
+    basicPather: options.basicPather === true,
   });
   return true;
 }
@@ -195,7 +200,11 @@ function dispatchMovementRequest(player, request) {
     request.y,
     request.maxRouteSegmentTiles
   );
-  calculateStrictWalkRoute(player, segmentTarget.x, segmentTarget.y);
+  if (request.basicPather === true) {
+    calculateWalkRoute(player, segmentTarget.x, segmentTarget.y);
+  } else {
+    calculateStrictWalkRoute(player, segmentTarget.x, segmentTarget.y);
+  }
   player.getUpdateFlag().flag(Flag.APPEARANCE);
   return segmentTarget;
 }

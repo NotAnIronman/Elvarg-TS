@@ -55,7 +55,12 @@ class ProcessPendingMovementActionNode {
     }
 
     const segmentTarget = dispatchMovementRequest(player, request);
-    clearMovementRequest(player);
+    const latestRequest = peekMovementRequest(player);
+    // Path dispatch can emit path-blocked hooks which enqueue a replacement
+    // movement request in the same tick. Only clear if nothing replaced it.
+    if (!latestRequest || latestRequest === request) {
+      clearMovementRequest(player);
+    }
     if (!segmentTarget) {
       return "failure";
     }
