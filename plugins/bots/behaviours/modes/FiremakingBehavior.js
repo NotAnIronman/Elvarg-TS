@@ -1,6 +1,5 @@
 const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
-const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { ObjectManager } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { Bank } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
@@ -438,7 +437,6 @@ class FiremakingBehavior {
 
     let bankBooth = this.resolveTargetBankBooth(player, firemaking.bankTarget);
     if (!bankBooth) {
-      this.ensureNearbyRegionsLoaded(player);
       bankBooth = this.findNearestBankBooth(player);
       if (!bankBooth) {
         firemaking.bankTarget = null;
@@ -699,28 +697,6 @@ class FiremakingBehavior {
       loc.getY() === target.y &&
       loc.getZ() === target.z
     );
-  }
-
-  ensureNearbyRegionsLoaded(player) {
-    const loc = player?.getLocation?.();
-    if (!loc) {
-      return;
-    }
-    if (this.objectSearch?.preloadRegionsAround) {
-      this.objectSearch.preloadRegionsAround(
-        loc.getX(),
-        loc.getY(),
-        BANK_SEARCH_REGION_RADIUS
-      );
-      return;
-    }
-    const baseX = loc.getX();
-    const baseY = loc.getY();
-    for (let rx = -BANK_SEARCH_REGION_RADIUS; rx <= BANK_SEARCH_REGION_RADIUS; rx++) {
-      for (let ry = -BANK_SEARCH_REGION_RADIUS; ry <= BANK_SEARCH_REGION_RADIUS; ry++) {
-        RegionManager.loadMapFiles(baseX + rx * 64, baseY + ry * 64);
-      }
-    }
   }
 
   resolveTargetBankBooth(player, target) {

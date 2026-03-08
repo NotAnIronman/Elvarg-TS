@@ -31,6 +31,7 @@ interface GameSyncTaskInterface {
 export class World {
     private static readonly MAX_PLAYERS = 500;
     private static readonly NPC_ACTIVE_REGION_RADIUS = 1;
+    private static readonly IDLE_BOT_PROCESS_STRIDE = 2;
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
@@ -73,6 +74,7 @@ export class World {
      * The manager for game synchronization.
      */
     private static executor = new GameSyncExecutor();
+    private static processCycle = 0;
 
     public players = new MobileList<Player>(0);
     public npcs = new MobileList<NPC>(0);
@@ -195,6 +197,11 @@ export class World {
             if (!player) {
                 return;
             }
+            // Prioritize active regions around real connected players.
+            // Bot-only regions can fan out NPC processing across most of the map.
+            if (!World.shouldRunNetworkUpdates(player)) {
+                return;
+            }
             const loc = player.getLocation();
             const baseRegionX = loc.getX() >> 6;
             const baseRegionY = loc.getY() >> 6;
@@ -243,6 +250,37 @@ export class World {
             return false;
         }
         return true;
+    }
+
+    private static shouldProcessBotPlayerThisTick(
+        player: Player,
+        cycle: number
+    ): boolean {
+        if (!player || player.isPlayerBot?.() !== true) {
+            return true;
+        }
+
+        if (player.getForceMovement?.() != null) {
+            return true;
+        }
+
+        const movementQueue: any = player.getMovementQueue?.();
+        if ((movementQueue?.size?.() ?? 0) > 0 || movementQueue?.isMovings?.() === true) {
+            return true;
+        }
+
+        const combat: any = player.getCombat?.();
+        if (
+            combat?.getTarget?.() != null ||
+            combat?.getAttacker?.() != null ||
+            player.getCombatFollowing?.() != null
+        ) {
+            return true;
+        }
+
+        const index = Number(player.getIndex?.() ?? 0);
+        const stride = Math.max(1, World.IDLE_BOT_PROCESS_STRIDE);
+        return ((cycle + index) % stride) === 0;
     }
 
     public static getPlayerBots(): TreeMap<string, any> {
@@ -323,6 +361,7 @@ export class World {
     }
 
     public static process() {
+        World.processCycle = (World.processCycle + 1) & 0x7fffffff;
         World.activeNpcsForUpdate = [];
         const timed = <T>(phase: string, fn: () => T): T =>
             ServerPerf.measurePhase(`world.${phase}`, fn);
@@ -450,10 +489,16 @@ export class World {
 
         // Sequential processing to avoid null-slot crashes during bring-up.
         timed("process_players", () => {
+            const cycle = World.processCycle;
             World.players.forEach((player) => {
                 try {
+                    if (!World.shouldProcessBotPlayerThisTick(player, cycle)) {
+                        return;
+                    }
                     player.process();
-                    PluginManager.emitPlayerProcess({ player });
+                    if (player.isPlayerBot?.() !== true) {
+                        PluginManager.emitPlayerProcess({ player });
+                    }
                 } catch (e) {
                     console.error(e);
                     player.requestLogout();

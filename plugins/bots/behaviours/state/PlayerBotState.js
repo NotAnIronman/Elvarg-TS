@@ -113,6 +113,7 @@ function createPvpBehaviorState() {
   return {
     phase: "idle",
     targetUsername: null,
+    targetPlayer: null,
     endsAt: 0,
     nextActionAt: 0,
   };
@@ -124,6 +125,7 @@ function clearPvpBehaviorState(state) {
   }
   state.pvp.phase = "idle";
   state.pvp.targetUsername = null;
+  state.pvp.targetPlayer = null;
   state.pvp.endsAt = 0;
   state.pvp.nextActionAt = 0;
 }
@@ -547,6 +549,7 @@ function setModePvp(
 
   state.pvp.phase = "seeking";
   state.pvp.targetUsername = targetUsername;
+  state.pvp.targetPlayer = targetPlayer;
   state.pvp.endsAt = nowMs + durationMs;
   state.pvp.nextActionAt = nowMs;
   player.setFollowing(targetPlayer);

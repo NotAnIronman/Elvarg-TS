@@ -1,5 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const {
+  BotRuntimeTelemetry,
+} = require("../../../src/main/typescript/elvarg/util/BotRuntimeTelemetry");
 
 const HOT_EVENT_THROTTLES_MS = Object.freeze({
   bot_movement_node_dispatch: 3000,
@@ -16,6 +19,14 @@ function createBotPluginLogging(options = {}) {
   const logPath = options.logPath;
   const runtimeEventLoggingEnabled = options.runtimeEventLoggingEnabled === true;
   const fileLogWritesEnabled = options.fileLogWritesEnabled === true;
+  const telemetryEnabled = options.telemetryEnabled !== false;
+  const telemetryLogPath =
+    typeof options.telemetryLogPath === "string" && options.telemetryLogPath.length > 0
+      ? options.telemetryLogPath
+      : null;
+  const telemetryIntervalMs = Number.isFinite(options.telemetryIntervalMs)
+    ? Math.max(1000, Math.floor(options.telemetryIntervalMs))
+    : 10000;
   const mirrorToServerLogger = options.mirrorToServerLogger === true;
   const mirrorErrorsToServerLogger = options.mirrorErrorsToServerLogger !== false;
   const recentLogLimit = Number.isFinite(options.recentLogLimit)
@@ -23,8 +34,42 @@ function createBotPluginLogging(options = {}) {
     : 24;
 
   let botLogStream = null;
+  let telemetryLogStream = null;
+  let telemetryTimer = null;
   const recentBotLogsByUsername = new Map();
   const lastHotEventAtByKey = new Map();
+
+  const writeTelemetryLine = (line) => {
+    if (!fileLogWritesEnabled || !telemetryLogPath || typeof line !== "string") {
+      return;
+    }
+    try {
+      if (telemetryLogStream) {
+        telemetryLogStream.write(line);
+      } else {
+        fs.appendFileSync(telemetryLogPath, line);
+      }
+    } catch (_) {
+      // Keep bots running even if telemetry writes fail.
+    }
+  };
+
+  const flushTelemetrySnapshot = (reason = "interval") => {
+    if (!telemetryEnabled) {
+      return;
+    }
+    try {
+      const snapshot = BotRuntimeTelemetry.flushIntervalSnapshot(10);
+      if (!snapshot || snapshot.totalEvents <= 0) {
+        return;
+      }
+      writeTelemetryLine(
+        `[${new Date().toISOString()}] ${reason} ${JSON.stringify(snapshot)}\n`
+      );
+    } catch (_) {
+      // Ignore telemetry flush failures.
+    }
+  };
 
   const shouldThrottleHotEvent = (message, extra, nowMs) => {
     const throttleMs = Number(HOT_EVENT_THROTTLES_MS[message] ?? 0);
@@ -105,6 +150,7 @@ function createBotPluginLogging(options = {}) {
 
   const botApi = Object.create(api ?? {});
   botApi.log = (message, extra) => {
+    BotRuntimeTelemetry.record(message, extra ?? null);
     if (!runtimeEventLoggingEnabled) {
       return;
     }
@@ -126,6 +172,26 @@ function createBotPluginLogging(options = {}) {
     } catch (err) {
       api?.log?.("bot_log_init_failed", {
         path: logPath,
+        error: String(err?.message ?? err),
+      });
+    }
+  }
+
+  if (telemetryEnabled && fileLogWritesEnabled && telemetryLogPath) {
+    try {
+      fs.mkdirSync(path.dirname(telemetryLogPath), { recursive: true });
+      fs.writeFileSync(telemetryLogPath, "");
+      telemetryLogStream = fs.createWriteStream(telemetryLogPath, {
+        flags: "a",
+        encoding: "utf8",
+      });
+      telemetryTimer = setInterval(() => {
+        flushTelemetrySnapshot("interval");
+      }, telemetryIntervalMs);
+      telemetryTimer.unref?.();
+    } catch (err) {
+      api?.log?.("bot_telemetry_log_init_failed", {
+        path: telemetryLogPath,
         error: String(err?.message ?? err),
       });
     }

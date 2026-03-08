@@ -4,6 +4,7 @@ import { World } from '../game/World';
 import { TaskManager } from './task/TaskManager';
 import { ServerPerf } from '../util/ServerPerf';
 import { FreezeDiagnostics } from '../util/FreezeDiagnostics';
+import { BotRuntimeTelemetry } from '../util/BotRuntimeTelemetry';
 
 
 /**
@@ -21,11 +22,15 @@ export class GameEngine  {
     private lastLagLogAt = 0;
     private lastOverrunLogAt = 0;
     private lastOverlapLogAt = 0;
+    private lastLagDiagnosticAt = 0;
     private lastFreezeDiagnosticAt = 0;
     private readonly tickRateMs = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE;
-    private readonly lagLogThresholdMs = Math.max(120, Math.floor(this.tickRateMs * 0.25));
+    private readonly lagLogThresholdMs = Math.max(450, Math.floor(this.tickRateMs * 0.75));
+    private readonly lagDiagnosticThresholdMs = Math.max(450, Math.floor(this.tickRateMs * 0.75));
     private readonly overrunLogThresholdMs = this.tickRateMs;
     private readonly lagLogCooldownMs = 1000;
+    private readonly lagWarnCooldownMs = 5000;
+    private readonly lagDiagnosticCooldownMs = 5000;
     private readonly freezeDiagnosticCooldownMs = 3000;
     private readonly severeLagThresholdMs = Math.max(1200, this.tickRateMs * 2);
     private readonly severeOverrunThresholdMs = Math.max(1200, this.tickRateMs * 2);
@@ -139,6 +144,7 @@ export class GameEngine  {
 
         const summary = ServerPerf.getSummary(30);
         const topPhases = this.formatTopPhases();
+        const botTelemetry = BotRuntimeTelemetry.getIntervalSnapshot(8);
         FreezeDiagnostics.log(event, {
             ...details,
             summaryTicks: summary.ticks,
@@ -151,6 +157,7 @@ export class GameEngine  {
             npcs: summary.lastNpcs,
             tasks: summary.lastTasks,
             topPhases,
+            botTelemetry: botTelemetry.totalEvents > 0 ? botTelemetry : undefined,
         });
     }
 
@@ -171,7 +178,7 @@ export class GameEngine  {
             return driftMs;
         }
 
-        if (tickStartedAt - this.lastLagLogAt < this.lagLogCooldownMs) {
+        if (tickStartedAt - this.lastLagLogAt < this.lagWarnCooldownMs) {
             return driftMs;
         }
         this.lastLagLogAt = tickStartedAt;
@@ -182,6 +189,20 @@ export class GameEngine  {
             `started=${new Date(tickStartedAt).toISOString()} players=${World.getPlayers().sizeReturn()} ` +
             `npcs=${World.getNpcs().sizeReturn()} tasks=${TaskManager.getTaskAmount()}`
         );
+
+        if (
+            driftMs >= this.lagDiagnosticThresholdMs &&
+            tickStartedAt - this.lastLagDiagnosticAt >= this.lagDiagnosticCooldownMs
+        ) {
+            this.lastLagDiagnosticAt = tickStartedAt;
+            this.logFreezeDiagnostic("tick_start_lag_diagnostic", tickStartedAt, {
+                tick: this.tickNumber,
+                driftMs,
+                thresholdMs: this.lagDiagnosticThresholdMs,
+                expectedAt: this.nextExpectedTickAt - this.tickRateMs,
+                startedAt: tickStartedAt,
+            });
+        }
 
         if (driftMs >= this.severeLagThresholdMs) {
             this.logFreezeDiagnostic("tick_start_lag_severe", tickStartedAt, {

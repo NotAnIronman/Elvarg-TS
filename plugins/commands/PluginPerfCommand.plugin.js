@@ -195,8 +195,12 @@ module.exports = {
       }
 
       if (sub === "once") {
+        const wasEnabled = PluginManager.isPluginPerformanceProfilingEnabled();
         PluginManager.setPluginPerformanceProfilingEnabled(true);
         streamPluginPerfToPlayer(player, limit);
+        if (!wasEnabled && pluginPerfStreams.size === 0) {
+          PluginManager.setPluginPerformanceProfilingEnabled(false);
+        }
         return true;
       }
 

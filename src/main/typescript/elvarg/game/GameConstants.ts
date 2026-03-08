@@ -9,8 +9,9 @@ export class GameConstants {
     public static readonly NPC_BITS: number = 18;
     // Keep optional OSRS spawns disabled by default; legacy 317 data is the baseline.
     //public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = false;
-    // Region-scoped NPC processing can hide NPC updates when parity is off; keep global by default.
-    public static readonly PROCESS_NPCS_BY_ACTIVE_REGIONS: boolean = false;
+    // Process NPC AI only near active player regions to avoid spending tick time
+    // on distant NPCs that no active client can currently observe.
+    public static readonly PROCESS_NPCS_BY_ACTIVE_REGIONS: boolean = true;
     public static readonly CLIENT_UID: number = 8784521;
     public static readonly DEFINITIONS_DIRECTORY: string = "./data/definitions/";
     public static readonly CLIPPING_DIRECTORY: string = "./data/clipping/";
@@ -34,8 +35,8 @@ export class GameConstants {
     public static readonly COMBAT_SKILLS_EXP_MULTIPLIER: number = 6;
     public static readonly REGULAR_SKILLS_EXP_MULTIPLIER: number = 18;
     public static readonly DEBUG_ATTACK_DISTANCE: boolean = false;
-    // Logs whenever an NPC's face-position target changes (old/new target + reason).
-    public static readonly DEBUG_NPC_FACE_POSITION_CHANGES: boolean = true;
+    // Verbose NPC face-change debug is expensive in large fights; keep off unless diagnosing.
+    public static readonly DEBUG_NPC_FACE_POSITION_CHANGES: boolean = false;
     public static readonly TAB_INTERFACES: number[] = [2423, 3917, 31000, 3213, 1644, 5608, -1, 37128, 5065, 5715, 2449,
         42500, 147, 32000];
     public static readonly TELEPORT_INTERFACE_ENABLED: boolean = false;

@@ -133,6 +133,14 @@ class BotBehaviorTask extends Task {
     };
   }
 
+  resolveModeActiveDuration(definition) {
+    const minMs = Number(definition?.minMs ?? 0);
+    const maxMs = Number(definition?.maxMs ?? minMs);
+    const safeMinMs = Number.isFinite(minMs) && minMs > 0 ? minMs : 1;
+    const safeMaxMs = Number.isFinite(maxMs) && maxMs >= safeMinMs ? maxMs : safeMinMs;
+    return randomInRange(safeMinMs, safeMaxMs);
+  }
+
   refreshHumanObservers(nowMs) {
     if (!this.lodConfig.enabled) {
       this._humanObservers = [];
@@ -292,18 +300,42 @@ class BotBehaviorTask extends Task {
     if (player.getForceMovement?.() != null) {
       return true;
     }
-    if (this.transientModes.has(state.mode)) {
-      return true;
-    }
-    if (state.mode === this.behaviorMode?.PVP) {
-      return true;
-    }
     let shard = Number.isFinite(state.processingShard)
       ? state.processingShard
       : Number.NaN;
     if (!Number.isFinite(shard) || shard < 0 || shard >= stride) {
       shard = Math.floor(Math.random() * stride);
       state.processingShard = shard;
+    }
+    if (state.mode === this.behaviorMode?.BANK_RUN) {
+      const queueSize = Number(player.getMovementQueue?.()?.size?.() ?? 0);
+      const nextActionAt = Number(state.bankRun?.nextActionAt ?? 0);
+      // Bank runs can spend long periods walking to/from booths; we can
+      // downsample BT work while movement is already in progress.
+      if (queueSize > 0 && nowMs < nextActionAt) {
+        const bankRunStride = Math.max(2, stride);
+        return (this._cycleCounter + shard) % bankRunStride === 0;
+      }
+    }
+    const queueSize = Number(player.getMovementQueue?.()?.size?.() ?? 0);
+    if (
+      queueSize > 0 &&
+      !this.transientModes.has(state.mode) &&
+      state.mode !== this.behaviorMode?.PVP
+    ) {
+      const movingStride = Math.max(2, stride);
+      return (this._cycleCounter + shard) % movingStride === 0;
+    }
+    if (this.transientModes.has(state.mode)) {
+      return true;
+    }
+    if (state.mode === this.behaviorMode?.PVP) {
+      const pvpNextActionAt = Number(state.pvp?.nextActionAt ?? 0);
+      if (this.isInCombat(player) || nowMs >= pvpNextActionAt) {
+        return true;
+      }
+      const pvpStride = Math.max(2, stride);
+      return (this._cycleCounter + shard) % pvpStride === 0;
     }
     return (this._cycleCounter + shard) % stride === 0;
   }
@@ -342,7 +374,9 @@ class BotBehaviorTask extends Task {
   }
 
   startModeWithHandler(entry, mode, nowMs, minMs, maxMs, reason = "auto_switch") {
-    const activeForMs = randomInRange(minMs, maxMs);
+    const safeMinMs = Number.isFinite(minMs) && minMs > 0 ? minMs : 1;
+    const safeMaxMs = Number.isFinite(maxMs) && maxMs >= safeMinMs ? maxMs : safeMinMs;
+    const activeForMs = randomInRange(safeMinMs, safeMaxMs);
     const started =
       callModeHook({
         modeHandlers: this.modeHandlers,
@@ -475,16 +509,21 @@ class BotBehaviorTask extends Task {
         definition?.params ?? {}
       );
     }
-    const minMs = Number(definition?.minMs ?? 0);
-    const maxMs = Number(definition?.maxMs ?? minMs);
-    const safeMinMs = Number.isFinite(minMs) && minMs > 0 ? minMs : 1;
-    const safeMaxMs = Number.isFinite(maxMs) && maxMs >= safeMinMs ? maxMs : safeMinMs;
+    if (entry?.state?.mode === mode) {
+      const autonomy = this.ensureAutonomyState(entry.state);
+      if (autonomy) {
+        const activeForMs = this.resolveModeActiveDuration(definition);
+        autonomy.modeEndsAt = nowMs + activeForMs;
+        this.scheduleNextDecision(entry.state, nowMs);
+      }
+      return true;
+    }
     return this.startModeWithHandler(
       entry,
       mode,
       nowMs,
-      safeMinMs,
-      safeMaxMs,
+      Number(definition?.minMs ?? 1),
+      Number(definition?.maxMs ?? definition?.minMs ?? 1),
       definition?.reason ?? "auto_switch"
     );
   }

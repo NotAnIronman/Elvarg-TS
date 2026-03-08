@@ -418,6 +418,26 @@ class PvpBehavior {
     return nearestPool[randomInRange(0, nearestPool.length - 1)].entry;
   }
 
+  resolveTargetPlayer(state) {
+    const pvp = state?.pvp;
+    if (!pvp?.targetUsername) {
+      return null;
+    }
+
+    const cachedTarget = pvp.targetPlayer;
+    if (
+      cachedTarget &&
+      cachedTarget.isRegistered?.() === true &&
+      cachedTarget.getUsername?.() === pvp.targetUsername
+    ) {
+      return cachedTarget;
+    }
+
+    const resolved = World.getPlayerByName(pvp.targetUsername);
+    pvp.targetPlayer = resolved ?? null;
+    return resolved ?? null;
+  }
+
   isModeStateValid({ player, state, nowMs }) {
     const pvp = state?.pvp;
     if (!player || !state || !pvp) {
@@ -427,7 +447,7 @@ class PvpBehavior {
       return false;
     }
 
-    const opponent = World.getPlayerByName(pvp.targetUsername);
+    const opponent = this.resolveTargetPlayer(state);
     if (!opponent || !opponent.isRegistered?.()) {
       return false;
     }
@@ -472,7 +492,7 @@ class PvpBehavior {
       return "success";
     }
 
-    const target = World.getPlayerByName(pvp.targetUsername);
+    const target = this.resolveTargetPlayer(state);
     if (!this.isValidTarget(player, target)) {
       this.setPhase(state, PVP_PHASE.SEEKING);
       this.stopPvp(player, state, nowMs, "invalid_target");

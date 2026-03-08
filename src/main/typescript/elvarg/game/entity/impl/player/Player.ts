@@ -123,6 +123,7 @@ export class Player extends Mobile {
     private multiIcon: number;
     private isRunning = true;
     private playerBot = false;
+    private botAreaProcessTick = 0;
     private runEnergy = 100;
     private lastRunRecovery = new Stopwatch();
     private isDying: boolean;
@@ -375,12 +376,14 @@ export class Player extends Mobile {
     }
 
     public process() {
+        const isBot = this.isPlayerBot();
+
         // Timers
         this.getTimers().process();
 
         // Process incoming packets...
         let session = this.getSession();
-        if (session != null) {
+        if (!isBot && session != null) {
             session.processPackets();
         }
 
@@ -394,34 +397,52 @@ export class Player extends Mobile {
         this.getCombat().process();
 
         // Process aggression
-        NpcAggression.process(this);
+        if (!isBot) {
+            NpcAggression.process(this);
+        }
 
         // Process areas..
-        AreaManager.process(this);
+        // Bots do not need full-frequency area processing while idle.
+        // Run immediately when moving/forced movement, otherwise downsample.
+        const shouldProcessArea =
+            !isBot ||
+            this.getMovementQueue().isMovings() ||
+            this.getForceMovement() != null ||
+            ((this.botAreaProcessTick = (this.botAreaProcessTick + 1) % 3) === 0);
+        if (shouldProcessArea) {
+            AreaManager.process(this);
+        }
 
         // Process Bounty Hunter
-        if (!this.isPlayerBot()) {
+        if (!isBot) {
             BountyHunter.process(this);
         }
 
         // Updates inventory if an update
         // has been requested
         if (this.isUpdateInventory()) {
-            this.getInventory().refreshItems();
+            if (!isBot) {
+                this.getInventory().refreshItems();
+            }
             this.setUpdateInventory(false);
         }
 
         // Updates appearance if an update
         // has been requested
         // or if skull timer hits 0.
-        if (this.isSkulled() && this.getAndDecrementSkullTimer() == 0) {
+        if (this.isSkulled() && this.getAndDecrementSkullTimer() == 0 && !isBot) {
             this.getUpdateFlag().flag(Flag.APPEARANCE);
         }
 
         // Send queued chat messages
         if (this.getChatMessageQueue().length > 0) {
-            this.setCurrentChatMessage(this.getChatMessageQueue().shift());
-            this.getUpdateFlag().flag(Flag.CHAT);
+            if (!isBot) {
+                this.setCurrentChatMessage(this.getChatMessageQueue().shift());
+                this.getUpdateFlag().flag(Flag.CHAT);
+            } else {
+                this.getChatMessageQueue().shift();
+                this.setCurrentChatMessage(null);
+            }
         } else {
             this.setCurrentChatMessage(null);
         }
@@ -430,7 +451,9 @@ export class Player extends Mobile {
         if (this.runEnergy < 100 && (!this.getMovementQueue().isMovings() || !this.isRunning)) {
             if (this.lastRunRecovery.elapsedTime(MovementQueue.runEnergyRestoreDelay(this))) {
                 this.runEnergy++;
-                this.getPacketSender().sendRunEnergy();
+                if (!isBot) {
+                    this.getPacketSender().sendRunEnergy();
+                }
                 this.lastRunRecovery.reset();
             }
         }

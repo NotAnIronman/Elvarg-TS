@@ -37,6 +37,14 @@ const MANUAL_CONTROL_PACKET_OPCODES = new Set([
   PacketConstants.OBJECT_FIFTH_CLICK_OPCODE,
 ]);
 
+function parseEnvInt(name, fallback, min = 0) {
+  const value = Number(process.env[name]);
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.floor(value));
+}
+
 const BOT_MODE_BEHAVIOR_OPTIONS = Object.freeze({
   endpointLingerMs: 500,
   botWalkRadius: 10,
@@ -62,8 +70,15 @@ const BOT_CONFIG = Object.freeze({
   botCount: 130,
   fullTimePvpBotCount: 65,
   botWalkRadius: 10,
-  botResourceIndexRegionRadius: 1,
-  botDecisionTicks: 1,
+  objectIndexCachePath: path.join(
+    process.cwd(),
+    "plugins",
+    "bots",
+    "data",
+    "object-index.json"
+  ),
+  // Run bot behavior decisions every 2 game ticks to reduce BT pressure.
+  botDecisionTicks: 2,
   botBaseCooldownMs: 1200,
   botJitterMs: 300,
   ditchAttemptCooldownMs: 1200,
@@ -85,9 +100,11 @@ const BOT_CONFIG = Object.freeze({
   pathBlockedBackoffMaxMs: 8000,
   pathBlockedIgnoredModes: [BOT_BEHAVIOR_MODE.PVP],
   taskProfiler: Object.freeze({
-    enabled: true,
-    intervalMs: 10000,
-    sampleStride: 2,
+    // Hot-path profiler is useful for diagnostics but expensive at scale.
+    // Keep disabled by default and enable explicitly when needed.
+    enabled: (process.env.BOT_TASK_PROFILER_ENABLED ?? "0") === "1",
+    intervalMs: parseEnvInt("BOT_TASK_PROFILER_INTERVAL_MS", 10000, 1000),
+    sampleStride: parseEnvInt("BOT_TASK_PROFILER_SAMPLE_STRIDE", 4, 1),
   }),
   botSpawnRadius: 14,
   botSpawnMinDistance: 2,
@@ -95,13 +112,13 @@ const BOT_CONFIG = Object.freeze({
   followBackDurationMs: 3 * 60 * 1000,
   playerAttackFleeChance: 0.5,
   followBlockedRetryMs: 200,
-  autoModeDecisionMinMs: 4500,
-  autoModeDecisionMaxMs: 14000,
+  autoModeDecisionMinMs: 7000,
+  autoModeDecisionMaxMs: 22000,
   // Throttle heavy BT work for calm/idle bots:
   // 1 = every bot every cycle, 2 = every second cycle, 3 = every third, etc.
   // Combat/traversal/transient bots still run every cycle.
-  modeValidationIntervalMs: 1200,
-  idleEntryStride: 3,
+  modeValidationIntervalMs: 2500,
+  idleEntryStride: 4,
   // Bot LOD simulation:
   // Near real players, bots tick every cycle for responsiveness.
   // Further away, bot behavior-tree work is downsampled.
@@ -110,16 +127,16 @@ const BOT_CONFIG = Object.freeze({
     refreshIntervalMs: 900,
     nearDistanceTiles: 32,
     mediumDistanceTiles: 96,
-    nearStride: 1,
-    mediumStride: 2,
-    farStride: 4,
+    nearStride: 2,
+    mediumStride: 4,
+    farStride: 8,
   }),
   wildernessDitchObjectId: ObjectIds.WILDERNESS_DITCH,
   manualControlPacketOpcodes: MANUAL_CONTROL_PACKET_OPCODES,
   logging: Object.freeze({
     logPath: path.join(process.cwd(), "logs", "player-bots.log"),
     runtimeEventLoggingEnabled:
-      (process.env.BOT_RUNTIME_EVENT_LOGGING ?? "1") === "1",
+      (process.env.BOT_RUNTIME_EVENT_LOGGING ?? "0") === "1",
     // Mirroring high-frequency bot runtime logs into the core server logger is
     // expensive because server.log uses synchronous disk writes.
     mirrorToServerLogger: (process.env.BOT_MIRROR_CORE_LOGGING ?? "0") === "1",
@@ -128,6 +145,14 @@ const BOT_CONFIG = Object.freeze({
     fileLogWritesEnabled:
       (process.env.BOT_FILE_LOG_WRITES_ENABLED ??
         (GameConstants.SERVER_LOG_WRITES_ENABLED ? "1" : "0")) === "1",
+    telemetryEnabled:
+      (process.env.BOT_RUNTIME_TELEMETRY_ENABLED ?? "1") === "1",
+    telemetryLogPath: path.join(process.cwd(), "logs", "bot-runtime-telemetry.log"),
+    telemetryIntervalMs: parseEnvInt(
+      "BOT_RUNTIME_TELEMETRY_INTERVAL_MS",
+      10000,
+      1000
+    ),
     recentLogLimit: 24,
   }),
   status: Object.freeze({
@@ -151,6 +176,9 @@ module.exports = {
       mirrorToServerLogger: BOT_CONFIG.logging.mirrorToServerLogger,
       mirrorErrorsToServerLogger: BOT_CONFIG.logging.mirrorErrorsToServerLogger,
       fileLogWritesEnabled: BOT_CONFIG.logging.fileLogWritesEnabled,
+      telemetryEnabled: BOT_CONFIG.logging.telemetryEnabled,
+      telemetryLogPath: BOT_CONFIG.logging.telemetryLogPath,
+      telemetryIntervalMs: BOT_CONFIG.logging.telemetryIntervalMs,
       recentLogLimit: BOT_CONFIG.logging.recentLogLimit,
     });
 

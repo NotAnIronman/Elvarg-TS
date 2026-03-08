@@ -6,7 +6,34 @@ const {
 } = require("../../navigation/BotNavigation");
 
 const MOVEMENT_DISPATCH_LOG_INTERVAL_MS = 4000;
+const MOVEMENT_DISPATCH_WINDOW_MS = 600;
+const MOVEMENT_DISPATCH_MAX_PER_WINDOW = 24;
+const PRIORITY_MOVEMENT_MODES = new Set(["pvp", "follow_back", "return_home"]);
 const lastMovementDispatchLogByUsername = new Map();
+let movementDispatchWindowStartedAt = 0;
+let movementDispatchesInWindow = 0;
+
+function canDispatchMovementNow(state, nowMs) {
+  const mode = state?.mode;
+  if (mode && PRIORITY_MOVEMENT_MODES.has(mode)) {
+    return true;
+  }
+
+  if (
+    !Number.isFinite(movementDispatchWindowStartedAt) ||
+    movementDispatchWindowStartedAt <= 0 ||
+    nowMs - movementDispatchWindowStartedAt >= MOVEMENT_DISPATCH_WINDOW_MS
+  ) {
+    movementDispatchWindowStartedAt = nowMs;
+    movementDispatchesInWindow = 0;
+  }
+
+  if (movementDispatchesInWindow >= MOVEMENT_DISPATCH_MAX_PER_WINDOW) {
+    return false;
+  }
+  movementDispatchesInWindow += 1;
+  return true;
+}
 
 class ProcessPendingMovementActionNode {
   constructor(botStatesByName, api, options = {}) {
@@ -69,6 +96,9 @@ class ProcessPendingMovementActionNode {
       return "failure";
     }
     if (queue.size?.() > 0) {
+      return "running";
+    }
+    if (!canDispatchMovementNow(state, nowMs)) {
       return "running";
     }
 

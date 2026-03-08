@@ -1,6 +1,5 @@
 const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
-const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Bank } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { ObjectIds } = require("../../../../src/main/typescript/elvarg/util/IdEnums");
@@ -23,10 +22,10 @@ const BANK_RUN_PHASE_WARN_MS = 25000;
 const BANK_RUN_TOTAL_WARN_MS = 90000;
 const BANK_RUN_HEARTBEAT_MS = 4000;
 const BANK_RUN_STUCK_LOG_INTERVAL_MS = 5000;
-const BANK_BOOTH_CACHE_TTL_MS = 1200;
+const BANK_BOOTH_CACHE_TTL_MS = 8000;
 const BANK_BOOTH_CACHE_MAX_KEYS = 256;
-const BLOCKED_BOOTH_FAILURE_THRESHOLD = 3;
-const BLOCKED_BOOTH_BLACKLIST_MS = 25000;
+const BLOCKED_BOOTH_FAILURE_THRESHOLD = 2;
+const BLOCKED_BOOTH_BLACKLIST_MS = 90000;
 const HARD_BLACKLISTED_BANK_BOOTH_KEYS = new Set([
   "3147,3449,0",
   "3148,3449,0",
@@ -51,6 +50,7 @@ class BankRunBehavior {
     this.modeHandlers = options.modeHandlers ?? {};
     this.objectSearch = options.objectSearch ?? null;
     this.bankBoothSearchCacheByArea = new Map();
+    this.globallyBlockedBoothsByKey = new Map();
   }
 
   getTraversalTarget(state) {
@@ -297,6 +297,7 @@ class BankRunBehavior {
     const bankRun = state.bankRun;
     this.setPhase(player, state, "to_bank", nowMs);
     this.cleanupBlockedBooths(bankRun, nowMs);
+    this.cleanupGloballyBlockedBooths(nowMs);
     let bankBooth = this.resolveTargetBankBooth(
       player,
       bankRun.bankTarget,
@@ -304,7 +305,6 @@ class BankRunBehavior {
       nowMs
     );
     if (!bankBooth) {
-      this.ensureNearbyRegionsLoaded(player);
       bankBooth = this.findNearestBankBooth(player, bankRun, nowMs);
       if (!bankBooth) {
         bankRun.bankTarget = null;
@@ -698,33 +698,14 @@ class BankRunBehavior {
     });
   }
 
-  ensureNearbyRegionsLoaded(player) {
-    const loc = player?.getLocation?.();
-    if (!loc) {
-      return;
-    }
-    if (this.objectSearch?.preloadRegionsAround) {
-      this.objectSearch.preloadRegionsAround(
-        loc.getX(),
-        loc.getY(),
-        BANK_SEARCH_REGION_RADIUS
-      );
-      return;
-    }
-    const baseX = loc.getX();
-    const baseY = loc.getY();
-    for (let rx = -BANK_SEARCH_REGION_RADIUS; rx <= BANK_SEARCH_REGION_RADIUS; rx++) {
-      for (let ry = -BANK_SEARCH_REGION_RADIUS; ry <= BANK_SEARCH_REGION_RADIUS; ry++) {
-        RegionManager.loadMapFiles(baseX + rx * 64, baseY + ry * 64);
-      }
-    }
-  }
-
   resolveTargetBankBooth(player, target, bankRun, nowMs = Date.now()) {
     if (!player || !target) {
       return null;
     }
     if (this.isHardBlacklistedBoothTarget(target)) {
+      return null;
+    }
+    if (this.isBoothGloballyBlocked(target, nowMs)) {
       return null;
     }
     const loc = new Location(target.x, target.y, target.z);
@@ -761,6 +742,18 @@ class BankRunBehavior {
         continue;
       }
       if (this.isHardBlacklistedBoothLoc(objectLoc)) {
+        continue;
+      }
+      if (
+        this.isBoothGloballyBlocked(
+          {
+            x: objectLoc.getX(),
+            y: objectLoc.getY(),
+            z: objectLoc.getZ(),
+          },
+          nowMs
+        )
+      ) {
         continue;
       }
       if (this.isBoothBlockedForRun(bankRun, objectLoc, nowMs)) {
@@ -820,6 +813,33 @@ class BankRunBehavior {
     }
   }
 
+  cleanupGloballyBlockedBooths(nowMs) {
+    if (!this.globallyBlockedBoothsByKey || this.globallyBlockedBoothsByKey.size <= 0) {
+      return;
+    }
+    for (const [key, blockedUntil] of this.globallyBlockedBoothsByKey.entries()) {
+      if (Number(blockedUntil) <= nowMs) {
+        this.globallyBlockedBoothsByKey.delete(key);
+      }
+    }
+  }
+
+  isBoothGloballyBlocked(target, nowMs) {
+    if (!target || !this.globallyBlockedBoothsByKey) {
+      return false;
+    }
+    const key = `${target.x},${target.y},${target.z}`;
+    const blockedUntil = this.globallyBlockedBoothsByKey.get(key);
+    if (!Number.isFinite(blockedUntil)) {
+      return false;
+    }
+    if (blockedUntil <= nowMs) {
+      this.globallyBlockedBoothsByKey.delete(key);
+      return false;
+    }
+    return true;
+  }
+
   isBoothBlockedForRun(bankRun, loc, nowMs) {
     if (!bankRun || !loc || !bankRun.blockedBoothsByKey) {
       return false;
@@ -865,6 +885,7 @@ class BankRunBehavior {
     if (current.failures >= BLOCKED_BOOTH_FAILURE_THRESHOLD) {
       current.failures = 0;
       current.blockedUntil = nowMs + BLOCKED_BOOTH_BLACKLIST_MS;
+      this.globallyBlockedBoothsByKey.set(key, current.blockedUntil);
       blacklisted = true;
     }
     bankRun.blockedBoothsByKey[key] = current;

@@ -276,6 +276,9 @@ module.exports = {
       if (!isValidPlayerTarget(player)) {
         return;
       }
+      if (player?.isPlayerBot?.() === true) {
+        return;
+      }
       const nowMs = Date.now();
       const lastProcessAt = playerProcessAt.get(player) ?? 0;
       if (nowMs - lastProcessAt < PLAYER_PROCESS_INTERVAL_MS) {

@@ -1,6 +1,5 @@
 const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
-const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Bank } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
@@ -402,7 +401,6 @@ class SmeltingBehavior {
 
     let bankBooth = this.resolveTargetBankBooth(player, smelting.bankTarget);
     if (!bankBooth) {
-      this.ensureNearbyRegionsLoaded(player, BANK_SEARCH_REGION_RADIUS);
       bankBooth = this.findNearestBankBooth(player);
       if (!bankBooth) {
         smelting.bankTarget = null;
@@ -545,7 +543,6 @@ class SmeltingBehavior {
 
     let furnace = this.resolveTargetFurnace(player, smelting.furnaceTarget);
     if (!furnace) {
-      this.ensureNearbyRegionsLoaded(player, FURNACE_SEARCH_REGION_RADIUS);
       furnace = this.findNearestFurnace(player);
       if (!furnace) {
         smelting.furnaceTarget = null;
@@ -633,7 +630,6 @@ class SmeltingBehavior {
     }
     let bankBooth = this.findNearestBankBooth(player);
     if (!bankBooth) {
-      this.ensureNearbyRegionsLoaded(player, BANK_SEARCH_REGION_RADIUS);
       bankBooth = this.findNearestBankBooth(player);
     }
     const returnTo = bankBooth
@@ -659,25 +655,6 @@ class SmeltingBehavior {
       });
     }
     return switched;
-  }
-
-  ensureNearbyRegionsLoaded(player, radius) {
-    const loc = player?.getLocation?.();
-    if (!loc) {
-      return;
-    }
-    if (this.objectSearch?.preloadRegionsAround) {
-      this.objectSearch.preloadRegionsAround(loc.getX(), loc.getY(), radius);
-      return;
-    }
-
-    const baseX = loc.getX();
-    const baseY = loc.getY();
-    for (let rx = -radius; rx <= radius; rx++) {
-      for (let ry = -radius; ry <= radius; ry++) {
-        RegionManager.loadMapFiles(baseX + rx * 64, baseY + ry * 64);
-      }
-    }
   }
 
   resolveTargetBankBooth(player, target) {

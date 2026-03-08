@@ -83,6 +83,7 @@ function bootPlayerBotsRuntime(options = {}) {
   const modeHandlers = {};
   const traversalAssist = createTraversalAssist(botApi, {
     objectIds: [config.wildernessDitchObjectId],
+    cachePath: config.objectIndexCachePath,
   });
 
   const { requiredHooksByMode } = createModeHandlers({
@@ -115,12 +116,8 @@ function bootPlayerBotsRuntime(options = {}) {
     trackedTraversalObjectIds.add(objectId);
   }
   traversalAssist.trackObjectIds([...trackedTraversalObjectIds]);
-  traversalAssist.preloadRegionsAround(
-    spawn.getX(),
-    spawn.getY(),
-    config.botResourceIndexRegionRadius
-  );
-  traversalAssist.rebuildTrackedIndexFromLoadedMapObjects();
+  // Defer index initialization until after core startup has initialized regions.
+  traversalAssist.schedulePersistentIndexInitialization(0);
 
   const traversalService = new DitchTraversalService({
     api: botApi,
