@@ -4,6 +4,7 @@ const { clearBotActivePreset } = require("../state/PlayerBotState");
 
 const RETRY_WAIT_LOG_INTERVAL_MS = 3000;
 const TRANSITION_WAIT_LOG_INTERVAL_MS = 2500;
+const ROUTE_OBJECT_CACHE_TTL_MS = 1500;
 
 class DitchTraversalService {
   constructor({
@@ -30,6 +31,48 @@ class DitchTraversalService {
       typeof emitObjectInteraction === "function"
         ? emitObjectInteraction
         : () => false;
+    this.routeObjectCacheByPlayer = new WeakMap();
+  }
+
+  buildRouteCacheKey(from, to) {
+    return [
+      from?.x ?? "?",
+      from?.y ?? "?",
+      from?.z ?? "?",
+      to?.x ?? "?",
+      to?.y ?? "?",
+      to?.z ?? "?",
+    ].join(":");
+  }
+
+  getCachedRouteObject(player, from, to, nowMs) {
+    if (!player || !from || !to) {
+      return undefined;
+    }
+    const entry = this.routeObjectCacheByPlayer.get(player);
+    if (!entry) {
+      return undefined;
+    }
+    if (nowMs - Number(entry.cachedAt ?? 0) > ROUTE_OBJECT_CACHE_TTL_MS) {
+      return undefined;
+    }
+    const key = this.buildRouteCacheKey(from, to);
+    if (entry.key !== key) {
+      return undefined;
+    }
+    return entry.object ?? null;
+  }
+
+  setCachedRouteObject(player, from, to, object, nowMs) {
+    if (!player || !from || !to) {
+      return object ?? null;
+    }
+    this.routeObjectCacheByPlayer.set(player, {
+      key: this.buildRouteCacheKey(from, to),
+      object: object ?? null,
+      cachedAt: nowMs,
+    });
+    return object ?? null;
   }
 
   clearMovementQueue(player) {
@@ -102,16 +145,21 @@ class DitchTraversalService {
     };
   }
 
-  findObjectOnRoute(player, from, to) {
+  findObjectOnRoute(player, from, to, nowMs = Date.now()) {
     if (!player || !from || !to || !this.traversalAssist) {
       return null;
     }
-    return this.traversalAssist.findObjectOnRoute(
+    const cached = this.getCachedRouteObject(player, from, to, nowMs);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const traversalObject = this.traversalAssist.findObjectOnRoute(
       player,
       from,
       to,
       this.objectId
     );
+    return this.setCachedRouteObject(player, from, to, traversalObject, nowMs);
   }
 
   isObjectBetween(fromY, targetY, objectY) {
@@ -266,7 +314,7 @@ class DitchTraversalService {
       y: loc.getY(),
       z: loc.getZ(),
     };
-    const traversalObject = this.findObjectOnRoute(player, current, target);
+    const traversalObject = this.findObjectOnRoute(player, current, target, nowMs);
     if (!traversalObject) {
       return false;
     }

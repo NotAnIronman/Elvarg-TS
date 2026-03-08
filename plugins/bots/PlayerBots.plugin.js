@@ -134,6 +134,7 @@ const BOT_CONFIG = Object.freeze({
     refreshIntervalMs: 900,
     nearDistanceTiles: 32,
     mediumDistanceTiles: 96,
+    chunkSizeTiles: 32,
     nearStride: 2,
     mediumStride: 4,
     farStride: 8,

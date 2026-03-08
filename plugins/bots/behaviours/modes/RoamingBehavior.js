@@ -11,6 +11,8 @@ const {
 const { clearFollowState, setModeRoaming } = require("../state/PlayerBotState");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 
+const DITCH_CONTEXT_TTL_MS = 1500;
+
 class RoamingBehavior {
   constructor(botStatesByName, options) {
     this.botStatesByName = botStatesByName;
@@ -34,6 +36,58 @@ class RoamingBehavior {
       : Math.max(12, this.botWalkRadius * 3);
   }
 
+  ensureDitchContext(state) {
+    if (!state?.roaming) {
+      return null;
+    }
+    if (!state.roaming.ditchContext) {
+      state.roaming.ditchContext = {
+        ditchY: null,
+        keepSouthSide: null,
+        computedAt: 0,
+        sourceY: null,
+        hintY: null,
+      };
+    }
+    return state.roaming.ditchContext;
+  }
+
+  getCachedDitchContext(player, state, preferredY, nowMs) {
+    const context = this.ensureDitchContext(state);
+    if (!context || !player) {
+      return null;
+    }
+    const currentY = player.getLocation?.()?.getY?.();
+    if (!Number.isFinite(currentY)) {
+      return null;
+    }
+    const hintY = Number.isFinite(preferredY) ? Math.floor(preferredY) : null;
+    if (
+      nowMs - Number(context.computedAt ?? 0) > DITCH_CONTEXT_TTL_MS ||
+      context.sourceY !== currentY ||
+      context.hintY !== hintY
+    ) {
+      return null;
+    }
+    if (!Number.isFinite(context.ditchY) || typeof context.keepSouthSide !== "boolean") {
+      return null;
+    }
+    return context;
+  }
+
+  storeDitchContext(state, currentY, ditchY, preferredY, nowMs) {
+    const context = this.ensureDitchContext(state);
+    if (!context) {
+      return null;
+    }
+    context.ditchY = ditchY;
+    context.keepSouthSide = currentY <= ditchY;
+    context.computedAt = nowMs;
+    context.sourceY = currentY;
+    context.hintY = Number.isFinite(preferredY) ? Math.floor(preferredY) : null;
+    return context;
+  }
+
   resolveNearestDitchY(player, preferredY = null) {
     if (Number.isFinite(preferredY)) {
       return preferredY;
@@ -54,19 +108,25 @@ class RoamingBehavior {
     return Number.isFinite(ditchY) ? ditchY : null;
   }
 
-  buildRoamingTargetConstraint(player, ditchYHint = null) {
+  buildRoamingTargetConstraint(player, state, ditchYHint = null, nowMs = Date.now()) {
     const currentY = player?.getLocation?.()?.getY?.();
     if (!Number.isFinite(currentY)) {
       return null;
     }
-    const ditchY = this.resolveNearestDitchY(player, ditchYHint);
+    const cached = this.getCachedDitchContext(player, state, ditchYHint, nowMs);
+    const ditchY =
+      cached?.ditchY ?? this.resolveNearestDitchY(player, ditchYHint);
     if (!Number.isFinite(ditchY)) {
       return null;
     }
     if (Math.abs(currentY - ditchY) <= this.roamingDitchCrossMaxDistanceY) {
       return null;
     }
-    const keepSouthSide = currentY <= ditchY;
+    const keepSouthSide =
+      typeof cached?.keepSouthSide === "boolean"
+        ? cached.keepSouthSide
+        : currentY <= ditchY;
+    this.storeDitchContext(state, currentY, ditchY, ditchYHint, nowMs);
     return {
       ditchY,
       acceptTarget: (target) => {
@@ -78,8 +138,13 @@ class RoamingBehavior {
     };
   }
 
-  chooseRoamingTarget(player, state, ditchYHint = null) {
-    const constraint = this.buildRoamingTargetConstraint(player, ditchYHint);
+  chooseRoamingTarget(player, state, ditchYHint = null, nowMs = Date.now()) {
+    const constraint = this.buildRoamingTargetConstraint(
+      player,
+      state,
+      ditchYHint,
+      nowMs
+    );
     const chooseOptions = constraint ? { acceptTarget: constraint.acceptTarget } : {};
     return {
       target: chooseNextTarget(player, state, this.botWalkRadius, chooseOptions),
@@ -161,7 +226,8 @@ class RoamingBehavior {
       const { target: fallbackTarget } = this.chooseRoamingTarget(
         player,
         state,
-        event?.to?.y
+        event?.to?.y,
+        nowMs
       );
       if (!fallbackTarget) {
         return true;
@@ -172,10 +238,11 @@ class RoamingBehavior {
     const traversalObject = traversalService.findObjectOnRoute(
       player,
       event?.from,
-      state.roaming.target
+      state.roaming.target,
+      nowMs
     );
     if (!traversalObject) {
-      const { chooseOptions } = this.chooseRoamingTarget(player, state, event?.to?.y);
+      const { chooseOptions } = this.chooseRoamingTarget(player, state, event?.to?.y, nowMs);
       retargetAfterBlocked(
         player,
         state,
@@ -195,7 +262,7 @@ class RoamingBehavior {
     const targetY = state.roaming.target.y;
     const objectY = traversalObject.getLocation().getY();
     if (!traversalService.isObjectBetween(currentY, targetY, objectY)) {
-      const { chooseOptions } = this.chooseRoamingTarget(player, state, objectY);
+      const { chooseOptions } = this.chooseRoamingTarget(player, state, objectY, nowMs);
       retargetAfterBlocked(
         player,
         state,
@@ -215,7 +282,7 @@ class RoamingBehavior {
       traversalService.requestCross(player, state, traversalObject, nowMs) ===
       true;
     if (!requestedCross) {
-      const { chooseOptions } = this.chooseRoamingTarget(player, state, objectY);
+      const { chooseOptions } = this.chooseRoamingTarget(player, state, objectY, nowMs);
       retargetAfterBlocked(
         player,
         state,
@@ -251,7 +318,7 @@ class RoamingBehavior {
 
     clearFollowState(player, state);
 
-    const { chooseOptions } = this.chooseRoamingTarget(player, state);
+    const { chooseOptions } = this.chooseRoamingTarget(player, state, null, nowMs);
     let target = state.roaming.target;
     if (
       target &&

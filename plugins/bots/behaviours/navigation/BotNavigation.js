@@ -5,6 +5,8 @@ const MAX_ROUTE_SEGMENT_TILES = 24;
 const PATH_BLOCKED_LOG_THROTTLE_MS = 2500;
 const NO_PATH_RETRY_BASE_MS = 1200;
 const NO_PATH_RETRY_MAX_MS = 6000;
+const SAME_SEGMENT_RETRY_BASE_MS = 1800;
+const SAME_SEGMENT_RETRY_MAX_MS = 12000;
 const UNREACHABLE_SEGMENT_COOLDOWN_BASE_MS = 1200;
 const UNREACHABLE_SEGMENT_COOLDOWN_MAX_MS = 12000;
 const UNREACHABLE_SEGMENT_TTL_MS = 30000;
@@ -251,6 +253,8 @@ function requestMovement(player, targetX, targetY, options = {}) {
       ? Math.max(0, Math.floor(options.nextDispatchAtMs))
       : 0,
     noPathAttempts: 0,
+    sameSegmentNoPathAttempts: 0,
+    lastFailedSegmentKey: null,
     lastSegmentX: null,
     lastSegmentY: null,
     lastSegmentZ: null,
@@ -325,22 +329,34 @@ function dispatchMovementRequest(player, request) {
 
   if (hasRoute) {
     request.noPathAttempts = 0;
+    request.sameSegmentNoPathAttempts = 0;
+    request.lastFailedSegmentKey = null;
     request.nextDispatchAtMs = 0;
     if (unreachableTracker) {
       unreachableTracker.delete(segmentKey(segmentTarget.x, segmentTarget.y, segmentZ));
     }
     player.getUpdateFlag().flag(Flag.APPEARANCE);
   } else {
+    const currentSegmentKey = segmentKey(segmentTarget.x, segmentTarget.y, segmentZ);
     const attempts = Math.max(0, Number(request.noPathAttempts ?? 0)) + 1;
     request.noPathAttempts = attempts;
+    const sameSegmentAttempts =
+      request.lastFailedSegmentKey === currentSegmentKey
+        ? Math.max(0, Number(request.sameSegmentNoPathAttempts ?? 0)) + 1
+        : 1;
+    request.sameSegmentNoPathAttempts = sameSegmentAttempts;
+    request.lastFailedSegmentKey = currentSegmentKey;
     const retryDelayMs = Math.min(
       NO_PATH_RETRY_MAX_MS,
       NO_PATH_RETRY_BASE_MS * 2 ** Math.min(attempts - 1, 3)
     );
+    const sameSegmentRetryDelayMs = Math.min(
+      SAME_SEGMENT_RETRY_MAX_MS,
+      SAME_SEGMENT_RETRY_BASE_MS * 2 ** Math.min(sameSegmentAttempts - 1, 3)
+    );
     let unreachableUntilMs = 0;
     if (unreachableTracker) {
-      const key = segmentKey(segmentTarget.x, segmentTarget.y, segmentZ);
-      const previousFailure = unreachableTracker.get(key);
+      const previousFailure = unreachableTracker.get(currentSegmentKey);
       const segmentAttempts =
         Math.max(0, Number(previousFailure?.attempts ?? 0)) + 1;
       const segmentCooldownMs = Math.min(
@@ -348,13 +364,17 @@ function dispatchMovementRequest(player, request) {
         UNREACHABLE_SEGMENT_COOLDOWN_BASE_MS * 2 ** Math.min(segmentAttempts - 1, 4)
       );
       unreachableUntilMs = nowMs + segmentCooldownMs;
-      unreachableTracker.set(key, {
+      unreachableTracker.set(currentSegmentKey, {
         attempts: segmentAttempts,
         untilMs: unreachableUntilMs,
         lastFailedAt: nowMs,
       });
     }
-    request.nextDispatchAtMs = Math.max(nowMs + retryDelayMs, unreachableUntilMs);
+    request.nextDispatchAtMs = Math.max(
+      nowMs + retryDelayMs,
+      nowMs + sameSegmentRetryDelayMs,
+      unreachableUntilMs
+    );
   }
 
   return {

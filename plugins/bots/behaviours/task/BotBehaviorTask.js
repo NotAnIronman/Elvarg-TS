@@ -32,7 +32,8 @@ class BotBehaviorTask extends Task {
       : 2;
     this.lodConfig = this.resolveLodConfig(options.lodConfig ?? {});
     this._nextLodRefreshAt = 0;
-    this._humanObservers = [];
+    this._humanObserverBuckets = new Map();
+    this._humanObserverCount = 0;
     this._cycleCounter = 0;
     this.taskProfiler = this.resolveTaskProfiler(options.taskProfiler ?? {});
     this._profileWindow = this.createProfileWindow(Date.now());
@@ -114,6 +115,8 @@ class BotBehaviorTask extends Task {
       Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
     const parseInterval = (value, fallback) =>
       Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+    const parseChunkSize = (value, fallback) =>
+      Number.isFinite(value) ? Math.max(8, Math.floor(value)) : fallback;
 
     const enabled = rawConfig?.enabled !== false;
     const nearDistanceTiles = parseDistance(rawConfig?.nearDistanceTiles, 32);
@@ -127,10 +130,16 @@ class BotBehaviorTask extends Task {
       refreshIntervalMs: parseInterval(rawConfig?.refreshIntervalMs, 900),
       nearDistanceTiles,
       mediumDistanceTiles,
+      chunkSizeTiles: parseChunkSize(rawConfig?.chunkSizeTiles, 32),
       nearStride: parseStride(rawConfig?.nearStride, 1),
       mediumStride: parseStride(rawConfig?.mediumStride, 2),
       farStride: parseStride(rawConfig?.farStride, this.idleEntryStride),
     };
+  }
+
+  getHumanObserverBucketKey(x, y, z) {
+    const chunkSize = this.lodConfig.chunkSizeTiles;
+    return `${z}:${Math.floor(x / chunkSize)}:${Math.floor(y / chunkSize)}`;
   }
 
   resolveModeActiveDuration(definition) {
@@ -143,7 +152,8 @@ class BotBehaviorTask extends Task {
 
   refreshHumanObservers(nowMs) {
     if (!this.lodConfig.enabled) {
-      this._humanObservers = [];
+      this._humanObserverBuckets.clear();
+      this._humanObserverCount = 0;
       this._nextLodRefreshAt = nowMs + this.lodConfig.refreshIntervalMs;
       return;
     }
@@ -151,7 +161,8 @@ class BotBehaviorTask extends Task {
       return;
     }
 
-    const observers = [];
+    const buckets = new Map();
+    let observerCount = 0;
     World.getPlayers().forEach((candidate) => {
       if (!candidate || candidate.isPlayerBot?.() === true) {
         return;
@@ -163,14 +174,23 @@ class BotBehaviorTask extends Task {
       if (!location) {
         return;
       }
-      observers.push({
+      const observer = {
         x: location.getX?.(),
         y: location.getY?.(),
         z: location.getZ?.(),
-      });
+      };
+      const key = this.getHumanObserverBucketKey(observer.x, observer.y, observer.z);
+      const bucket = buckets.get(key);
+      if (bucket) {
+        bucket.push(observer);
+      } else {
+        buckets.set(key, [observer]);
+      }
+      observerCount += 1;
     });
 
-    this._humanObservers = observers;
+    this._humanObserverBuckets = buckets;
+    this._humanObserverCount = observerCount;
     this._nextLodRefreshAt = nowMs + this.lodConfig.refreshIntervalMs;
   }
 
@@ -179,7 +199,7 @@ class BotBehaviorTask extends Task {
       return this.idleEntryStride;
     }
     this.refreshHumanObservers(nowMs);
-    if (!entry?.player || this._humanObservers.length === 0) {
+    if (!entry?.player || this._humanObserverCount === 0) {
       return this.lodConfig.farStride;
     }
 
@@ -195,19 +215,33 @@ class BotBehaviorTask extends Task {
     }
 
     let bestChebyshevDistance = Number.POSITIVE_INFINITY;
-    for (const observer of this._humanObservers) {
-      if (!observer || observer.z !== z) {
-        continue;
-      }
-      const distance = Math.max(
-        Math.abs(observer.x - x),
-        Math.abs(observer.y - y)
-      );
-      if (distance < bestChebyshevDistance) {
-        bestChebyshevDistance = distance;
-      }
-      if (bestChebyshevDistance <= this.lodConfig.nearDistanceTiles) {
-        return this.lodConfig.nearStride;
+    const chunkSize = this.lodConfig.chunkSizeTiles;
+    const baseChunkX = Math.floor(x / chunkSize);
+    const baseChunkY = Math.floor(y / chunkSize);
+    const chunkRadius = Math.max(
+      1,
+      Math.ceil(this.lodConfig.mediumDistanceTiles / chunkSize)
+    );
+    for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
+      for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
+        const bucket = this._humanObserverBuckets.get(
+          `${z}:${baseChunkX + dx}:${baseChunkY + dy}`
+        );
+        if (!bucket || bucket.length === 0) {
+          continue;
+        }
+        for (const observer of bucket) {
+          const distance = Math.max(
+            Math.abs(observer.x - x),
+            Math.abs(observer.y - y)
+          );
+          if (distance < bestChebyshevDistance) {
+            bestChebyshevDistance = distance;
+          }
+          if (bestChebyshevDistance <= this.lodConfig.nearDistanceTiles) {
+            return this.lodConfig.nearStride;
+          }
+        }
       }
     }
 
