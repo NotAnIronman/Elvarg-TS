@@ -29,6 +29,32 @@ export class Location {
         this.z = z ?? 0;
     }
 
+    private static readAxis(source: any, axis: "X" | "Y" | "Z"): number | null {
+        if (!source) {
+            return null;
+        }
+        const getter = source[`get${axis}`];
+        const fallback = source[axis.toLowerCase()];
+        const value = typeof getter === "function" ? getter.call(source) : fallback;
+        return Number.isFinite(value) ? value : null;
+    }
+
+    public static readTile(source: any): Location | null {
+        const x = Location.readAxis(source, "X");
+        const y = Location.readAxis(source, "Y");
+        const z = Location.readAxis(source, "Z");
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+            return null;
+        }
+        return new Location(x, y, z);
+    }
+
+    public static isSameTile(a: any, b: any): boolean {
+        const left = Location.readTile(a);
+        const right = Location.readTile(b);
+        return !!left && !!right && left.x === right.x && left.y === right.y && left.z === right.z;
+    }
+
     /**
      * Gets the x coordinate of this position.
      *

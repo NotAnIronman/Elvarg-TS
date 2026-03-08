@@ -2,6 +2,7 @@ const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/
 const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { Inventory } = require("../../src/main/typescript/elvarg/game/model/container/impl/Inventory");
+const { PlayerStatus } = require("../../src/main/typescript/elvarg/game/model/PlayerStatus");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const BANK_BOOTH_IDS = Object.freeze([
@@ -69,6 +70,8 @@ const BANK_MAIN_BUTTON_IDS = new Set([
 const BANK_TAB_SELECT_START = 50070;
 const REGULAR_BANK_INTERFACE_ID = 5292;
 const BANK_SETTINGS_INTERFACE_ID = 32500;
+const BANK_OPEN_DEBOUNCE_MS = 250;
+const lastBankOpenAt = new WeakMap();
 
 function isBankTabSelectButton(buttonId) {
   if (!Number.isInteger(buttonId) || buttonId < BANK_TAB_SELECT_START) {
@@ -98,6 +101,29 @@ function openBank(player) {
   if (!player) {
     return false;
   }
+  const now = Date.now();
+  const lastOpenAt = lastBankOpenAt.get(player) ?? 0;
+  if (now - lastOpenAt < BANK_OPEN_DEBOUNCE_MS) {
+    return true;
+  }
+  lastBankOpenAt.set(player, now);
+
+  if (
+    player.getStatus?.() === PlayerStatus.BANKING &&
+    player.getInterfaceId?.() === REGULAR_BANK_INTERFACE_ID
+  ) {
+    return true;
+  }
+
+  if (player.isPlayerBot?.() === true) {
+    // Bots do not need full interface/container refresh work just to use bank
+    // operations. They only need banking state + interface marker.
+    player.setStatus?.(PlayerStatus.BANKING);
+    player.setEnteredSyntaxAction?.(null);
+    player.setInterfaceId?.(REGULAR_BANK_INTERFACE_ID);
+    return true;
+  }
+
   player.getBank(player.getCurrentBankTab()).open();
   return true;
 }

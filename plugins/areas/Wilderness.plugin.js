@@ -2,6 +2,7 @@ const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wi
 const { BountyHunter } = require("../../src/main/typescript/elvarg/game/content/combat/bountyhunter/BountyHunter");
 const { Obelisks } = require("../../src/main/typescript/elvarg/game/content/Obelisks");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
+const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 
 function addToWildList(player) {
   if (player?.isPlayerBot?.()) {
@@ -19,60 +20,125 @@ function removeFromWildList(player) {
   }
 }
 
+function readPlayerTile(player) {
+  const location = player?.getLocation?.();
+  const tile = Location.readTile(location);
+  if (!location || !tile) {
+    return null;
+  }
+  return { location, ...tile };
+}
+
+function isInWildernessCached(cache, player) {
+  const tile = readPlayerTile(player);
+  if (!tile) {
+    return false;
+  }
+  const state = cache.get(player);
+  if (Location.isSameTile(state, tile) && typeof state.inWilderness === "boolean") {
+    return state.inWilderness;
+  }
+    const inWilderness = Wilderness.isInLocation(tile.location);
+  cache.set(player, {
+    ...state,
+    x: tile.x,
+    y: tile.y,
+    z: tile.z,
+    inWilderness,
+  });
+  return inWilderness;
+}
+
+function getCachedInWilderness(cache, player) {
+  if (!player) {
+    return false;
+  }
+  const state = cache.get(player);
+  if (state && typeof state.inWilderness === "boolean") {
+    return state.inWilderness;
+  }
+  const tile = readPlayerTile(player);
+  const inWilderness = tile
+    ? Wilderness.isInLocation(tile.location)
+    : Wilderness.isIn(player);
+  cache.set(player, {
+    ...state,
+    ...(tile ?? {}),
+    inWilderness,
+  });
+  return inWilderness;
+}
+
 module.exports = {
   name: "Wilderness",
   register(api) {
     const inWildState = new Map();
 
     api.onPlayerProcess(({ player }) => {
-      if (player?.isPlayerBot?.()) {
+      const tile = readPlayerTile(player);
+      if (!tile) {
         return;
       }
-      const username = player?.getUsername?.();
-      if (!username) {
+      const isBot = player?.isPlayerBot?.() === true;
+      const previous = inWildState.get(player);
+      if (Location.isSameTile(previous, tile) && typeof previous.inWilderness === "boolean") {
         return;
       }
-      const location = player.getLocation();
-      const inWilderness = Wilderness.isInLocation(location);
-      const wasInWilderness = inWildState.get(username) === true;
 
-      if (inWilderness && !wasInWilderness) {
-        player.getPacketSender().sendInteractionOption("Attack", 2, true);
-        player.getPacketSender().sendWalkableInterface(197);
-        addToWildList(player);
-        BountyHunter.updateInterface(player);
-      } else if (!inWilderness && wasInWilderness) {
-        player.getPacketSender().sendWalkableInterface(-1);
-        player.getPacketSender().sendInteractionOption("null", 2, true);
-        player.setWildernessLevel(0);
-        removeFromWildList(player);
+      const inWilderness = Wilderness.isInLocation(tile.location);
+      const wasInWilderness = previous?.inWilderness === true;
+      const nextState = {
+        ...previous,
+        x: tile.x,
+        y: tile.y,
+        z: tile.z,
+        inWilderness,
+      };
+
+      if (!isBot) {
+        if (inWilderness && !wasInWilderness) {
+          player.getPacketSender().sendInteractionOption("Attack", 2, true);
+          player.getPacketSender().sendWalkableInterface(197);
+          addToWildList(player);
+          BountyHunter.updateInterface(player);
+        } else if (!inWilderness && wasInWilderness) {
+          player.getPacketSender().sendWalkableInterface(-1);
+          player.getPacketSender().sendInteractionOption("null", 2, true);
+          removeFromWildList(player);
+        }
       }
 
       if (inWilderness) {
-        const level = Wilderness.levelForY(location.getY());
-        player.setWildernessLevel(level);
-        player.getPacketSender().sendString(`Level: ${level}`, 199);
-
-        const multiIcon = Wilderness.isMulti(
-          location.getX(),
-          location.getY()
-        )
-          ? 1
-          : 0;
-        if (player.getMultiIcon() !== multiIcon) {
-          player.setMultiIcon(multiIcon);
-          player.getPacketSender().sendMultiIcon(multiIcon);
+        const level = Wilderness.levelForY(tile.y);
+        if (player.getWildernessLevel() !== level) {
+          player.setWildernessLevel(level);
+          if (!isBot) {
+            player.getPacketSender().sendString(`Level: ${level}`, 199);
+          }
         }
-      } else if (player.getMultiIcon() !== 0) {
-        player.setMultiIcon(0);
-        player.getPacketSender().sendMultiIcon(0);
+
+        if (!isBot) {
+          const multiIcon = Wilderness.isMulti(tile.x, tile.y) ? 1 : 0;
+          if (player.getMultiIcon() !== multiIcon) {
+            player.setMultiIcon(multiIcon);
+            player.getPacketSender().sendMultiIcon(multiIcon);
+          }
+        }
+      } else {
+        if (player.getWildernessLevel() !== 0) {
+          player.setWildernessLevel(0);
+        }
+        if (!isBot && player.getMultiIcon() !== 0) {
+          player.setMultiIcon(0);
+          player.getPacketSender().sendMultiIcon(0);
+        }
       }
 
-      inWildState.set(username, inWilderness);
+      inWildState.set(player, nextState);
     });
 
-    api.onPlayerDisconnect(({ player, username }) => {
-      inWildState.delete(username);
+    api.onPlayerDisconnect(({ player }) => {
+      inWildState.delete(player);
       removeFromWildList(player);
     });
 
@@ -81,7 +147,8 @@ module.exports = {
         return;
       }
       const { player } = event;
-      if (!Wilderness.isIn(player)) {
+      const wildernessLevel = player?.getWildernessLevel?.() | 0;
+      if (wildernessLevel <= 0 && !getCachedInWilderness(inWildState, player)) {
         return;
       }
       if (
@@ -108,8 +175,16 @@ module.exports = {
       if (!attacker?.isPlayer?.() || !target?.isPlayer?.()) {
         return;
       }
-      const attackerInWild = Wilderness.isIn(attacker);
-      const targetInWild = Wilderness.isIn(target);
+      const attackerLevel = attacker?.getWildernessLevel?.() | 0;
+      const targetLevel = target?.getWildernessLevel?.() | 0;
+
+      if (attackerLevel > 0 && targetLevel > 0) {
+        event.allow = true;
+        return;
+      }
+
+      const attackerInWild = getCachedInWilderness(inWildState, attacker);
+      const targetInWild = getCachedInWilderness(inWildState, target);
       if (attackerInWild && targetInWild) {
         event.allow = true;
       } else if (attackerInWild || targetInWild) {
@@ -121,7 +196,8 @@ module.exports = {
       if (event.override !== null) {
         return;
       }
-      if (Wilderness.isIn(event.player)) {
+      const wildernessLevel = event.player?.getWildernessLevel?.() | 0;
+      if (wildernessLevel > 0 || getCachedInWilderness(inWildState, event.player)) {
         event.override = true;
       }
     });
@@ -139,7 +215,13 @@ module.exports = {
       if (!killer || !victim) {
         return;
       }
-      if (!Wilderness.isIn(killer) || !Wilderness.isIn(victim)) {
+      if (killer?.isPlayerBot?.() || victim?.isPlayerBot?.()) {
+        return;
+      }
+      if (
+        !getCachedInWilderness(inWildState, killer) ||
+        !getCachedInWilderness(inWildState, victim)
+      ) {
         return;
       }
       BountyHunter.onDeath(killer, victim, true, 50);

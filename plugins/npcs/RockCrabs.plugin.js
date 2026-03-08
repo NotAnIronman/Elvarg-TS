@@ -6,6 +6,7 @@ const AGGRESSION_DISTANCE = 1;
 const KEEP_AWAKE_DISTANCE = 2;
 const SLEEP_AFTER_IDLE_MS = 5000;
 const PLAYER_PROCESS_INTERVAL_MS = 600;
+const WAKE_THROTTLE_MS = 250;
 
 const ROCK_CRAB_VARIANTS = Object.freeze([
   {
@@ -223,6 +224,7 @@ module.exports = {
   register(api) {
     const npcState = new WeakMap();
     const playerProcessAt = new WeakMap();
+    const wakeAttemptAt = new WeakMap();
 
     api.onNpcInteraction((event) => {
       const npc = event?.npc;
@@ -239,19 +241,36 @@ module.exports = {
     });
 
     api.onCanAttack((event) => {
-      if (!event?.attacker?.isPlayer?.() || !event?.target?.isNpc?.()) {
+      if (!event || event.allow !== null) {
+        return;
+      }
+      if (event.attacker?.isPlayer?.() !== true || event.target?.isNpc?.() !== true) {
         return;
       }
       const npc = event.target.getAsNpc?.() ?? event.target;
-      const variant = resolveVariant(npc);
+      const currentId = npc?.getId?.();
+      if (!Number.isInteger(currentId)) {
+        return;
+      }
+      const variant = VARIANT_BY_ID.get(currentId);
       if (!variant) {
         return;
       }
+      if (currentId === variant.activeId) {
+        return;
+      }
+      const nowMs = Date.now();
+      const lastWakeAt = wakeAttemptAt.get(npc) ?? 0;
+      // Prevent repeated wake attempts in the same short combat-check window.
+      if (nowMs - lastWakeAt < WAKE_THROTTLE_MS) {
+        return;
+      }
+      wakeAttemptAt.set(npc, nowMs);
       transformAwake(
         npc,
         variant,
         npcState,
-        Date.now(),
+        nowMs,
         api,
         "player_attack_attempt"
       );

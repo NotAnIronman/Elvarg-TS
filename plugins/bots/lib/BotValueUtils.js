@@ -1,3 +1,5 @@
+const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
+
 function readCoord(source, axis) {
   if (!source) {
     return null;
@@ -9,6 +11,10 @@ function readCoord(source, axis) {
 }
 
 function readPoint(source) {
+  const tile = Location.readTile(source);
+  if (tile) {
+    return tile;
+  }
   const x = readCoord(source, "X");
   const y = readCoord(source, "Y");
   if (!Number.isFinite(x) || !Number.isFinite(y)) {
@@ -19,11 +25,7 @@ function readPoint(source) {
 }
 
 function readTile(source) {
-  const point = readPoint(source);
-  if (!point || !Number.isFinite(point.z)) {
-    return null;
-  }
-  return point;
+  return Location.readTile(source);
 }
 
 function formatTile(source, fallback = "n/a") {

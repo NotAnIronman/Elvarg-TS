@@ -1,10 +1,21 @@
 const { callModeHook } = require("../hooks/ModeHookContract");
 
 class NpcAggroPolicyHandler {
-  constructor({ botStatesByName, modeHandlers, api }) {
+  constructor({ botStatesByName, modeHandlers, api, options = {} }) {
     this.botStatesByName = botStatesByName;
     this.modeHandlers = modeHandlers ?? {};
     this.api = api ?? null;
+    this.npcAggroBlockedModes = new Set(options.npcAggroBlockedModes ?? []);
+    this.modesWithNpcAggroAttemptHook = new Set();
+    this.modesWithNpcCombatDetectedHook = new Set();
+    for (const [mode, handler] of Object.entries(this.modeHandlers)) {
+      if (typeof handler?.onNpcAggroAttempt === "function") {
+        this.modesWithNpcAggroAttemptHook.add(mode);
+      }
+      if (typeof handler?.onNpcCombatDetected === "function") {
+        this.modesWithNpcCombatDetectedHook.add(mode);
+      }
+    }
   }
 
   resolveBotState(player) {
@@ -23,20 +34,33 @@ class NpcAggroPolicyHandler {
   }
 
   handleCanAttack(event) {
+    if (!event || event.allow !== null) {
+      return false;
+    }
     const attacker = event?.attacker;
     const target = event?.target;
-    if (!attacker?.isNpc?.() || !target?.isPlayer?.()) {
-      return;
+    if (attacker?.isNpc?.() !== true || target?.isPlayer?.() !== true) {
+      return false;
     }
 
     const player = target.getAsPlayer?.() ?? target;
+    if (player?.isPlayerBot?.() !== true) {
+      return false;
+    }
     const resolved = this.resolveBotState(player);
     if (!resolved) {
-      return;
+      return false;
+    }
+    if (this.npcAggroBlockedModes.has(resolved.state.mode)) {
+      event.allow = false;
+      return true;
+    }
+    if (!this.modesWithNpcAggroAttemptHook.has(resolved.state.mode)) {
+      return false;
     }
     const npc = attacker.getAsNpc?.() ?? attacker;
 
-    callModeHook({
+    return callModeHook({
       modeHandlers: this.modeHandlers,
       mode: resolved.state.mode,
       hookName: "onNpcAggroAttempt",
@@ -50,21 +74,24 @@ class NpcAggroPolicyHandler {
   handlePlayerProcess({ player, nowMs = Date.now() }) {
     const resolved = this.resolveBotState(player);
     if (!resolved) {
-      return;
+      return false;
+    }
+    if (!this.modesWithNpcCombatDetectedHook.has(resolved.state.mode)) {
+      return false;
     }
     const combat = player.getCombat?.();
     if (!combat) {
-      return;
+      return false;
     }
     const attacker = combat.getAttacker?.();
     const target = combat.getTarget?.();
     const attackerIsNpc = attacker?.isNpc?.() === true;
     const targetIsNpc = target?.isNpc?.() === true;
     if (!attackerIsNpc && !targetIsNpc) {
-      return;
+      return false;
     }
 
-    callModeHook({
+    return callModeHook({
       modeHandlers: this.modeHandlers,
       mode: resolved.state.mode,
       hookName: "onNpcCombatDetected",
@@ -86,4 +113,3 @@ class NpcAggroPolicyHandler {
 module.exports = {
   NpcAggroPolicyHandler,
 };
-

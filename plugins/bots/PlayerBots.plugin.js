@@ -99,6 +99,13 @@ const BOT_CONFIG = Object.freeze({
   pathBlockedBackoffBaseMs: 600,
   pathBlockedBackoffMaxMs: 8000,
   pathBlockedIgnoredModes: [BOT_BEHAVIOR_MODE.PVP],
+  npcAggroBlockedModes: [
+    BOT_BEHAVIOR_MODE.WOODCUTTING,
+    BOT_BEHAVIOR_MODE.MINING,
+    BOT_BEHAVIOR_MODE.SMELTING,
+    BOT_BEHAVIOR_MODE.FIREMAKING,
+    BOT_BEHAVIOR_MODE.BANK_RUN,
+  ],
   taskProfiler: Object.freeze({
     // Hot-path profiler is useful for diagnostics but expensive at scale.
     // Keep disabled by default and enable explicitly when needed.

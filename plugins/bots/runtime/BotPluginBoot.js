@@ -163,6 +163,9 @@ function bootPlayerBotsRuntime(options = {}) {
     botStatesByName,
     modeHandlers,
     api: botApi,
+    options: {
+      npcAggroBlockedModes: config.npcAggroBlockedModes,
+    },
   });
 
   const spawnOffsets = createSpawnOffsets(
