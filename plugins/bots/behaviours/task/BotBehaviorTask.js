@@ -1,10 +1,11 @@
 const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task");
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
-const { randomInRange } = require("../navigation/BotNavigation");
+const { peekMovementRequest, randomInRange } = require("../navigation/BotNavigation");
 const { callModeHook } = require("../hooks/ModeHookContract");
 const { clearBotActivePreset } = require("../state/PlayerBotState");
 
 const NS_PER_MS = 1_000_000n;
+const MOVING_MODE_DECISION_DELAY_MS = 1500;
 
 class BotBehaviorTask extends Task {
   constructor(entries, traversalService, decisionTicks, options = {}) {
@@ -290,6 +291,20 @@ class BotBehaviorTask extends Task {
       state.roaming?.pendingRetry != null ||
       player.getForceMovement?.() != null
     );
+  }
+
+  shouldDelayModeDecisionWhileMoving(player, state) {
+    if (!player || !state || this.transientModes.has(state.mode)) {
+      return false;
+    }
+    if (state.mode === this.behaviorMode?.PVP) {
+      return false;
+    }
+    const queueSize = Number(player.getMovementQueue?.()?.size?.() ?? 0);
+    if (queueSize > 0) {
+      return true;
+    }
+    return peekMovementRequest(player) != null;
   }
 
   scheduleNextDecision(state, nowMs) {
@@ -701,6 +716,10 @@ class BotBehaviorTask extends Task {
       return;
     }
     if (nowMs < (autonomy.modeEndsAt ?? 0)) {
+      return;
+    }
+    if (this.shouldDelayModeDecisionWhileMoving(player, state)) {
+      autonomy.nextDecisionAt = nowMs + MOVING_MODE_DECISION_DELAY_MS;
       return;
     }
 

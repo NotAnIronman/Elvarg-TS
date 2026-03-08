@@ -84,14 +84,9 @@ export class Combat {
 
         // Primary combat lock-on comes from entity interaction.
         this.character.setMobileInteraction(this.target);
-        // Also push a face-position fallback each tick so clients can keep facing
-        // correctly if interaction target resolution is delayed for a cycle.
+        // Keep combat-facing updated every tick; Mobile now dedupes identical
+        // face positions so this no longer needlessly re-flags unchanged values.
         this.character.setPositionToFace(this.target.getLocation().clone());
-
-        if (!CombatFactory.canReach(this.character, this.method, this.target)) {
-            // Make sure the character is within reach before processing combat
-            return;
-        }
 
         // Granite maul special attack, make sure we disregard delay
         // and that we do not reset the attack timer.
@@ -101,8 +96,13 @@ export class Combat {
         }
 
         if (!instant && this.character.getTimers().has(TimerKey.COMBAT_ATTACK)) {
-            // If attack isn't instant, make sure timer is elapsed.
-            Server.logDebug("Combat : Waiting on COMBAT_ATTACK timer");
+            // If attack isn't instant, avoid repeated reach/facing work until the
+            // timer elapses. Combat following continues via MovementQueue.
+            return;
+        }
+
+        if (!CombatFactory.canReach(this.character, this.method, this.target)) {
+            // Make sure the character is within reach before processing combat
             return;
         }
 

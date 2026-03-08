@@ -186,6 +186,9 @@ export abstract class Mobile extends Entity {
     }
 
     setMobileInteraction(mobile: Mobile | null): Mobile {
+        if (this.interactingMobile === mobile) {
+            return this;
+        }
         this.interactingMobile = mobile;
         this.getUpdateFlag().flag(Flag.ENTITY_INTERACTION);
         return this;
@@ -341,6 +344,22 @@ export abstract class Mobile extends Entity {
     }
 
     setPositionToFace(positionToFace: Location): Mobile {
+        const current = this.positionToFace;
+        if (current === positionToFace) {
+            return this;
+        }
+        if (
+            current != null &&
+            positionToFace != null &&
+            current.getX() === positionToFace.getX() &&
+            current.getY() === positionToFace.getY() &&
+            current.getZ() === positionToFace.getZ()
+        ) {
+            return this;
+        }
+        if (current == null && positionToFace == null) {
+            return this;
+        }
         this.positionToFace = positionToFace;
         this.getUpdateFlag().flag(Flag.FACE_POSITION);
         return this;

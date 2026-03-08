@@ -25,6 +25,8 @@ import { FastDeque } from "../../../util/FastDeque";
 import * as fs from "fs";
 import * as path from "path";
 export class MovementQueue {
+    private static readonly BOT_FOLLOW_REPATH_COOLDOWN_MS = 500;
+    private static readonly BOT_COMBAT_FOLLOW_REPATH_COOLDOWN_MS = 350;
 
     private static RANDOM: RandomGen = new RandomGen();
     private static LOG_DIR = path.join(process.cwd(), "logs");
@@ -473,14 +475,22 @@ export class MovementQueue {
 
     public processCombatFollowing() {
         const following = this.character.getCombatFollowing();
+        if (!following) {
+            return;
+        }
+        const isBot = this.isBotPlayer();
+        const nowMs = Date.now();
         const size = this.character.getSize();
         const followingSize = following.getSize();
 
         // Update interaction
         this.character.setMobileInteraction(following);
 
-        // Make sure we reset the current movement queue to prevent erratic back and forth
-        this.reset();
+        // Normal players keep the legacy reset behavior. Bots are allowed to
+        // retain an in-flight route briefly so they do not rebuild it every tick.
+        if (!isBot) {
+            this.reset();
+        }
 
         // Block if our movement is locked.
         if (!this.getMobility().canMove()) {
@@ -653,7 +663,7 @@ export class MovementQueue {
                 }
                 return;
             }
-            const attackDistance = CombatFactory.getMethod(this.character).attackDistance(this.character);
+            const attackDistance = method.attackDistance(this.character);
 
             // Find the nearest tile surrounding the target
             destination = PathFinder.getClosestAttackableTile(this.character, following, attackDistance);
@@ -667,6 +677,13 @@ export class MovementQueue {
             }
         }
 
+        if (this.shouldThrottleBotRepath(destination, nowMs, true)) {
+            return;
+        }
+        if (!isBot) {
+            this.reset();
+        }
+        this.markBotRepathScheduled(destination, nowMs, true);
         PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY());
     }
 
@@ -675,6 +692,7 @@ export class MovementQueue {
         if (!following) {
             return;
         }
+        const nowMs = Date.now();
 
         if (following === this.character || !following.isRegistered()) {
             this.character.setFollowing(null);
@@ -760,12 +778,13 @@ export class MovementQueue {
             return;
         }
 
-        // Avoid resetting and rebuilding identical routes each tick.
-        if (this.points.length > 0 && this.lastDestX === destination.getX() && this.lastDestY === destination.getY()) {
+        // Avoid resetting and rebuilding identical routes each tick for bots.
+        if (this.shouldThrottleBotRepath(destination, nowMs, false)) {
             return;
         }
 
         this.reset();
+        this.markBotRepathScheduled(destination, nowMs, false);
         PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY());
     }
 
@@ -842,6 +861,8 @@ export class MovementQueue {
     public lastDestY: number;
     public pathX: number;
     public pathY: number;
+    private nextBotFollowRepathAt = 0;
+    private nextBotCombatFollowRepathAt = 0;
 
     public setPathX(x: number): MovementQueue {
         this.pathX = (this.character.getLocation().getRegionX() * 8) + x;
@@ -865,6 +886,41 @@ export class MovementQueue {
 
     public pointsReturn() {
         return this.points.toArray();
+    }
+
+    private isBotPlayer(): boolean {
+        return this.character.isPlayer() && this.character.getAsPlayer().isPlayerBot();
+    }
+
+    private shouldThrottleBotRepath(destination: Location, nowMs: number, combatFollow: boolean): boolean {
+        if (!this.isBotPlayer() || !destination) {
+            return false;
+        }
+        const cooldownUntil = combatFollow
+            ? this.nextBotCombatFollowRepathAt
+            : this.nextBotFollowRepathAt;
+        if (this.lastDestX !== destination.getX() || this.lastDestY !== destination.getY()) {
+            return false;
+        }
+        if (this.points.length > 0) {
+            return true;
+        }
+        return nowMs < cooldownUntil;
+    }
+
+    private markBotRepathScheduled(destination: Location, nowMs: number, combatFollow: boolean): void {
+        if (!this.isBotPlayer() || !destination) {
+            return;
+        }
+        this.lastDestX = destination.getX();
+        this.lastDestY = destination.getY();
+        if (combatFollow) {
+            this.nextBotCombatFollowRepathAt =
+                nowMs + MovementQueue.BOT_COMBAT_FOLLOW_REPATH_COOLDOWN_MS;
+            return;
+        }
+        this.nextBotFollowRepathAt =
+            nowMs + MovementQueue.BOT_FOLLOW_REPATH_COOLDOWN_MS;
     }
 
     public walkToGroundItem(pos: Location, action: () => void) {
