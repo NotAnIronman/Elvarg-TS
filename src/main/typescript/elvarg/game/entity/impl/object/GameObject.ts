@@ -90,6 +90,12 @@ export class GameObject extends Entity {
     }
 
     clone(): GameObject {
-        return new GameObject(this.getId(), this.getLocation(), this.getType(), this.getFace(), this.getPrivateArea()!);
+        return new GameObject(
+            this.getId(),
+            this.getLocation().clone(),
+            this.getType(),
+            this.getFace(),
+            this.getPrivateArea()!
+        );
     }
 }

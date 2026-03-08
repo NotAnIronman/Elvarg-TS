@@ -929,23 +929,16 @@ export class PacketSender {
       return null;
     }
 
-    const regionSource =
-      this.player.getLastKnownRegion?.() ?? this.player.getLocation?.();
-    const playerLocation = this.player.getLocation?.();
-    if (!regionSource || !playerLocation) {
+    const regionSource = this.player.getLastKnownRegion?.();
+    if (!regionSource) {
       return null;
     }
 
-    let localY = position.getY() - 8 * regionSource.getRegionY();
-    let localX = position.getX() - 8 * regionSource.getRegionX();
+    const localY = position.getY() - 8 * regionSource.getRegionY();
+    const localX = position.getX() - 8 * regionSource.getRegionX();
 
-    // If cached region drifts out of sync, retry from current player region.
-    if (localX < 0 || localX > 103 || localY < 0 || localY > 103) {
-      localY = position.getY() - 8 * playerLocation.getRegionY();
-      localX = position.getX() - 8 * playerLocation.getRegionX();
-    }
-
-    // Never clamp here. Clamping creates false world placements (wrong tile/object).
+    // Never clamp here. During region transitions, dropping out-of-range updates
+    // is safer than emitting a wrong tile/object placement.
     if (localX < 0 || localX > 103 || localY < 0 || localY > 103) {
       return null;
     }
@@ -1225,6 +1218,12 @@ export class PacketSender {
       return this;
     }
 
+    // Avoid sending object deltas while the client is mid-region change.
+    // RegionChange sync will send a full consistent object snapshot.
+    if (this.player?.isAllowRegionChangePacket?.() === true) {
+      return this;
+    }
+
     const location = object.getLocation();
     if (!this.sendPositionIfVisible(location)) {
       return this;
@@ -1244,6 +1243,12 @@ export class PacketSender {
       typeof object.getType !== "function" ||
       typeof object.getFace !== "function"
     ) {
+      return this;
+    }
+
+    // Avoid sending object deltas while the client is mid-region change.
+    // RegionChange sync will send a full consistent object snapshot.
+    if (this.player?.isAllowRegionChangePacket?.() === true) {
       return this;
     }
 
