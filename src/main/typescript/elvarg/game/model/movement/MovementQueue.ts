@@ -1196,6 +1196,13 @@ export class MovementQueue {
                 this.pathY = this.player.getLocation().getY();
                 if (walkStage === 1) {
                     if (action !== null) {
+                        this.player.setPositionToFace(
+                            new Location(
+                                objectX,
+                                objectY,
+                                this.player.getLocation().getZ()
+                            )
+                        );
                         action.execute();
                     }
                     TaskManager.cancelTasks(this.player.getIndex());

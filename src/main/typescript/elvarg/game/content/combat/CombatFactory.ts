@@ -938,8 +938,8 @@ export class CombatFactory {
             let auto_ret = false;
             if (target.isPlayer()) {
                 auto_ret =
-                    target.isPlayerBot() ||
-                    (target.getAsPlayer().autoRetaliateReturn() && !target.getMovementQueue().isMovings());
+                    target.getAsPlayer().autoRetaliateReturn() &&
+                    !target.getMovementQueue().isMovings();
             } else if (target.isNpc()) {
                 auto_ret = target.getAsNpc().getMovementCoordinator().getCoordinateState() == CoordinateState.HOME;
             }
