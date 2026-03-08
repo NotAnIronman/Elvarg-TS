@@ -4,30 +4,94 @@ const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet
 const { Inventory } = require("../../src/main/typescript/elvarg/game/model/container/impl/Inventory");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
-const BANK_BOOTH_IDS = Object.entries(ObjectIds)
-  .filter(
-    ([name, id]) =>
-      typeof name === "string" &&
-      name.includes("BANK_BOOTH") &&
-      Number.isInteger(id)
-  )
-  .map(([, id]) => id);
+const BANK_BOOTH_IDS = Object.freeze([
+  ObjectIds.BANK_BOOTH,
+  ObjectIds.BANK_BOOTH_2,
+  ObjectIds.BANK_BOOTH_3,
+  ObjectIds.BANK_BOOTH_4,
+  ObjectIds.BANK_BOOTH_5,
+  ObjectIds.BANK_BOOTH_6,
+  ObjectIds.BANK_BOOTH_7,
+  ObjectIds.BANK_BOOTH_8,
+  ObjectIds.BANK_BOOTH_9,
+  ObjectIds.BANK_BOOTH_10,
+  ObjectIds.BANK_BOOTH_11,
+  ObjectIds.BANK_BOOTH_12,
+  ObjectIds.BANK_BOOTH_13,
+  ObjectIds.BANK_BOOTH_14,
+  ObjectIds.BANK_BOOTH_15,
+  ObjectIds.BANK_BOOTH_16,
+  ObjectIds.BANK_BOOTH_17,
+  ObjectIds.BANK_BOOTH_18,
+  ObjectIds.BANK_BOOTH_19,
+  ObjectIds.BANK_BOOTH_20,
+  ObjectIds.BANK_BOOTH_21,
+  ObjectIds.BANK_BOOTH_22,
+  ObjectIds.BANK_BOOTH_23,
+  ObjectIds.BANK_BOOTH_24,
+  ObjectIds.BANK_BOOTH_25,
+  ObjectIds.BANK_BOOTH_26,
+  ObjectIds.BANK_BOOTH_27,
+  ObjectIds.BANK_BOOTH_28,
+  ObjectIds.BANK_BOOTH_29,
+  ObjectIds.BANK_BOOTH_30,
+  ObjectIds.BANK_BOOTH_31,
+  ObjectIds.BANK_BOOTH_32,
+  ObjectIds.BANK_BOOTH_33,
+  ObjectIds.BANK_BOOTH_34,
+  ObjectIds.BANK_BOOTH_35,
+  ObjectIds.BANK_BOOTH_36,
+  ObjectIds.BANK_BOOTH_37,
+  ObjectIds.BANK_BOOTH_38,
+  ObjectIds.BANK_BOOTH_39,
+  ObjectIds.BANK_BOOTH_40,
+  ObjectIds.BANK_BOOTH_41,
+  ObjectIds.BANK_BOOTH_42,
+  ObjectIds.BANK_BOOTH_43,
+  ObjectIds.BANK_BOOTH_44,
+  ObjectIds.BANK_BOOTH_45,
+].filter(Number.isInteger));
 
-function isBankBoothName(name) {
-  return (
-    typeof name === "string" &&
-    name.trim().toLowerCase().includes("bank booth")
-  );
+const BANK_BOOTH_ID_SET = new Set(BANK_BOOTH_IDS);
+const BANK_SETTINGS_BUTTON_IDS = new Set([32503, 32512, 32513]);
+const BANK_MAIN_BUTTON_IDS = new Set([
+  50013,
+  5386,
+  5387,
+  8130,
+  8131,
+  50004,
+  50007,
+  5384,
+  50001,
+  50010,
+]);
+const BANK_TAB_SELECT_START = 50070;
+const REGULAR_BANK_INTERFACE_ID = 5292;
+const BANK_SETTINGS_INTERFACE_ID = 32500;
+
+function isBankTabSelectButton(buttonId) {
+  if (!Number.isInteger(buttonId) || buttonId < BANK_TAB_SELECT_START) {
+    return false;
+  }
+  const offset = buttonId - BANK_TAB_SELECT_START;
+  if (offset % 4 !== 0) {
+    return false;
+  }
+  const bankTab = offset / 4;
+  return bankTab >= 0 && bankTab < Bank.TOTAL_BANK_TABS;
 }
 
-function isBankBoothEvent(event) {
-  if (BANK_BOOTH_IDS.includes(event.objectId)) {
-    return true;
+function isBankButtonForInterface(interfaceId, buttonId) {
+  if (interfaceId === BANK_SETTINGS_INTERFACE_ID) {
+    return BANK_SETTINGS_BUTTON_IDS.has(buttonId);
   }
-
-  const definition = event.object.getDefinition?.();
-  const name = definition?.name ?? definition?.getName?.();
-  return isBankBoothName(name);
+  if (interfaceId === REGULAR_BANK_INTERFACE_ID) {
+    return (
+      BANK_MAIN_BUTTON_IDS.has(buttonId) || isBankTabSelectButton(buttonId)
+    );
+  }
+  return false;
 }
 
 function openBank(player) {
@@ -346,6 +410,10 @@ function handleBankButton(player, buttonId) {
   if (!Number.isInteger(buttonId)) {
     return false;
   }
+  const interfaceId = player.getInterfaceId?.();
+  if (!isBankButtonForInterface(interfaceId, buttonId)) {
+    return false;
+  }
   return Bank.handleButton(player, buttonId, 0) === true;
 }
 
@@ -354,6 +422,10 @@ function handleBankInterfaceAction(player, buttonId, action) {
     return false;
   }
   if (!Number.isInteger(buttonId) || !Number.isInteger(action)) {
+    return false;
+  }
+  const interfaceId = player.getInterfaceId?.();
+  if (!isBankButtonForInterface(interfaceId, buttonId)) {
     return false;
   }
   return Bank.handleButton(player, buttonId, action) === true;
@@ -365,17 +437,16 @@ module.exports = {
   handleBankButton,
   handleBankInterfaceAction,
   register(api) {
-    api.onObjectInteraction((event) => {
-      if (event.clickType !== 1 && event.clickType !== 2) {
-        return;
-      }
-      if (!isBankBoothEvent(event)) {
+    const onBankBoothClick = (event) => {
+      if (!BANK_BOOTH_ID_SET.has(event?.objectId)) {
         return;
       }
       if (openBank(event.player)) {
         event.handled = true;
       }
-    });
+    };
+    api.onObjectFirstClick(BANK_BOOTH_IDS, onBankBoothClick);
+    api.onObjectSecondClick(BANK_BOOTH_IDS, onBankBoothClick);
 
     api.onButtonClick((event) => {
       if (handleBankButton(event.player, event.buttonId)) {
