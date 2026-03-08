@@ -6,6 +6,11 @@ const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/Plug
 const { ServerPerf } = require("../../src/main/typescript/elvarg/util/ServerPerf");
 
 const PLUGIN_PERF_LOG_FILE = path.join(process.cwd(), "logs", "plugin-performance.log");
+const PLUGIN_PERF_LATEST_FILE = path.join(
+  process.cwd(),
+  "logs",
+  "plugin-performance.latest.log"
+);
 const SERVER_PERF_SNAPSHOT_FILE = path.join(
   process.cwd(),
   "logs",
@@ -40,8 +45,11 @@ function appendPluginPerfLog(lines) {
   if (!Array.isArray(lines) || lines.length === 0) {
     return;
   }
+  const payload = `${lines.join("\n")}\n`;
   fs.mkdirSync(path.dirname(PLUGIN_PERF_LOG_FILE), { recursive: true });
-  fs.appendFileSync(PLUGIN_PERF_LOG_FILE, `${lines.join("\n")}\n`, "utf8");
+  fs.appendFileSync(PLUGIN_PERF_LOG_FILE, payload, "utf8");
+  // Keep a rolling latest snapshot for quick diagnosis without scanning a large log.
+  fs.writeFileSync(PLUGIN_PERF_LATEST_FILE, payload, "utf8");
 }
 
 function streamPluginPerfToPlayer(player, limit = DEFAULT_LIMIT) {

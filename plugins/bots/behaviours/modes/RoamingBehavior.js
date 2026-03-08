@@ -20,6 +20,72 @@ class RoamingBehavior {
     this.botWalkRadius = options.botWalkRadius;
     this.roamingMinMs = options.roamingMinMs ?? 22000;
     this.roamingMaxMs = options.roamingMaxMs ?? 80000;
+    this.objectSearch = options.objectSearch ?? null;
+    this.wildernessDitchObjectId = Number.isFinite(options.wildernessDitchObjectId)
+      ? options.wildernessDitchObjectId
+      : null;
+    this.roamingDitchCrossMaxDistanceY = Number.isFinite(
+      options.roamingDitchCrossMaxDistanceY
+    )
+      ? Math.max(0, Math.floor(options.roamingDitchCrossMaxDistanceY))
+      : 12;
+    this.ditchProbeRadius = Number.isFinite(options.ditchProbeRadius)
+      ? Math.max(1, Math.floor(options.ditchProbeRadius))
+      : Math.max(12, this.botWalkRadius * 3);
+  }
+
+  resolveNearestDitchY(player, preferredY = null) {
+    if (Number.isFinite(preferredY)) {
+      return preferredY;
+    }
+    if (
+      !player ||
+      !this.objectSearch?.findNearestObject ||
+      !Number.isFinite(this.wildernessDitchObjectId)
+    ) {
+      return null;
+    }
+    const ditchObject = this.objectSearch.findNearestObject(
+      player,
+      this.wildernessDitchObjectId,
+      this.ditchProbeRadius
+    );
+    const ditchY = ditchObject?.getLocation?.()?.getY?.();
+    return Number.isFinite(ditchY) ? ditchY : null;
+  }
+
+  buildRoamingTargetConstraint(player, ditchYHint = null) {
+    const currentY = player?.getLocation?.()?.getY?.();
+    if (!Number.isFinite(currentY)) {
+      return null;
+    }
+    const ditchY = this.resolveNearestDitchY(player, ditchYHint);
+    if (!Number.isFinite(ditchY)) {
+      return null;
+    }
+    if (Math.abs(currentY - ditchY) <= this.roamingDitchCrossMaxDistanceY) {
+      return null;
+    }
+    const keepSouthSide = currentY <= ditchY;
+    return {
+      ditchY,
+      acceptTarget: (target) => {
+        if (!target || !Number.isFinite(target.y)) {
+          return false;
+        }
+        return keepSouthSide ? target.y <= ditchY : target.y >= ditchY;
+      },
+    };
+  }
+
+  chooseRoamingTarget(player, state, ditchYHint = null) {
+    const constraint = this.buildRoamingTargetConstraint(player, ditchYHint);
+    const chooseOptions = constraint ? { acceptTarget: constraint.acceptTarget } : {};
+    return {
+      target: chooseNextTarget(player, state, this.botWalkRadius, chooseOptions),
+      chooseOptions,
+      constraintApplied: !!constraint,
+    };
   }
 
   activateMode({ player, state }) {
@@ -92,7 +158,11 @@ class RoamingBehavior {
       return false;
     }
     if (!state.roaming?.target) {
-      const fallbackTarget = chooseNextTarget(player, state, this.botWalkRadius);
+      const { target: fallbackTarget } = this.chooseRoamingTarget(
+        player,
+        state,
+        event?.to?.y
+      );
       if (!fallbackTarget) {
         return true;
       }
@@ -105,6 +175,7 @@ class RoamingBehavior {
       state.roaming.target
     );
     if (!traversalObject) {
+      const { chooseOptions } = this.chooseRoamingTarget(player, state, event?.to?.y);
       retargetAfterBlocked(
         player,
         state,
@@ -114,7 +185,8 @@ class RoamingBehavior {
         nowMs,
         blockedRetargetMinDelayMs,
         blockedRetargetMaxDelayMs,
-        this.botWalkRadius
+        this.botWalkRadius,
+        chooseOptions
       );
       return true;
     }
@@ -123,6 +195,7 @@ class RoamingBehavior {
     const targetY = state.roaming.target.y;
     const objectY = traversalObject.getLocation().getY();
     if (!traversalService.isObjectBetween(currentY, targetY, objectY)) {
+      const { chooseOptions } = this.chooseRoamingTarget(player, state, objectY);
       retargetAfterBlocked(
         player,
         state,
@@ -132,12 +205,30 @@ class RoamingBehavior {
         nowMs,
         blockedRetargetMinDelayMs,
         blockedRetargetMaxDelayMs,
-        this.botWalkRadius
+        this.botWalkRadius,
+        chooseOptions
       );
       return true;
     }
 
-    traversalService.requestCross(player, state, traversalObject, nowMs);
+    const requestedCross =
+      traversalService.requestCross(player, state, traversalObject, nowMs) ===
+      true;
+    if (!requestedCross) {
+      const { chooseOptions } = this.chooseRoamingTarget(player, state, objectY);
+      retargetAfterBlocked(
+        player,
+        state,
+        this.api,
+        "ditch_too_far_for_roaming_cross",
+        event,
+        nowMs,
+        blockedRetargetMinDelayMs,
+        blockedRetargetMaxDelayMs,
+        this.botWalkRadius,
+        chooseOptions
+      );
+    }
     return true;
   }
 
@@ -160,9 +251,17 @@ class RoamingBehavior {
 
     clearFollowState(player, state);
 
+    const { chooseOptions } = this.chooseRoamingTarget(player, state);
     let target = state.roaming.target;
+    if (
+      target &&
+      typeof chooseOptions?.acceptTarget === "function" &&
+      chooseOptions.acceptTarget(target) !== true
+    ) {
+      target = null;
+    }
     if (!target) {
-      target = chooseNextTarget(player, state, this.botWalkRadius);
+      target = chooseNextTarget(player, state, this.botWalkRadius, chooseOptions);
       if (!target) {
         return "failure";
       }
@@ -183,7 +282,12 @@ class RoamingBehavior {
     }
 
     state.roaming.endpointPauseUntil = 0;
-    const nextTarget = chooseNextTarget(player, state, this.botWalkRadius);
+    const nextTarget = chooseNextTarget(
+      player,
+      state,
+      this.botWalkRadius,
+      chooseOptions
+    );
     if (!nextTarget) {
       return "failure";
     }
@@ -205,7 +309,7 @@ const ROAMING_MODE_DESCRIPTOR = Object.freeze({
     priority: 60,
   }),
   requiredHooks: ["activateMode", "startMode", "handleBlocked"],
-  create({ botStatesByName, api, behaviorMode, options = {} }) {
+  create({ botStatesByName, api, behaviorMode, options = {}, objectSearch }) {
     return new RoamingBehavior(botStatesByName, {
       api,
       behaviorMode,
@@ -213,6 +317,10 @@ const ROAMING_MODE_DESCRIPTOR = Object.freeze({
       botWalkRadius: options.botWalkRadius,
       roamingMinMs: options.roamingMinMs,
       roamingMaxMs: options.roamingMaxMs,
+      objectSearch,
+      wildernessDitchObjectId: options.wildernessDitchObjectId,
+      roamingDitchCrossMaxDistanceY: options.roamingDitchCrossMaxDistanceY,
+      ditchProbeRadius: options.roamingDitchProbeRadius,
     });
   },
 });

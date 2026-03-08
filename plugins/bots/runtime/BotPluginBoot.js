@@ -131,6 +131,7 @@ function bootPlayerBotsRuntime(options = {}) {
     options: {
       behaviorMode,
       modeHandlers,
+      roamingDitchCrossMaxDistanceY: config.roamingDitchCrossMaxDistanceY,
       ditchAttemptCooldownMs: config.ditchAttemptCooldownMs,
       ditchPostCrossRetryDelayMs: config.ditchPostCrossRetryDelayMs,
       ditchTransitionTimeoutMs: config.ditchTransitionTimeoutMs,
@@ -141,6 +142,7 @@ function bootPlayerBotsRuntime(options = {}) {
     behaviorMode,
     ...(config.treeOptions ?? {}),
     modeHandlers,
+    traversalService,
   });
 
   const pathBlockedHandler = new PathBlockedHandler({
@@ -152,10 +154,12 @@ function bootPlayerBotsRuntime(options = {}) {
       blockedRetargetMinDelayMs: config.blockedRetargetMinDelayMs,
       blockedRetargetMaxDelayMs: config.blockedRetargetMaxDelayMs,
       duplicateEventWindowMs: config.pathBlockedDuplicateEventWindowMs,
+      minHandleIntervalMs: config.pathBlockedHandleMinIntervalMs,
       meaningfulRecheckMs: config.pathBlockedMeaningfulRecheckMs,
       maxRepeatBeforeBackoff: config.pathBlockedMaxRepeatBeforeBackoff,
       backoffBaseMs: config.pathBlockedBackoffBaseMs,
       backoffMaxMs: config.pathBlockedBackoffMaxMs,
+      ignoredModes: config.pathBlockedIgnoredModes,
     },
   });
   const npcAggroPolicyHandler = new NpcAggroPolicyHandler({
@@ -206,6 +210,7 @@ function bootPlayerBotsRuntime(options = {}) {
         modeValidationIntervalMs: config.modeValidationIntervalMs,
         idleEntryStride: config.idleEntryStride,
         lodConfig: config.lodConfig,
+        taskProfiler: config.taskProfiler,
       })
     );
     behaviorTaskStarted = true;

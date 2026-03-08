@@ -17,6 +17,12 @@ class DitchTraversalService {
     this.traversalAssist = traversalAssist;
     this.objectId = objectId;
     this.modeHandlers = options.modeHandlers ?? {};
+    this.behaviorMode = options.behaviorMode ?? null;
+    this.roamingDitchCrossMaxDistanceY = Number.isFinite(
+      options.roamingDitchCrossMaxDistanceY
+    )
+      ? Math.max(0, Math.floor(options.roamingDitchCrossMaxDistanceY))
+      : 12;
     this.ditchAttemptCooldownMs = options.ditchAttemptCooldownMs;
     this.ditchPostCrossRetryDelayMs = options.ditchPostCrossRetryDelayMs;
     this.ditchTransitionTimeoutMs = options.ditchTransitionTimeoutMs;
@@ -118,16 +124,32 @@ class DitchTraversalService {
     );
   }
 
+  isRoamingCrossProximitySatisfied(player, state, objectY) {
+    const roamingMode = this.behaviorMode?.ROAMING ?? "roaming";
+    if (state?.mode !== roamingMode) {
+      return true;
+    }
+    const currentY = player?.getLocation?.()?.getY?.();
+    if (!Number.isFinite(currentY) || !Number.isFinite(objectY)) {
+      return false;
+    }
+    return Math.abs(currentY - objectY) <= this.roamingDitchCrossMaxDistanceY;
+  }
+
   requestCross(player, state, traversalObject, nowMs = Date.now()) {
     if (!player || !state || !traversalObject) {
       return false;
     }
-    clearBotActivePreset(player);
     const traversalTarget = this.getTraversalTarget(state);
     if (!traversalTarget) {
       return false;
     }
     const objectLoc = traversalObject.getLocation();
+    const objectY = objectLoc.getY();
+    if (!this.isRoamingCrossProximitySatisfied(player, state, objectY)) {
+      return false;
+    }
+    clearBotActivePreset(player);
     const traversalTargetSnapshot = {
       x: traversalTarget.x ?? null,
       y: traversalTarget.y ?? null,
@@ -150,8 +172,6 @@ class DitchTraversalService {
       return true;
     }
     state.nextDitchAttemptAt = nowMs + this.ditchAttemptCooldownMs;
-
-    const objectY = objectLoc.getY();
 
     player.getMovementQueue().walkToObject(traversalObject, {
       execute: () => {
@@ -225,6 +245,36 @@ class DitchTraversalService {
       ...this.getModeContext(state),
     });
     return true;
+  }
+
+  maybeRequestCrossForTarget(player, state, target, nowMs = Date.now()) {
+    if (!player || !state || !target) {
+      return false;
+    }
+    if (state.awaitingDitchTransition != null) {
+      return false;
+    }
+    if (player.getForceMovement?.() != null) {
+      return false;
+    }
+    const loc = player.getLocation?.();
+    if (!loc) {
+      return false;
+    }
+    const current = {
+      x: loc.getX(),
+      y: loc.getY(),
+      z: loc.getZ(),
+    };
+    const traversalObject = this.findObjectOnRoute(player, current, target);
+    if (!traversalObject) {
+      return false;
+    }
+    const objectY = traversalObject.getLocation().getY();
+    if (!this.isObjectBetween(current.y, target.y, objectY)) {
+      return false;
+    }
+    return this.requestCross(player, state, traversalObject, nowMs) === true;
   }
 
   processTransition(player, state, nowMs = Date.now()) {

@@ -1,11 +1,20 @@
 const { callModeHook } = require("../hooks/ModeHookContract");
+const { peekMovementRequest } = require("../navigation/BotNavigation");
 
-const PATH_BLOCKED_HANDLE_MIN_INTERVAL_MS = 200;
 const DEFAULT_DUPLICATE_EVENT_WINDOW_MS = 650;
+const DEFAULT_MIN_HANDLE_INTERVAL_MS = 200;
 const DEFAULT_MEANINGFUL_RECHECK_MS = 1500;
 const DEFAULT_MAX_REPEAT_BEFORE_BACKOFF = 4;
 const DEFAULT_BACKOFF_BASE_MS = 400;
 const DEFAULT_BACKOFF_MAX_MS = 8000;
+const MODE_COOLDOWN_STATE_KEY_BY_MODE = Object.freeze({
+  bank_run: "bankRun",
+  woodcutting: "woodcutting",
+  mining: "mining",
+  smelting: "smelting",
+  firemaking: "firemaking",
+  pvp: "pvp",
+});
 
 function toTileSignature(point) {
   if (!point) {
@@ -55,6 +64,10 @@ class PathBlockedHandler {
         DEFAULT_MAX_REPEAT_BEFORE_BACKOFF
       )
     );
+    this.minHandleIntervalMs = Math.max(
+      1,
+      clampMs(options.minHandleIntervalMs, DEFAULT_MIN_HANDLE_INTERVAL_MS)
+    );
     this.backoffBaseMs = Math.max(
       1,
       clampMs(options.backoffBaseMs, DEFAULT_BACKOFF_BASE_MS)
@@ -63,12 +76,16 @@ class PathBlockedHandler {
       this.backoffBaseMs,
       clampMs(options.backoffMaxMs, DEFAULT_BACKOFF_MAX_MS)
     );
+    this.ignoredModes = new Set(
+      Array.isArray(options.ignoredModes) ? options.ignoredModes : []
+    );
   }
 
   ensureTracker(state) {
     if (!state.pathBlockedTracker) {
       state.pathBlockedTracker = {
         lastSignature: null,
+        lastBaseSignature: null,
         lastMode: null,
         lastTargetSignature: null,
         repeatCount: 0,
@@ -113,6 +130,53 @@ class PathBlockedHandler {
     ].join("|");
   }
 
+  buildBasePathBlockedSignature(mode, event) {
+    return [
+      `mode:${mode ?? "n/a"}`,
+      `from:${toTileSignature(event?.from)}`,
+      `to:${toTileSignature(event?.to)}`,
+      `basic:${event?.basicPather === true ? 1 : 0}`,
+      `size:${event?.requestedSize ?? "?"}`,
+      `dir:${event?.direction ?? "?"}`,
+      `mask:${event?.blockingMask ?? "?"}`,
+    ].join("|");
+  }
+
+  buildRequestBlockedSignature(mode, request) {
+    return [
+      `mode:${mode ?? "n/a"}`,
+      `req:${request?.x ?? "?"},${request?.y ?? "?"},${request?.z ?? "?"}`,
+      `basic:${request?.basicPather === true ? 1 : 0}`,
+      `reason:${request?.reason ?? "n/a"}`,
+    ].join("|");
+  }
+
+  matchesLatestDispatchedSegment(event, movementRequest) {
+    if (!event || !movementRequest) {
+      return true;
+    }
+    const to = event.to;
+    if (!to) {
+      return true;
+    }
+    const lastX = Number(movementRequest.lastSegmentX);
+    const lastY = Number(movementRequest.lastSegmentY);
+    if (!Number.isFinite(lastX) || !Number.isFinite(lastY)) {
+      return true;
+    }
+    if (!Number.isFinite(to.x) || !Number.isFinite(to.y)) {
+      return true;
+    }
+    if (to.x !== lastX || to.y !== lastY) {
+      return false;
+    }
+    const lastZ = Number(movementRequest.lastSegmentZ);
+    if (!Number.isFinite(lastZ) || !Number.isFinite(to.z)) {
+      return true;
+    }
+    return to.z === lastZ;
+  }
+
   applyBackoffIfNeeded(tracker, state, nowMs, context = {}) {
     if (!tracker || tracker.repeatCount < this.maxRepeatBeforeBackoff) {
       return;
@@ -143,6 +207,19 @@ class PathBlockedHandler {
     }
   }
 
+  getModeCooldownUntil(state, mode) {
+    if (!state || !mode) {
+      return 0;
+    }
+    const stateKey = MODE_COOLDOWN_STATE_KEY_BY_MODE[mode];
+    if (!stateKey) {
+      return 0;
+    }
+    const modeState = state[stateKey];
+    const cooldown = Number(modeState?.nextActionAt ?? 0);
+    return Number.isFinite(cooldown) ? cooldown : 0;
+  }
+
   handle(event, nowMs = Date.now()) {
     if (!event || !event.username) {
       return;
@@ -151,10 +228,20 @@ class PathBlockedHandler {
     if (!state || state.awaitingDitchTransition) {
       return;
     }
+    const mode = state.mode;
+    if (this.ignoredModes.has(mode)) {
+      return;
+    }
+    // Most behavior modes already set `nextActionAt` after a failed pathing
+    // attempt. Honor that cooldown to avoid re-running blocked recovery logic
+    // on every duplicate blocked event.
+    if (nowMs < this.getModeCooldownUntil(state, mode)) {
+      return;
+    }
     const tracker = this.ensureTracker(state);
     if (
       Number.isInteger(tracker.lastReceivedAt) &&
-      nowMs - tracker.lastReceivedAt < PATH_BLOCKED_HANDLE_MIN_INTERVAL_MS
+      nowMs - tracker.lastReceivedAt < this.minHandleIntervalMs
     ) {
       return;
     }
@@ -172,8 +259,61 @@ class PathBlockedHandler {
     if (player.getMovementQueue()?.size?.() > 0) {
       return;
     }
+    const movementRequest = peekMovementRequest(player);
+    if (!movementRequest) {
+      return;
+    }
+    // Ignore delayed/stale blocked events emitted for an older segment once a
+    // newer movement request/segment has already been dispatched for this bot.
+    if (!this.matchesLatestDispatchedSegment(event, movementRequest)) {
+      return;
+    }
 
-    const mode = state.mode;
+    const baseSignature = this.buildRequestBlockedSignature(
+      mode,
+      movementRequest
+    );
+    const baseSignatureChanged = baseSignature !== tracker.lastBaseSignature;
+    if (baseSignatureChanged) {
+      tracker.lastBaseSignature = baseSignature;
+      tracker.repeatCount = 0;
+      tracker.backoffUntil = 0;
+    } else {
+      tracker.repeatCount += 1;
+    }
+
+    if (!baseSignatureChanged && nowMs < tracker.backoffUntil) {
+      return;
+    }
+
+    // Fast duplicate gate before expensive mode target resolution.
+    if (
+      !baseSignatureChanged &&
+      nowMs - Number(tracker.lastHandledAt ?? 0) < this.duplicateEventWindowMs
+    ) {
+      this.applyBackoffIfNeeded(tracker, state, nowMs, {
+        username: player.getUsername?.() ?? event?.username ?? null,
+        mode,
+        targetSignature: tracker.lastTargetSignature ?? null,
+      });
+      return;
+    }
+
+    const modeChanged = tracker.lastMode !== mode;
+    const meaningfulByTime =
+      nowMs - Number(tracker.lastMeaningfulAt ?? 0) >= this.meaningfulRecheckMs;
+    // Avoid target-resolution / mode-hook fanout on repeated same-route blocks
+    // unless mode changed or the periodic meaningful recheck is due.
+    if (!baseSignatureChanged && !modeChanged && !meaningfulByTime) {
+      tracker.lastHandledAt = nowMs;
+      this.applyBackoffIfNeeded(tracker, state, nowMs, {
+        username: player.getUsername?.() ?? event?.username ?? null,
+        mode,
+        targetSignature: tracker.lastTargetSignature ?? null,
+      });
+      return;
+    }
+
     const target = this.resolveTraversalTarget(mode, state);
     const targetSignature = toTargetSignature(target);
     const signature = this.buildPathBlockedSignature(mode, event, target);
@@ -181,36 +321,14 @@ class PathBlockedHandler {
 
     if (signatureChanged) {
       tracker.lastSignature = signature;
-      tracker.repeatCount = 0;
-      tracker.backoffUntil = 0;
-    } else {
-      tracker.repeatCount += 1;
     }
 
-    if (!signatureChanged && nowMs < tracker.backoffUntil) {
-      return;
-    }
-
-    // Debounce duplicates from repeated pathfinder failures on the same route.
-    if (
-      !signatureChanged &&
-      nowMs - Number(tracker.lastHandledAt ?? 0) < this.duplicateEventWindowMs
-    ) {
-      this.applyBackoffIfNeeded(tracker, state, nowMs, {
-        username: player.getUsername?.() ?? event?.username ?? null,
-        mode,
-        targetSignature,
-      });
-      return;
-    }
-
-    const modeChanged = tracker.lastMode !== mode;
     const targetChanged = tracker.lastTargetSignature !== targetSignature;
     const meaningfulChange =
       signatureChanged ||
       modeChanged ||
       targetChanged ||
-      nowMs - Number(tracker.lastMeaningfulAt ?? 0) >= this.meaningfulRecheckMs;
+      meaningfulByTime;
 
     // Skip expensive mode-specific blocked recovery until state meaningfully changes.
     if (!meaningfulChange) {

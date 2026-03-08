@@ -16,6 +16,8 @@ function createBotPluginLogging(options = {}) {
   const logPath = options.logPath;
   const runtimeEventLoggingEnabled = options.runtimeEventLoggingEnabled === true;
   const fileLogWritesEnabled = options.fileLogWritesEnabled === true;
+  const mirrorToServerLogger = options.mirrorToServerLogger === true;
+  const mirrorErrorsToServerLogger = options.mirrorErrorsToServerLogger !== false;
   const recentLogLimit = Number.isFinite(options.recentLogLimit)
     ? Math.max(1, Math.floor(options.recentLogLimit))
     : 24;
@@ -91,12 +93,24 @@ function createBotPluginLogging(options = {}) {
     }
   };
 
+  const shouldMirrorToServerLog = (message) => {
+    if (mirrorToServerLogger) {
+      return true;
+    }
+    if (!mirrorErrorsToServerLogger || typeof message !== "string") {
+      return false;
+    }
+    return /error|failed|exception|fatal/i.test(message);
+  };
+
   const botApi = Object.create(api ?? {});
   botApi.log = (message, extra) => {
     if (!runtimeEventLoggingEnabled) {
       return;
     }
-    api?.log?.(message, extra);
+    if (shouldMirrorToServerLog(message)) {
+      api?.log?.(message, extra);
+    }
     writeBotLog(message, extra);
   };
 

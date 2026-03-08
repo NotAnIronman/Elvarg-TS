@@ -913,34 +913,57 @@ export class PacketSender {
     return this;
   }
 
-  public sendPosition(position: any) {
-    if (!position || typeof position.getX !== "function" || typeof position.getY !== "function") {
-      return this;
+  private writeLocalPosition(localX: number, localY: number): void {
+    const out = new PacketBuilder(85);
+    out.puts(localY, ValueType.C);
+    out.puts(localX, ValueType.C);
+    this.player.getSession().write(out);
+  }
+
+  private resolveLocalPosition(position: any): { localX: number; localY: number } | null {
+    if (
+      !position ||
+      typeof position.getX !== "function" ||
+      typeof position.getY !== "function"
+    ) {
+      return null;
     }
-    const regionSource = this.player.getLastKnownRegion?.() ?? this.player.getLocation?.();
+
+    const regionSource =
+      this.player.getLastKnownRegion?.() ?? this.player.getLocation?.();
     const playerLocation = this.player.getLocation?.();
     if (!regionSource || !playerLocation) {
-      return this;
+      return null;
     }
 
     let localY = position.getY() - 8 * regionSource.getRegionY();
     let localX = position.getX() - 8 * regionSource.getRegionX();
 
-    // If cached region drifts out of sync, fall back to current player region
-    // so region packets (e.g. projectiles) remain decodable client-side.
+    // If cached region drifts out of sync, retry from current player region.
     if (localX < 0 || localX > 103 || localY < 0 || localY > 103) {
       localY = position.getY() - 8 * playerLocation.getRegionY();
       localX = position.getX() - 8 * playerLocation.getRegionX();
     }
 
-    // Client region packets operate on local scene tiles (0..103).
-    localX = Math.max(0, Math.min(103, localX));
-    localY = Math.max(0, Math.min(103, localY));
+    // Never clamp here. Clamping creates false world placements (wrong tile/object).
+    if (localX < 0 || localX > 103 || localY < 0 || localY > 103) {
+      return null;
+    }
 
-    let out = new PacketBuilder(85);
-    out.puts(localY, ValueType.C);
-    out.puts(localX, ValueType.C);
-    this.player.getSession().write(out);
+    return { localX, localY };
+  }
+
+  private sendPositionIfVisible(position: any): boolean {
+    const local = this.resolveLocalPosition(position);
+    if (!local) {
+      return false;
+    }
+    this.writeLocalPosition(local.localX, local.localY);
+    return true;
+  }
+
+  public sendPosition(position: any) {
+    this.sendPositionIfVisible(position);
     return this;
   }
 
@@ -1134,7 +1157,9 @@ export class PacketSender {
       return this;
     }
 
-    this.sendPosition(start);
+    if (!this.sendPositionIfVisible(start)) {
+      return this;
+    }
 
     const out = new PacketBuilder(117);
     out.put(offset);
@@ -1201,7 +1226,9 @@ export class PacketSender {
     }
 
     const location = object.getLocation();
-    this.sendPosition(location);
+    if (!this.sendPositionIfVisible(location)) {
+      return this;
+    }
     const out = new PacketBuilder(151);
     out.puts(location.getZ(), ValueType.A);
     out.putShorts(object.getId(), ByteOrder.LITTLE);
@@ -1221,7 +1248,9 @@ export class PacketSender {
     }
 
     const location = object.getLocation();
-    this.sendPosition(location);
+    if (!this.sendPositionIfVisible(location)) {
+      return this;
+    }
     const out = new PacketBuilder(101);
     out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.C);
     out.put(location.getZ());
@@ -1274,7 +1303,9 @@ export class PacketSender {
     if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
       return this;
     }
-    this.sendPosition(item.getPosition());
+    if (!this.sendPositionIfVisible(item.getPosition())) {
+      return this;
+    }
     const out = new PacketBuilder(84);
     out.put(0);
     out
@@ -1289,7 +1320,9 @@ export class PacketSender {
     if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
       return this;
     }
-    this.sendPosition(item.getPosition());
+    if (!this.sendPositionIfVisible(item.getPosition())) {
+      return this;
+    }
     const out = new PacketBuilder(156);
     out.puts(0, ValueType.A);
     out.putShort(item.getItem().getId());
@@ -1301,7 +1334,9 @@ export class PacketSender {
     if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
       return this;
     }
-    this.sendPosition(item.getPosition());
+    if (!this.sendPositionIfVisible(item.getPosition())) {
+      return this;
+    }
     const out = new PacketBuilder(44);
     out.putShort(item.getItem().getId(), ValueType.A, ByteOrder.LITTLE);
     out.putInt(item.getItem().getAmount()).put(0);

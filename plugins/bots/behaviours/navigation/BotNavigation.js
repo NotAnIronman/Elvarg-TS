@@ -3,7 +3,15 @@ const { PathFinder } = require("../../../../src/main/typescript/elvarg/game/mode
 
 const MAX_ROUTE_SEGMENT_TILES = 24;
 const PATH_BLOCKED_LOG_THROTTLE_MS = 2500;
+const NO_PATH_RETRY_BASE_MS = 1200;
+const NO_PATH_RETRY_MAX_MS = 6000;
+const UNREACHABLE_SEGMENT_COOLDOWN_BASE_MS = 1200;
+const UNREACHABLE_SEGMENT_COOLDOWN_MAX_MS = 12000;
+const UNREACHABLE_SEGMENT_TTL_MS = 30000;
+const UNREACHABLE_SEGMENT_MAX_TRACKED = 24;
+const FORBIDDEN_TARGET_Y = new Set([3521, 3522]);
 const pendingMovementByPlayer = new WeakMap();
+const unreachableSegmentsByPlayer = new WeakMap();
 const pathBlockedLogStateByUsername = new Map();
 
 function consumePathBlockedLogBudget(username, nowMs) {
@@ -31,6 +39,59 @@ function randomInRange(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function getUnreachableSegmentTracker(player) {
+  if (!player) {
+    return null;
+  }
+  let tracker = unreachableSegmentsByPlayer.get(player);
+  if (!tracker) {
+    tracker = new Map();
+    unreachableSegmentsByPlayer.set(player, tracker);
+  }
+  return tracker;
+}
+
+function segmentKey(x, y, z) {
+  return `${x},${y},${z}`;
+}
+
+function isForbiddenTargetY(y) {
+  return Number.isFinite(y) && FORBIDDEN_TARGET_Y.has(Math.floor(y));
+}
+
+function sanitizeTargetTile(player, targetX, targetY) {
+  const safeX = Math.floor(targetX);
+  const y = Math.floor(targetY);
+  if (!isForbiddenTargetY(y)) {
+    return { x: safeX, y };
+  }
+  const currentY = player?.getLocation?.()?.getY?.();
+  const safeY = Number.isFinite(currentY) && currentY <= 3521 ? 3520 : 3523;
+  return { x: safeX, y: safeY };
+}
+
+function pruneUnreachableSegments(tracker, nowMs) {
+  if (!tracker || tracker.size <= 0) {
+    return;
+  }
+  const staleBefore = nowMs - UNREACHABLE_SEGMENT_TTL_MS;
+  for (const [key, entry] of tracker.entries()) {
+    if (!entry || Number(entry.lastFailedAt ?? 0) < staleBefore) {
+      tracker.delete(key);
+    }
+  }
+  if (tracker.size <= UNREACHABLE_SEGMENT_MAX_TRACKED) {
+    return;
+  }
+  const byOldest = Array.from(tracker.entries()).sort(
+    (a, b) => Number(a[1]?.lastFailedAt ?? 0) - Number(b[1]?.lastFailedAt ?? 0)
+  );
+  const removeCount = tracker.size - UNREACHABLE_SEGMENT_MAX_TRACKED;
+  for (let index = 0; index < removeCount; index++) {
+    tracker.delete(byOldest[index][0]);
+  }
+}
+
 function isAtTarget(player, target) {
   if (!player || !target) {
     return false;
@@ -43,7 +104,7 @@ function isAtTarget(player, target) {
   );
 }
 
-function chooseNextTarget(player, state, botWalkRadius) {
+function chooseNextTarget(player, state, botWalkRadius, options = {}) {
   if (!player || !state?.home) {
     return null;
   }
@@ -54,6 +115,8 @@ function chooseNextTarget(player, state, botWalkRadius) {
   const currentX = player.getLocation().getX();
   const currentY = player.getLocation().getY();
   const previousTarget = state.roaming?.target;
+  const acceptTarget =
+    typeof options.acceptTarget === "function" ? options.acceptTarget : null;
   const radiusSq = botWalkRadius * botWalkRadius;
   const maxAttempts = 24;
 
@@ -68,6 +131,9 @@ function chooseNextTarget(player, state, botWalkRadius) {
 
     const targetX = homeX + dx;
     const targetY = homeY + dy;
+    if (isForbiddenTargetY(targetY)) {
+      continue;
+    }
     if (targetX === currentX && targetY === currentY) {
       continue;
     }
@@ -79,7 +145,11 @@ function chooseNextTarget(player, state, botWalkRadius) {
     ) {
       continue;
     }
-    return { x: targetX, y: targetY, z: homeZ };
+    const candidate = { x: targetX, y: targetY, z: homeZ };
+    if (acceptTarget && acceptTarget(candidate) !== true) {
+      continue;
+    }
+    return candidate;
   }
 
   const fallbackTargets = [
@@ -91,10 +161,17 @@ function chooseNextTarget(player, state, botWalkRadius) {
   ];
 
   for (const [targetX, targetY] of fallbackTargets) {
+    if (isForbiddenTargetY(targetY)) {
+      continue;
+    }
     if (targetX === currentX && targetY === currentY) {
       continue;
     }
-    return { x: targetX, y: targetY, z: homeZ };
+    const candidate = { x: targetX, y: targetY, z: homeZ };
+    if (acceptTarget && acceptTarget(candidate) !== true) {
+      continue;
+    }
+    return candidate;
   }
 
   return null;
@@ -103,11 +180,11 @@ function chooseNextTarget(player, state, botWalkRadius) {
 function calculateStrictWalkRoute(player, targetX, targetY) {
   // Bot ditch traversal depends on `path_blocked` events. The default walk route
   // uses basic fallback and can stop near the target instead of reporting blocked.
-  PathFinder.calculateRoute(player, 0, targetX, targetY, 0, 0, 0, 0, false);
+  return PathFinder.calculateRoute(player, 0, targetX, targetY, 0, 0, 0, 0, false);
 }
 
 function calculateWalkRoute(player, targetX, targetY) {
-  PathFinder.calculateWalkRoute(player, targetX, targetY);
+  return PathFinder.calculateRoute(player, 0, targetX, targetY, 0, 0, 0, 0, true);
 }
 
 function resolveSegmentTarget(
@@ -117,7 +194,7 @@ function resolveSegmentTarget(
   maxRouteSegmentTiles = MAX_ROUTE_SEGMENT_TILES
 ) {
   if (!player) {
-    return { x: targetX, y: targetY };
+    return sanitizeTargetTile(player, targetX, targetY);
   }
   const maxSegmentTiles = Math.max(1, Math.floor(maxRouteSegmentTiles));
   const loc = player.getLocation();
@@ -127,7 +204,7 @@ function resolveSegmentTarget(
   const dy = targetY - currentY;
   const chebyshevDistance = Math.max(Math.abs(dx), Math.abs(dy));
   if (chebyshevDistance <= maxSegmentTiles) {
-    return { x: targetX, y: targetY };
+    return sanitizeTargetTile(player, targetX, targetY);
   }
 
   const ratio = maxSegmentTiles / chebyshevDistance;
@@ -141,10 +218,7 @@ function resolveSegmentTarget(
     segmentY += Math.sign(dy);
   }
 
-  return {
-    x: segmentX,
-    y: segmentY,
-  };
+  return sanitizeTargetTile(player, segmentX, segmentY);
 }
 
 function queueRouteAndFlagAppearance(player, targetX, targetY) {
@@ -160,9 +234,10 @@ function requestMovement(player, targetX, targetY, options = {}) {
   }
   const loc = player.getLocation?.();
   const z = Number.isFinite(options.z) ? Math.floor(options.z) : loc?.getZ?.();
+  const target = sanitizeTargetTile(player, targetX, targetY);
   pendingMovementByPlayer.set(player, {
-    x: Math.floor(targetX),
-    y: Math.floor(targetY),
+    x: target.x,
+    y: target.y,
     z: Number.isFinite(z) ? z : null,
     reason: typeof options.reason === "string" ? options.reason : null,
     requestedAtMs: Number.isFinite(options.nowMs) ? options.nowMs : Date.now(),
@@ -172,6 +247,14 @@ function requestMovement(player, targetX, targetY, options = {}) {
         ? Math.floor(options.maxRouteSegmentTiles)
         : MAX_ROUTE_SEGMENT_TILES,
     basicPather: options.basicPather === true,
+    nextDispatchAtMs: Number.isFinite(options.nextDispatchAtMs)
+      ? Math.max(0, Math.floor(options.nextDispatchAtMs))
+      : 0,
+    noPathAttempts: 0,
+    lastSegmentX: null,
+    lastSegmentY: null,
+    lastSegmentZ: null,
+    lastDispatchedAtMs: 0,
   });
   return true;
 }
@@ -194,19 +277,91 @@ function dispatchMovementRequest(player, request) {
   if (!player || !request) {
     return null;
   }
+  const nowMs = Date.now();
   const segmentTarget = resolveSegmentTarget(
     player,
     request.x,
     request.y,
     request.maxRouteSegmentTiles
   );
-  if (request.basicPather === true) {
-    calculateWalkRoute(player, segmentTarget.x, segmentTarget.y);
-  } else {
-    calculateStrictWalkRoute(player, segmentTarget.x, segmentTarget.y);
+  const segmentZ = Number.isFinite(request.z)
+    ? request.z
+    : player.getLocation()?.getZ?.() ?? 0;
+  const unreachableTracker = getUnreachableSegmentTracker(player);
+  if (unreachableTracker) {
+    pruneUnreachableSegments(unreachableTracker, nowMs);
+    const key = segmentKey(segmentTarget.x, segmentTarget.y, segmentZ);
+    const previousFailure = unreachableTracker.get(key);
+    if (
+      previousFailure &&
+      Number.isFinite(previousFailure.untilMs) &&
+      nowMs < previousFailure.untilMs
+    ) {
+      request.lastSegmentX = segmentTarget.x;
+      request.lastSegmentY = segmentTarget.y;
+      request.lastSegmentZ = segmentZ;
+      request.lastDispatchedAtMs = nowMs;
+      request.nextDispatchAtMs = Math.max(
+        Number(request.nextDispatchAtMs ?? 0),
+        previousFailure.untilMs
+      );
+      return {
+        segmentTarget,
+        hasRoute: false,
+        steps: 0,
+        skippedByCooldown: true,
+      };
+    }
   }
-  player.getUpdateFlag().flag(Flag.APPEARANCE);
-  return segmentTarget;
+  const steps =
+    request.basicPather === true
+      ? calculateWalkRoute(player, segmentTarget.x, segmentTarget.y)
+      : calculateStrictWalkRoute(player, segmentTarget.x, segmentTarget.y);
+  const hasRoute = Number.isFinite(steps) ? steps > 0 : false;
+  request.lastSegmentX = segmentTarget.x;
+  request.lastSegmentY = segmentTarget.y;
+  request.lastSegmentZ = segmentZ;
+  request.lastDispatchedAtMs = nowMs;
+
+  if (hasRoute) {
+    request.noPathAttempts = 0;
+    request.nextDispatchAtMs = 0;
+    if (unreachableTracker) {
+      unreachableTracker.delete(segmentKey(segmentTarget.x, segmentTarget.y, segmentZ));
+    }
+    player.getUpdateFlag().flag(Flag.APPEARANCE);
+  } else {
+    const attempts = Math.max(0, Number(request.noPathAttempts ?? 0)) + 1;
+    request.noPathAttempts = attempts;
+    const retryDelayMs = Math.min(
+      NO_PATH_RETRY_MAX_MS,
+      NO_PATH_RETRY_BASE_MS * 2 ** Math.min(attempts - 1, 3)
+    );
+    let unreachableUntilMs = 0;
+    if (unreachableTracker) {
+      const key = segmentKey(segmentTarget.x, segmentTarget.y, segmentZ);
+      const previousFailure = unreachableTracker.get(key);
+      const segmentAttempts =
+        Math.max(0, Number(previousFailure?.attempts ?? 0)) + 1;
+      const segmentCooldownMs = Math.min(
+        UNREACHABLE_SEGMENT_COOLDOWN_MAX_MS,
+        UNREACHABLE_SEGMENT_COOLDOWN_BASE_MS * 2 ** Math.min(segmentAttempts - 1, 4)
+      );
+      unreachableUntilMs = nowMs + segmentCooldownMs;
+      unreachableTracker.set(key, {
+        attempts: segmentAttempts,
+        untilMs: unreachableUntilMs,
+        lastFailedAt: nowMs,
+      });
+    }
+    request.nextDispatchAtMs = Math.max(nowMs + retryDelayMs, unreachableUntilMs);
+  }
+
+  return {
+    segmentTarget,
+    hasRoute,
+    steps: Number.isFinite(steps) ? steps : 0,
+  };
 }
 
 function retargetAfterBlocked(
@@ -218,7 +373,8 @@ function retargetAfterBlocked(
   nowMs = Date.now(),
   blockedRetargetMinDelayMs = 0,
   blockedRetargetMaxDelayMs = 0,
-  botWalkRadius = 0
+  botWalkRadius = 0,
+  chooseOptions = null
 ) {
   if (!player || !state) {
     return false;
@@ -238,7 +394,12 @@ function retargetAfterBlocked(
     : null;
 
   state.roaming.endpointPauseUntil = 0;
-  const nextTarget = chooseNextTarget(player, state, botWalkRadius);
+  const nextTarget = chooseNextTarget(
+    player,
+    state,
+    botWalkRadius,
+    chooseOptions ?? {}
+  );
   if (!nextTarget) {
     state.roaming.target = null;
     state.roaming.nextWalkAt = nowMs + blockedRetargetMaxDelayMs;
@@ -261,6 +422,13 @@ function retargetAfterBlocked(
     blockedRetargetMaxDelayMs
   );
   state.roaming.nextWalkAt = nowMs + retryInMs;
+  requestMovement(player, nextTarget.x, nextTarget.y, {
+    nowMs,
+    reason: `blocked_retarget:${reason}`,
+    basicPather: true,
+    nextDispatchAtMs: nowMs + retryInMs,
+    z: nextTarget.z,
+  });
   if (logBudget.shouldLog) {
     api.log("path_blocked_retarget", {
       username,

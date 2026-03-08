@@ -27,6 +27,10 @@ const BANK_BOOTH_CACHE_TTL_MS = 1200;
 const BANK_BOOTH_CACHE_MAX_KEYS = 256;
 const BLOCKED_BOOTH_FAILURE_THRESHOLD = 3;
 const BLOCKED_BOOTH_BLACKLIST_MS = 25000;
+const HARD_BLACKLISTED_BANK_BOOTH_KEYS = new Set([
+  "3147,3449,0",
+  "3148,3449,0",
+]);
 
 const BANK_BOOTH_IDS = new Set(
   Object.entries(ObjectIds)
@@ -281,10 +285,15 @@ class BankRunBehavior {
       return this.processReturnPhase(player, state, nowMs);
     }
 
-    return this.processToBankPhase(player, state, nowMs);
+    return this.processToBankPhase(
+      player,
+      state,
+      nowMs,
+      context?.traversalService ?? null
+    );
   }
 
-  processToBankPhase(player, state, nowMs) {
+  processToBankPhase(player, state, nowMs, traversalService = null) {
     const bankRun = state.bankRun;
     this.setPhase(player, state, "to_bank", nowMs);
     this.cleanupBlockedBooths(bankRun, nowMs);
@@ -380,6 +389,50 @@ class BankRunBehavior {
         bankRun.travelTarget = null;
       },
     });
+
+    const hasRoute = player.getMovementQueue?.().hasRoute?.() === true;
+    const queuedSteps = player.getMovementQueue?.().size?.() ?? 0;
+    if (!hasRoute && queuedSteps <= 0) {
+      const requestedCross =
+        traversalService?.maybeRequestCrossForTarget?.(
+          player,
+          state,
+          bankRun.travelTarget,
+          nowMs
+        ) === true;
+      this.api?.log?.("bank_run_no_route_to_booth", {
+        username: player.getUsername?.(),
+        bankRunId: bankRun.id ?? null,
+        objectId: bankBooth.getId(),
+        targetX: bankRun.travelTarget?.x ?? null,
+        targetY: bankRun.travelTarget?.y ?? null,
+        targetZ: bankRun.travelTarget?.z ?? null,
+        requestedCross,
+      });
+      if (!requestedCross) {
+        const blacklisted = this.recordBlockedBooth(
+          bankRun,
+          bankRun.travelTarget,
+          nowMs
+        );
+        if (blacklisted) {
+          this.api?.log?.("bank_run_booth_blacklisted", {
+            username: player.getUsername?.(),
+            bankRunId: bankRun.id ?? null,
+            x: bankRun.travelTarget?.x ?? null,
+            y: bankRun.travelTarget?.y ?? null,
+            z: bankRun.travelTarget?.z ?? null,
+            blockedUntil: nowMs + BLOCKED_BOOTH_BLACKLIST_MS,
+          });
+        }
+        bankRun.bankTarget = null;
+        bankRun.travelTarget = null;
+        bankRun.nextActionAt = nowMs + RETRY_SEARCH_MS;
+      } else {
+        bankRun.nextActionAt = nowMs + WALK_COMMAND_COOLDOWN_MS;
+      }
+      return "running";
+    }
 
     bankRun.nextActionAt = nowMs + WALK_COMMAND_COOLDOWN_MS;
     return "running";
@@ -671,6 +724,9 @@ class BankRunBehavior {
     if (!player || !target) {
       return null;
     }
+    if (this.isHardBlacklistedBoothTarget(target)) {
+      return null;
+    }
     const loc = new Location(target.x, target.y, target.z);
     if (this.isBoothBlockedForRun(bankRun, loc, nowMs)) {
       return null;
@@ -702,6 +758,9 @@ class BankRunBehavior {
       }
       const objectLoc = object.getLocation();
       if (!objectLoc || objectLoc.getZ() !== loc.getZ()) {
+        continue;
+      }
+      if (this.isHardBlacklistedBoothLoc(objectLoc)) {
         continue;
       }
       if (this.isBoothBlockedForRun(bankRun, objectLoc, nowMs)) {
@@ -750,7 +809,12 @@ class BankRunBehavior {
       return;
     }
     for (const [key, record] of Object.entries(bankRun.blockedBoothsByKey)) {
-      if (!record || Number(record.blockedUntil) <= nowMs) {
+      if (!record) {
+        delete bankRun.blockedBoothsByKey[key];
+        continue;
+      }
+      const blockedUntil = Number(record.blockedUntil ?? 0);
+      if (blockedUntil > 0 && blockedUntil <= nowMs) {
         delete bankRun.blockedBoothsByKey[key];
       }
     }
@@ -766,6 +830,22 @@ class BankRunBehavior {
       return false;
     }
     return Number(record.blockedUntil) > nowMs;
+  }
+
+  isHardBlacklistedBoothLoc(loc) {
+    if (!loc) {
+      return false;
+    }
+    const key = `${loc.getX()},${loc.getY()},${loc.getZ()}`;
+    return HARD_BLACKLISTED_BANK_BOOTH_KEYS.has(key);
+  }
+
+  isHardBlacklistedBoothTarget(target) {
+    if (!target) {
+      return false;
+    }
+    const key = `${target.x},${target.y},${target.z}`;
+    return HARD_BLACKLISTED_BANK_BOOTH_KEYS.has(key);
   }
 
   recordBlockedBooth(bankRun, target, nowMs) {

@@ -4,6 +4,8 @@ const { randomInRange } = require("../navigation/BotNavigation");
 const { callModeHook } = require("../hooks/ModeHookContract");
 const { clearBotActivePreset } = require("../state/PlayerBotState");
 
+const NS_PER_MS = 1_000_000n;
+
 class BotBehaviorTask extends Task {
   constructor(entries, traversalService, decisionTicks, options = {}) {
     super(decisionTicks);
@@ -32,6 +34,77 @@ class BotBehaviorTask extends Task {
     this._nextLodRefreshAt = 0;
     this._humanObservers = [];
     this._cycleCounter = 0;
+    this.taskProfiler = this.resolveTaskProfiler(options.taskProfiler ?? {});
+    this._profileWindow = this.createProfileWindow(Date.now());
+  }
+
+  resolveTaskProfiler(rawConfig) {
+    const enabled = rawConfig?.enabled === true;
+    const intervalMs = Number.isFinite(rawConfig?.intervalMs)
+      ? Math.max(1000, Math.floor(rawConfig.intervalMs))
+      : 10000;
+    const sampleStride = Number.isFinite(rawConfig?.sampleStride)
+      ? Math.max(1, Math.floor(rawConfig.sampleStride))
+      : 2;
+    return {
+      enabled,
+      intervalMs,
+      sampleStride,
+    };
+  }
+
+  createProfileWindow(nowMs) {
+    return {
+      startedAt: nowMs,
+      sampledEntries: 0,
+      heavyEntries: 0,
+      traversalMs: 0,
+      npcAggroMs: 0,
+      heavyGateMs: 0,
+      autonomyMs: 0,
+      controllerMs: 0,
+      totalEntryMs: 0,
+    };
+  }
+
+  shouldSampleEntry(index) {
+    if (!this.taskProfiler.enabled) {
+      return false;
+    }
+    return (this._cycleCounter + index) % this.taskProfiler.sampleStride === 0;
+  }
+
+  elapsedMs(startNs, endNs = process.hrtime.bigint()) {
+    return Number(endNs - startNs) / Number(NS_PER_MS);
+  }
+
+  flushTaskProfileIfDue(nowMs) {
+    if (!this.taskProfiler.enabled || !this._profileWindow) {
+      return;
+    }
+    if (nowMs - this._profileWindow.startedAt < this.taskProfiler.intervalMs) {
+      return;
+    }
+    const window = this._profileWindow;
+    this._profileWindow = this.createProfileWindow(nowMs);
+    if (window.sampledEntries <= 0) {
+      return;
+    }
+    const sampledEntries = window.sampledEntries;
+    const heavyEntries = window.heavyEntries;
+    const avg = (total, count) => (count > 0 ? Number((total / count).toFixed(4)) : 0);
+    this.api?.log?.("bot_task_profile_snapshot", {
+      windowMs: nowMs - window.startedAt,
+      sampledEntries,
+      heavyEntries,
+      sampleStride: this.taskProfiler.sampleStride,
+      avgEntryMs: avg(window.totalEntryMs, sampledEntries),
+      avgTraversalMs: avg(window.traversalMs, sampledEntries),
+      avgNpcAggroMs: avg(window.npcAggroMs, sampledEntries),
+      avgHeavyGateMs: avg(window.heavyGateMs, sampledEntries),
+      avgAutonomyMs: avg(window.autonomyMs, heavyEntries),
+      avgControllerMs: avg(window.controllerMs, heavyEntries),
+    });
   }
 
   resolveLodConfig(rawConfig) {
@@ -599,25 +672,98 @@ class BotBehaviorTask extends Task {
   execute() {
     const now = Date.now();
     this._cycleCounter = (this._cycleCounter + 1) & 0x7fffffff;
-    for (const entry of this.entries) {
+    for (let index = 0; index < this.entries.length; index++) {
+      const entry = this.entries[index];
+      const sampleEntry = this.shouldSampleEntry(index);
+      let entryStartNs = 0n;
+      if (sampleEntry && this._profileWindow) {
+        entryStartNs = process.hrtime.bigint();
+      }
       try {
-        this.traversalService.processTransition(entry.player, entry.state, now);
-        this.traversalService.processPendingRetry(entry.player, entry.state, now);
-        if (this.npcAggroPolicyHandler) {
-          this.npcAggroPolicyHandler.handlePlayerProcess({
-            player: entry.player,
-            nowMs: now,
-          });
-        }
-        if (!this.shouldProcessEntryHeavy(entry, now)) {
+        const state = entry?.state;
+        const player = entry?.player;
+        if (!player || !state) {
           continue;
         }
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.sampledEntries += 1;
+        }
+
+        // Traversal processing is only needed while an actual transition/retry
+        // is queued; avoid the call overhead on every idle bot tick.
+        let traversalStartNs = 0n;
+        if (sampleEntry && this._profileWindow) {
+          traversalStartNs = process.hrtime.bigint();
+        }
+        if (state.awaitingDitchTransition != null) {
+          this.traversalService.processTransition(player, state, now);
+        }
+        if (state.roaming?.pendingRetry != null) {
+          this.traversalService.processPendingRetry(player, state, now);
+        }
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.traversalMs += this.elapsedMs(traversalStartNs);
+        }
+
+        // Only run NPC aggro policy when NPC combat context exists.
+        let npcAggroStartNs = 0n;
+        if (sampleEntry && this._profileWindow) {
+          npcAggroStartNs = process.hrtime.bigint();
+        }
+        if (this.npcAggroPolicyHandler) {
+          const combat = player.getCombat?.();
+          const attacker = combat?.getAttacker?.();
+          const target = combat?.getTarget?.();
+          if (attacker?.isNpc?.() === true || target?.isNpc?.() === true) {
+            this.npcAggroPolicyHandler.handlePlayerProcess({
+              player,
+              nowMs: now,
+            });
+          }
+        }
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.npcAggroMs += this.elapsedMs(npcAggroStartNs);
+        }
+
+        let heavyGateStartNs = 0n;
+        if (sampleEntry && this._profileWindow) {
+          heavyGateStartNs = process.hrtime.bigint();
+        }
+        const shouldProcessHeavy = this.shouldProcessEntryHeavy(entry, now);
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.heavyGateMs += this.elapsedMs(heavyGateStartNs);
+        }
+        if (!shouldProcessHeavy) {
+          continue;
+        }
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.heavyEntries += 1;
+        }
+        let autonomyStartNs = 0n;
+        if (sampleEntry && this._profileWindow) {
+          autonomyStartNs = process.hrtime.bigint();
+        }
         this.processAutonomousMode(entry, now);
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.autonomyMs += this.elapsedMs(autonomyStartNs);
+        }
+        let controllerStartNs = 0n;
+        if (sampleEntry && this._profileWindow) {
+          controllerStartNs = process.hrtime.bigint();
+        }
         entry.controller.tick(now);
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.controllerMs += this.elapsedMs(controllerStartNs);
+        }
       } catch (err) {
         console.error("[bots] behavior tick failed", err);
+      } finally {
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.totalEntryMs += this.elapsedMs(entryStartNs);
+        }
       }
     }
+    this.flushTaskProfileIfDue(now);
   }
 }
 

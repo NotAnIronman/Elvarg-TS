@@ -42,6 +42,9 @@ const BOT_MODE_BEHAVIOR_OPTIONS = Object.freeze({
   botWalkRadius: 10,
   roamingMinMs: 22000,
   roamingMaxMs: 80000,
+  wildernessDitchObjectId: ObjectIds.WILDERNESS_DITCH,
+  roamingDitchCrossMaxDistanceY: 12,
+  roamingDitchProbeRadius: 30,
 });
 
 const BOT_TREE_OPTIONS = Object.freeze({
@@ -64,6 +67,7 @@ const BOT_CONFIG = Object.freeze({
   botBaseCooldownMs: 1200,
   botJitterMs: 300,
   ditchAttemptCooldownMs: 1200,
+  roamingDitchCrossMaxDistanceY: 12,
   ditchTransitionTimeoutMs: 15000,
   ditchPostCrossRetryDelayMs: 0,
   blockedRetargetMinDelayMs: 450,
@@ -72,11 +76,19 @@ const BOT_CONFIG = Object.freeze({
   // - dedupe repeated identical block events
   // - only re-run heavy recovery on meaningful state changes
   // - cap repeated retries with exponential backoff
-  pathBlockedDuplicateEventWindowMs: 650,
-  pathBlockedMeaningfulRecheckMs: 1500,
-  pathBlockedMaxRepeatBeforeBackoff: 4,
-  pathBlockedBackoffBaseMs: 400,
+  pathBlockedDuplicateEventWindowMs: 1200,
+  // Minimum time between path-blocked recovery attempts per bot.
+  pathBlockedHandleMinIntervalMs: 750,
+  pathBlockedMeaningfulRecheckMs: 3500,
+  pathBlockedMaxRepeatBeforeBackoff: 2,
+  pathBlockedBackoffBaseMs: 600,
   pathBlockedBackoffMaxMs: 8000,
+  pathBlockedIgnoredModes: [BOT_BEHAVIOR_MODE.PVP],
+  taskProfiler: Object.freeze({
+    enabled: true,
+    intervalMs: 10000,
+    sampleStride: 2,
+  }),
   botSpawnRadius: 14,
   botSpawnMinDistance: 2,
   botSpawnMaxAttempts: 80,
@@ -108,6 +120,11 @@ const BOT_CONFIG = Object.freeze({
     logPath: path.join(process.cwd(), "logs", "player-bots.log"),
     runtimeEventLoggingEnabled:
       (process.env.BOT_RUNTIME_EVENT_LOGGING ?? "1") === "1",
+    // Mirroring high-frequency bot runtime logs into the core server logger is
+    // expensive because server.log uses synchronous disk writes.
+    mirrorToServerLogger: (process.env.BOT_MIRROR_CORE_LOGGING ?? "0") === "1",
+    mirrorErrorsToServerLogger:
+      (process.env.BOT_MIRROR_ERRORS_TO_CORE_LOGGING ?? "1") === "1",
     fileLogWritesEnabled:
       (process.env.BOT_FILE_LOG_WRITES_ENABLED ??
         (GameConstants.SERVER_LOG_WRITES_ENABLED ? "1" : "0")) === "1",
@@ -131,6 +148,8 @@ module.exports = {
       api,
       logPath: BOT_CONFIG.logging.logPath,
       runtimeEventLoggingEnabled: BOT_CONFIG.logging.runtimeEventLoggingEnabled,
+      mirrorToServerLogger: BOT_CONFIG.logging.mirrorToServerLogger,
+      mirrorErrorsToServerLogger: BOT_CONFIG.logging.mirrorErrorsToServerLogger,
       fileLogWritesEnabled: BOT_CONFIG.logging.fileLogWritesEnabled,
       recentLogLimit: BOT_CONFIG.logging.recentLogLimit,
     });
@@ -183,6 +202,7 @@ module.exports = {
       baseCooldownMs: BOT_CONFIG.botBaseCooldownMs,
       jitterMs: BOT_CONFIG.botJitterMs,
       ditchObjectId: BOT_CONFIG.wildernessDitchObjectId,
+      roamingDitchCrossMaxDistanceY: BOT_CONFIG.roamingDitchCrossMaxDistanceY,
       roamRadius: BOT_CONFIG.botWalkRadius,
       followBackDurationMs: BOT_CONFIG.followBackDurationMs,
       autoMode: {

@@ -3,6 +3,7 @@ import { GameConstants } from './GameConstants';
 import { World } from '../game/World';
 import { TaskManager } from './task/TaskManager';
 import { ServerPerf } from '../util/ServerPerf';
+import { FreezeDiagnostics } from '../util/FreezeDiagnostics';
 
 
 /**
@@ -12,16 +13,24 @@ import { ServerPerf } from '../util/ServerPerf';
  */
 export class GameEngine  {
     private scheduler: NodeJS.Timeout;
+    private eventLoopMonitor: NodeJS.Timeout | null = null;
     private tickInProgress = false;
     private nextExpectedTickAt = 0;
+    private nextEventLoopProbeAt = 0;
     private tickNumber = 0;
     private lastLagLogAt = 0;
     private lastOverrunLogAt = 0;
     private lastOverlapLogAt = 0;
+    private lastFreezeDiagnosticAt = 0;
     private readonly tickRateMs = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE;
     private readonly lagLogThresholdMs = Math.max(120, Math.floor(this.tickRateMs * 0.25));
     private readonly overrunLogThresholdMs = this.tickRateMs;
     private readonly lagLogCooldownMs = 1000;
+    private readonly freezeDiagnosticCooldownMs = 3000;
+    private readonly severeLagThresholdMs = Math.max(1200, this.tickRateMs * 2);
+    private readonly severeOverrunThresholdMs = Math.max(1200, this.tickRateMs * 2);
+    private readonly eventLoopProbeIntervalMs = 1000;
+    private readonly eventLoopStallThresholdMs = Math.max(1500, this.tickRateMs * 2);
     
     constructor() {
         // ...
@@ -30,6 +39,7 @@ export class GameEngine  {
     public init() {
         const now = Date.now();
         this.nextExpectedTickAt = now + this.tickRateMs;
+        this.startEventLoopProbe(now);
         // Tick the game engine at the configured interval (milliseconds).
         this.scheduler = setInterval(this.run.bind(this), this.tickRateMs);
     }
@@ -62,15 +72,86 @@ export class GameEngine  {
         } finally {
             const tickEndedAt = Date.now();
             const tickDurationMs = tickEndedAt - tickStartedAt;
-            this.logTickOverrun(tickDurationMs, tickEndedAt);
             ServerPerf.endTick(
                 tickDurationMs,
                 World.getPlayers().sizeReturn(),
                 World.getNpcs().sizeReturn(),
                 TaskManager.getTaskAmount()
             );
+            this.logTickOverrun(tickDurationMs, tickEndedAt);
             this.tickInProgress = false;
         }
+    }
+
+    private startEventLoopProbe(nowMs: number): void {
+        this.nextEventLoopProbeAt = nowMs + this.eventLoopProbeIntervalMs;
+        if (this.eventLoopMonitor) {
+            clearInterval(this.eventLoopMonitor);
+        }
+        this.eventLoopMonitor = setInterval(() => {
+            this.probeEventLoopDelay();
+        }, this.eventLoopProbeIntervalMs);
+        this.eventLoopMonitor.unref?.();
+    }
+
+    private probeEventLoopDelay(): void {
+        const nowMs = Date.now();
+        if (this.nextEventLoopProbeAt <= 0) {
+            this.nextEventLoopProbeAt = nowMs + this.eventLoopProbeIntervalMs;
+            return;
+        }
+
+        const stallMs = nowMs - this.nextEventLoopProbeAt;
+        this.nextEventLoopProbeAt += this.eventLoopProbeIntervalMs;
+        if (nowMs > this.nextEventLoopProbeAt + this.eventLoopProbeIntervalMs) {
+            this.nextEventLoopProbeAt = nowMs + this.eventLoopProbeIntervalMs;
+        }
+
+        if (stallMs < this.eventLoopStallThresholdMs) {
+            return;
+        }
+        this.logFreezeDiagnostic(
+            "event_loop_stall",
+            nowMs,
+            {
+                stallMs,
+                thresholdMs: this.eventLoopStallThresholdMs,
+                tick: this.tickNumber,
+            }
+        );
+    }
+
+    private formatTopPhases(): string[] {
+        return ServerPerf.getSummary(30).topPhases.slice(0, 6).map((phase) =>
+            `${phase.name}:${phase.totalMs.toFixed(1)}|${phase.avgMs.toFixed(3)}|${phase.maxMs.toFixed(3)}`
+        );
+    }
+
+    private logFreezeDiagnostic(
+        event: string,
+        nowMs: number,
+        details: Record<string, unknown>
+    ): void {
+        if (nowMs - this.lastFreezeDiagnosticAt < this.freezeDiagnosticCooldownMs) {
+            return;
+        }
+        this.lastFreezeDiagnosticAt = nowMs;
+
+        const summary = ServerPerf.getSummary(30);
+        const topPhases = this.formatTopPhases();
+        FreezeDiagnostics.log(event, {
+            ...details,
+            summaryTicks: summary.ticks,
+            avgTickMs: Number(summary.avgTickMs.toFixed(3)),
+            maxTickMs: Number(summary.maxTickMs.toFixed(3)),
+            avgDriftMs: Number(summary.avgDriftMs.toFixed(3)),
+            maxDriftMs: Number(summary.maxDriftMs.toFixed(3)),
+            lastTick: summary.lastTickNumber,
+            players: summary.lastPlayers,
+            npcs: summary.lastNpcs,
+            tasks: summary.lastTasks,
+            topPhases,
+        });
     }
 
     private logTickLag(tickStartedAt: number): number {
@@ -101,6 +182,16 @@ export class GameEngine  {
             `started=${new Date(tickStartedAt).toISOString()} players=${World.getPlayers().sizeReturn()} ` +
             `npcs=${World.getNpcs().sizeReturn()} tasks=${TaskManager.getTaskAmount()}`
         );
+
+        if (driftMs >= this.severeLagThresholdMs) {
+            this.logFreezeDiagnostic("tick_start_lag_severe", tickStartedAt, {
+                tick: this.tickNumber,
+                driftMs,
+                thresholdMs: this.severeLagThresholdMs,
+                expectedAt: this.nextExpectedTickAt - this.tickRateMs,
+                startedAt: tickStartedAt,
+            });
+        }
         return driftMs;
     }
 
@@ -118,6 +209,15 @@ export class GameEngine  {
             `budgetMs=${this.tickRateMs} players=${World.getPlayers().sizeReturn()} ` +
             `npcs=${World.getNpcs().sizeReturn()} tasks=${TaskManager.getTaskAmount()}`
         );
+
+        if (tickDurationMs >= this.severeOverrunThresholdMs) {
+            this.logFreezeDiagnostic("tick_overrun_severe", nowMs, {
+                tick: this.tickNumber,
+                durationMs: tickDurationMs,
+                thresholdMs: this.severeOverrunThresholdMs,
+                budgetMs: this.tickRateMs,
+            });
+        }
     }
 
     private logOverlap(nowMs: number): void {
@@ -131,5 +231,11 @@ export class GameEngine  {
             `players=${World.getPlayers().sizeReturn()} npcs=${World.getNpcs().sizeReturn()} ` +
             `tasks=${TaskManager.getTaskAmount()}`
         );
+        this.logFreezeDiagnostic("tick_overlap", nowMs, {
+            tick: this.tickNumber,
+            players: World.getPlayers().sizeReturn(),
+            npcs: World.getNpcs().sizeReturn(),
+            tasks: TaskManager.getTaskAmount(),
+        });
     }
 }

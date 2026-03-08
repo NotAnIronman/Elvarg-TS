@@ -35,6 +35,7 @@ class PlayerBotBehaviorTreeFactory {
     this.botHomeRadius = options.botHomeRadius;
     this.blockedRetargetMinDelayMs = options.blockedRetargetMinDelayMs;
     this.modeHandlers = options.modeHandlers;
+    this.traversalService = options.traversalService ?? null;
     this.roamingBehavior = requireModeBehavior(
       this.modeHandlers,
       this.behaviorMode.ROAMING,
@@ -80,7 +81,9 @@ class PlayerBotBehaviorTreeFactory {
 
   create(cooldownMs, initialDelayMs) {
     return new SelectorNode([
-      new ProcessPendingMovementActionNode(this.botStatesByName, this.api),
+      new ProcessPendingMovementActionNode(this.botStatesByName, this.api, {
+        traversalService: this.traversalService,
+      }),
       new ActionNode((context) => this.eatFoodActionNode.tick(context)),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {
@@ -107,7 +110,12 @@ class PlayerBotBehaviorTreeFactory {
           requireNotBusy: false,
           requireNotInCombat: false,
         }),
-        new ActionNode((context) => this.bankRunBehavior.tick(context)),
+        new ActionNode((context) =>
+          this.bankRunBehavior.tick({
+            ...context,
+            traversalService: this.traversalService,
+          })
+        ),
       ]),
       new SequenceNode([
         new BotReadyConditionNode(this.botStatesByName, {

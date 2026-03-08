@@ -54,6 +54,10 @@ function registerBotEvents(options) {
   });
 
   api.onPlayerPathBlocked((event) => {
+    const username = event?.username;
+    if (!username || !runtime.playerBotUsernames.has(username)) {
+      return;
+    }
     pathBlockedHandler.handle(event, Date.now());
   });
 

@@ -9,9 +9,10 @@ const MOVEMENT_DISPATCH_LOG_INTERVAL_MS = 4000;
 const lastMovementDispatchLogByUsername = new Map();
 
 class ProcessPendingMovementActionNode {
-  constructor(botStatesByName, api) {
+  constructor(botStatesByName, api, options = {}) {
     this.botStatesByName = botStatesByName;
     this.api = api;
+    this.traversalService = options.traversalService ?? null;
   }
 
   tick(context) {
@@ -24,7 +25,8 @@ class ProcessPendingMovementActionNode {
       return "failure";
     }
 
-    const { player } = resolved;
+    const { player, state } = resolved;
+    const nowMs = Number.isFinite(resolved?.nowMs) ? resolved.nowMs : Date.now();
     const request = peekMovementRequest(player);
     if (!request) {
       return "failure";
@@ -44,6 +46,22 @@ class ProcessPendingMovementActionNode {
     if (player.getForceMovement?.() != null) {
       return "running";
     }
+    if (
+      Number.isFinite(request.nextDispatchAtMs) &&
+      request.nextDispatchAtMs > nowMs
+    ) {
+      return "running";
+    }
+    if (
+      this.traversalService?.maybeRequestCrossForTarget?.(
+        player,
+        state,
+        request,
+        nowMs
+      ) === true
+    ) {
+      return "running";
+    }
 
     const queue = player.getMovementQueue?.();
     if (!queue) {
@@ -54,20 +72,23 @@ class ProcessPendingMovementActionNode {
       return "running";
     }
 
-    const segmentTarget = dispatchMovementRequest(player, request);
+    const dispatchResult = dispatchMovementRequest(player, request);
     const latestRequest = peekMovementRequest(player);
     // Path dispatch can emit path-blocked hooks which enqueue a replacement
     // movement request in the same tick. Only clear if nothing replaced it.
-    if (!latestRequest || latestRequest === request) {
+    if (
+      latestRequest === request &&
+      dispatchResult &&
+      dispatchResult.hasRoute === true
+    ) {
       clearMovementRequest(player);
     }
-    if (!segmentTarget) {
+    if (!dispatchResult || !dispatchResult.segmentTarget) {
       return "failure";
     }
 
     if (this.api?.log) {
       const username = player.getUsername?.();
-      const nowMs = Number.isFinite(resolved?.nowMs) ? resolved.nowMs : Date.now();
       const lastLogAt = username ? lastMovementDispatchLogByUsername.get(username) ?? 0 : 0;
       if (!username || nowMs - lastLogAt >= MOVEMENT_DISPATCH_LOG_INTERVAL_MS) {
         if (username) {
@@ -78,11 +99,16 @@ class ProcessPendingMovementActionNode {
           targetX: request.x,
           targetY: request.y,
           targetZ: request.z,
-          segmentX: segmentTarget.x,
-          segmentY: segmentTarget.y,
+          segmentX: dispatchResult.segmentTarget.x,
+          segmentY: dispatchResult.segmentTarget.y,
+          routeBuilt: dispatchResult.hasRoute === true,
+          routeSteps: dispatchResult.steps ?? 0,
           reason: request.reason ?? null,
         });
       }
+    }
+    if (dispatchResult.hasRoute !== true) {
+      return "running";
     }
     return "running";
   }

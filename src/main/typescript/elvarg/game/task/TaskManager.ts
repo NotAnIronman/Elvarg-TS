@@ -1,9 +1,13 @@
 import { Task } from './Task';
 import { ServerPerf } from '../../util/ServerPerf';
+import { FreezeDiagnostics } from '../../util/FreezeDiagnostics';
  
 export class TaskManager {
     private static pendingTasks: Task[] = [];
     private static activeTasks: Task[] = [];
+    private static readonly SLOW_TASK_WARN_MS = 50;
+    private static readonly SLOW_TASK_LOG_COOLDOWN_MS = 3000;
+    private static lastSlowTaskLogAtByName = new Map<string, number>();
     
     private constructor() {
         throw new Error("This class cannot be instantiated!");
@@ -23,7 +27,9 @@ export class TaskManager {
                 const taskName = t?.constructor?.name ?? "UnknownTask";
                 const startedAt = Date.now();
                 const keepRunning = t.tick();
-                ServerPerf.addPhaseDuration(`task.${taskName}`, Date.now() - startedAt);
+                const durationMs = Date.now() - startedAt;
+                ServerPerf.addPhaseDuration(`task.${taskName}`, durationMs);
+                TaskManager.logSlowTaskTick(taskName, durationMs);
                 if (!keepRunning) {
                     TaskManager.activeTasks.splice(i, 1);
                     i--;
@@ -66,5 +72,28 @@ export class TaskManager {
         
     public static getTaskAmount(): number {
             return (TaskManager.pendingTasks.length + TaskManager.activeTasks.length);
+    }
+
+    private static logSlowTaskTick(taskName: string, durationMs: number): void {
+        if (durationMs < TaskManager.SLOW_TASK_WARN_MS) {
+            return;
+        }
+        const nowMs = Date.now();
+        const lastLoggedAt = TaskManager.lastSlowTaskLogAtByName.get(taskName) ?? 0;
+        if (nowMs - lastLoggedAt < TaskManager.SLOW_TASK_LOG_COOLDOWN_MS) {
+            return;
+        }
+        TaskManager.lastSlowTaskLogAtByName.set(taskName, nowMs);
+        FreezeDiagnostics.log("slow_task_tick", {
+            taskName,
+            durationMs,
+            slowThresholdMs: TaskManager.SLOW_TASK_WARN_MS,
+            activeTasks: TaskManager.activeTasks.length,
+            pendingTasks: TaskManager.pendingTasks.length,
+        });
+        console.warn(
+            `[task] slow_task_tick task=${taskName} durationMs=${durationMs} ` +
+            `active=${TaskManager.activeTasks.length} pending=${TaskManager.pendingTasks.length}`
+        );
     }
 }

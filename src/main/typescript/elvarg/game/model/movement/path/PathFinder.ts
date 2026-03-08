@@ -13,7 +13,13 @@ import * as path from "path";
 
 export class PathFinder {
     private static readonly ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
-    private static readonly PATH_BLOCKED_EVENT_DEBOUNCE_MS = 650;
+    // Debounce path-blocked events aggressively: repeated retries against the
+    // same destination within a short window do not provide extra recovery
+    // signal for bot logic, but they do add measurable hook overhead.
+    private static readonly PATH_BLOCKED_EVENT_DEBOUNCE_MS = 1200;
+    // Bots generate substantially more repeated "no path" attempts than human
+    // players, so use a longer debounce window for bot entities.
+    private static readonly PATH_BLOCKED_EVENT_BOT_DEBOUNCE_MS = 2500;
     private static LOG_DIR = path.join(process.cwd(), "logs");
     private static LOG_FILE = path.join(PathFinder.LOG_DIR, "movement.log");
     private static LOG_READY = false;
@@ -46,11 +52,17 @@ export class PathFinder {
         signature: string,
         nowMs: number
     ): boolean {
+        const isBot =
+            entity?.isPlayer?.() === true &&
+            entity.getAsPlayer?.()?.isPlayerBot?.() === true;
+        const debounceMs = isBot
+            ? PathFinder.PATH_BLOCKED_EVENT_BOT_DEBOUNCE_MS
+            : PathFinder.PATH_BLOCKED_EVENT_DEBOUNCE_MS;
         const previous = PathFinder.blockedEventTracker.get(entity);
         if (
             previous &&
             previous.signature === signature &&
-            nowMs - previous.lastEmittedAtMs < PathFinder.PATH_BLOCKED_EVENT_DEBOUNCE_MS
+            nowMs - previous.lastEmittedAtMs < debounceMs
         ) {
             return false;
         }
@@ -446,8 +458,10 @@ export class PathFinder {
                 PathFinder.log(`no path found to ${destX},${destY}`);
                 const fromX = entity.getLocation().getX();
                 const fromY = entity.getLocation().getY();
+                // Use destination/request shape as the debounce signature.
+                // Excluding "from" avoids event spam while an entity repeatedly
+                // retries toward the same blocked destination.
                 const signature = [
-                    `${fromX},${fromY},${height}`,
                     `${destX},${destY},${height}`,
                     `b:${basicPather ? 1 : 0}`,
                     `s:${size}`,

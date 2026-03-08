@@ -5,6 +5,8 @@ import { GameConstants } from "../game/GameConstants";
 const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "packets.log");
 let initialized = false;
+let logStream: fs.WriteStream | null = null;
+let streamWritable = true;
 
 function ensureLogFile() {
   if (!GameConstants.SERVER_LOG_WRITES_ENABLED) {
@@ -15,6 +17,18 @@ function ensureLogFile() {
   }
   fs.mkdirSync(LOG_DIR, { recursive: true });
   fs.writeFileSync(LOG_FILE, "", { encoding: "utf8" });
+  logStream = fs.createWriteStream(LOG_FILE, {
+    flags: "a",
+    encoding: "utf8",
+  });
+  streamWritable = true;
+  logStream.on("drain", () => {
+    streamWritable = true;
+  });
+  logStream.on("error", () => {
+    // Disable further packet-file writes if the stream fails.
+    streamWritable = false;
+  });
   initialized = true;
 }
 
@@ -64,7 +78,13 @@ function writeEntry(meta: PacketLogMeta) {
   }
   try {
     ensureLogFile();
-    fs.appendFileSync(LOG_FILE, formatEntry(meta) + "\n", { encoding: "utf8" });
+    if (!logStream || !streamWritable) {
+      return;
+    }
+    const line = formatEntry(meta) + "\n";
+    if (!logStream.write(line)) {
+      streamWritable = false;
+    }
   } catch (err) {
     // Swallow write errors; logging should not crash the server.
     console.warn("[PacketLogger] failed to write packet log", err);
