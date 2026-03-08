@@ -408,12 +408,18 @@ export class PluginManager {
   }
 
   public static emitPacketReceived(event: PluginPacketEvent): void {
+    if (PluginManager.packetHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.packetHooks) {
       PluginManager.executeHook(hook, event, "packet", "packet_received");
     }
   }
 
   public static emitPlayerLogin(event: PluginPlayerLoginEvent): void {
+    if (PluginManager.loginHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.loginHooks) {
       PluginManager.executeHook(hook, event, "login", "player_login");
     }
@@ -423,36 +429,54 @@ export class PluginManager {
   }
 
   public static emitPlayerDisconnect(event: PluginPlayerDisconnectEvent): void {
+    if (PluginManager.disconnectHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.disconnectHooks) {
       PluginManager.executeHook(hook, event, "disconnect", "player_disconnect");
     }
   }
 
   public static emitPlayerLogout(event: PluginPlayerLogoutEvent): void {
+    if (PluginManager.logoutHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.logoutHooks) {
       PluginManager.executeHook(hook, event, "logout", "player_logout");
     }
   }
 
   public static emitPlayerProcess(event: PluginPlayerProcessEvent): void {
+    if (PluginManager.playerProcessHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.playerProcessHooks) {
       PluginManager.executeHook(hook, event, "player_process", "player_process");
     }
   }
 
   public static emitPlayerLevelUp(event: PluginPlayerLevelUpEvent): void {
+    if (PluginManager.playerLevelUpHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.playerLevelUpHooks) {
       PluginManager.executeHook(hook, event, "player_level_up", "player_level_up");
     }
   }
 
   public static emitRegionLoaded(event: PluginRegionLoadedEvent): void {
+    if (PluginManager.regionLoadedHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.regionLoadedHooks) {
       PluginManager.executeHook(hook, event, "region_loaded", "region_loaded");
     }
   }
 
   public static emitPathBlocked(event: PluginPathBlockedEvent): void {
+    if (PluginManager.pathBlockedHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.pathBlockedHooks) {
       PluginManager.executeHook(hook, event, "path_blocked", "path_blocked");
     }
@@ -462,6 +486,9 @@ export class PluginManager {
     event: PluginObjectInteractionEvent
   ): boolean {
     if (!event || !event.player || !event.object || event.handled) {
+      return false;
+    }
+    if (PluginManager.objectInteractionHooks.length === 0) {
       return false;
     }
 
@@ -483,6 +510,9 @@ export class PluginManager {
   // Keep common event guard clauses centralized in emit* methods so plugin
   // consumers do not have to repeat the same checks in every handler.
   public static emitNpcInteraction(event: PluginNpcInteractionEvent): boolean {
+    if (PluginManager.npcInteractionHooks.length === 0) {
+      return event.handled === true;
+    }
     for (const hook of PluginManager.npcInteractionHooks) {
       PluginManager.executeHook(hook, event, "npc_interaction", "npc_interaction");
     }
@@ -490,6 +520,9 @@ export class PluginManager {
   }
 
   public static emitNpcDeath(event: PluginNpcDeathEvent): void {
+    if (PluginManager.npcDeathHooks.length === 0) {
+      return;
+    }
     for (const hook of PluginManager.npcDeathHooks) {
       PluginManager.executeHook(hook, event, "npc_death", "npc_death");
     }
@@ -499,6 +532,9 @@ export class PluginManager {
     attacker: any,
     target: any
   ): boolean | null {
+    if (PluginManager.canAttackHooks.length === 0) {
+      return null;
+    }
     const event: PluginCanAttackEvent = { attacker, target, allow: null };
     for (const hook of PluginManager.canAttackHooks) {
       PluginManager.executeHook(hook, event, "can_attack", "can_attack");
@@ -510,6 +546,9 @@ export class PluginManager {
   }
 
   public static emitCanTeleport(player: any): boolean | null {
+    if (PluginManager.canTeleportHooks.length === 0) {
+      return null;
+    }
     const event: PluginCanTeleportEvent = { player, allow: null };
     for (const hook of PluginManager.canTeleportHooks) {
       PluginManager.executeHook(hook, event, "can_teleport", "can_teleport");
@@ -521,6 +560,9 @@ export class PluginManager {
   }
 
   public static emitCanEat(player: any, itemId: number): boolean | null {
+    if (PluginManager.canEatHooks.length === 0) {
+      return null;
+    }
     const event: PluginCanEatEvent = { player, itemId, allow: null };
     for (const hook of PluginManager.canEatHooks) {
       PluginManager.executeHook(hook, event, "can_eat", "can_eat");
@@ -535,6 +577,9 @@ export class PluginManager {
     event: PluginFiremakingBlockedEvent
   ): boolean {
     if (!event || !event.player || event.handled) {
+      return false;
+    }
+    if (PluginManager.firemakingBlockedHooks.length === 0) {
       return false;
     }
 
@@ -553,6 +598,9 @@ export class PluginManager {
   }
 
   public static emitCanDrink(player: any, itemId: number): boolean | null {
+    if (PluginManager.canDrinkHooks.length === 0) {
+      return null;
+    }
     const event: PluginCanDrinkEvent = { player, itemId, allow: null };
     for (const hook of PluginManager.canDrinkHooks) {
       PluginManager.executeHook(hook, event, "can_drink", "can_drink");
@@ -564,6 +612,9 @@ export class PluginManager {
   }
 
   public static emitCanTrade(player: any, target: any): boolean | null {
+    if (PluginManager.canTradeHooks.length === 0) {
+      return null;
+    }
     const event: PluginCanTradeEvent = { player, target, allow: null };
     for (const hook of PluginManager.canTradeHooks) {
       PluginManager.executeHook(hook, event, "can_trade", "can_trade");
@@ -575,6 +626,9 @@ export class PluginManager {
   }
 
   public static emitCanBank(player: any): boolean | null {
+    if (PluginManager.canBankHooks.length === 0) {
+      return null;
+    }
     const event: PluginCanBankEvent = { player, allow: null };
     for (const hook of PluginManager.canBankHooks) {
       PluginManager.executeHook(hook, event, "can_bank", "can_bank");
@@ -586,6 +640,9 @@ export class PluginManager {
   }
 
   public static emitCanShop(player: any, shopId: number | null = null): boolean | null {
+    if (PluginManager.canShopHooks.length === 0) {
+      return null;
+    }
     const event: PluginCanShopEvent = { player, shopId, allow: null };
     for (const hook of PluginManager.canShopHooks) {
       PluginManager.executeHook(hook, event, "can_shop", "can_shop");
@@ -597,6 +654,9 @@ export class PluginManager {
   }
 
   public static emitShouldDropItemsOnDeath(player: any, killer: any): boolean | null {
+    if (PluginManager.shouldDropItemsOnDeathHooks.length === 0) {
+      return null;
+    }
     const event: PluginShouldDropItemsOnDeathEvent = {
       player,
       killer,

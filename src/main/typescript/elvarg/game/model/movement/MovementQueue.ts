@@ -21,6 +21,7 @@ import { RandomGen } from "../../../util/RandomGen";
 import { TimerKey } from "../../../util/timers/TimerKey";
 import { Action } from "../Action";
 import { GameConstants } from "../../GameConstants";
+import { FastDeque } from "../../../util/FastDeque";
 import * as fs from "fs";
 import * as path from "path";
 export class MovementQueue {
@@ -77,7 +78,7 @@ export class MovementQueue {
     /**
      * The queue of directions.
      */
-    private points: Array<Point> = new Array<Point>();
+    private points: FastDeque<Point> = new FastDeque<Point>();
 
     /**
      * Whether movement is currently blocked for this Mobile.
@@ -298,7 +299,7 @@ export class MovementQueue {
     }
 
     private getLast(): Point {
-        let last = this.points.slice(-1)[0];
+        let last = this.points.peekLast();
         if (!last)
             return new Point(this.character.getLocation(), Direction.NONE);
         return last;
@@ -456,7 +457,7 @@ export class MovementQueue {
     }
 
     public reset(): MovementQueue {
-        this.points = [];
+        this.points.clear();
         this.followX = -1;
         this.followY = -1;
         this.isMoving = false;
@@ -771,12 +772,20 @@ export class MovementQueue {
     private getClosestFollowTile(leader: Mobile): Location | null {
         const privateArea = this.character.getPrivateArea();
         const current = this.character.getLocation();
-        const candidates = leader
-            .outterTiles()
-            .filter(tile => !RegionManager.blocked(tile, privateArea))
-            .sort((a, b) => a.getDistance(current) - b.getDistance(current));
+        let bestTile: Location | null = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (const tile of leader.outterTiles()) {
+            if (RegionManager.blocked(tile, privateArea)) {
+                continue;
+            }
+            const distance = tile.getDistance(current);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestTile = tile;
+            }
+        }
 
-        return candidates.length > 0 ? candidates[0] : null;
+        return bestTile;
     }
 
     private tryTeleportPetToFollower(following: Mobile): boolean {
@@ -855,7 +864,7 @@ export class MovementQueue {
     }
 
     public pointsReturn() {
-        return this.points;
+        return this.points.toArray();
     }
 
     public walkToGroundItem(pos: Location, action: () => void) {

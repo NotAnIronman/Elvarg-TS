@@ -401,10 +401,21 @@ export class CombatFactory {
             new Location(target.getLocation().getX(), target.getLocation().getY() + 1),
             new Location(target.getLocation().getX(), target.getLocation().getY() - 1)
         ];
-        /** If a tile is present it will step out **/
-        tiles.filter(t => !RegionManager.blocked(t, attacker.getPrivateArea())).sort((a, b) => attacker.getLocation().getDistance(a) - attacker.getLocation().getDistance(b)).forEach(tile => {
-            PathFinder.calculateWalkRoute(attacker, tile.getX(), tile.getY());
-        });
+        let bestTile: Location | null = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (const tile of tiles) {
+            if (RegionManager.blocked(tile, attacker.getPrivateArea())) {
+                continue;
+            }
+            const distance = attacker.getLocation().getDistance(tile);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestTile = tile;
+            }
+        }
+        if (bestTile != null) {
+            PathFinder.calculateWalkRoute(attacker, bestTile.getX(), bestTile.getY());
+        }
     }
 
     public static canAttack(attacker: Mobile, method: CombatMethod, target: Mobile): CanAttackResponse {

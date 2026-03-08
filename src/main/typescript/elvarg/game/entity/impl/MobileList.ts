@@ -1,7 +1,8 @@
 import { Mobile } from './Mobile';
+import { FastDeque } from '../../../util/FastDeque';
 
 export class MobileList<E extends Mobile> implements Iterable<E> {
-    private slotQueue: number[] = [];
+    private slotQueue: FastDeque<number> = new FastDeque<number>();
     private capacity: number;
     public characters: E[];
     private size: number;

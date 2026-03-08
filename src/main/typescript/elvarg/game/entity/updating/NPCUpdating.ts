@@ -26,11 +26,17 @@ export class NPCUpdating {
     // spawns in crowded areas and make newly spawned NPCs (e.g. pets) appear invisible.
     private static readonly MAX_LOCAL_NPCS = 255;
 
-    public static update(player: Player): void {
+    public static update(player: Player, nearbyNpcs: NPC[] = []): void {
         let update = new PacketBuilder();
         let packet = new PacketBuilder(65, PacketType.VARIABLE_SHORT);
         packet.initializeAccess(AccessType.BIT);
         const localNpcs = player.getLocalNpcs();
+        const localNpcIndexes = new Set<number>();
+        for (const npc of localNpcs) {
+            if (npc) {
+                localNpcIndexes.add(npc.getIndex());
+            }
+        }
         packet.putBits(8, localNpcs.length);
 
         // Keep iteration order stable to mirror the client-side local NPC list.
@@ -50,6 +56,7 @@ export class NPCUpdating {
                 }
                 index++;
             } else {
+                localNpcIndexes.delete(npc.getIndex());
                 localNpcs.splice(index, 1);
                 packet.putBits(1, 1);
                 packet.putBits(2, 3);
@@ -69,11 +76,12 @@ export class NPCUpdating {
                 currentPet.setArea(player.getArea());
             }
             if (
-                !localNpcs.includes(currentPet)
+                !localNpcIndexes.has(currentPet.getIndex())
                 && localNpcs.length < NPCUpdating.MAX_LOCAL_NPCS
                 && currentPet.getLocation().isViewableFrom(player.getLocation())
             ) {
                 localNpcs.push(currentPet);
+                localNpcIndexes.add(currentPet.getIndex());
                 NPCUpdating.addNPC(player, currentPet, packet);
                 if (currentPet.getUpdateFlag().isUpdateRequired()) {
                     NPCUpdating.appendUpdates(currentPet, update);
@@ -82,15 +90,16 @@ export class NPCUpdating {
         }
 
         // Keep add-to-local parity with Java: iterate the world NPC list directly.
-        for (let npc of World.getNpcs()) {
+        for (let npc of nearbyNpcs) {
             if (localNpcs.length >= NPCUpdating.MAX_LOCAL_NPCS) // Originally 255 in legacy.
                 break;
-            if (npc == null || localNpcs.includes(npc) || !npc.isVisible() || npc.isNeedsPlacement()
+            if (npc == null || localNpcIndexes.has(npc.getIndex()) || !npc.isVisible() || npc.isNeedsPlacement()
                 || npc.getPrivateArea() != player.getPrivateArea())
                 continue;
 
             if (npc.getLocation().isViewableFrom(player.getLocation())) {
                 localNpcs.push(npc);
+                localNpcIndexes.add(npc.getIndex());
                 NPCUpdating.addNPC(player, npc, packet);
                 if (npc.getUpdateFlag().isUpdateRequired()) {
                     NPCUpdating.appendUpdates(npc, update);

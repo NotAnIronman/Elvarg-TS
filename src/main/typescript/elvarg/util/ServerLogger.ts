@@ -17,6 +17,8 @@ type ConsoleFns = {
 
 export class ServerLogger {
   private static installed = false;
+  private static logStream: fs.WriteStream | null = null;
+  private static streamWritable = true;
   private static enabledLevels: Set<LogLevel> = new Set(
     (GameConstants.SERVER_LOG_LEVELS || [])
       .map((v) => String(v).toLowerCase())
@@ -108,10 +110,19 @@ export class ServerLogger {
 
     if (GameConstants.SERVER_LOG_WRITES_ENABLED) {
       fs.mkdirSync(path.dirname(logFile), { recursive: true });
-      fs.appendFileSync(
-        logFile,
-        `${new Date().toISOString()} [INFO] ===== server_bootstrap pid=${process.pid} =====\n`,
-        { encoding: "utf8" }
+      ServerLogger.logStream = fs.createWriteStream(logFile, {
+        flags: "a",
+        encoding: "utf8",
+      });
+      ServerLogger.streamWritable = true;
+      ServerLogger.logStream.on("drain", () => {
+        ServerLogger.streamWritable = true;
+      });
+      ServerLogger.logStream.on("error", () => {
+        ServerLogger.streamWritable = false;
+      });
+      ServerLogger.logStream.write(
+        `${new Date().toISOString()} [INFO] ===== server_bootstrap pid=${process.pid} =====\n`
       );
     }
 
@@ -178,7 +189,11 @@ export class ServerLogger {
       )}`;
 
       try {
-        fs.appendFileSync(logFile, line + "\n", { encoding: "utf8" });
+        if (ServerLogger.logStream && ServerLogger.streamWritable) {
+          if (!ServerLogger.logStream.write(line + "\n")) {
+            ServerLogger.streamWritable = false;
+          }
+        }
       } catch {
         // Keep stdout/stderr logging even if disk writes fail.
       }

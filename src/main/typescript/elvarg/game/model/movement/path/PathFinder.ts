@@ -12,6 +12,9 @@ import * as fs from "fs";
 import * as path from "path";
 
 export class PathFinder {
+    private static readonly GRID_SIZE = 104;
+    private static readonly ROUTE_STEP_CAPACITY = 4096;
+    private static readonly DISTANCE_SENTINEL = 0x5f5e0ff;
     private static readonly ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
     // Debounce path-blocked events aggressively: repeated retries against the
     // same destination within a short window do not provide extra recovery
@@ -28,6 +31,27 @@ export class PathFinder {
         signature: string;
         lastEmittedAtMs: number;
     }>();
+    private static readonly scratchDirections: number[][] = PathFinder.createGrid(0);
+    private static readonly scratchDistanceValues: number[][] =
+        PathFinder.createGrid(PathFinder.DISTANCE_SENTINEL);
+    private static readonly scratchRouteStepsX: number[] =
+        new Array<number>(PathFinder.ROUTE_STEP_CAPACITY).fill(0);
+    private static readonly scratchRouteStepsY: number[] =
+        new Array<number>(PathFinder.ROUTE_STEP_CAPACITY).fill(0);
+
+    private static createGrid(fillValue: number): number[][] {
+        const grid = new Array<number[]>(PathFinder.GRID_SIZE);
+        for (let x = 0; x < PathFinder.GRID_SIZE; x++) {
+            grid[x] = new Array<number>(PathFinder.GRID_SIZE).fill(fillValue);
+        }
+        return grid;
+    }
+
+    private static resetScratchGrid(grid: number[][], fillValue: number): void {
+        for (let x = 0; x < PathFinder.GRID_SIZE; x++) {
+            grid[x].fill(fillValue);
+        }
+    }
 
     private static log(line: string) {
         if (!PathFinder.LOG_ENABLED) {
@@ -155,13 +179,14 @@ export class PathFinder {
     public static getClosestAttackableTile(attacker: Mobile, defender: Mobile, distance: number): Location | null {
         const privateArea = attacker.getPrivateArea();
         const targetLocation = defender.getLocation();
+        const current = attacker.getLocation();
 
         if (distance === 1) {
             const size = attacker.getSize();
             const followingSize = defender.getSize();
-            const current = attacker.getLocation();
-
-            const tiles: Location[] = [];
+            let bestTile: Location | null = null;
+            let bestDistance = Number.POSITIVE_INFINITY;
+            let bestPerpendicular = false;
             for (const tile of defender.outterTiles()) {
                 if (!RegionManager.canMovestart(attacker.getLocation(), tile, size, size, privateArea)
                     || RegionManager.blocked(tile, privateArea)) {
@@ -171,28 +196,22 @@ export class PathFinder {
                 if (attacker.useProjectileClipping() && !RegionManager.canProjectileAttackReturn(tile, targetLocation, size, privateArea)) {
                     continue;
                 }
-                tiles.push(tile);
+                const tileDistance = tile.getDistance(current);
+                const tilePerpendicular =
+                    size === 1 &&
+                    followingSize === 1 &&
+                    tile.isPerpendicularTo(current);
+                if (
+                    tileDistance < bestDistance ||
+                    (tileDistance === bestDistance && tilePerpendicular && !bestPerpendicular)
+                ) {
+                    bestTile = tile;
+                    bestDistance = tileDistance;
+                    bestPerpendicular = tilePerpendicular;
+                }
             }
-            if (tiles.length !== 0) {
-                tiles.sort((l1, l2) => {
-                    const distance1 = l1.getDistance(current);
-                    const distance2 = l2.getDistance(current);
-                    const delta = (distance1 - distance2);
-
-                    // Make sure we don't pick a diagonal tile if we're a small entity and have to
-                    // attack closely (melee).
-                    if (distance1 === distance2 && size === 1 && followingSize === 1) {
-                        if (l1.isPerpendicularTo(current)) {
-                            return -1;
-                        } else if (l2.isPerpendicularTo(current)) {
-                            return 1;
-                        }
-                    }
-
-                    return delta;
-                });
-
-                return tiles[0];
+            if (bestTile != null) {
+                return bestTile;
             }
         }
 
@@ -208,13 +227,22 @@ export class PathFinder {
                     possibleTiles.forEach(t => attacker.getAsPlayer().packetSender.sendGraphic(PathFinder.ATTACK_RANGE_DEBUG_GRAPHIC, t));
                 }
 
-            tile = possibleTiles
-                // Filter out any tiles which are clipped
-                .filter(t => !RegionManager.blocked(t, attacker.getPrivateArea()))
-                // Filter out any tiles which projectiles are blocked from (i.e. tree is in the way)
-                .filter(t => RegionManager.canProjectileAttack(attacker, t, targetLocation))
-                // Find the tile closest to the attacker
-                .sort((a, b) => attacker.getLocation().getDistance(a) - attacker.getLocation().getDistance(b))[0];
+            let bestTile: Location | undefined = undefined;
+            let bestDistance = Number.POSITIVE_INFINITY;
+            for (const possibleTile of possibleTiles) {
+                if (RegionManager.blocked(possibleTile, attacker.getPrivateArea())) {
+                    continue;
+                }
+                if (!RegionManager.canProjectileAttack(attacker, possibleTile, targetLocation)) {
+                    continue;
+                }
+                const tileDistance = current.getDistance(possibleTile);
+                if (tileDistance < bestDistance) {
+                    bestDistance = tileDistance;
+                    bestTile = possibleTile;
+                }
+            }
+            tile = bestTile;
 
             if (distance === 1) {
                 // We've reached the closest attackable tile, break out of the loop as we can't get any closer
@@ -252,18 +280,10 @@ export class PathFinder {
         const byte0 = 104;
         const byte1 = 104;
 
-        let directions: number[][] = new Array(104);
-        for (let i = 0; i < directions.length; i++) {
-            directions[i] = new Array(104).fill(0);
-        }
-
-        let distanceValues: number[][] = new Array(104);
-        for (let i = 0; i < distanceValues.length; i++) {
-            distanceValues[i] = new Array(104).fill(0x5f5e0ff);
-        }
-
-        let routeStepsX: number[] = new Array(4096);
-        let routeStepsY: number[] = new Array(4096);
+        const directions = PathFinder.scratchDirections;
+        const distanceValues = PathFinder.scratchDistanceValues;
+        const routeStepsX = PathFinder.scratchRouteStepsX;
+        const routeStepsY = PathFinder.scratchRouteStepsY;
 
         let anInt1264 = 0;
         let anInt1288 = 0;
@@ -271,12 +291,8 @@ export class PathFinder {
         entity.getMovementQueue().lastDestX = destX;
         entity.getMovementQueue().lastDestY = destY;
 
-        for (let l2 = 0; l2 < 104; l2++) {
-            for (let i3 = 0; i3 < 104; i3++) {
-                directions[l2][i3] = 0;
-                distanceValues[l2][i3] = 0x5f5e0ff;
-            }
-        }
+        PathFinder.resetScratchGrid(directions, 0);
+        PathFinder.resetScratchGrid(distanceValues, PathFinder.DISTANCE_SENTINEL);
 
         // Calculate local coordinates relative to the player's current region.
         let localX = entity.getLocation().getX() - (entity.getLocation().getRegionX() << 3);

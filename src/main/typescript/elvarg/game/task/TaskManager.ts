@@ -1,9 +1,10 @@
 import { Task } from './Task';
 import { ServerPerf } from '../../util/ServerPerf';
 import { FreezeDiagnostics } from '../../util/FreezeDiagnostics';
+import { FastDeque } from '../../util/FastDeque';
  
 export class TaskManager {
-    private static pendingTasks: Task[] = [];
+    private static pendingTasks: FastDeque<Task> = new FastDeque<Task>();
     private static activeTasks: Task[] = [];
     private static readonly SLOW_TASK_WARN_MS = 50;
     private static readonly SLOW_TASK_LOG_COOLDOWN_MS = 3000;
@@ -21,7 +22,8 @@ export class TaskManager {
                     TaskManager.activeTasks.push(t);
                 }
             }
-    
+
+            let writeIndex = 0;
             for (let i = 0; i < TaskManager.activeTasks.length; i++) {
                 t = TaskManager.activeTasks[i];
                 const taskName = t?.constructor?.name ?? "UnknownTask";
@@ -30,11 +32,11 @@ export class TaskManager {
                 const durationMs = Date.now() - startedAt;
                 ServerPerf.addPhaseDuration(`task.${taskName}`, durationMs);
                 TaskManager.logSlowTaskTick(taskName, durationMs);
-                if (!keepRunning) {
-                    TaskManager.activeTasks.splice(i, 1);
-                    i--;
+                if (keepRunning) {
+                    TaskManager.activeTasks[writeIndex++] = t;
                 }
             }
+            TaskManager.activeTasks.length = writeIndex;
         } catch (e) {
             console.error(e);
         }
@@ -63,7 +65,11 @@ export class TaskManager {
     
     public static cancelTasks(key: Object): void {
             try {
-                TaskManager.pendingTasks.filter(t => t.key === key).forEach(t => t.stop());
+                for (const task of TaskManager.pendingTasks.toArray()) {
+                    if (task.key === key) {
+                        task.stop();
+                    }
+                }
                 TaskManager.activeTasks.filter(t => t.key === key).forEach(t => t.stop());
             } catch (e) {
                 console.error(e);

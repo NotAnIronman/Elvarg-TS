@@ -9,6 +9,8 @@ export class PlayerRelations {
     private status: PrivateChatStatus = PrivateChatStatus.ON;
     public friendList: Array<bigint> = [];
     public ignoreList: Array<bigint> = [];
+    private friendSet: Set<bigint> = new Set<bigint>();
+    private ignoreSet: Set<bigint> = new Set<bigint>();
     private privateMessageId = 1;
     private player: Player;
 
@@ -45,6 +47,14 @@ export class PlayerRelations {
         return this.ignoreList;
     }
 
+    public hasFriend(username: bigint): boolean {
+        return this.friendSet.has(username);
+    }
+
+    public hasIgnore(username: bigint): boolean {
+        return this.ignoreSet.has(username);
+    }
+
     updateLists(online: boolean) {
         if (this.status === PrivateChatStatus.OFF) {
             online = false;
@@ -58,12 +68,12 @@ export class PlayerRelations {
             }
 
             let temporaryOnlineStatus = online;
-            if (other.getRelations().friendList.includes(this.player.getLongUsername())) {
+            if (other.getRelations().hasFriend(this.player.getLongUsername())) {
                 if (
                     (this.status === PrivateChatStatus.FRIENDS_ONLY &&
-                        !this.friendList.includes(other.getLongUsername())) ||
+                        !this.hasFriend(other.getLongUsername())) ||
                     this.status === PrivateChatStatus.OFF ||
-                    this.ignoreList.includes(other.getLongUsername())
+                    this.hasIgnore(other.getLongUsername())
                 ) {
                     temporaryOnlineStatus = false;
                 }
@@ -74,12 +84,12 @@ export class PlayerRelations {
             }
 
             let otherVisibleToPlayer = true;
-            if (this.friendList.includes(other.getLongUsername())) {
+            if (this.hasFriend(other.getLongUsername())) {
                 if (
                     (other.getRelations().status === PrivateChatStatus.FRIENDS_ONLY &&
-                        !other.getRelations().getFriendList().includes(this.player.getLongUsername())) ||
+                        !other.getRelations().hasFriend(this.player.getLongUsername())) ||
                     other.getRelations().status === PrivateChatStatus.OFF ||
-                    other.getRelations().getIgnoreList().includes(this.player.getLongUsername())
+                    other.getRelations().hasIgnore(this.player.getLongUsername())
                 ) {
                     otherVisibleToPlayer = false;
                 }
@@ -154,6 +164,7 @@ export class PlayerRelations {
             this.player.getPacketSender().sendMessage(name + " is already on your friends list!");
         } else {
             this.friendList.push(username);
+            this.friendSet.add(username);
             this.sendAddFriend(username);
             this.updateLists(true);
             const friend = World.getPlayerByName(name);
@@ -168,7 +179,7 @@ export class PlayerRelations {
     }
 
     public isFriendWith(player: string): boolean {
-        return this.friendList.indexOf(Misc.stringToLongBigInt(player)) !== -1;
+        return this.hasFriend(Misc.stringToLongBigInt(player));
     }
 
     public deleteFriend(username: bigint): void {
@@ -179,6 +190,7 @@ export class PlayerRelations {
         const friendIndex = this.friendList.indexOf(username);
         if (friendIndex !== -1) {
             this.friendList.splice(friendIndex, 1);
+            this.friendSet.delete(username);
             this.sendDeleteFriend(username);
             this.updateLists(false);
             const unfriend = World.getPlayerByName(name);
@@ -211,6 +223,7 @@ export class PlayerRelations {
             this.player.getPacketSender().sendMessage(name + " is already on your ignore list!");
         } else {
             this.ignoreList.push(username);
+            this.ignoreSet.add(username);
             this.sendAddIgnore(username);
             this.updateLists(true);
             const ignored = World.getPlayerByName(name);
@@ -228,6 +241,7 @@ export class PlayerRelations {
         const ignoreIndex = this.ignoreList.indexOf(username);
         if (ignoreIndex !== -1) {
             this.ignoreList.splice(ignoreIndex, 1);
+            this.ignoreSet.delete(username);
             this.sendDeleteIgnore(username);
             this.updateLists(true);
             if (this.status === PrivateChatStatus.ON) {
@@ -242,7 +256,7 @@ export class PlayerRelations {
     }
 
     public message(friend: Player, message: Uint8Array, size: number): void {
-        if ((friend.getRelations().status === PrivateChatStatus.FRIENDS_ONLY && friend.getRelations().friendList.indexOf(this.player.getLongUsername()) === -1) || friend.getRelations().status === PrivateChatStatus.OFF) {
+        if ((friend.getRelations().status === PrivateChatStatus.FRIENDS_ONLY && !friend.getRelations().hasFriend(this.player.getLongUsername())) || friend.getRelations().status === PrivateChatStatus.OFF) {
             this.player.getPacketSender().sendMessage("This player is currently offline.");
             return;
         }

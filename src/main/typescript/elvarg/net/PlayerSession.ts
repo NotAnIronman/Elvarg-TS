@@ -20,6 +20,7 @@ import {
 } from "./OutboundPacketProfile";
 import type { Player } from "../game/entity/impl/player/Player";
 import { GameConstants } from "../game/GameConstants";
+import { FastDeque } from "../util/FastDeque";
 
 const PACKET_OUT_LOGGING_ENABLED = process.env.PACKET_OUT_LOGGING === "1";
 
@@ -32,7 +33,7 @@ export interface OutboundPacketMeta {
 }
 
 export class PlayerSession {
-  private packetsQueue: Packet[] = [];
+  private packetsQueue: FastDeque<Packet> = new FastDeque<Packet>();
   private lastPacketOpcodeQueue: number[] = [];
   private channel: Socket;
   private encryptor?: IsaacRandom;

@@ -32,6 +32,9 @@ export class World {
     private static readonly MAX_PLAYERS = 500;
     private static readonly NPC_ACTIVE_REGION_RADIUS = 1;
     private static readonly IDLE_BOT_PROCESS_STRIDE = 2;
+    private static readonly UPDATE_BUCKET_RADIUS = 2;
+    private static readonly PLAYER_UPDATE_BUCKET_COMPARE_ENABLED =
+        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "1") === "1";
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
@@ -39,6 +42,8 @@ export class World {
     private static items: ItemOnGround[] = [];
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];
+    private static playerUpdateBuckets: Map<string, Player[]> = new Map();
+    private static npcUpdateBuckets: Map<string, NPC[]> = new Map();
 
     /**
      * The collection of active {@link GameObject}s..
@@ -191,6 +196,89 @@ export class World {
         return `${z}:${x >> 6}:${y >> 6}`;
     }
 
+    private static getUpdateBucketKey(x: number, y: number, z: number): string {
+        return `${z}:${x >> 3}:${y >> 3}`;
+    }
+
+    private static addToUpdateBucket<T extends { getLocation(): Location }>(
+        buckets: Map<string, T[]>,
+        entity: T
+    ): void {
+        const loc = entity.getLocation();
+        const key = World.getUpdateBucketKey(loc.getX(), loc.getY(), loc.getZ());
+        const bucket = buckets.get(key);
+        if (bucket) {
+            bucket.push(entity);
+            return;
+        }
+        buckets.set(key, [entity]);
+    }
+
+    private static rebuildUpdateBuckets(): void {
+        World.npcUpdateBuckets.clear();
+        if (World.PLAYER_UPDATE_BUCKET_COMPARE_ENABLED) {
+            World.playerUpdateBuckets.clear();
+            World.forEachNetworkPlayer((player) => {
+                World.addToUpdateBucket(World.playerUpdateBuckets, player);
+            });
+        } else if (World.playerUpdateBuckets.size > 0) {
+            World.playerUpdateBuckets.clear();
+        }
+        for (const npc of World.activeNpcsForUpdate) {
+            if (!npc || !npc.isVisible?.()) {
+                continue;
+            }
+            World.addToUpdateBucket(World.npcUpdateBuckets, npc);
+        }
+    }
+
+    private static collectFromBuckets<T>(
+        buckets: Map<string, T[]>,
+        location: Location
+    ): T[] {
+        const results: T[] = [];
+        const baseChunkX = location.getX() >> 3;
+        const baseChunkY = location.getY() >> 3;
+        const z = location.getZ();
+        for (let dx = -World.UPDATE_BUCKET_RADIUS; dx <= World.UPDATE_BUCKET_RADIUS; dx++) {
+            for (let dy = -World.UPDATE_BUCKET_RADIUS; dy <= World.UPDATE_BUCKET_RADIUS; dy++) {
+                const bucket = buckets.get(`${z}:${baseChunkX + dx}:${baseChunkY + dy}`);
+                if (!bucket || bucket.length === 0) {
+                    continue;
+                }
+                results.push(...bucket);
+            }
+        }
+        return results;
+    }
+
+    public static getBucketNearbyPlayersForUpdate(player: Player): Player[] {
+        const nearby = World.collectFromBuckets(World.playerUpdateBuckets, player.getLocation());
+        nearby.sort((a, b) => a.getIndex() - b.getIndex());
+        return nearby;
+    }
+
+    public static getNearbyPlayersForUpdate(player: Player): Player[] {
+        const nearby = World.getBucketNearbyPlayersForUpdate(player);
+        if (nearby.length === 0) {
+            return Array.from(World.getPlayers()).sort((a, b) => a.getIndex() - b.getIndex());
+        }
+        return nearby;
+    }
+
+    public static getNearbyNpcsForUpdate(player: Player): NPC[] {
+        const nearby = World.collectFromBuckets(World.npcUpdateBuckets, player.getLocation());
+        if (nearby.length === 0) {
+            return Array.from(World.getActiveNpcsForUpdate()).sort((a, b) => a.getIndex() - b.getIndex());
+        }
+        nearby.sort((a, b) => a.getIndex() - b.getIndex());
+        return nearby;
+    }
+
+    public static isPlayerUpdateBucketCompareEnabled(): boolean {
+        return World.PLAYER_UPDATE_BUCKET_COMPARE_ENABLED;
+    }
+
     private static buildActiveNpcRegionKeys(): Set<string> {
         const keys = new Set<string>();
         World.players.forEach((player) => {
@@ -303,6 +391,7 @@ export class World {
     public static getAddPlayerQueue(): Player[] {
         return this.addPlayerQueue;
     }
+
     public static getRemovePlayerQueue(): Player[] {
         return this.removePlayerQueue;
     }
@@ -523,12 +612,16 @@ export class World {
             });
         });
 
-        // Enable player movement updates only. (NPC updating remains disabled for now.)
+        timed("rebuild_update_buckets", () => {
+            World.rebuildUpdateBuckets();
+        });
+
         timed("update_players_npcs", () => {
             World.forEachNetworkPlayer((player) => {
                 try {
+                    const nearbyNpcs = World.getNearbyNpcsForUpdate(player);
                     PlayerUpdating.update(player);
-                    NPCUpdating.update(player);
+                    NPCUpdating.update(player, nearbyNpcs);
                 } catch (e) {
                     console.error("[World] Player/NPC updating failure", e);
                     player.requestLogout();

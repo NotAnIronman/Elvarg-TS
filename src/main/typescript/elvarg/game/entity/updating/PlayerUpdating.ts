@@ -16,6 +16,9 @@ import * as path from "path";
 
 export class PlayerUpdating {
     private static MAX_NEW_PLAYERS_PER_CYCLE = 25;
+    private static readonly CANDIDATE_COMPARE_ENABLED =
+        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "1") === "1";
+    private static readonly CANDIDATE_COMPARE_LOG_COOLDOWN_MS = 3000;
     private static readonly DEBUG_ENABLED =
         (process.env.PLAYER_UPDATE_DEBUG ?? "0") === "1";
     private static readonly DEBUG_RECEIVER_FILTER = (
@@ -35,6 +38,7 @@ export class PlayerUpdating {
     );
     private static debugReady = false;
     private static updateSequence = 0;
+    private static lastCandidateCompareLogAt = 0;
 
     private static nextUpdateId(): number {
         PlayerUpdating.updateSequence += 1;
@@ -132,6 +136,88 @@ export class PlayerUpdating {
         }
     }
 
+    private static isEligibleAddCandidate(receiver: Player, candidate: Player): boolean {
+        if (!candidate || candidate === receiver) {
+            return false;
+        }
+        if (
+            !candidate.getLocation().isViewableFrom(receiver.getLocation()) ||
+            candidate.getPrivateArea() !== receiver.getPrivateArea()
+        ) {
+            return false;
+        }
+        return true;
+    }
+
+    private static compareBucketCandidates(
+        player: Player,
+        localPlayers: Player[],
+        visibleCandidates: Player[]
+    ): void {
+        if (
+            !PlayerUpdating.CANDIDATE_COMPARE_ENABLED ||
+            player?.isPlayerBot?.() === true
+        ) {
+            return;
+        }
+
+        const bucketCandidates = World.getBucketNearbyPlayersForUpdate(player);
+        const localIndexes = new Set<number>();
+        for (const localPlayer of localPlayers) {
+            if (localPlayer) {
+                localIndexes.add(localPlayer.getIndex());
+            }
+        }
+
+        const legacyIndexes = new Set<number>();
+        for (const candidate of visibleCandidates) {
+            legacyIndexes.add(candidate.getIndex());
+        }
+
+        const bucketIndexes = new Set<number>();
+        const extras: number[] = [];
+        for (const candidate of bucketCandidates) {
+            if (!this.isEligibleAddCandidate(player, candidate) || localIndexes.has(candidate.getIndex())) {
+                continue;
+            }
+            const index = candidate.getIndex();
+            bucketIndexes.add(index);
+            if (!legacyIndexes.has(index)) {
+                extras.push(index);
+            }
+        }
+
+        const missing: number[] = [];
+        for (const candidate of visibleCandidates) {
+            const index = candidate.getIndex();
+            if (!bucketIndexes.has(index)) {
+                missing.push(index);
+            }
+        }
+
+        if (missing.length === 0 && extras.length === 0) {
+            return;
+        }
+
+        const nowMs = Date.now();
+        if (
+            nowMs - PlayerUpdating.lastCandidateCompareLogAt <
+            PlayerUpdating.CANDIDATE_COMPARE_LOG_COOLDOWN_MS
+        ) {
+            return;
+        }
+        PlayerUpdating.lastCandidateCompareLogAt = nowMs;
+        console.warn("[player_update] bucket_candidate_mismatch", {
+            receiver: this.playerName(player),
+            receiverIndex: player.getIndex(),
+            localCount: localPlayers.length,
+            legacyVisibleCount: visibleCandidates.length,
+            bucketVisibleCount: bucketIndexes.size,
+            missing: missing.slice(0, 10),
+            extras: extras.slice(0, 10),
+        });
+    }
+
     public static update(player: Player) {
         if (!player || player.isPlayerBot?.() === true) {
             return;
@@ -163,20 +249,34 @@ export class PlayerUpdating {
         }
         localPlayers.length = 0;
         localPlayers.push(...retainedLocalPlayers);
+        const localPlayerIndexes = new Set<number>();
+        for (const localPlayer of localPlayers) {
+            if (localPlayer) {
+                localPlayerIndexes.add(localPlayer.getIndex());
+            }
+        }
         let playersAdded = 0;
+        const visibleCandidates: Player[] = [];
 
         for (const otherPlayer of World.getPlayers()) {
             if (player.getLocalPlayers().length >= 79 || playersAdded > PlayerUpdating.MAX_NEW_PLAYERS_PER_CYCLE)
                 break;
-            if (otherPlayer == null || otherPlayer == player || player.getLocalPlayers().includes(otherPlayer)
+            if (otherPlayer == null || otherPlayer == player || localPlayerIndexes.has(otherPlayer.getIndex())
                 || !otherPlayer.getLocation().isViewableFrom(player.getLocation())
                 || otherPlayer.getPrivateArea() !== player.getPrivateArea()) {
                 continue;
             }
+            if (PlayerUpdating.CANDIDATE_COMPARE_ENABLED) {
+                visibleCandidates.push(otherPlayer);
+            }
             player.getLocalPlayers().push(otherPlayer);
+            localPlayerIndexes.add(otherPlayer.getIndex());
             this.addPlayer(player, otherPlayer, packet);
             this.appendUpdates(player, update, otherPlayer, true, false, updateId);
             playersAdded++;
+        }
+        if (PlayerUpdating.CANDIDATE_COMPARE_ENABLED) {
+            this.compareBucketCandidates(player, localPlayers, visibleCandidates);
         }
 
         const updateBuffer = update.getBuffer();
@@ -464,7 +564,7 @@ export class PlayerUpdating {
         if (flag.flagged(Flag.FORCED_CHAT) && target.forcedChat != null) {
             mask |= 0x4;
         }
-        if (flag.flagged(Flag.CHAT) && target.currentChatMessage != null && !noChat && !player.relations.ignoreList.includes(target.longUsername)) {
+        if (flag.flagged(Flag.CHAT) && target.currentChatMessage != null && !noChat && !player.relations.hasIgnore(target.longUsername)) {
             mask |= 0x80;
         }
         if (flag.flagged(Flag.ENTITY_INTERACTION)) {
@@ -512,7 +612,7 @@ export class PlayerUpdating {
         }
         if (flag.flagged(Flag.FORCED_CHAT) && target.forcedChat != null) {
             this.updateForcedChat(builder, target);
-        } if (flag.flagged(Flag.CHAT) && target.currentChatMessage != null && !noChat && !player.relations.ignoreList.includes(target.longUsername)) {
+        } if (flag.flagged(Flag.CHAT) && target.currentChatMessage != null && !noChat && !player.relations.hasIgnore(target.longUsername)) {
             this.updateChat(builder, target, player);
         }
         if (flag.flagged(Flag.ENTITY_INTERACTION)) {

@@ -25,6 +25,19 @@ export class PacketBuilder {
     private buffers = Buffer.alloc(4096);
     private offset = 0;
 
+    public reset(opcodeOrType?: number | PacketType, type?: PacketType): PacketBuilder {
+        this.bitPosition = 0;
+        this.offset = 0;
+        if (typeof opcodeOrType === 'number') {
+            this.opcode = opcodeOrType;
+            this.type = type ?? PacketType.FIXED;
+        } else {
+            this.opcode = -1;
+            this.type = PacketType.FIXED;
+        }
+        return this;
+    }
+
     private ensureCapacity(additionalBytes: number): void {
         if (additionalBytes <= 0) {
             return;
@@ -44,13 +57,7 @@ export class PacketBuilder {
     }
 
     constructor(opcodeOrType?: number | PacketType, type?: PacketType) {
-        if (typeof opcodeOrType === 'number') {
-            this.opcode = opcodeOrType;
-            this.type = type ?? PacketType.FIXED;
-        } else {
-            this.opcode = -1;
-            this.type = PacketType.FIXED;
-        }
+        this.reset(opcodeOrType, type);
     }
 
     public writeBuffer(buffer: string | Buffer): PacketBuilder {
