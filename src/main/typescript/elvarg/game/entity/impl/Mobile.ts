@@ -186,9 +186,6 @@ export abstract class Mobile extends Entity {
     }
 
     setMobileInteraction(mobile: Mobile | null): Mobile {
-        if (this.interactingMobile === mobile) {
-            return this;
-        }
         this.interactingMobile = mobile;
         this.getUpdateFlag().flag(Flag.ENTITY_INTERACTION);
         return this;
@@ -565,6 +562,9 @@ export abstract class Mobile extends Entity {
     }
 
     setFollowing(following: Mobile): void {
+        if (this.following === following) {
+            return;
+        }
         this.following = following;
     }
 
@@ -573,6 +573,9 @@ export abstract class Mobile extends Entity {
     }
 
     setCombatFollowing(target: Mobile): void {
+        if (this.combatFollowing === target) {
+            return;
+        }
         this.combatFollowing = target;
     }
 

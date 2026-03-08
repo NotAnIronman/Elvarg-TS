@@ -61,6 +61,7 @@ import { EffectTimer } from "../../../model/EffectTimer";
 import { Task } from "../../../task/Task";
 import { World } from "../../../World";
 import { PluginManager } from "../../../../plugins/PluginManager";
+import { ServerPerf } from "../../../../util/ServerPerf";
 
 export class Player extends Mobile {
     private static readonly MAX_PLAYER_PRESETS = 10;
@@ -377,28 +378,30 @@ export class Player extends Mobile {
 
     public process() {
         const isBot = this.isPlayerBot();
+        const timed = <T>(phase: string, fn: () => T): T =>
+            ServerPerf.measurePhase(`player.process.${phase}`, fn);
 
         // Timers
-        this.getTimers().process();
+        timed("timers", () => this.getTimers().process());
 
         // Process incoming packets...
         let session = this.getSession();
         if (!isBot && session != null) {
-            session.processPackets();
+            timed("packets", () => session.processPackets());
         }
 
         // Process walking queue..
-        this.getMovementQueue().process();
+        timed("movement", () => this.getMovementQueue().process());
         if (this.getMovementQueue().isMovings()) {
             this.updateFlag.flag(Flag.APPEARANCE);
         }
 
         // Process combat
-        this.getCombat().process();
+        timed("combat", () => this.getCombat().process());
 
         // Process aggression
         if (!isBot) {
-            NpcAggression.process(this);
+            timed("npc_aggression", () => NpcAggression.process(this));
         }
 
         // Process areas..
@@ -410,12 +413,12 @@ export class Player extends Mobile {
             this.getForceMovement() != null ||
             ((this.botAreaProcessTick = (this.botAreaProcessTick + 1) % 3) === 0);
         if (shouldProcessArea) {
-            AreaManager.process(this);
+            timed("area", () => AreaManager.process(this));
         }
 
         // Process Bounty Hunter
         if (!isBot) {
-            BountyHunter.process(this);
+            timed("bounty_hunter", () => BountyHunter.process(this));
         }
 
         // Updates inventory if an update
@@ -462,50 +465,52 @@ export class Player extends Mobile {
         // Decrease boosted stats Increase lowered stats
         if (this.getHitpoints() > 0) {
             if (this.increaseStats.finished() || this.decreaseStats.secondsElapsed() >= (PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60)) {
-                for (let skill of Skill.values()) {
-                    let current = this.getSkillManager().getCurrentLevel(skill);
-                    let max = this.getSkillManager().getMaxLevel(skill);
+                timed("stats", () => {
+                    for (let skill of Skill.values()) {
+                        let current = this.getSkillManager().getCurrentLevel(skill);
+                        let max = this.getSkillManager().getMaxLevel(skill);
 
-                    // Should lowered stats be increased?
-                    if (current < max) {
-                        if (this.increaseStats.finished()) {
-                            let restoreRate = 1;
+                        // Should lowered stats be increased?
+                        if (current < max) {
+                            if (this.increaseStats.finished()) {
+                                let restoreRate = 1;
 
-                            // Rapid restore effect - 2x restore rate for all stats except hp/prayer
-                            // Rapid heal - 2x restore rate for hitpoints
-                            if (skill != Skill.HITPOINTS && skill != Skill.PRAYER) {
-                                if (PrayerHandler.isActivated(this, PrayerHandler.RAPID_RESTORE)) {
-                                    restoreRate = 2;
+                                // Rapid restore effect - 2x restore rate for all stats except hp/prayer
+                                // Rapid heal - 2x restore rate for hitpoints
+                                if (skill != Skill.HITPOINTS && skill != Skill.PRAYER) {
+                                    if (PrayerHandler.isActivated(this, PrayerHandler.RAPID_RESTORE)) {
+                                        restoreRate = 2;
+                                    }
+                                } else if (skill == Skill.HITPOINTS) {
+                                    if (PrayerHandler.isActivated(this, PrayerHandler.RAPID_HEAL)) {
+                                        restoreRate = 2;
+                                    }
                                 }
-                            } else if (skill == Skill.HITPOINTS) {
-                                if (PrayerHandler.isActivated(this, PrayerHandler.RAPID_HEAL)) {
-                                    restoreRate = 2;
+
+                                this.getSkillManager().increaseCurrentLevel(skill, restoreRate, max);
+                            }
+                        } else if (current > max) {
+
+                            // Should boosted stats be decreased?
+                            if (this.decreaseStats.secondsElapsed() >= (PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60)) {
+
+                                // Never decrease Hitpoints / Prayer
+                                if (skill != Skill.HITPOINTS && skill != Skill.PRAYER) {
+                                    this.getSkillManager().decreaseCurrentLevel(skill, 1, 1);
                                 }
+
                             }
-
-                            this.getSkillManager().increaseCurrentLevel(skill, restoreRate, max);
-                        }
-                    } else if (current > max) {
-
-                        // Should boosted stats be decreased?
-                        if (this.decreaseStats.secondsElapsed() >= (PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60)) {
-
-                            // Never decrease Hitpoints / Prayer
-                            if (skill != Skill.HITPOINTS && skill != Skill.PRAYER) {
-                                this.getSkillManager().decreaseCurrentLevel(skill, 1, 1);
-                            }
-
                         }
                     }
-                }
-                // Reset timers
-                if (this.increaseStats.finished()) {
-                    this.increaseStats.start(60);
-                }
-                if (this.decreaseStats
-                    .secondsElapsed() >= (PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60)) {
-                    this.decreaseStats.start((PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60));
-                }
+                    // Reset timers
+                    if (this.increaseStats.finished()) {
+                        this.increaseStats.start(60);
+                    }
+                    if (this.decreaseStats
+                        .secondsElapsed() >= (PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60)) {
+                        this.decreaseStats.start((PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60));
+                    }
+                });
             }
         }
     }

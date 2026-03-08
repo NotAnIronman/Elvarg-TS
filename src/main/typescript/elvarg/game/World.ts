@@ -32,9 +32,15 @@ export class World {
     private static readonly MAX_PLAYERS = 500;
     private static readonly NPC_ACTIVE_REGION_RADIUS = 1;
     private static readonly IDLE_BOT_PROCESS_STRIDE = 2;
+    private static readonly BOT_PROCESS_LOD_CHUNK_SIZE_TILES = 32;
+    private static readonly BOT_PROCESS_LOD_NEAR_DISTANCE_TILES = 15;
+    private static readonly BOT_PROCESS_LOD_MEDIUM_DISTANCE_TILES = 48;
+    private static readonly BOT_PROCESS_LOD_NEAR_STRIDE = 1;
+    private static readonly BOT_PROCESS_LOD_MEDIUM_STRIDE = 2;
+    private static readonly BOT_PROCESS_LOD_FAR_STRIDE = 12;
     private static readonly UPDATE_BUCKET_RADIUS = 2;
     private static readonly PLAYER_UPDATE_BUCKET_COMPARE_ENABLED =
-        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "1") === "1";
+        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "0") === "1";
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
@@ -42,6 +48,8 @@ export class World {
     private static items: ItemOnGround[] = [];
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];
+    private static realPlayerObserverBuckets: Map<string, Array<{ x: number; y: number; z: number }>> = new Map();
+    private static realPlayerObserverCount = 0;
     private static playerUpdateBuckets: Map<string, Player[]> = new Map();
     private static npcUpdateBuckets: Map<string, NPC[]> = new Map();
 
@@ -200,6 +208,10 @@ export class World {
         return `${z}:${x >> 3}:${y >> 3}`;
     }
 
+    private static getBotProcessObserverBucketKey(x: number, y: number, z: number): string {
+        return `${z}:${Math.floor(x / World.BOT_PROCESS_LOD_CHUNK_SIZE_TILES)}:${Math.floor(y / World.BOT_PROCESS_LOD_CHUNK_SIZE_TILES)}`;
+    }
+
     private static addToUpdateBucket<T extends { getLocation(): Location }>(
         buckets: Map<string, T[]>,
         entity: T
@@ -230,6 +242,40 @@ export class World {
             }
             World.addToUpdateBucket(World.npcUpdateBuckets, npc);
         }
+    }
+
+    private static rebuildRealPlayerObserverBuckets(): void {
+        World.realPlayerObserverBuckets.clear();
+        World.realPlayerObserverCount = 0;
+        World.players.forEach((candidate) => {
+            if (!candidate || candidate.isPlayerBot?.() === true) {
+                return;
+            }
+            if (!World.isPlayerSessionConnected(candidate)) {
+                return;
+            }
+            const location = candidate.getLocation?.();
+            if (!location) {
+                return;
+            }
+            const observer = {
+                x: location.getX(),
+                y: location.getY(),
+                z: location.getZ(),
+            };
+            const key = World.getBotProcessObserverBucketKey(
+                observer.x,
+                observer.y,
+                observer.z
+            );
+            const bucket = World.realPlayerObserverBuckets.get(key);
+            if (bucket) {
+                bucket.push(observer);
+            } else {
+                World.realPlayerObserverBuckets.set(key, [observer]);
+            }
+            World.realPlayerObserverCount++;
+        });
     }
 
     private static collectFromBuckets<T>(
@@ -352,23 +398,101 @@ export class World {
             return true;
         }
 
-        const movementQueue: any = player.getMovementQueue?.();
-        if ((movementQueue?.size?.() ?? 0) > 0 || movementQueue?.isMovings?.() === true) {
-            return true;
-        }
-
-        const combat: any = player.getCombat?.();
-        if (
-            combat?.getTarget?.() != null ||
-            combat?.getAttacker?.() != null ||
-            player.getCombatFollowing?.() != null
-        ) {
-            return true;
-        }
-
         const index = Number(player.getIndex?.() ?? 0);
-        const stride = Math.max(1, World.IDLE_BOT_PROCESS_STRIDE);
+        const stride = World.resolveBotProcessStride(player);
         return ((cycle + index) % stride) === 0;
+    }
+
+    private static resolveBotProcessStride(player: Player): number {
+        if (!player) {
+            return 1;
+        }
+        if (World.isBotInteractingWithRealPlayer(player)) {
+            return World.BOT_PROCESS_LOD_NEAR_STRIDE;
+        }
+        if (World.realPlayerObserverCount === 0) {
+            return World.BOT_PROCESS_LOD_FAR_STRIDE;
+        }
+
+        const location = player.getLocation?.();
+        if (!location) {
+            return World.BOT_PROCESS_LOD_FAR_STRIDE;
+        }
+
+        const x = location.getX();
+        const y = location.getY();
+        const z = location.getZ();
+        let bestChebyshevDistance = Number.POSITIVE_INFINITY;
+        const chunkSize = World.BOT_PROCESS_LOD_CHUNK_SIZE_TILES;
+        const baseChunkX = Math.floor(x / chunkSize);
+        const baseChunkY = Math.floor(y / chunkSize);
+        const chunkRadius = Math.max(
+            1,
+            Math.ceil(World.BOT_PROCESS_LOD_MEDIUM_DISTANCE_TILES / chunkSize)
+        );
+
+        for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
+                const bucket = World.realPlayerObserverBuckets.get(
+                    `${z}:${baseChunkX + dx}:${baseChunkY + dy}`
+                );
+                if (!bucket || bucket.length === 0) {
+                    continue;
+                }
+                for (const observer of bucket) {
+                    const distance = Math.max(
+                        Math.abs(observer.x - x),
+                        Math.abs(observer.y - y)
+                    );
+                    if (distance < bestChebyshevDistance) {
+                        bestChebyshevDistance = distance;
+                    }
+                    if (bestChebyshevDistance <= World.BOT_PROCESS_LOD_NEAR_DISTANCE_TILES) {
+                        return World.BOT_PROCESS_LOD_NEAR_STRIDE;
+                    }
+                }
+            }
+        }
+
+        if (bestChebyshevDistance <= World.BOT_PROCESS_LOD_MEDIUM_DISTANCE_TILES) {
+            return World.BOT_PROCESS_LOD_MEDIUM_STRIDE;
+        }
+
+        return Math.max(World.IDLE_BOT_PROCESS_STRIDE, World.BOT_PROCESS_LOD_FAR_STRIDE);
+    }
+
+    private static isRealNetworkPlayer(player: Player | null | undefined): boolean {
+        if (!player || player.isPlayerBot?.() === true) {
+            return false;
+        }
+        return World.isPlayerSessionConnected(player);
+    }
+
+    private static isBotInteractingWithRealPlayer(player: Player): boolean {
+        if (!player || player.isPlayerBot?.() !== true) {
+            return false;
+        }
+
+        const combat = player.getCombat?.();
+        const related = [
+            player.getInteractingMobile?.(),
+            player.getFollowing?.(),
+            player.getCombatFollowing?.(),
+            combat?.getTarget?.(),
+            combat?.getAttacker?.(),
+        ];
+
+        for (const entity of related) {
+            if (!entity || entity.isPlayer?.() !== true) {
+                continue;
+            }
+            const other = entity.getAsPlayer?.();
+            if (World.isRealNetworkPlayer(other)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static getPlayerBots(): TreeMap<string, any> {
@@ -579,6 +703,7 @@ export class World {
         // Sequential processing to avoid null-slot crashes during bring-up.
         timed("process_players", () => {
             const cycle = World.processCycle;
+            World.rebuildRealPlayerObserverBuckets();
             World.players.forEach((player) => {
                 try {
                     if (!World.shouldProcessBotPlayerThisTick(player, cycle)) {

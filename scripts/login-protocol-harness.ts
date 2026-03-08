@@ -63,6 +63,13 @@ const OBJECT_CLICK_REPEAT_INTERVAL_MS = parseEnvInt("OBJECT_CLICK_REPEAT_INTERVA
 const OBJECT_CLICK_ID = parseEnvInt("OBJECT_CLICK_ID", 23271);
 const OBJECT_CLICK_X = parseEnvInt("OBJECT_CLICK_X", 3094);
 const OBJECT_CLICK_Y = parseEnvInt("OBJECT_CLICK_Y", 3521);
+const COMMAND_SEQUENCE = (process.env.COMMAND_SEQUENCE ?? "")
+  .split("||")
+  .map((value) => value.trim())
+  .filter((value) => value.length > 0);
+const COMMAND_DELAY_MS = parseEnvInt("COMMAND_DELAY_MS", 1500);
+const COMMAND_STEP_MS = parseEnvInt("COMMAND_STEP_MS", 1200);
+const DECODE_SERVER_FRAMES = (process.env.DECODE_SERVER_FRAMES ?? "1") !== "0";
 
 const RSA_MODULUS = BigInt(
   "131409501542646890473421187351592645202876910715283031445708554322032707707649791604685616593680318619733794036379235220188001221437267862925531863675607742394687835827374685954437825783807190283337943749605737918856262761566146702087468587898515768996741636870321689974105378482179138088453912399137944888201"
@@ -260,6 +267,16 @@ function sendPacket(ws: WebSocket, opcode: number, payload: Buffer, type: Packet
   ws.send(encoded);
 }
 
+function encodeCommandPayload(command: string): Buffer {
+  const sanitized = command.endsWith("\n") ? command : `${command}\n`;
+  return Buffer.from(sanitized, "latin1");
+}
+
+function sendCommand(ws: WebSocket, command: string) {
+  const normalized = command.startsWith("::") ? command : `::${command.replace(/^[:/]+/, "")}`;
+  sendPacket(ws, 103, encodeCommandPayload(normalized), "var", "command");
+}
+
 function decodeServerFrame(frame: Buffer) {
   if (!state.inboundCipher) {
     throw new Error("Inbound cipher not initialized");
@@ -370,6 +387,19 @@ function nextLoopDestination(step: number): { x: number; y: number; plane: numbe
 }
 
 function summarizeAndAssert() {
+  if (!DECODE_SERVER_FRAMES) {
+    const summary = {
+      loginSucceeded: state.loginSucceeded,
+      rights: state.rights,
+      decodeServerFrames: false,
+    };
+    log("summary", summary);
+    if (!state.loginSucceeded) {
+      throw new Error("Protocol harness failed: login was not successful");
+    }
+    return;
+  }
+
   const summary = {
     loginSucceeded: state.loginSucceeded,
     rights: state.rights,
@@ -434,6 +464,14 @@ async function main() {
             intervalMs: OBJECT_CLICK_REPEAT_INTERVAL_MS,
           }
         : null,
+      commands:
+        COMMAND_SEQUENCE.length > 0
+          ? {
+              delayMs: COMMAND_DELAY_MS,
+              stepMs: COMMAND_STEP_MS,
+              values: COMMAND_SEQUENCE,
+            }
+          : null,
     });
 
     let finished = false;
@@ -521,6 +559,17 @@ async function main() {
           sendKeepAlive(ws);
           keepAliveTimer = setInterval(() => sendKeepAlive(ws), 2500);
 
+          if (COMMAND_SEQUENCE.length > 0) {
+            COMMAND_SEQUENCE.forEach((command, index) => {
+              setTimeout(() => {
+                if (ws.readyState !== WebSocket.OPEN) {
+                  return;
+                }
+                sendCommand(ws, command);
+              }, COMMAND_DELAY_MS + index * COMMAND_STEP_MS);
+            });
+          }
+
           if (SEND_MOVEMENT) {
             setTimeout(() => {
               if (ws.readyState === WebSocket.OPEN) {
@@ -584,7 +633,11 @@ async function main() {
           return;
         }
 
-        decodeServerFrame(frame);
+        if (DECODE_SERVER_FRAMES) {
+          decodeServerFrame(frame);
+        } else {
+          log("recv_frame", { length: frame.length });
+        }
       } catch (err) {
         complete(err as Error);
       }

@@ -15,6 +15,7 @@ import { TimerKey } from "../../../util/timers/TimerKey";
 import { CombatFactory, CanAttackResponse } from "./CombatFactory";
 import { CombatSpecial } from "./CombatSpecial";
 import { CombatConstants } from "./CombatConstants";
+import { ServerPerf } from "../../../util/ServerPerf";
 export class Combat {
     private character: Mobile;
     private hitQueue: HitQueue;
@@ -57,7 +58,7 @@ export class Combat {
      */
     public process() {
         // Process the hit queue
-        this.hitQueue.process(this.character);
+        ServerPerf.measurePhase("combat.process.hit_queue", () => this.hitQueue.process(this.character));
 
         // Reset attacker if we haven't been attacked in 6 seconds.
         if (this.lastAttack.elapsedTime(6000)) {
@@ -70,7 +71,7 @@ export class Combat {
         }
 
         // Handle attacking
-        this.performNewAttack(false);
+        ServerPerf.measurePhase("combat.process.attack_cycle", () => this.performNewAttack(false));
     }
 
     public performNewAttack(instant: boolean) {
@@ -78,8 +79,6 @@ export class Combat {
             // Don't process attacks for NPC's who don't fight back
             return;
         }
-        // Fetch the combat method the character will be attacking with
-        this.method = CombatFactory.getMethod(this.character);
         this.character.setCombatFollowing(this.target);
 
         // Primary combat lock-on comes from entity interaction.
@@ -88,17 +87,24 @@ export class Combat {
         // face positions so this no longer needlessly re-flags unchanged values.
         this.character.setPositionToFace(this.target.getLocation().clone());
 
+        if (!instant && this.character.getTimers().has(TimerKey.COMBAT_ATTACK)) {
+            if (!this.character.isPlayer()) {
+                return;
+            }
+            const player = this.character.getAsPlayer();
+            if (!player.isSpecialActivated() || player.getCombatSpecial() !== CombatSpecial.GRANITE_MAUL) {
+                return;
+            }
+        }
+
+        // Fetch the combat method the character will be attacking with
+        this.method = CombatFactory.getMethod(this.character);
+
         // Granite maul special attack, make sure we disregard delay
         // and that we do not reset the attack timer.
         let graniteMaulSpecial = (this.method instanceof GraniteMaulCombatMethod);
         if (graniteMaulSpecial) {
             instant = true;
-        }
-
-        if (!instant && this.character.getTimers().has(TimerKey.COMBAT_ATTACK)) {
-            // If attack isn't instant, avoid repeated reach/facing work until the
-            // timer elapses. Combat following continues via MovementQueue.
-            return;
         }
 
         if (!CombatFactory.canReach(this.character, this.method, this.target)) {

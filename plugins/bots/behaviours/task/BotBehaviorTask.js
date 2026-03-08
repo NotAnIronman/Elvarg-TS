@@ -203,6 +203,9 @@ class BotBehaviorTask extends Task {
     if (!entry?.player || this._humanObserverCount === 0) {
       return this.lodConfig.farStride;
     }
+    if (this.isInteractingWithRealPlayer(entry.player)) {
+      return this.lodConfig.nearStride;
+    }
 
     const location = entry.player.getLocation?.();
     if (!location) {
@@ -250,6 +253,30 @@ class BotBehaviorTask extends Task {
       return this.lodConfig.mediumStride;
     }
     return this.lodConfig.farStride;
+  }
+
+  isInteractingWithRealPlayer(player) {
+    if (!player || player.isPlayerBot?.() !== true) {
+      return false;
+    }
+    const combat = player.getCombat?.();
+    const related = [
+      player.getInteractingMobile?.(),
+      player.getFollowing?.(),
+      player.getCombatFollowing?.(),
+      combat?.getTarget?.(),
+      combat?.getAttacker?.(),
+    ];
+    for (const entity of related) {
+      if (!entity || entity.isPlayer?.() !== true) {
+        continue;
+      }
+      const other = entity.getAsPlayer?.();
+      if (other && other.isPlayerBot?.() !== true && World.isPlayerSessionConnected(other)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   ensureAutonomyState(state) {

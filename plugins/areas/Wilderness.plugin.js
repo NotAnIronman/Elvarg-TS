@@ -54,10 +54,13 @@ function getCachedInWilderness(cache, player) {
     return false;
   }
   const state = cache.get(player);
-  if (state && typeof state.inWilderness === "boolean") {
+  const tile = readPlayerTile(player);
+  if (tile && Location.isSameTile(state, tile) && typeof state?.inWilderness === "boolean") {
     return state.inWilderness;
   }
-  const tile = readPlayerTile(player);
+  if (!tile && state && typeof state.inWilderness === "boolean") {
+    return state.inWilderness;
+  }
   const inWilderness = tile
     ? Wilderness.isInLocation(tile.location)
     : Wilderness.isIn(player);
@@ -69,10 +72,43 @@ function getCachedInWilderness(cache, player) {
   return inWilderness;
 }
 
+function getCachedCanAttackDecision(cache, attacker, target, attackerState, targetState) {
+  const attackerEntries = cache.get(attacker);
+  const entry = attackerEntries?.get(target);
+  if (!entry) {
+    return null;
+  }
+  if (
+    entry.attackerLevel !== (attacker?.getWildernessLevel?.() | 0) ||
+    entry.targetLevel !== (target?.getWildernessLevel?.() | 0) ||
+    !Location.isSameTile(entry.attackerTile, attackerState) ||
+    !Location.isSameTile(entry.targetTile, targetState)
+  ) {
+    return null;
+  }
+  return entry.allow;
+}
+
+function cacheCanAttackDecision(cache, attacker, target, attackerState, targetState, allow) {
+  let attackerEntries = cache.get(attacker);
+  if (!attackerEntries) {
+    attackerEntries = new WeakMap();
+    cache.set(attacker, attackerEntries);
+  }
+  attackerEntries.set(target, {
+    attackerLevel: attacker?.getWildernessLevel?.() | 0,
+    targetLevel: target?.getWildernessLevel?.() | 0,
+    attackerTile: attackerState ? { x: attackerState.x, y: attackerState.y, z: attackerState.z } : null,
+    targetTile: targetState ? { x: targetState.x, y: targetState.y, z: targetState.z } : null,
+    allow,
+  });
+}
+
 module.exports = {
   name: "Wilderness",
   register(api) {
     const inWildState = new Map();
+    const canAttackCache = new WeakMap();
 
     api.onPlayerProcess(({ player }) => {
       const tile = readPlayerTile(player);
@@ -183,12 +219,36 @@ module.exports = {
         return;
       }
 
+      const attackerState = readPlayerTile(attacker) ?? inWildState.get(attacker) ?? null;
+      const targetState = readPlayerTile(target) ?? inWildState.get(target) ?? null;
+      const cachedDecision = getCachedCanAttackDecision(
+        canAttackCache,
+        attacker,
+        target,
+        attackerState,
+        targetState
+      );
+      if (typeof cachedDecision === "boolean") {
+        event.allow = cachedDecision;
+        return;
+      }
+
       const attackerInWild = getCachedInWilderness(inWildState, attacker);
       const targetInWild = getCachedInWilderness(inWildState, target);
       if (attackerInWild && targetInWild) {
         event.allow = true;
       } else if (attackerInWild || targetInWild) {
         event.allow = false;
+      }
+      if (typeof event.allow === "boolean") {
+        cacheCanAttackDecision(
+          canAttackCache,
+          attacker,
+          target,
+          attackerState,
+          targetState,
+          event.allow
+        );
       }
     });
 

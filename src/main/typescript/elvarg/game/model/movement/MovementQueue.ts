@@ -666,7 +666,11 @@ export class MovementQueue {
             const attackDistance = method.attackDistance(this.character);
 
             // Find the nearest tile surrounding the target
-            destination = PathFinder.getClosestAttackableTile(this.character, following, attackDistance);
+            destination = this.getCachedBotAttackTile(following, attackDistance, nowMs);
+            if (destination == null) {
+                destination = PathFinder.getClosestAttackableTile(this.character, following, attackDistance);
+                this.cacheBotAttackTile(following, attackDistance, destination, nowMs);
+            }
             if (destination == null) {
                 if (this.character.isPlayer()) {
                     this.character.getAsPlayer().sendMessage("I can't reach that!");
@@ -863,6 +867,14 @@ export class MovementQueue {
     public pathY: number;
     private nextBotFollowRepathAt = 0;
     private nextBotCombatFollowRepathAt = 0;
+    private cachedBotAttackTileExpiresAt = 0;
+    private cachedBotAttackTileTargetX = Number.MIN_SAFE_INTEGER;
+    private cachedBotAttackTileTargetY = Number.MIN_SAFE_INTEGER;
+    private cachedBotAttackTileTargetZ = Number.MIN_SAFE_INTEGER;
+    private cachedBotAttackTileDistance = -1;
+    private cachedBotAttackTileX = Number.MIN_SAFE_INTEGER;
+    private cachedBotAttackTileY = Number.MIN_SAFE_INTEGER;
+    private cachedBotAttackTileZ = Number.MIN_SAFE_INTEGER;
 
     public setPathX(x: number): MovementQueue {
         this.pathX = (this.character.getLocation().getRegionX() * 8) + x;
@@ -921,6 +933,51 @@ export class MovementQueue {
         }
         this.nextBotFollowRepathAt =
             nowMs + MovementQueue.BOT_FOLLOW_REPATH_COOLDOWN_MS;
+    }
+
+    private getCachedBotAttackTile(
+        following: Mobile,
+        attackDistance: number,
+        nowMs: number
+    ): Location | null {
+        if (!this.isBotPlayer() || !following || nowMs > this.cachedBotAttackTileExpiresAt) {
+            return null;
+        }
+        const target = following.getLocation();
+        if (
+            this.cachedBotAttackTileTargetX !== target.getX() ||
+            this.cachedBotAttackTileTargetY !== target.getY() ||
+            this.cachedBotAttackTileTargetZ !== target.getZ() ||
+            this.cachedBotAttackTileDistance !== attackDistance
+        ) {
+            return null;
+        }
+        return new Location(
+            this.cachedBotAttackTileX,
+            this.cachedBotAttackTileY,
+            this.cachedBotAttackTileZ
+        );
+    }
+
+    private cacheBotAttackTile(
+        following: Mobile,
+        attackDistance: number,
+        destination: Location | null,
+        nowMs: number
+    ): void {
+        if (!this.isBotPlayer() || !following || destination == null) {
+            return;
+        }
+        const target = following.getLocation();
+        this.cachedBotAttackTileTargetX = target.getX();
+        this.cachedBotAttackTileTargetY = target.getY();
+        this.cachedBotAttackTileTargetZ = target.getZ();
+        this.cachedBotAttackTileDistance = attackDistance;
+        this.cachedBotAttackTileX = destination.getX();
+        this.cachedBotAttackTileY = destination.getY();
+        this.cachedBotAttackTileZ = destination.getZ();
+        this.cachedBotAttackTileExpiresAt =
+            nowMs + MovementQueue.BOT_COMBAT_FOLLOW_REPATH_COOLDOWN_MS;
     }
 
     public walkToGroundItem(pos: Location, action: () => void) {

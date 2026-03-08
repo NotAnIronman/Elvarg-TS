@@ -5,6 +5,7 @@ import { CanAttackResponse } from "../../content/combat/CombatFactory";
 
 export class AreaManager {
     public static areas: Area[] = [];
+    private static readonly areaHints = new WeakMap<Mobile, AreaHint>();
     /**
      * Processes areas for the given character.
      *
@@ -13,11 +14,14 @@ export class AreaManager {
     public static process(c: Mobile): void {
         let position = c.getLocation();
         let area = c.getArea();
+        const hint = AreaManager.areaHints.get(c);
 
         let previousArea: Area | null = null;
+        let boundaryIndex = -1;
 
         if (area != null) {
-            if (!AreaManager.inside(position, area)) {
+            boundaryIndex = AreaManager.findBoundaryIndex(position, area, hint != null && hint.area === area ? hint.boundaryIndex : -1);
+            if (boundaryIndex === -1) {
                 area.leave(c, false);
                 previousArea = area;
                 area = null;
@@ -25,7 +29,17 @@ export class AreaManager {
         }
 
         if (area == null) {
-            area = AreaManager.get(position);
+            if (hint != null
+                && hint.area == null
+                && hint.x === position.getX()
+                && hint.y === position.getY()
+                && hint.z === position.getZ()) {
+                area = null;
+            } else {
+                const resolved = AreaManager.getWithBoundaryIndex(position);
+                area = resolved.area;
+                boundaryIndex = resolved.boundaryIndex;
+            }
             if (area != null) {
                 area.enter(c);
             }
@@ -53,6 +67,13 @@ export class AreaManager {
 
         // Update area..
         c.setArea(area);
+        AreaManager.areaHints.set(c, {
+            area,
+            boundaryIndex,
+            x: position.getX(),
+            y: position.getY(),
+            z: position.getZ(),
+        });
 
         // Handle postLeave...
         if (previousArea != null) {
@@ -98,12 +119,17 @@ export class AreaManager {
      * @return
      */
     public static get(position: Location): Area | null {
+        return AreaManager.getWithBoundaryIndex(position).area;
+    }
+
+    private static getWithBoundaryIndex(position: Location): AreaSearchResult {
         for (let area of this.areas) {
-            if (AreaManager.inside(position, area)) {
-                return area;
+            const boundaryIndex = AreaManager.findBoundaryIndex(position, area);
+            if (boundaryIndex !== -1) {
+                return { area, boundaryIndex };
             }
         }
-        return null;
+        return { area: null, boundaryIndex: -1 };
     }
 
     /**
@@ -113,11 +139,37 @@ export class AreaManager {
      * @return
      */
     public static inside(position: Location, area: Area): boolean {
-        for (let b of area.getBoundaries()) {
-            if (b.inside(position)) {
-                return true;
+        return AreaManager.findBoundaryIndex(position, area) !== -1;
+    }
+
+    private static findBoundaryIndex(position: Location, area: Area, hintBoundaryIndex: number = -1): number {
+        const boundaries = area.getBoundaries();
+        if (boundaries == null || boundaries.length === 0) {
+            return -1;
+        }
+
+        if (hintBoundaryIndex >= 0 && hintBoundaryIndex < boundaries.length && boundaries[hintBoundaryIndex].inside(position)) {
+            return hintBoundaryIndex;
+        }
+
+        for (let index = 0; index < boundaries.length; index++) {
+            if (index !== hintBoundaryIndex && boundaries[index].inside(position)) {
+                return index;
             }
         }
-        return false;
+        return -1;
     }
 }
+
+type AreaSearchResult = {
+    area: Area | null;
+    boundaryIndex: number;
+};
+
+type AreaHint = {
+    area: Area | null;
+    boundaryIndex: number;
+    x: number;
+    y: number;
+    z: number;
+};
