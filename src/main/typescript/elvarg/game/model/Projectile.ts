@@ -85,6 +85,7 @@ export class Projectile {
         let scannedNetworkPlayers = 0;
         let skippedArea = 0;
         let skippedView = 0;
+        let skippedTargetView = 0;
         World.forEachNetworkPlayer((player) => {
             scannedNetworkPlayers++;
             if (player.getPrivateArea() != this.privateArea) {
@@ -93,6 +94,14 @@ export class Projectile {
             }
             if (!this.start.isViewableFrom(player.getLocation())) {
                 skippedView++;
+                return;
+            }
+            if (
+                this.lockon &&
+                typeof this.lockon.getLocation === "function" &&
+                !this.lockon.getLocation().isViewableFrom(player.getLocation())
+            ) {
+                skippedTargetView++;
                 return;
             }
             recipients++;
@@ -112,7 +121,7 @@ export class Projectile {
         });
         if (process.env.PROJECTILE_DEBUG === "1") {
             console.log(
-                `[projectile.send] id=${this.projectileId} recipients=${recipients} scanned=${scannedNetworkPlayers} skippedArea=${skippedArea} skippedView=${skippedView} start=(${this.start.getX()},${this.start.getY()},${this.start.getZ?.() ?? 0}) end=(${this.end.getX()},${this.end.getY()},${this.end.getZ?.() ?? 0})`
+                `[projectile.send] id=${this.projectileId} recipients=${recipients} scanned=${scannedNetworkPlayers} skippedArea=${skippedArea} skippedView=${skippedView} skippedTargetView=${skippedTargetView} start=(${this.start.getX()},${this.start.getY()},${this.start.getZ?.() ?? 0}) end=(${this.end.getX()},${this.end.getY()},${this.end.getZ?.() ?? 0})`
             );
         }
     }
