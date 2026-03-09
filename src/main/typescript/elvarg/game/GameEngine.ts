@@ -13,7 +13,7 @@ import { BotRuntimeTelemetry } from '../util/BotRuntimeTelemetry';
  * @author Professor Oak
  */
 export class GameEngine  {
-    private scheduler: NodeJS.Timeout;
+    private scheduler: NodeJS.Timeout | null = null;
     private eventLoopMonitor: NodeJS.Timeout | null = null;
     private tickInProgress = false;
     private nextExpectedTickAt = 0;
@@ -45,8 +45,18 @@ export class GameEngine  {
         const now = Date.now();
         this.nextExpectedTickAt = now + this.tickRateMs;
         this.startEventLoopProbe(now);
-        // Tick the game engine at the configured interval (milliseconds).
-        this.scheduler = setInterval(this.run.bind(this), this.tickRateMs);
+        this.scheduleNextRun(this.tickRateMs);
+    }
+
+    private scheduleNextRun(delayMs: number): void {
+        if (this.scheduler) {
+            clearTimeout(this.scheduler);
+        }
+        const safeDelayMs = Math.max(0, Math.floor(delayMs));
+        this.scheduler = setTimeout(() => {
+            void this.run();
+        }, safeDelayMs);
+        this.scheduler.unref?.();
     }
     
     public async run() {
@@ -85,6 +95,7 @@ export class GameEngine  {
             );
             this.logTickOverrun(tickDurationMs, tickEndedAt);
             this.tickInProgress = false;
+            this.scheduleNextRun(this.nextExpectedTickAt - tickEndedAt);
         }
     }
 

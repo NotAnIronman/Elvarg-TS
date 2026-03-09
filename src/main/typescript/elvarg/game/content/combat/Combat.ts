@@ -16,6 +16,7 @@ import { CombatFactory, CanAttackResponse } from "./CombatFactory";
 import { CombatSpecial } from "./CombatSpecial";
 import { CombatConstants } from "./CombatConstants";
 import { ServerPerf } from "../../../util/ServerPerf";
+import { World } from "../../World";
 export class Combat {
     private character: Mobile;
     private hitQueue: HitQueue;
@@ -30,12 +31,87 @@ export class Combat {
     private target: Mobile;
     private attacker: Mobile;
     private method: CombatMethod;
+    private cachedResolvedMethod: CombatMethod | null = null;
+    private cachedResolvedMethodCycle = -1;
+    private cachedCanReachResult = false;
+    private cachedCanReachCycle = -1;
+    private cachedCanReachMethod: CombatMethod | null = null;
+    private cachedCanReachTarget: Mobile | null = null;
+    private cachedCanReachAttackerX = -1;
+    private cachedCanReachAttackerY = -1;
+    private cachedCanReachAttackerZ = -1;
+    private cachedCanReachTargetX = -1;
+    private cachedCanReachTargetY = -1;
+    private cachedCanReachTargetZ = -1;
+    private cachedCanReachAttackerMoving = false;
+    private cachedCanReachTargetMoving = false;
     private castSpell: CombatSpell;
     private autoCastSpell: CombatSpell;
     private previousCast: CombatSpell;
     constructor(character: Mobile) {
         this.character = character;
         this.hitQueue = new HitQueue();
+    }
+
+    private invalidateResolvedMethodCache() {
+        this.cachedResolvedMethod = null;
+        this.cachedResolvedMethodCycle = -1;
+    }
+
+    private invalidateCanReachCache() {
+        this.cachedCanReachCycle = -1;
+        this.cachedCanReachMethod = null;
+        this.cachedCanReachTarget = null;
+    }
+
+    public resolveMethodForCurrentCycle(): CombatMethod {
+        const cycle = World.getProcessCycle();
+        if (this.cachedResolvedMethod && this.cachedResolvedMethodCycle === cycle) {
+            return this.cachedResolvedMethod;
+        }
+        const resolved = CombatFactory.getMethod(this.character);
+        this.cachedResolvedMethod = resolved;
+        this.cachedResolvedMethodCycle = cycle;
+        return resolved;
+    }
+
+    public resolveCanReachForCurrentCycle(method: CombatMethod, target: Mobile): boolean {
+        const cycle = World.getProcessCycle();
+        const attackerLocation = this.character.getLocation();
+        const targetLocation = target?.getLocation();
+        const attackerMoving = this.character.getMovementQueue().isMovings();
+        const targetMoving = target?.getMovementQueue().isMovings() ?? false;
+
+        if (
+            this.cachedCanReachCycle === cycle &&
+            this.cachedCanReachMethod === method &&
+            this.cachedCanReachTarget === target &&
+            this.cachedCanReachAttackerX === (attackerLocation?.getX() ?? -1) &&
+            this.cachedCanReachAttackerY === (attackerLocation?.getY() ?? -1) &&
+            this.cachedCanReachAttackerZ === (attackerLocation?.getZ() ?? -1) &&
+            this.cachedCanReachTargetX === (targetLocation?.getX() ?? -1) &&
+            this.cachedCanReachTargetY === (targetLocation?.getY() ?? -1) &&
+            this.cachedCanReachTargetZ === (targetLocation?.getZ() ?? -1) &&
+            this.cachedCanReachAttackerMoving === attackerMoving &&
+            this.cachedCanReachTargetMoving === targetMoving
+        ) {
+            return this.cachedCanReachResult;
+        }
+
+        const result = CombatFactory.canReach(this.character, method, target);
+        this.cachedCanReachCycle = cycle;
+        this.cachedCanReachMethod = method;
+        this.cachedCanReachTarget = target;
+        this.cachedCanReachAttackerX = attackerLocation?.getX() ?? -1;
+        this.cachedCanReachAttackerY = attackerLocation?.getY() ?? -1;
+        this.cachedCanReachAttackerZ = attackerLocation?.getZ() ?? -1;
+        this.cachedCanReachTargetX = targetLocation?.getX() ?? -1;
+        this.cachedCanReachTargetY = targetLocation?.getY() ?? -1;
+        this.cachedCanReachTargetZ = targetLocation?.getZ() ?? -1;
+        this.cachedCanReachAttackerMoving = attackerMoving;
+        this.cachedCanReachTargetMoving = targetMoving;
+        this.cachedCanReachResult = result;
+        return result;
     }
 
     public attack(target: Mobile) {
@@ -57,6 +133,9 @@ export class Combat {
      * Processes combat.
      */
     public process() {
+        if (!this.hasPendingWork()) {
+            return;
+        }
         // Process the hit queue
         ServerPerf.measurePhase("combat.process.hit_queue", () => this.hitQueue.process(this.character));
 
@@ -74,6 +153,10 @@ export class Combat {
         ServerPerf.measurePhase("combat.process.attack_cycle", () => this.performNewAttack(false));
     }
 
+    public hasPendingWork(): boolean {
+        return this.target != null || this.attacker != null || this.hitQueue.hasPendingWork();
+    }
+
     public performNewAttack(instant: boolean) {
         if (this.target == null || (this.character != null && this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack())) {
             // Don't process attacks for NPC's who don't fight back
@@ -85,7 +168,12 @@ export class Combat {
         this.character.setMobileInteraction(this.target);
         // Keep combat-facing updated every tick; Mobile now dedupes identical
         // face positions so this no longer needlessly re-flags unchanged values.
-        this.character.setPositionToFace(this.target.getLocation().clone());
+        const targetLocation = this.target.getLocation();
+        this.character.setPositionToFaceCoordinates(
+            targetLocation.getX(),
+            targetLocation.getY(),
+            targetLocation.getZ()
+        );
 
         if (!instant && this.character.getTimers().has(TimerKey.COMBAT_ATTACK)) {
             if (!this.character.isPlayer()) {
@@ -98,7 +186,10 @@ export class Combat {
         }
 
         // Fetch the combat method the character will be attacking with
-        this.method = CombatFactory.getMethod(this.character);
+        this.method = ServerPerf.measurePhase(
+            "combat.process.get_method",
+            () => this.resolveMethodForCurrentCycle()
+        );
 
         // Granite maul special attack, make sure we disregard delay
         // and that we do not reset the attack timer.
@@ -107,12 +198,29 @@ export class Combat {
             instant = true;
         }
 
-        if (!CombatFactory.canReach(this.character, this.method, this.target)) {
+        const target = this.target;
+        if (!ServerPerf.measurePhase(
+            "combat.process.can_reach",
+            () => this.resolveCanReachForCurrentCycle(this.method, target)
+        )) {
             // Make sure the character is within reach before processing combat
             return;
         }
+        if (this.target !== target || target == null) {
+            return;
+        }
 
-        switch (CombatFactory.canAttack(this.character, this.method, this.target)) {
+        if (!ServerPerf.measurePhase(
+            "combat.process.can_attack.valid_target",
+            () => CombatFactory.validTarget(this.character, target)
+        )) {
+            return;
+        }
+
+        switch (ServerPerf.measurePhase(
+            "combat.process.can_attack",
+            () => CombatFactory.canAttack(this.character, this.method, target, true)
+        )) {
             case CanAttackResponse.CAN_ATTACK: {
                 if (this.character.getCombat().getAttacker() == null) {
                     // Call the onCombatBegan hook once when combat begins
@@ -123,14 +231,20 @@ export class Combat {
                     let targetMethod = CombatFactory.getMethod(this.target);
                     targetMethod.onCombatBegan(this.target, this.character);
                 }
-                this.method.start(this.character, this.target);
-                let hits = this.method.hits(this.character, this.target);
+                ServerPerf.measurePhase("combat.process.method_start", () =>
+                    this.method.start(this.character, this.target)
+                );
+                let hits = ServerPerf.measurePhase("combat.process.method_hits", () =>
+                    this.method.hits(this.character, this.target)
+                );
                 if (hits == null)
                     return;
                 for (let hit of hits) {
                     CombatFactory.addPendingHit(hit);
                 }
-                this.method.finished(this.character, this.target);
+                ServerPerf.measurePhase("combat.process.method_finished", () =>
+                    this.method.finished(this.character, this.target)
+                );
 
                 // Reset attack timer
                 if (!graniteMaulSpecial) {
@@ -229,6 +343,8 @@ export class Combat {
         this.setTarget(null);
         this.character.setCombatFollowing(null);
         this.character.setMobileInteraction(null);
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
     /**
 * Adds damage to the damage map, as long as the argued amount of damage is
@@ -319,6 +435,8 @@ export class Combat {
         }
 
         this.target = target;
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
 
     public getHitQueue(): HitQueue {
@@ -339,6 +457,8 @@ export class Combat {
     }
     public setCastSpell(castSpell: CombatSpell) {
         this.castSpell = castSpell;
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
 
     public getAutocastSpell(): CombatSpell {
@@ -347,6 +467,8 @@ export class Combat {
 
     public setAutocastSpell(autoCastSpell: CombatSpell) {
         this.autoCastSpell = autoCastSpell;
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
 
     public getSelectedSpell(): CombatSpell {
@@ -363,6 +485,8 @@ export class Combat {
 
     public setPreviousCast(previousCast: CombatSpell) {
         this.previousCast = previousCast;
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
 
     public getRangedWeapon(): RangedWeapon {
@@ -371,6 +495,8 @@ export class Combat {
 
     public setRangedWeapon(rangedWeapon: RangedWeapon) {
         this.rangedWeapon = rangedWeapon;
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
 
     public getAmmunition(): Ammunition {
@@ -379,6 +505,8 @@ export class Combat {
 
     public setAmmunition(ammunition: Ammunition) {
         this.ammunition = ammunition;
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
 
     public getRangeAmmoData(): RangedData {
@@ -387,6 +515,8 @@ export class Combat {
 
     public setRangeAmmoData(rangeAmmoData: RangedData) {
         this.ammunition = rangeAmmoData as unknown as Ammunition;
+        this.invalidateResolvedMethodCache();
+        this.invalidateCanReachCache();
     }
 
     public getPoisonImmunityTimer(): SecondsTimer {

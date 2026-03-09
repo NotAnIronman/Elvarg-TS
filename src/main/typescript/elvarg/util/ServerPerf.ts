@@ -151,7 +151,7 @@ export class ServerPerf {
         maxMs: agg.maxMs,
       }))
       .sort((a, b) => b.totalMs - a.totalMs)
-      .slice(0, 8);
+      .slice(0, 20);
 
     const last = samples[samples.length - 1];
     return {
@@ -168,4 +168,3 @@ export class ServerPerf {
     };
   }
 }
-

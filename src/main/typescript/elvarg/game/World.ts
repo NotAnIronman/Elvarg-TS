@@ -40,7 +40,7 @@ export class World {
     private static readonly BOT_PROCESS_LOD_FAR_STRIDE = 12;
     private static readonly UPDATE_BUCKET_RADIUS = 2;
     private static readonly PLAYER_UPDATE_BUCKET_COMPARE_ENABLED =
-        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "0") === "1";
+        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "1") === "1";
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
@@ -192,6 +192,10 @@ export class World {
         return this.players;
     }
 
+    public static getProcessCycle(): number {
+        return this.processCycle;
+    }
+
     public static getNpcs(): MobileList<NPC> {
         return this.npcs;
     }
@@ -230,7 +234,10 @@ export class World {
         World.npcUpdateBuckets.clear();
         if (World.PLAYER_UPDATE_BUCKET_COMPARE_ENABLED) {
             World.playerUpdateBuckets.clear();
-            World.forEachNetworkPlayer((player) => {
+            World.players.forEach((player) => {
+                if (!player) {
+                    return;
+                }
                 World.addToUpdateBucket(World.playerUpdateBuckets, player);
             });
         } else if (World.playerUpdateBuckets.size > 0) {

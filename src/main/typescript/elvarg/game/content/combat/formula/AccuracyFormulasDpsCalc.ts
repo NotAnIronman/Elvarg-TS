@@ -1,5 +1,3 @@
-import * as crypto from 'crypto-browserify'
-
 import { PrayerHandler } from "../../../content/PrayerHandler";
 import { CombatFactory } from "../CombatFactory";
 import { CombatType } from "../CombatType";
@@ -10,6 +8,21 @@ import { BonusManager } from "../../../model/equipment/BonusManager";
 import { Skill } from "../../../model/Skill";
 import { applyMeleeAttackAccuracyModifiers, applyRangedAttackAccuracyModifiers, applyMagicAttackAccuracyModifiers, applyMeleeDefenseModifiers, applyRangedDefenseModifiers, applyMagicDefenseModifiers } from "../EquipmentEffects";
 import type { Player } from '../../../entity/impl/player/Player';
+import { World } from "../../../World";
+
+type RollCacheEntry = {
+    cycle: number;
+    effectiveAttackLevel?: number;
+    effectiveDefenseLevel?: number;
+    effectiveRangedAttack?: number;
+    effectiveMagicLevel?: number;
+    attackMeleeRoll?: number;
+    attackRangedRoll?: number;
+    attackMagicRoll?: number;
+    defenseRangedRoll?: number;
+    defenseMagicRoll?: number;
+    defenseMeleeRolls?: Map<number, number>;
+};
 
 const getPlayerCombatSpecial = (player: Player): any | null => {
     const accessor = (player as any)?.getCombatSpecial;
@@ -23,9 +36,21 @@ const getPlayerCombatSpecial = (player: Player): any | null => {
 };
 
 export class AccuracyFormulasDpsCalc {
+    private static readonly rollCache = new WeakMap<Mobile, RollCacheEntry>();
+
+    private static getRollCache(entity: Mobile): RollCacheEntry {
+        const cycle = World.getProcessCycle();
+        const cached = this.rollCache.get(entity);
+        if (cached && cached.cycle === cycle) {
+            return cached;
+        }
+        const next: RollCacheEntry = { cycle, defenseMeleeRolls: new Map<number, number>() };
+        this.rollCache.set(entity, next);
+        return next;
+    }
+
     static randomFloat() {
-        const randomByte = crypto.randomBytes(1);
-        return randomByte.readUInt8() / 255;
+        return Math.random();
     }
 
     public static rollAccuracy(entity: any, enemy: any, style: any) {
@@ -66,10 +91,15 @@ export class AccuracyFormulasDpsCalc {
     }
 
     public static effectiveAttackLevel(entity: Mobile) {
+        const cache = this.getRollCache(entity);
+        if (cache.effectiveAttackLevel != null) {
+            return cache.effectiveAttackLevel;
+        }
         let att = 8;
 
         if (entity.isNpc()) {
             att += entity.getAsNpc().getCurrentDefinition().getStats()[0];
+            cache.effectiveAttackLevel = att;
             return att;
         }
 
@@ -108,16 +138,22 @@ export class AccuracyFormulasDpsCalc {
             att *= special.getAccuracyMultiplier();
         }
 
+        cache.effectiveAttackLevel = att;
         return att;
     }
 
     public static attackMeleeRoll(entity: Mobile) {
+        const cache = this.getRollCache(entity);
+        if (cache.attackMeleeRoll != null) {
+            return cache.attackMeleeRoll;
+        }
         let attRoll = AccuracyFormulasDpsCalc.effectiveAttackLevel(entity);
 
         if (entity.isNpc()) {
             // NPC's don't currently have stab/slash/crush bonuses
             attRoll *= 64;
-            return Math.floor(attRoll);
+            cache.attackMeleeRoll = Math.floor(attRoll);
+            return cache.attackMeleeRoll;
         }
 
         let player = entity.getAsPlayer();
@@ -141,14 +177,20 @@ export class AccuracyFormulasDpsCalc {
                 attRoll *= maxAtt + 64;
         }
 
-        return Math.floor(attRoll);
+        cache.attackMeleeRoll = Math.floor(attRoll);
+        return cache.attackMeleeRoll;
     }
 
     public static effectiveDefenseLevel(enemy: Mobile) {
+        const cache = this.getRollCache(enemy);
+        if (cache.effectiveDefenseLevel != null) {
+            return cache.effectiveDefenseLevel;
+        }
         let def = 1;
 
         if (enemy.isNpc()) {
-            return enemy.getAsNpc().getCurrentDefinition().getStats()[2];
+            cache.effectiveDefenseLevel = enemy.getAsNpc().getCurrentDefinition().getStats()[2];
+            return cache.effectiveDefenseLevel;
         }
 
         let player = enemy.getAsPlayer();
@@ -185,6 +227,7 @@ export class AccuracyFormulasDpsCalc {
 
         def = applyMeleeDefenseModifiers(player, def);
 
+        cache.effectiveDefenseLevel = def;
         return def;
     }
 
@@ -195,6 +238,11 @@ export class AccuracyFormulasDpsCalc {
     }
 
     public static defenseMeleeRoll(enemy: Mobile, bonusType: number) {
+        const cache = this.getRollCache(enemy);
+        const cachedRoll = cache.defenseMeleeRolls?.get(bonusType);
+        if (cachedRoll != null) {
+            return cachedRoll;
+        }
         let defLevel = AccuracyFormulasDpsCalc.effectiveDefenseLevel(enemy);
 
         let enemyPlayer = enemy.getAsPlayer();
@@ -219,11 +267,17 @@ export class AccuracyFormulasDpsCalc {
                 defLevel *= maxDef + 64;
         }
 
-        return Math.floor(defLevel);
+        const resolved = Math.floor(defLevel);
+        cache.defenseMeleeRolls?.set(bonusType, resolved);
+        return resolved;
     }
 
     // Ranged
     public static defenseRangedRoll(enemy: Mobile) {
+        const cache = this.getRollCache(enemy);
+        if (cache.defenseRangedRoll != null) {
+            return cache.defenseRangedRoll;
+        }
         let defLevel = AccuracyFormulasDpsCalc.effectiveDefenseLevel(enemy);
 
         const defRange = (enemy.isPlayer() ?
@@ -232,15 +286,21 @@ export class AccuracyFormulasDpsCalc {
 
         defLevel *= defRange + 64;
 
+        cache.defenseRangedRoll = defLevel;
         return defLevel;
     }
 
     private static effectiveRangedAttack(entity: Mobile) {
+        const cache = this.getRollCache(entity);
+        if (cache.effectiveRangedAttack != null) {
+            return cache.effectiveRangedAttack;
+        }
         let rngStrength = 8;
 
         if (entity.isNpc()) {
             // Prayer bonuses don't apply to NPCs (yet)
-            return rngStrength + entity.getAsNpc().getCurrentDefinition().getStats()[3];
+            cache.effectiveRangedAttack = rngStrength + entity.getAsNpc().getCurrentDefinition().getStats()[3];
+            return cache.effectiveRangedAttack;
         }
 
         let player = entity.getAsPlayer();
@@ -267,25 +327,36 @@ export class AccuracyFormulasDpsCalc {
 
         //    if (dragonHunter(input))
         //        rngStrength =
+        cache.effectiveRangedAttack = rngStrength;
         return rngStrength;
     }
 
     public static attackRangedRoll(entity: Mobile) {
+        const cache = this.getRollCache(entity);
+        if (cache.attackRangedRoll != null) {
+            return cache.attackRangedRoll;
+        }
         let accuracyBonus = (entity.isNpc() ? 0 : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_RANGE]);
 
         let attRoll = AccuracyFormulasDpsCalc.effectiveRangedAttack(entity);
 
         attRoll *= (accuracyBonus + 64);
 
-        return Math.floor(attRoll);
+        cache.attackRangedRoll = Math.floor(attRoll);
+        return cache.attackRangedRoll;
     }
 
     private static effectiveMagicLevel(entity: Mobile) {
+        const cache = this.getRollCache(entity);
+        if (cache.effectiveMagicLevel != null) {
+            return cache.effectiveMagicLevel;
+        }
         let mag = 8;
 
         if (entity.isNpc()) {
             // Prayer bonuses don't apply to NPCs (yet)
             mag += entity.getAsNpc().getCurrentDefinition().getStats()[4];
+            cache.effectiveMagicLevel = mag;
             return mag;
         }
 
@@ -315,25 +386,36 @@ export class AccuracyFormulasDpsCalc {
 
         mag = applyMagicAttackAccuracyModifiers(player, mag);
 
+        cache.effectiveMagicLevel = mag;
         return mag;
     }
 
     public static defenseMagicRoll(enemy: Mobile): number {
+        const cache = this.getRollCache(enemy);
+        if (cache.defenseMagicRoll != null) {
+            return cache.defenseMagicRoll;
+        }
         let defLevel = AccuracyFormulasDpsCalc.effectiveMagicLevel(enemy);
 
         let defRange = (enemy.isNpc() ? 0 : enemy.getAsPlayer().getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_MAGIC]);
 
         defLevel *= (defRange + 64);
 
+        cache.defenseMagicRoll = defLevel;
         return defLevel;
     }
 
     public static attackMagicRoll(entity: Mobile): number {
+        const cache = this.getRollCache(entity);
+        if (cache.attackMagicRoll != null) {
+            return cache.attackMagicRoll;
+        }
         let accuracyBonus = (entity.isNpc() ? 0 : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_MAGIC]);
 
         let attRoll = AccuracyFormulasDpsCalc.effectiveMagicLevel(entity);
         attRoll *= (accuracyBonus + 64);
 
+        cache.attackMagicRoll = attRoll;
         return attRoll;
     }
 }

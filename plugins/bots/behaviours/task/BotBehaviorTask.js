@@ -66,7 +66,25 @@ class BotBehaviorTask extends Task {
       autonomyMs: 0,
       controllerMs: 0,
       totalEntryMs: 0,
+      modeSamples: Object.create(null),
     };
+  }
+
+  getModeProfile(window, mode) {
+    if (!window) {
+      return null;
+    }
+    const key = mode || "unknown";
+    if (!window.modeSamples[key]) {
+      window.modeSamples[key] = {
+        sampledEntries: 0,
+        heavyEntries: 0,
+        autonomyMs: 0,
+        controllerMs: 0,
+        totalEntryMs: 0,
+      };
+    }
+    return window.modeSamples[key];
   }
 
   shouldSampleEntry(index) {
@@ -95,6 +113,17 @@ class BotBehaviorTask extends Task {
     const sampledEntries = window.sampledEntries;
     const heavyEntries = window.heavyEntries;
     const avg = (total, count) => (count > 0 ? Number((total / count).toFixed(4)) : 0);
+    const topModes = Object.entries(window.modeSamples)
+      .map(([mode, stats]) => ({
+        mode,
+        sampledEntries: stats.sampledEntries,
+        heavyEntries: stats.heavyEntries,
+        avgEntryMs: avg(stats.totalEntryMs, stats.sampledEntries),
+        avgAutonomyMs: avg(stats.autonomyMs, stats.heavyEntries),
+        avgControllerMs: avg(stats.controllerMs, stats.heavyEntries),
+      }))
+      .sort((a, b) => b.avgEntryMs - a.avgEntryMs)
+      .slice(0, 6);
     this.api?.log?.("bot_task_profile_snapshot", {
       windowMs: nowMs - window.startedAt,
       sampledEntries,
@@ -106,6 +135,7 @@ class BotBehaviorTask extends Task {
       avgHeavyGateMs: avg(window.heavyGateMs, sampledEntries),
       avgAutonomyMs: avg(window.autonomyMs, heavyEntries),
       avgControllerMs: avg(window.controllerMs, heavyEntries),
+      topModes,
     });
   }
 
@@ -376,12 +406,21 @@ class BotBehaviorTask extends Task {
     if (player.getForceMovement?.() != null) {
       return true;
     }
+    const blockedBackoffUntil = Number(state.pathBlockedTracker?.backoffUntil ?? 0);
     let shard = Number.isFinite(state.processingShard)
       ? state.processingShard
       : Number.NaN;
     if (!Number.isFinite(shard) || shard < 0 || shard >= stride) {
       shard = Math.floor(Math.random() * stride);
       state.processingShard = shard;
+    }
+    if (
+      blockedBackoffUntil > nowMs &&
+      !this.transientModes.has(state.mode) &&
+      state.mode !== this.behaviorMode?.PVP
+    ) {
+      const backoffStride = Math.max(4, stride * 2);
+      return (this._cycleCounter + shard) % backoffStride === 0;
     }
     if (state.mode === this.behaviorMode?.BANK_RUN) {
       const queueSize = Number(player.getMovementQueue?.()?.size?.() ?? 0);
@@ -794,6 +833,10 @@ class BotBehaviorTask extends Task {
     for (let index = 0; index < this.entries.length; index++) {
       const entry = this.entries[index];
       const sampleEntry = this.shouldSampleEntry(index);
+      const modeProfile =
+        sampleEntry && this._profileWindow
+          ? this.getModeProfile(this._profileWindow, entry?.state?.mode)
+          : null;
       let entryStartNs = 0n;
       if (sampleEntry && this._profileWindow) {
         entryStartNs = process.hrtime.bigint();
@@ -806,18 +849,49 @@ class BotBehaviorTask extends Task {
         }
         if (sampleEntry && this._profileWindow) {
           this._profileWindow.sampledEntries += 1;
+          if (modeProfile) {
+            modeProfile.sampledEntries += 1;
+          }
+        }
+
+        const combat = player.getCombat?.();
+        const attacker = combat?.getAttacker?.();
+        const target = combat?.getTarget?.();
+        const hasPendingTraversal =
+          state.awaitingDitchTransition != null ||
+          state.roaming?.pendingRetry != null;
+        const needsNpcAggro =
+          !!this.npcAggroPolicyHandler &&
+          (attacker?.isNpc?.() === true || target?.isNpc?.() === true);
+
+        let shouldProcessHeavy = true;
+        let traversalStartNs = 0n;
+        let npcAggroStartNs = 0n;
+        if (sampleEntry && this._profileWindow) {
+          traversalStartNs = process.hrtime.bigint();
+          npcAggroStartNs = process.hrtime.bigint();
+        }
+
+        if (!hasPendingTraversal && !needsNpcAggro) {
+          let heavyGateStartNs = 0n;
+          if (sampleEntry && this._profileWindow) {
+            heavyGateStartNs = process.hrtime.bigint();
+          }
+          shouldProcessHeavy = this.shouldProcessEntryHeavy(entry, now);
+          if (sampleEntry && this._profileWindow) {
+            this._profileWindow.heavyGateMs += this.elapsedMs(heavyGateStartNs);
+          }
+          if (!shouldProcessHeavy) {
+            continue;
+          }
         }
 
         // Traversal processing is only needed while an actual transition/retry
         // is queued; avoid the call overhead on every idle bot tick.
-        let traversalStartNs = 0n;
-        if (sampleEntry && this._profileWindow) {
-          traversalStartNs = process.hrtime.bigint();
-        }
-        if (state.awaitingDitchTransition != null) {
+        if (hasPendingTraversal && state.awaitingDitchTransition != null) {
           this.traversalService.processTransition(player, state, now);
         }
-        if (state.roaming?.pendingRetry != null) {
+        if (hasPendingTraversal && state.roaming?.pendingRetry != null) {
           this.traversalService.processPendingRetry(player, state, now);
         }
         if (sampleEntry && this._profileWindow) {
@@ -825,38 +899,21 @@ class BotBehaviorTask extends Task {
         }
 
         // Only run NPC aggro policy when NPC combat context exists.
-        let npcAggroStartNs = 0n;
-        if (sampleEntry && this._profileWindow) {
-          npcAggroStartNs = process.hrtime.bigint();
-        }
-        if (this.npcAggroPolicyHandler) {
-          const combat = player.getCombat?.();
-          const attacker = combat?.getAttacker?.();
-          const target = combat?.getTarget?.();
-          if (attacker?.isNpc?.() === true || target?.isNpc?.() === true) {
-            this.npcAggroPolicyHandler.handlePlayerProcess({
-              player,
-              nowMs: now,
-            });
-          }
+        if (needsNpcAggro) {
+          this.npcAggroPolicyHandler.handlePlayerProcess({
+            player,
+            nowMs: now,
+          });
         }
         if (sampleEntry && this._profileWindow) {
           this._profileWindow.npcAggroMs += this.elapsedMs(npcAggroStartNs);
         }
 
-        let heavyGateStartNs = 0n;
-        if (sampleEntry && this._profileWindow) {
-          heavyGateStartNs = process.hrtime.bigint();
-        }
-        const shouldProcessHeavy = this.shouldProcessEntryHeavy(entry, now);
-        if (sampleEntry && this._profileWindow) {
-          this._profileWindow.heavyGateMs += this.elapsedMs(heavyGateStartNs);
-        }
-        if (!shouldProcessHeavy) {
-          continue;
-        }
         if (sampleEntry && this._profileWindow) {
           this._profileWindow.heavyEntries += 1;
+          if (modeProfile) {
+            modeProfile.heavyEntries += 1;
+          }
         }
         let autonomyStartNs = 0n;
         if (sampleEntry && this._profileWindow) {
@@ -864,7 +921,11 @@ class BotBehaviorTask extends Task {
         }
         this.processAutonomousMode(entry, now);
         if (sampleEntry && this._profileWindow) {
-          this._profileWindow.autonomyMs += this.elapsedMs(autonomyStartNs);
+          const autonomyMs = this.elapsedMs(autonomyStartNs);
+          this._profileWindow.autonomyMs += autonomyMs;
+          if (modeProfile) {
+            modeProfile.autonomyMs += autonomyMs;
+          }
         }
         let controllerStartNs = 0n;
         if (sampleEntry && this._profileWindow) {
@@ -872,13 +933,21 @@ class BotBehaviorTask extends Task {
         }
         entry.controller.tick(now);
         if (sampleEntry && this._profileWindow) {
-          this._profileWindow.controllerMs += this.elapsedMs(controllerStartNs);
+          const controllerMs = this.elapsedMs(controllerStartNs);
+          this._profileWindow.controllerMs += controllerMs;
+          if (modeProfile) {
+            modeProfile.controllerMs += controllerMs;
+          }
         }
       } catch (err) {
         console.error("[bots] behavior tick failed", err);
       } finally {
         if (sampleEntry && this._profileWindow) {
-          this._profileWindow.totalEntryMs += this.elapsedMs(entryStartNs);
+          const totalEntryMs = this.elapsedMs(entryStartNs);
+          this._profileWindow.totalEntryMs += totalEntryMs;
+          if (modeProfile) {
+            modeProfile.totalEntryMs += totalEntryMs;
+          }
         }
       }
     }

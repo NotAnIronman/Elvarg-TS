@@ -11,41 +11,53 @@ function resolveBotNodeContext(context, botStatesByName, options = {}) {
   if (!player) {
     return null;
   }
-  if (requireRegistered && !player.isRegistered()) {
-    return null;
-  }
-
-  const username = player.getUsername?.();
-  if (!username) {
-    return null;
-  }
-
-  const state = botStatesByName.get(username);
-  if (!state) {
-    return null;
-  }
-
-  if (requireNotBusy && player.busy()) {
-    return null;
-  }
-  if (requireNotInCombat) {
+  let cached = context?.__resolvedBotNodeContext;
+  if (!cached || cached.player !== player) {
+    const username = player.getUsername?.();
+    const state = username ? botStatesByName.get(username) : null;
     const combat = player.getCombat?.();
-    const hasTarget = combat?.getTarget?.();
-    const hasAttacker = combat?.getAttacker?.();
-    const isCombatFollowing = player.getCombatFollowing?.();
-    if (hasTarget || hasAttacker || isCombatFollowing) {
-      return null;
-    }
+    cached = {
+      player,
+      username,
+      state,
+      isRegistered: player.isRegistered(),
+      isBusy: player.busy(),
+      inCombat: !!(
+        combat?.getTarget?.() ||
+        combat?.getAttacker?.() ||
+        player.getCombatFollowing?.()
+      ),
+      hasTraversalTransition: !!state?.awaitingDitchTransition,
+      nowMs: Number.isFinite(context?.nowMs) ? context.nowMs : Date.now(),
+    };
+    context.__resolvedBotNodeContext = cached;
   }
-  if (requireNoTraversalTransition && state.awaitingDitchTransition) {
+
+  if (requireRegistered && !cached.isRegistered) {
     return null;
   }
-  if (requiredMode && state.mode !== requiredMode) {
+  if (!cached.username || !cached.state) {
+    return null;
+  }
+  if (requireNotBusy && cached.isBusy) {
+    return null;
+  }
+  if (requireNotInCombat && cached.inCombat) {
+    return null;
+  }
+  if (requireNoTraversalTransition && cached.hasTraversalTransition) {
+    return null;
+  }
+  if (requiredMode && cached.state.mode !== requiredMode) {
     return null;
   }
 
-  const nowMs = Number.isFinite(context?.nowMs) ? context.nowMs : Date.now();
-  return { player, state, username, nowMs };
+  return {
+    player,
+    state: cached.state,
+    username: cached.username,
+    nowMs: cached.nowMs,
+  };
 }
 
 module.exports = {

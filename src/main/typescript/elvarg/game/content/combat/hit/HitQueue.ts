@@ -8,32 +8,43 @@ import { CombatFactory } from "../../../content/combat/CombatFactory";
 export class HitQueue {
     private pendingHits: PendingHit[] = [];
     private pendingDamage: HitDamage[] = [];
+    private pendingDamageOffset = 0;
 
     public process(character: Mobile) {
         if (character.getHitpoints() <= 0) {
             this.pendingHits = [];
             this.pendingDamage = [];
+            this.pendingDamageOffset = 0;
             return;
         }
 
-        for (let i = 0; i < this.pendingHits.length; i++) {
-            const hit = this.pendingHits[i];
-            if (hit == null || hit.getTarget() == null || hit.getAttacker() == null || hit.getTarget().isUntargetable() || hit.getAttacker().getHitpoints() <= 0) {
-                this.pendingHits.splice(i, 1);
-                i--;
-                continue;
-            }
+        if (this.pendingHits.length > 0) {
+            let writeIndex = 0;
+            for (let i = 0; i < this.pendingHits.length; i++) {
+                const hit = this.pendingHits[i];
+                if (
+                    hit == null ||
+                    hit.getTarget() == null ||
+                    hit.getAttacker() == null ||
+                    hit.getTarget().isUntargetable() ||
+                    hit.getAttacker().getHitpoints() <= 0
+                ) {
+                    continue;
+                }
 
-            if (hit.getAndDecrementDelay() <= 0) {
-                CombatFactory.executeHit(hit);
-                this.pendingHits.splice(i, 1);
-                i--;
+                if (hit.getAndDecrementDelay() <= 0) {
+                    CombatFactory.executeHit(hit);
+                    continue;
+                }
+
+                this.pendingHits[writeIndex++] = hit;
             }
+            this.pendingHits.length = writeIndex;
         }
 
-        if (this.pendingDamage.length > 0) {
+        if (this.pendingDamageOffset < this.pendingDamage.length) {
             if (!character.getUpdateFlag().flagged(Flag.SINGLE_HIT)) {
-                const firstHit = this.pendingDamage.shift();
+                const firstHit = this.pendingDamage[this.pendingDamageOffset++];
 
                 // Check if it's present
                 if (firstHit != null) {
@@ -48,7 +59,7 @@ export class HitQueue {
             if (!character.getUpdateFlag().flagged(Flag.DOUBLE_HIT)) {
 
                 // Attempt to fetch a second hit.
-                const secondHit = this.pendingDamage.shift();
+                const secondHit = this.pendingDamage[this.pendingDamageOffset++];
 
                 // Check if it's present
                 if (secondHit != null){
@@ -59,6 +70,17 @@ export class HitQueue {
                     character.getUpdateFlag().flag(Flag.DOUBLE_HIT);
                 }
             }
+            if (this.pendingDamageOffset >= this.pendingDamage.length) {
+                this.pendingDamage.length = 0;
+                this.pendingDamageOffset = 0;
+            } else if (this.pendingDamageOffset >= 32 && this.pendingDamageOffset * 2 >= this.pendingDamage.length) {
+                let writeIndex = 0;
+                for (let i = this.pendingDamageOffset; i < this.pendingDamage.length; i++) {
+                    this.pendingDamage[writeIndex++] = this.pendingDamage[i];
+                }
+                this.pendingDamage.length = writeIndex;
+                this.pendingDamageOffset = 0;
+            }
         }
     }
 
@@ -67,12 +89,33 @@ export class HitQueue {
     }
 
     public addPendingDamage(hits: HitDamage[]) {
-        hits.filter(h => h != null).forEach(h => this.pendingDamage.push(h));
+        for (let i = 0; i < hits.length; i++) {
+            const hit = hits[i];
+            if (hit != null) {
+                this.pendingDamage.push(hit);
+            }
+        }
+    }
+
+    public hasPendingWork(): boolean {
+        return this.pendingHits.length > 0 || this.pendingDamageOffset < this.pendingDamage.length;
     }
 
     public getAccumulatedDamage(): number {
-        let hitDmg = this.pendingHits.filter(pd => pd.getExecutedInTicks() < 2).map(pd => pd.getTotalDamage()).reduce((a, b) => a + b);
-        let dmg = this.pendingDamage.map(h => h.getDamage()).reduce((a, b) => a + b);
+        let hitDmg = 0;
+        for (let i = 0; i < this.pendingHits.length; i++) {
+            const pendingHit = this.pendingHits[i];
+            if (pendingHit != null && pendingHit.getExecutedInTicks() < 2) {
+                hitDmg += pendingHit.getTotalDamage();
+            }
+        }
+        let dmg = 0;
+        for (let i = this.pendingDamageOffset; i < this.pendingDamage.length; i++) {
+            const hit = this.pendingDamage[i];
+            if (hit != null) {
+                dmg += hit.getDamage();
+            }
+        }
         return hitDmg + dmg;
     }
 

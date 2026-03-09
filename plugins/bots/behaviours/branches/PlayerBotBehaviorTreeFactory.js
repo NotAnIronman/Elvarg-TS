@@ -2,7 +2,6 @@ const {
   ActionNode,
   CooldownNode,
   SelectorNode,
-  SequenceNode,
 } = require("../../../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { FollowBackActionNode } = require("../nodes/actions/FollowBackActionNode");
 const { EatFoodActionNode } = require("../nodes/actions/EatFoodActionNode");
@@ -10,7 +9,6 @@ const {
   ProcessPendingMovementActionNode,
 } = require("../nodes/actions/ProcessPendingMovementActionNode");
 const { ReturnHomeActionNode } = require("../nodes/actions/ReturnHomeActionNode");
-const { BotReadyConditionNode } = require("../nodes/conditions/BotReadyConditionNode");
 
 function requireModeBehavior(modeHandlers, modeValue, label) {
   const behavior = modeHandlers?.[modeValue];
@@ -80,89 +78,69 @@ class PlayerBotBehaviorTreeFactory {
   }
 
   create(cooldownMs, initialDelayMs) {
-    return new SelectorNode([
-      new ProcessPendingMovementActionNode(this.botStatesByName, this.api, {
+    const processPendingMovementActionNode = new ProcessPendingMovementActionNode(
+      this.botStatesByName,
+      this.api,
+      {
         traversalService: this.traversalService,
-      }),
-      new ActionNode((context) => this.eatFoodActionNode.tick(context)),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.RETURN_HOME,
-        }),
-        new ReturnHomeActionNode(this.botStatesByName, this.api, {
-          behaviorMode: this.behaviorMode,
-          botHomeRadius: this.botHomeRadius,
-          blockedRetargetMinDelayMs: this.blockedRetargetMinDelayMs,
-        }),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.FOLLOW_BACK,
-        }),
-        new FollowBackActionNode(this.botStatesByName, this.api, {
-          behaviorMode: this.behaviorMode,
-          followRepathIntervalMs: this.followRepathIntervalMs,
-        }),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.BANK_RUN,
-          requireNotBusy: false,
-          requireNotInCombat: false,
-        }),
-        new ActionNode((context) =>
-          this.bankRunBehavior.tick({
+      }
+    );
+    const returnHomeActionNode = new ReturnHomeActionNode(
+      this.botStatesByName,
+      this.api,
+      {
+        behaviorMode: this.behaviorMode,
+        botHomeRadius: this.botHomeRadius,
+        blockedRetargetMinDelayMs: this.blockedRetargetMinDelayMs,
+      }
+    );
+    const followBackActionNode = new FollowBackActionNode(
+      this.botStatesByName,
+      this.api,
+      {
+        behaviorMode: this.behaviorMode,
+        followRepathIntervalMs: this.followRepathIntervalMs,
+      }
+    );
+    const roamingCooldownNode = new CooldownNode(
+      cooldownMs,
+      new ActionNode((context) => this.roamingBehavior.tick(context)),
+      initialDelayMs
+    );
+    const tickCurrentMode = (context) => {
+      const player = context?.player;
+      const username = player?.getUsername?.();
+      const state = username ? this.botStatesByName.get(username) : null;
+      switch (state?.mode) {
+        case this.behaviorMode.RETURN_HOME:
+          return returnHomeActionNode.tick(context);
+        case this.behaviorMode.FOLLOW_BACK:
+          return followBackActionNode.tick(context);
+        case this.behaviorMode.BANK_RUN:
+          return this.bankRunBehavior.tick({
             ...context,
             traversalService: this.traversalService,
-          })
-        ),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.WOODCUTTING,
-        }),
-        new ActionNode((context) => this.woodcuttingBehavior.tick(context)),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.MINING,
-        }),
-        new ActionNode((context) => this.miningBehavior.tick(context)),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.SMELTING,
-          requireNotInCombat: false,
-          requireNotBusy: false,
-        }),
-        new ActionNode((context) => this.smeltingBehavior.tick(context)),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.FIREMAKING,
-          requireNotBusy: false,
-          requireNotInCombat: false,
-        }),
-        new ActionNode((context) => this.firemakingBehavior.tick(context)),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.PVP,
-          requireNotInCombat: false,
-          requireNotBusy: false,
-        }),
-        new ActionNode((context) => this.pvpBehavior.tick(context)),
-      ]),
-      new SequenceNode([
-        new BotReadyConditionNode(this.botStatesByName, {
-          requiredMode: this.behaviorMode.ROAMING,
-        }),
-        new CooldownNode(
-          cooldownMs,
-          new ActionNode((context) => this.roamingBehavior.tick(context)),
-          initialDelayMs
-        ),
-      ]),
+          });
+        case this.behaviorMode.WOODCUTTING:
+          return this.woodcuttingBehavior.tick(context);
+        case this.behaviorMode.MINING:
+          return this.miningBehavior.tick(context);
+        case this.behaviorMode.SMELTING:
+          return this.smeltingBehavior.tick(context);
+        case this.behaviorMode.FIREMAKING:
+          return this.firemakingBehavior.tick(context);
+        case this.behaviorMode.PVP:
+          return this.pvpBehavior.tick(context);
+        case this.behaviorMode.ROAMING:
+          return roamingCooldownNode.tick(context);
+        default:
+          return "failure";
+      }
+    };
+    return new SelectorNode([
+      processPendingMovementActionNode,
+      new ActionNode((context) => this.eatFoodActionNode.tick(context)),
+      new ActionNode((context) => tickCurrentMode(context)),
     ]);
   }
 }

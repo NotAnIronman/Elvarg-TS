@@ -390,14 +390,22 @@ export class Player extends Mobile {
             timed("packets", () => session.processPackets());
         }
 
-        // Process walking queue..
-        timed("movement", () => this.getMovementQueue().process());
+        if (isBot) {
+            timed("overlap_break", () => this.tryBreakBotCombatOverlap());
+        }
+
+        // Process walking queue only when movement/follow state exists.
+        if (this.getMovementQueue().hasPendingWork()) {
+            timed("movement", () => this.getMovementQueue().process());
+        }
         if (this.getMovementQueue().isMovings()) {
             this.updateFlag.flag(Flag.APPEARANCE);
         }
 
         // Process combat
-        timed("combat", () => this.getCombat().process());
+        if (this.getCombat().hasPendingWork()) {
+            timed("combat", () => this.getCombat().process());
+        }
 
         // Process aggression
         if (!isBot) {
@@ -512,6 +520,70 @@ export class Player extends Mobile {
                     }
                 });
             }
+        }
+    }
+
+    private tryBreakBotCombatOverlap(): void {
+        if (
+            this.getForceMovement() != null ||
+            this.getTimers().has(TimerKey.FREEZE) ||
+            this.getTimers().has(TimerKey.STEPPING_OUT) ||
+            this.getMovementQueue().size() > 0
+        ) {
+            return;
+        }
+
+        const combat = this.getCombat();
+        if (!combat?.hasPendingWork()) {
+            return;
+        }
+
+        const current = this.getLocation();
+        const privateArea = this.getPrivateArea();
+        const locals = this.getLocalPlayers();
+        let overlap: Player = null;
+
+        for (const other of locals) {
+            if (
+                !other ||
+                other === this ||
+                !other.isRegistered() ||
+                !other.isPlayerBot() ||
+                other.getPrivateArea() !== privateArea ||
+                other.getForceMovement() != null ||
+                other.getTimers().has(TimerKey.FREEZE)
+            ) {
+                continue;
+            }
+            const otherCombat = other.getCombat();
+            if (!otherCombat?.hasPendingWork()) {
+                continue;
+            }
+            const otherLoc = other.getLocation();
+            if (
+                otherLoc &&
+                otherLoc.getX() === current.getX() &&
+                otherLoc.getY() === current.getY() &&
+                otherLoc.getZ() === current.getZ()
+            ) {
+                overlap = other;
+                break;
+            }
+        }
+
+        if (!overlap) {
+            return;
+        }
+
+        // Break bot-bot overlap from one side only. If both participants yield,
+        // they can swap tiles and oscillate.
+        if (this.getIndex() > overlap.getIndex()) {
+            return;
+        }
+
+        MovementQueue.clippedStep(this);
+        if (this.getMovementQueue().size() > 0) {
+            this.getTimers().registers(TimerKey.STEPPING_OUT, 2);
         }
     }
 

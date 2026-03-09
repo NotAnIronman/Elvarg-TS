@@ -4,6 +4,7 @@ import { GameConstants } from "../game/GameConstants";
 
 const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "packets.log");
+const PACKET_LOGGING_ENABLED = (process.env.PACKET_LOGGING ?? "0") === "1";
 let initialized = false;
 let logStream: fs.WriteStream | null = null;
 let streamWritable = true;
@@ -73,7 +74,7 @@ function formatEntry(meta: PacketLogMeta): string {
 }
 
 function writeEntry(meta: PacketLogMeta) {
-  if (!GameConstants.SERVER_LOG_WRITES_ENABLED) {
+  if (!PACKET_LOGGING_ENABLED || !GameConstants.SERVER_LOG_WRITES_ENABLED) {
     return;
   }
   try {

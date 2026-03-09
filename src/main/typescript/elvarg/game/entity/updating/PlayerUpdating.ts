@@ -16,8 +16,11 @@ import * as path from "path";
 
 export class PlayerUpdating {
     private static MAX_NEW_PLAYERS_PER_CYCLE = 25;
+    // Player local count is encoded on 8 bits. Keeping this at 79 starves nearby
+    // interactable players in bot-heavy scenes even though the client can track more.
+    private static readonly MAX_LOCAL_PLAYERS = 255;
     private static readonly CANDIDATE_COMPARE_ENABLED =
-        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "1") === "1";
+        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "0") === "1";
     private static readonly CANDIDATE_COMPARE_LOG_COOLDOWN_MS = 3000;
     private static readonly DEBUG_ENABLED =
         (process.env.PLAYER_UPDATE_DEBUG ?? "0") === "1";
@@ -176,12 +179,26 @@ export class PlayerUpdating {
 
         const bucketIndexes = new Set<number>();
         const extras: number[] = [];
+        let simulatedLocalCount = localPlayers.length;
+        let simulatedPlayersAdded = 0;
         for (const candidate of bucketCandidates) {
-            if (!this.isEligibleAddCandidate(player, candidate) || localIndexes.has(candidate.getIndex())) {
+            if (
+                simulatedLocalCount >= PlayerUpdating.MAX_LOCAL_PLAYERS ||
+                simulatedPlayersAdded > PlayerUpdating.MAX_NEW_PLAYERS_PER_CYCLE
+            ) {
+                break;
+            }
+            if (
+                !this.isEligibleAddCandidate(player, candidate) ||
+                localIndexes.has(candidate.getIndex())
+            ) {
                 continue;
             }
             const index = candidate.getIndex();
             bucketIndexes.add(index);
+            localIndexes.add(index);
+            simulatedLocalCount += 1;
+            simulatedPlayersAdded += 1;
             if (!legacyIndexes.has(index)) {
                 extras.push(index);
             }
@@ -258,15 +275,21 @@ export class PlayerUpdating {
         let playersAdded = 0;
         const visibleCandidates: Player[] = [];
 
-        for (const otherPlayer of World.getPlayers()) {
-            if (player.getLocalPlayers().length >= 79 || playersAdded > PlayerUpdating.MAX_NEW_PLAYERS_PER_CYCLE)
-                break;
+        // TODO: Finish player bucket semantics before reintroducing them to live updates.
+        // Local-player correctness is more important than the small cost of the legacy scan.
+        const tryAddCandidate = (otherPlayer: Player | null | undefined, recordCompare: boolean) => {
+            if (
+                player.getLocalPlayers().length >= PlayerUpdating.MAX_LOCAL_PLAYERS ||
+                playersAdded > PlayerUpdating.MAX_NEW_PLAYERS_PER_CYCLE
+            ) {
+                return true;
+            }
             if (otherPlayer == null || otherPlayer == player || localPlayerIndexes.has(otherPlayer.getIndex())
                 || !otherPlayer.getLocation().isViewableFrom(player.getLocation())
                 || otherPlayer.getPrivateArea() !== player.getPrivateArea()) {
-                continue;
+                return false;
             }
-            if (PlayerUpdating.CANDIDATE_COMPARE_ENABLED) {
+            if (recordCompare && PlayerUpdating.CANDIDATE_COMPARE_ENABLED) {
                 visibleCandidates.push(otherPlayer);
             }
             player.getLocalPlayers().push(otherPlayer);
@@ -274,6 +297,13 @@ export class PlayerUpdating {
             this.addPlayer(player, otherPlayer, packet);
             this.appendUpdates(player, update, otherPlayer, true, false, updateId);
             playersAdded++;
+            return false;
+        };
+
+        for (const otherPlayer of World.getPlayers()) {
+            if (tryAddCandidate(otherPlayer, true)) {
+                break;
+            }
         }
         if (PlayerUpdating.CANDIDATE_COMPARE_ENABLED) {
             this.compareBucketCandidates(player, localPlayers, visibleCandidates);

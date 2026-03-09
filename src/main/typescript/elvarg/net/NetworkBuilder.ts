@@ -70,6 +70,8 @@ const MALE_LOOK_RANGES: Array<[number, number]> = [
   [42, 43], // feet
 ];
 const NPC_BITS = GameConstants.NPC_BITS;
+const LOGIN_SESSION_VERBOSE_LOGGING_ENABLED =
+  (process.env.LOGIN_SESSION_VERBOSE_LOGGING ?? "0") === "1";
 
 class LoginSession {
   private stage: LoginStage = "HANDSHAKE";
@@ -1014,6 +1016,12 @@ class LoginSession {
   }
 
   private log(event: string, data?: Record<string, unknown>) {
+    if (
+      !LOGIN_SESSION_VERBOSE_LOGGING_ENABLED &&
+      (event === "packet_received" || event === "send_packet")
+    ) {
+      return;
+    }
     const meta = data ? JSON.stringify(data) : "";
     console.log(`[login_session] ${event} ${meta}`);
   }

@@ -15,6 +15,7 @@ import { RS317PathFinder } from './path/RS317PathFinder'
 import { PlayerRights } from "../rights/PlayerRights";
 import { Task } from "../../task/Task";
 import { TaskManager } from "../../task/TaskManager";
+import { CombatType } from "../../content/combat/CombatType";
 import { Misc } from "../../../util/Misc";
 import { NpcIdentifiers } from "../../../util/NpcIdentifiers";
 import { RandomGen } from "../../../util/RandomGen";
@@ -22,6 +23,7 @@ import { TimerKey } from "../../../util/timers/TimerKey";
 import { Action } from "../Action";
 import { GameConstants } from "../../GameConstants";
 import { FastDeque } from "../../../util/FastDeque";
+import { ServerPerf } from "../../../util/ServerPerf";
 import * as fs from "fs";
 import * as path from "path";
 export class MovementQueue {
@@ -317,6 +319,19 @@ export class MovementQueue {
         return this.isMoving;
     }
 
+    public hasPendingWork(): boolean {
+        if (this.points.length > 0 || this.isMoving) {
+            return true;
+        }
+        if (this.character.getCombatFollowing() != null) {
+            return true;
+        }
+        if (!this.character.isPlayer() && this.character.getFollowing() != null) {
+            return true;
+        }
+        return false;
+    }
+
     public process() {
         const ownerLabel = this.ownerLabel();
 
@@ -329,9 +344,15 @@ export class MovementQueue {
         }
 
         if (this.character.getCombatFollowing() != null) {
-            this.processCombatFollowing();
+            ServerPerf.measurePhase(
+                "movement.process.combat_follow",
+                () => this.processCombatFollowing()
+            );
         } else if (this.character.getFollowing() != null && !this.character.isPlayer()) {
-            this.processFollowing();
+            ServerPerf.measurePhase(
+                "movement.process.follow",
+                () => this.processFollowing()
+            );
         }
 
         if (this.points.length > 0) {
@@ -341,7 +362,10 @@ export class MovementQueue {
         let walkPoint: Point = null;
         let runPoint: Point = null;
 
-        walkPoint = this.points.shift();
+        walkPoint = ServerPerf.measurePhase(
+            "movement.process.dequeue",
+            () => this.points.shift()
+        );
 
         if (this.isRunToggled()) {
             runPoint = this.points.shift();
@@ -352,7 +376,7 @@ export class MovementQueue {
 
         if (walkPoint != null && walkPoint.direction != Direction.NONE) {
             let next: Location = walkPoint.position;
-            if (this.canWalkTo(next)) {
+            if (ServerPerf.measurePhase("movement.process.walk_check", () => this.canWalkTo(next))) {
                 this.followX = oldPosition.getX();
                 this.followY = oldPosition.getY();
                 this.character.setLocation(next);
@@ -367,7 +391,7 @@ export class MovementQueue {
 
         if (runPoint != null && runPoint.direction != Direction.NONE) {
             let next: Location = runPoint.position;
-            if (this.canWalkTo(next)) {
+            if (ServerPerf.measurePhase("movement.process.run_check", () => this.canWalkTo(next))) {
                 this.followX = oldPosition.getX();
                 this.followY = oldPosition.getY();
                 oldPosition = next;
@@ -478,6 +502,20 @@ export class MovementQueue {
         if (!following) {
             return;
         }
+        if (
+            !following.isRegistered() ||
+            following.getHitpoints() <= 0 ||
+            (following.isPlayer?.() && following.getAsPlayer()?.isDyingReturn?.() === true) ||
+            (following.isNpc?.() && following.getAsNpc?.()?.isDyingFunction?.() === true)
+        ) {
+            this.character.getCombat().reset();
+            this.character.setCombatFollowing(null);
+            this.character.setFollowing(null);
+            this.character.setMobileInteraction(null);
+            this.character.setPositionToFace(null);
+            this.reset();
+            return;
+        }
         const isBot = this.isBotPlayer();
         const nowMs = Date.now();
         const size = this.character.getSize();
@@ -496,17 +534,19 @@ export class MovementQueue {
         if (!this.getMobility().canMove()) {
             return;
         }
-
-        let combatFollow = this.character.getCombat().getTarget() === following;
-        const method = CombatFactory.getMethod(this.character);
-
-        if (combatFollow && CombatFactory.canReach(this.character, method, following)) {
-            // Don't continue finding a path if we can reach our opponent
-            this.reset();
+        if (
+            this.character.getTimers().has(TimerKey.STEPPING_OUT) &&
+            this.size() > 0
+        ) {
+            // Let an already-queued sidestep complete before combat-follow
+            // immediately rebuilds a route onto the same target tile.
             return;
         }
 
-        // If we're way too far away from eachother, simply reset following completely.
+        let combatFollow = this.character.getCombat().getTarget() === following;
+
+        // Cheap hard reset checks first; avoid combat-method resolution and
+        // reach checks when the target is obviously out of follow scope.
         if (!this.character.getLocation().isViewableFrom(following.getLocation()) || !following.isRegistered() || following.getPrivateArea() != this.character.getPrivateArea()) {
 
             let reset = true;
@@ -558,6 +598,37 @@ export class MovementQueue {
                 this.character.setMobileInteraction(null);
                 return;
             }
+        }
+
+        const method = ServerPerf.measurePhase(
+            "movement.process.combat_follow.get_method",
+            () => this.character.getCombat().resolveMethodForCurrentCycle()
+        );
+
+        let closeEnoughToNeedReachCheck = true;
+        if (combatFollow) {
+            let requiredDistance = method.attackDistance(this.character);
+            const currentDistance = this.character.calculateDistance(following);
+            if (
+                method.type() == CombatType.MELEE &&
+                (following.getMovementQueue().isMovings() || this.character.getMovementQueue().isMovings())
+            ) {
+                requiredDistance++;
+            }
+            closeEnoughToNeedReachCheck = currentDistance <= requiredDistance;
+        }
+
+        if (
+            combatFollow &&
+            closeEnoughToNeedReachCheck &&
+            ServerPerf.measurePhase(
+                "movement.process.combat_follow.can_reach",
+                () => this.canStopCombatFollowing(method, following)
+            )
+        ) {
+            // Don't continue finding a path if we can reach our opponent
+            this.reset();
+            return;
         }
 
         let dancing = (!combatFollow && this.character.isPlayer() && following.isPlayer() && following.getCombatFollowing() == this.character);
@@ -665,10 +736,20 @@ export class MovementQueue {
             }
             const attackDistance = method.attackDistance(this.character);
 
+            if (this.shouldContinueCachedBotAttackRoute(following, attackDistance, nowMs)) {
+                return;
+            }
+
             // Find the nearest tile surrounding the target
-            destination = this.getCachedBotAttackTile(following, attackDistance, nowMs);
+            destination = ServerPerf.measurePhase(
+                "movement.process.combat_follow.attack_tile",
+                () => this.getCachedBotAttackTile(following, attackDistance, nowMs)
+            );
             if (destination == null) {
-                destination = PathFinder.getClosestAttackableTile(this.character, following, attackDistance);
+                destination = ServerPerf.measurePhase(
+                    "movement.process.combat_follow.closest_attack_tile",
+                    () => PathFinder.getClosestAttackableTile(this.character, following, attackDistance)
+                );
                 this.cacheBotAttackTile(following, attackDistance, destination, nowMs);
             }
             if (destination == null) {
@@ -681,14 +762,71 @@ export class MovementQueue {
             }
         }
 
-        if (this.shouldThrottleBotRepath(destination, nowMs, true)) {
+        if (ServerPerf.measurePhase(
+            "movement.process.combat_follow.repath_gate",
+            () => this.shouldThrottleBotRepath(destination, nowMs, true)
+        )) {
             return;
         }
         if (!isBot) {
             this.reset();
         }
         this.markBotRepathScheduled(destination, nowMs, true);
-        PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY());
+        ServerPerf.measurePhase("movement.process.combat_follow.route", () =>
+            PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY())
+        );
+    }
+
+    private canStopCombatFollowing(method: any, following: Mobile): boolean {
+        if (!this.character.isPlayer()) {
+            return this.character.getCombat().resolveCanReachForCurrentCycle(method, following);
+        }
+
+        const current = this.character.getLocation();
+        const target = following.getLocation();
+        if (!current || !target) {
+            return false;
+        }
+        if (current.equals(target)) {
+            return false;
+        }
+
+        let requiredDistance = method.attackDistance(this.character);
+        const distance = this.character.calculateDistance(following);
+        if (
+            method.type() == CombatType.MELEE &&
+            (following.getMovementQueue().isMovings() || this.character.getMovementQueue().isMovings())
+        ) {
+            requiredDistance++;
+        }
+        if (distance > requiredDistance) {
+            return false;
+        }
+
+        if (
+            method.type() == CombatType.MELEE &&
+            this.character.getSize() == 1 &&
+            following.getSize() == 1 &&
+            !this.character.getMovementQueue().isMovings() &&
+            !following.getMovementQueue().isMovings() &&
+            PathFinder.isDiagonalLocation(this.character, following)
+        ) {
+            return false;
+        }
+
+        if (
+            this.character.useProjectileClipping() &&
+            !RegionManager.canProjectileAttackReturn(
+                current,
+                target,
+                this.character.getSize(),
+                this.character.getPrivateArea()
+            )
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     public processFollowing() {
@@ -698,10 +836,18 @@ export class MovementQueue {
         }
         const nowMs = Date.now();
 
-        if (following === this.character || !following.isRegistered()) {
+        if (
+            following === this.character ||
+            !following.isRegistered() ||
+            following.getHitpoints() <= 0 ||
+            (following.isPlayer?.() && following.getAsPlayer()?.isDyingReturn?.() === true) ||
+            (following.isNpc?.() && following.getAsNpc?.()?.isDyingFunction?.() === true)
+        ) {
             this.character.setFollowing(null);
             this.character.setMobileInteraction(null);
             this.character.setPositionToFace(null);
+            this.character.setCombatFollowing(null);
+            this.reset();
             return;
         }
 
@@ -957,6 +1103,21 @@ export class MovementQueue {
             this.cachedBotAttackTileY,
             this.cachedBotAttackTileZ
         );
+    }
+
+    private shouldContinueCachedBotAttackRoute(
+        following: Mobile,
+        attackDistance: number,
+        nowMs: number
+    ): boolean {
+        if (!this.isBotPlayer() || this.points.length === 0) {
+            return false;
+        }
+        const destination = this.getCachedBotAttackTile(following, attackDistance, nowMs);
+        if (!destination) {
+            return false;
+        }
+        return this.lastDestX === destination.getX() && this.lastDestY === destination.getY();
     }
 
     private cacheBotAttackTile(

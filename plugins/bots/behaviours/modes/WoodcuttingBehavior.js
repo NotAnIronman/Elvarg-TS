@@ -48,7 +48,10 @@ class WoodcuttingBehavior {
     this.searchWalkRadius = options.botWalkRadius ?? 6;
     this.objectSearch = options.objectSearch ?? null;
     this.treeTierByObjectId = new Map();
+    this.treeIdsByTier = new Map();
+    this.sortedEligibleTiersByLevel = new Map();
     for (const tree of Woodcutting.TREES) {
+      this.treeIdsByTier.set(tree, [...(tree.objectIds ?? [])]);
       for (const objectId of tree.objectIds ?? []) {
         if (!this.treeTierByObjectId.has(objectId)) {
           this.treeTierByObjectId.set(objectId, tree);
@@ -396,9 +399,16 @@ class WoodcuttingBehavior {
   }
 
   resolveBestTreeTiersForLevel(level) {
-    return Woodcutting.TREES.filter(
-      (tree) => tree.objectIds?.length && tree.requiredLevel <= level
+    const safeLevel = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
+    const cached = this.sortedEligibleTiersByLevel.get(safeLevel);
+    if (cached) {
+      return cached;
+    }
+    const tiers = Woodcutting.TREES.filter(
+      (tree) => tree.objectIds?.length && tree.requiredLevel <= safeLevel
     ).sort((a, b) => b.requiredLevel - a.requiredLevel);
+    this.sortedEligibleTiersByLevel.set(safeLevel, tiers);
+    return tiers;
   }
 
   findNearestTreeObjectForTier(player, treeTier, state = null, nowMs = Date.now()) {
@@ -408,19 +418,19 @@ class WoodcuttingBehavior {
     this.pruneAvoidedTargets(state, nowMs);
     const loc = player.getLocation();
     const privateArea = player.getPrivateArea();
-    const treeIds = new Set(treeTier.objectIds ?? []);
+    const treeIds = this.treeIdsByTier.get(treeTier) ?? [];
     let bestObject = null;
     let bestDistSq = Number.MAX_SAFE_INTEGER;
 
     const candidateObjects =
-      this.objectSearch?.findCandidatesByIds?.(player, [...treeIds], {
+      this.objectSearch?.findCandidatesByIds?.(player, treeIds, {
         regionRadius: TREE_SEARCH_REGION_RADIUS,
         z: loc.getZ(),
         privateArea,
       }) ?? [];
 
     for (const object of candidateObjects) {
-      if (!object || !treeIds.has(object.getId())) {
+      if (!object) {
         continue;
       }
       const objectLoc = object.getLocation();
@@ -650,22 +660,23 @@ class WoodcuttingBehavior {
     const loc = player.getLocation();
     const privateArea = player.getPrivateArea();
     const radiusSq = radiusTiles * radiusTiles;
-    const treeIds = new Set();
+    const treeIds = [];
     for (const tier of treeTiers) {
-      for (const objectId of tier.objectIds ?? []) {
-        treeIds.add(objectId);
+      const ids = this.treeIdsByTier.get(tier);
+      if (ids?.length) {
+        treeIds.push(...ids);
       }
     }
 
     let count = 0;
     const candidateObjects =
-      this.objectSearch?.findCandidatesByIds?.(player, [...treeIds], {
+      this.objectSearch?.findCandidatesByIds?.(player, treeIds, {
         regionRadius: TREE_SEARCH_REGION_RADIUS,
         z: loc.getZ(),
         privateArea,
       }) ?? [];
     for (const object of candidateObjects) {
-      if (!object || !treeIds.has(object.getId())) {
+      if (!object) {
         continue;
       }
       const objectLoc = object.getLocation();

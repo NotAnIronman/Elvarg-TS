@@ -1,5 +1,9 @@
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
+const { GameConstants } = require("../../../../src/main/typescript/elvarg/game/GameConstants");
+const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { randomInRange } = require("../navigation/BotNavigation");
 const { applyRandomGlobalPreset } = require("../../../interface/Presets.plugin");
 const {
@@ -20,6 +24,8 @@ const POST_PVP_DECISION_MIN_MS = 3500;
 const POST_PVP_DECISION_MAX_MS = 9000;
 const POST_PVP_COOLDOWN_MIN_MS = 35000;
 const POST_PVP_COOLDOWN_MAX_MS = 110000;
+const UNSTACK_CHECK_INTERVAL_MS = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE * 2;
+const UNSTACK_COOLDOWN_MS = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE * 3;
 
 const PVP_PHASE = Object.freeze({
   IDLE: "idle",
@@ -468,6 +474,101 @@ class PvpBehavior {
     return true;
   }
 
+  tryStepOutOfStack(player, state, target, nowMs) {
+    const pvp = state?.pvp;
+    const playerLoc = player?.getLocation?.();
+    const targetLoc = target?.getLocation?.();
+    if (!pvp || !playerLoc || !targetLoc || !playerLoc.equals(targetLoc)) {
+      return false;
+    }
+    // Resolve stacks from one side only. If both bots try to sidestep at once they
+    // can trade places and oscillate between two tiles. Use a stable ordering so the
+    // same participant yields every time for a given pair.
+    if ((player.getIndex?.() ?? 0) > (target.getIndex?.() ?? 0)) {
+      return false;
+    }
+    if (player.getForceMovement?.() != null) {
+      return false;
+    }
+    if (nowMs < Number(pvp.nextUnstackCheckAt ?? 0)) {
+      return false;
+    }
+    pvp.nextUnstackCheckAt = nowMs + UNSTACK_CHECK_INTERVAL_MS;
+    if (nowMs < Number(pvp.nextUnstackAt ?? 0)) {
+      return false;
+    }
+
+    const privateArea = player.getPrivateArea?.() ?? null;
+    const size = Number(player.getSize?.() ?? 1);
+    const candidates = [
+      new Location(playerLoc.getX() - 1, playerLoc.getY(), playerLoc.getZ()),
+      new Location(playerLoc.getX() + 1, playerLoc.getY(), playerLoc.getZ()),
+      new Location(playerLoc.getX(), playerLoc.getY() - 1, playerLoc.getZ()),
+      new Location(playerLoc.getX(), playerLoc.getY() + 1, playerLoc.getZ()),
+    ];
+
+    let bestTile = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    const localPlayers = player.getLocalPlayers?.() ?? [];
+    for (const tile of candidates) {
+      if (RegionManager.blocked(tile, privateArea)) {
+        continue;
+      }
+      if (!RegionManager.canMovestart(playerLoc, tile, size, size, privateArea)) {
+        continue;
+      }
+
+      let occupied = false;
+      for (const candidate of localPlayers) {
+        if (!candidate || candidate === player || candidate === target) {
+          continue;
+        }
+        if (!candidate.isRegistered?.()) {
+          continue;
+        }
+        if (candidate.getPrivateArea?.() !== privateArea) {
+          continue;
+        }
+        const loc = candidate.getLocation?.();
+        if (!loc) {
+          continue;
+        }
+        if (
+          loc.getX() === tile.getX() &&
+          loc.getY() === tile.getY() &&
+          loc.getZ() === tile.getZ()
+        ) {
+          occupied = true;
+          break;
+        }
+      }
+      if (occupied) {
+        continue;
+      }
+
+      const distance = tile.getDistance(targetLoc);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestTile = tile;
+      }
+    }
+
+    if (!bestTile) {
+      return false;
+    }
+
+    pvp.nextUnstackAt = nowMs + UNSTACK_COOLDOWN_MS;
+    player.getMovementQueue?.().reset?.();
+    player.getMovementQueue?.().addFirstStep?.(bestTile);
+    player.getTimers?.().registers?.(TimerKey.STEPPING_OUT, 2);
+    player.setPositionToFaceCoordinates?.(
+      targetLoc.getX(),
+      targetLoc.getY(),
+      targetLoc.getZ()
+    );
+    return true;
+  }
+
   tick(context) {
     const resolved = resolveBotNodeContext(context, this.botStatesByName, {
       requiredMode: this.behaviorMode.PVP,
@@ -527,6 +628,10 @@ class PvpBehavior {
     }
     if (player.getInteractingMobile?.() !== target) {
       player.setMobileInteraction?.(target);
+    }
+    if (this.tryStepOutOfStack(player, state, target, nowMs)) {
+      this.setPhase(state, PVP_PHASE.COMBAT);
+      return "running";
     }
 
     if (nowMs < (pvp.nextActionAt ?? 0)) {

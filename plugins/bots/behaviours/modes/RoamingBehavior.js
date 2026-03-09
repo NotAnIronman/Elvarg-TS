@@ -316,19 +316,22 @@ class RoamingBehavior {
       return "failure";
     }
 
-    clearFollowState(player, state);
-
-    const { chooseOptions } = this.chooseRoamingTarget(player, state, null, nowMs);
     let target = state.roaming.target;
-    if (
-      target &&
-      typeof chooseOptions?.acceptTarget === "function" &&
-      chooseOptions.acceptTarget(target) !== true
-    ) {
-      target = null;
+    let chooseOptions = null;
+    if (target) {
+      const constraint = this.buildRoamingTargetConstraint(player, state, null, nowMs);
+      if (typeof constraint?.acceptTarget === "function") {
+        chooseOptions = { acceptTarget: constraint.acceptTarget };
+        if (constraint.acceptTarget(target) !== true) {
+          target = null;
+        }
+      }
     }
+    clearFollowState(player, state);
     if (!target) {
-      target = chooseNextTarget(player, state, this.botWalkRadius, chooseOptions);
+      const targetSelection = this.chooseRoamingTarget(player, state, null, nowMs);
+      chooseOptions = targetSelection.chooseOptions;
+      target = targetSelection.target;
       if (!target) {
         return "failure";
       }
@@ -349,6 +352,9 @@ class RoamingBehavior {
     }
 
     state.roaming.endpointPauseUntil = 0;
+    if (!chooseOptions) {
+      chooseOptions = this.chooseRoamingTarget(player, state, null, nowMs).chooseOptions;
+    }
     const nextTarget = chooseNextTarget(
       player,
       state,

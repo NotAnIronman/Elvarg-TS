@@ -6,6 +6,7 @@ import { Mobile } from "../../../entity/impl/Mobile";
 import type { Player } from "../../../entity/impl/player/Player";
 import { AccuracyFormulasDpsCalc } from "../formula/AccuracyFormulasDpsCalc";
 import { HitMask } from "./HitMask";
+import { ServerPerf } from "../../../../util/ServerPerf";
 
 type PendingHitConfig = {
     delay?: number;
@@ -123,18 +124,58 @@ export class PendingHit {
             return null;
         }
 
-        let hits: HitDamage[] = new Array(hitAmount);
         this.totalDamage = 0;
+
+        if (hitAmount === 1) {
+            this.accurate = !rollAccuracy || ServerPerf.measurePhase(
+                "combat.process.method_hits.roll_accuracy",
+                () => AccuracyFormulasDpsCalc.rollAccuracy(
+                    this.attacker,
+                    this.target,
+                    this.combatType
+                )
+            );
+            const damage: HitDamage = this.accurate
+                ? ServerPerf.measurePhase(
+                    "combat.process.method_hits.damage",
+                    () => CombatFactory.getHitDamage(this.attacker, this.target, this.combatType)
+                )
+                : new HitDamage(0, HitMask.BLUE);
+            ServerPerf.measurePhase(
+                "combat.process.method_hits.extra_rolls",
+                () => CombatFactory.applyExtraHitRolls(
+                    this.attacker,
+                    this.target,
+                    this.combatType,
+                    damage,
+                    this.accurate,
+                    this.method
+                )
+            );
+            this.totalDamage = damage.getDamage();
+            return [damage];
+        }
+
+        let hits: HitDamage[] = new Array(hitAmount);
         for (let i = 0; i < hits.length; i++) {
-            this.accurate = !rollAccuracy || AccuracyFormulasDpsCalc.rollAccuracy(this.attacker, this.target, this.combatType);
-            let damage: HitDamage = this.accurate ? CombatFactory.getHitDamage(this.attacker, this.target, this.combatType) : new HitDamage(0, HitMask.BLUE);
-            CombatFactory.applyExtraHitRolls(
-                this.attacker,
-                this.target,
-                this.combatType,
-                damage,
-                this.accurate,
-                this.method
+            this.accurate = !rollAccuracy || ServerPerf.measurePhase(
+                "combat.process.method_hits.roll_accuracy",
+                () => AccuracyFormulasDpsCalc.rollAccuracy(this.attacker, this.target, this.combatType)
+            );
+            let damage: HitDamage = this.accurate ? ServerPerf.measurePhase(
+                "combat.process.method_hits.damage",
+                () => CombatFactory.getHitDamage(this.attacker, this.target, this.combatType)
+            ) : new HitDamage(0, HitMask.BLUE);
+            ServerPerf.measurePhase(
+                "combat.process.method_hits.extra_rolls",
+                () => CombatFactory.applyExtraHitRolls(
+                    this.attacker,
+                    this.target,
+                    this.combatType,
+                    damage,
+                    this.accurate,
+                    this.method
+                )
             );
             this.totalDamage += damage.getDamage();
             hits[i] = damage;

@@ -362,6 +362,21 @@ export abstract class Mobile extends Entity {
         return this;
     }
 
+    setPositionToFaceCoordinates(x: number, y: number, z: number): Mobile {
+        const current = this.positionToFace;
+        if (
+            current != null &&
+            current.getX() === x &&
+            current.getY() === y &&
+            current.getZ() === z
+        ) {
+            return this;
+        }
+        this.positionToFace = new Location(x, y, z);
+        this.getUpdateFlag().flag(Flag.FACE_POSITION);
+        return this;
+    }
+
     getUpdateFlag(): UpdateFlag {
         return this.updateFlag;
     }

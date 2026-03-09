@@ -153,4 +153,6 @@ export class Server {
   }
 }
 
-Server.main(process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["1"]);
+if (require.main === module) {
+  Server.main(process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["1"]);
+}

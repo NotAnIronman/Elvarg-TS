@@ -50,6 +50,7 @@ import { CombatConstants } from "./CombatConstants";
 import { Wilderness } from "../wilderness/Wilderness";
 import { ZaryteCrossbowCombatMethod } from "./method/impl/specials/ZaryteCrossbowCombatMethod";
 import { PluginManager } from "../../../plugins/PluginManager";
+import { ServerPerf } from "../../../util/ServerPerf";
 
 const normalizeAreaResponse = (response: CanAttackResponse | BasicAttackResponse): CanAttackResponse => {
     if (response === BasicAttackResponse.CAN_ATTACK) {
@@ -94,8 +95,14 @@ export class CombatFactory {
             const player = attacker.getAsPlayer();
 
             // Update ranged data before selecting the combat method.
-            player.getCombat().setAmmunition(Ammunition.getFor(player));
-            player.getCombat().setRangedWeapon(RangedWeapon.getFor(player));
+            const resolvedAmmo = Ammunition.getFor(player);
+            if (player.getCombat().getAmmunition() !== resolvedAmmo) {
+                player.getCombat().setAmmunition(resolvedAmmo);
+            }
+            const resolvedWeapon = RangedWeapon.getFor(player);
+            if (player.getCombat().getRangedWeapon() !== resolvedWeapon) {
+                player.getCombat().setRangedWeapon(resolvedWeapon);
+            }
 
             if (
                 player.getCombat().getCastSpell() != null ||
@@ -309,7 +316,10 @@ export class CombatFactory {
         // Don't allow diagonal attacks for smaller entities
         if (method.type() == CombatType.MELEE && attacker.getSize() == 1 && target.getSize() == 1 && !isMoving && !target.getMovementQueue().isMovings()) {
             if (PathFinder.isDiagonalLocation(attacker, target)) {
-                CombatFactory.stepOut(attacker, target);
+                if (!attacker.getTimers().has(TimerKey.STEPPING_OUT)) {
+                    CombatFactory.stepOut(attacker, target);
+                    attacker.getTimers().registers(TimerKey.STEPPING_OUT, 2);
+                }
                 return false;
             }
         }
@@ -418,76 +428,108 @@ export class CombatFactory {
         }
     }
 
-    public static canAttack(attacker: Mobile, method: CombatMethod, target: Mobile): CanAttackResponse {
-        if (!CombatFactory.validTarget(attacker, target)) {
+    public static canAttack(
+        attacker: Mobile,
+        method: CombatMethod,
+        target: Mobile,
+        skipTargetValidation: boolean = false
+    ): CanAttackResponse {
+        if (!skipTargetValidation && !ServerPerf.measurePhase(
+            "combat.process.can_attack.valid_target",
+            () => CombatFactory.validTarget(attacker, target)
+        )) {
             return CanAttackResponse.INVALID_TARGET;
         }
 
         // Here we check if we are already in combat with another entity.
         // Only check if we aren't in multi.
-        if (!(AreaManager.inMulti(attacker) && AreaManager.inMulti(target))) {
+        if (!ServerPerf.measurePhase(
+            "combat.process.can_attack.multi_check",
+            () => AreaManager.inMulti(attacker) && AreaManager.inMulti(target)
+        )) {
             if (
-                (
-                    CombatFactory.isBeingAttacked(attacker) &&
-                    attacker.getCombat().getAttacker() != target &&
-                    attacker.getCombat().getAttacker().getHitpoints() > 0
-                ) || !attacker.getCombat().getHitQueue().isEmpty(target)
+                ServerPerf.measurePhase("combat.process.can_attack.attacker_busy", () =>
+                    (
+                        CombatFactory.isBeingAttacked(attacker) &&
+                        attacker.getCombat().getAttacker() != target &&
+                        attacker.getCombat().getAttacker().getHitpoints() > 0
+                    ) || !attacker.getCombat().getHitQueue().isEmpty(target)
+                )
             ) {
                 return CanAttackResponse.ALREADY_UNDER_ATTACK;
             }
 
             // Here we check if we are already in combat with another entity.
             if (
-                (CombatFactory.isBeingAttacked(target) && target.getCombat().getAttacker() != attacker) ||
-                !target.getCombat().getHitQueue().isEmpty(attacker)
+                ServerPerf.measurePhase("combat.process.can_attack.target_busy", () =>
+                    (CombatFactory.isBeingAttacked(target) && target.getCombat().getAttacker() != attacker) ||
+                    !target.getCombat().getHitQueue().isEmpty(attacker)
+                )
             ) {
                 return CanAttackResponse.ALREADY_UNDER_ATTACK;
             }
         }
 
         // Check plugin and area attack policy.
-        const areaResponse = CombatFactory.canAttackByPolicy(attacker, target);
+        const areaResponse = ServerPerf.measurePhase(
+            "combat.process.can_attack.policy",
+            () => CombatFactory.canAttackByPolicy(attacker, target)
+        );
         if (areaResponse != CanAttackResponse.CAN_ATTACK) {
             return areaResponse;
         }
 
-        if (!method.canAttack(attacker, target)) {
+        if (!ServerPerf.measurePhase(
+            "combat.process.can_attack.method",
+            () => method.canAttack(attacker, target)
+        )) {
             return CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED;
         }
 
         // Check special attack and player-only attack restrictions.
         if (attacker.isPlayer()) {
-            const player = attacker.getAsPlayer();
-            const special = getPlayerCombatSpecial(player);
+            const playerRestriction = ServerPerf.measurePhase(
+                "combat.process.can_attack.player_restrictions",
+                () => {
+                    const player = attacker.getAsPlayer();
+                    const special = getPlayerCombatSpecial(player);
 
-            if (player.isSpecialActivated() && special != null) {
-                if (player.getSpecialPercentage() < special.getDrainAmount()) {
-                    return CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY;
-                }
-            }
+                    if (player.isSpecialActivated() && special != null) {
+                        if (player.getSpecialPercentage() < special.getDrainAmount()) {
+                            return CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY;
+                        }
+                    }
 
-            if (player.getTimers().has(TimerKey.STUN)) {
-                return CanAttackResponse.STUNNED;
-            }
+                    if (player.getTimers().has(TimerKey.STUN)) {
+                        return CanAttackResponse.STUNNED;
+                    }
 
-            // Duel rules
-            if (player.getDueling().inDuel()) {
-                if (method.type() == CombatType.MELEE && player.getDueling().getRules()[DuelRule.NO_MELEE.getButtonId()]) {
-                    return CanAttackResponse.DUEL_MELEE_DISABLED;
+                    if (player.getDueling().inDuel()) {
+                        if (method.type() == CombatType.MELEE && player.getDueling().getRules()[DuelRule.NO_MELEE.getButtonId()]) {
+                            return CanAttackResponse.DUEL_MELEE_DISABLED;
+                        }
+                        if (method.type() == CombatType.RANGED && player.getDueling().getRules()[DuelRule.NO_RANGED.getButtonId()]) {
+                            return CanAttackResponse.DUEL_RANGED_DISABLED;
+                        }
+                        if (method.type() == CombatType.MAGIC && player.getDueling().getRules()[DuelRule.NO_MAGIC.getButtonId()]) {
+                            return CanAttackResponse.DUEL_MAGIC_DISABLED;
+                        }
+                    }
+
+                    return CanAttackResponse.CAN_ATTACK;
                 }
-                if (method.type() == CombatType.RANGED && player.getDueling().getRules()[DuelRule.NO_RANGED.getButtonId()]) {
-                    return CanAttackResponse.DUEL_RANGED_DISABLED;
-                }
-                if (method.type() == CombatType.MAGIC && player.getDueling().getRules()[DuelRule.NO_MAGIC.getButtonId()]) {
-                    return CanAttackResponse.DUEL_MAGIC_DISABLED;
-                }
+            );
+            if (playerRestriction != CanAttackResponse.CAN_ATTACK) {
+                return playerRestriction;
             }
         }
 
         // Check immune npcs..
         if (target.isNpc()) {
-            const npc = target as unknown as NPC;
-            if (npc.getTimers().has(TimerKey.ATTACK_IMMUNITY)) {
+            if (ServerPerf.measurePhase(
+                "combat.process.can_attack.target_immunity",
+                () => (target as unknown as NPC).getTimers().has(TimerKey.ATTACK_IMMUNITY)
+            )) {
                 return CanAttackResponse.TARGET_IS_IMMUNE;
             }
         }

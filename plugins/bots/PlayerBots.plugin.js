@@ -137,7 +137,7 @@ const BOT_CONFIG = Object.freeze({
     chunkSizeTiles: 32,
     nearStride: 2,
     mediumStride: 4,
-    farStride: 12,
+    farStride: 16,
   }),
   wildernessDitchObjectId: ObjectIds.WILDERNESS_DITCH,
   manualControlPacketOpcodes: MANUAL_CONTROL_PACKET_OPCODES,
