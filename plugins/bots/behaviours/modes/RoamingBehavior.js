@@ -16,6 +16,9 @@ const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 
 const DITCH_CONTEXT_TTL_MS = 1500;
 const ROAMING_LINGER_JITTER_MS = 2200;
+const ROAMING_DYNAMIC_JITTER_MS = 3200;
+const ROAMING_PRE_WALK_MIN_MS = 180;
+const ROAMING_PRE_WALK_MAX_MS = 1650;
 
 function hashUsername(value) {
   const text = typeof value === "string" ? value : "";
@@ -24,6 +27,12 @@ function hashUsername(value) {
     hash = (hash * 31 + text.charCodeAt(index)) | 0;
   }
   return Math.abs(hash);
+}
+
+function resolveDeterministicJitterMs(username, nowMs, spreadMs) {
+  const safeSpreadMs = Math.max(1, Math.floor(spreadMs));
+  const cycleSeed = Math.floor(Math.max(0, Number(nowMs) || 0) / 5000);
+  return (hashUsername(`${username}:${cycleSeed}`) % safeSpreadMs);
 }
 
 class RoamingBehavior {
@@ -69,6 +78,14 @@ class RoamingBehavior {
     const username = player?.getUsername?.() ?? "";
     const jitterMs = hashUsername(username) % ROAMING_LINGER_JITTER_MS;
     return baseLingerMs + jitterMs;
+  }
+
+  getDynamicRoamingDelayMs(player, nowMs, minMs, maxMs) {
+    const lowerBound = Math.max(0, Math.floor(minMs));
+    const upperBound = Math.max(lowerBound, Math.floor(maxMs));
+    const baseDelayMs = randomInRange(lowerBound, upperBound);
+    const username = player?.getUsername?.() ?? "";
+    return baseDelayMs + resolveDeterministicJitterMs(username, nowMs, ROAMING_DYNAMIC_JITTER_MS);
   }
 
   buildHotspotTargetConstraint(state) {
@@ -402,6 +419,15 @@ class RoamingBehavior {
         return "failure";
       }
       state.roaming.target = target;
+      state.roaming.nextWalkAt =
+        nowMs +
+        this.getDynamicRoamingDelayMs(
+          player,
+          nowMs,
+          ROAMING_PRE_WALK_MIN_MS,
+          ROAMING_PRE_WALK_MAX_MS
+        );
+      return "failure";
     }
 
     if (!isAtTarget(player, target)) {
@@ -432,8 +458,15 @@ class RoamingBehavior {
       return "failure";
     }
     state.roaming.target = nextTarget;
-    queueRouteAndFlagAppearance(player, nextTarget.x, nextTarget.y);
-    return "success";
+    state.roaming.nextWalkAt =
+      nowMs +
+      this.getDynamicRoamingDelayMs(
+        player,
+        nowMs,
+        ROAMING_PRE_WALK_MIN_MS,
+        ROAMING_PRE_WALK_MAX_MS
+      );
+    return "failure";
   }
 }
 

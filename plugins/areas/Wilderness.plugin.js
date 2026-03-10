@@ -29,6 +29,44 @@ function readPlayerTile(player) {
   return { location, ...tile };
 }
 
+function refreshWildernessUi(player, tile, inWilderness) {
+  if (!player || player?.isPlayerBot?.() === true || !tile) {
+    return;
+  }
+
+  if (inWilderness) {
+    player.getPacketSender().sendInteractionOption("Attack", 2, true);
+    player.getPacketSender().sendWalkableInterface(197);
+    addToWildList(player);
+    BountyHunter.updateInterface(player);
+
+    const level = Wilderness.levelForY(tile.y);
+    if (player.getWildernessLevel() !== level) {
+      player.setWildernessLevel(level);
+    }
+    player.getPacketSender().sendString(`Level: ${level}`, 199);
+
+    const multiIcon = Wilderness.isMulti(tile.x, tile.y) ? 1 : 0;
+    if (player.getMultiIcon() !== multiIcon) {
+      player.setMultiIcon(multiIcon);
+    }
+    player.getPacketSender().sendMultiIcon(multiIcon);
+    return;
+  }
+
+  player.getPacketSender().sendWalkableInterface(-1);
+  player.getPacketSender().sendInteractionOption("null", 2, true);
+  removeFromWildList(player);
+
+  if (player.getWildernessLevel() !== 0) {
+    player.setWildernessLevel(0);
+  }
+  if (player.getMultiIcon() !== 0) {
+    player.setMultiIcon(0);
+  }
+  player.getPacketSender().sendMultiIcon(0);
+}
+
 function isInWildernessCached(cache, player) {
   const tile = readPlayerTile(player);
   if (!tile) {
@@ -131,17 +169,8 @@ module.exports = {
         inWilderness,
       };
 
-      if (!isBot) {
-        if (inWilderness && !wasInWilderness) {
-          player.getPacketSender().sendInteractionOption("Attack", 2, true);
-          player.getPacketSender().sendWalkableInterface(197);
-          addToWildList(player);
-          BountyHunter.updateInterface(player);
-        } else if (!inWilderness && wasInWilderness) {
-          player.getPacketSender().sendWalkableInterface(-1);
-          player.getPacketSender().sendInteractionOption("null", 2, true);
-          removeFromWildList(player);
-        }
+      if (!isBot && inWilderness !== wasInWilderness) {
+        refreshWildernessUi(player, tile, inWilderness);
       }
 
       if (inWilderness) {
@@ -149,7 +178,7 @@ module.exports = {
         if (player.getWildernessLevel() !== level) {
           player.setWildernessLevel(level);
           if (!isBot) {
-            player.getPacketSender().sendString(`Level: ${level}`, 199);
+          player.getPacketSender().sendString(`Level: ${level}`, 199);
           }
         }
 
@@ -171,6 +200,21 @@ module.exports = {
       }
 
       inWildState.set(player, nextState);
+    });
+
+    api.onPlayerLogin(({ player }) => {
+      const tile = readPlayerTile(player);
+      if (!tile) {
+        return;
+      }
+      const inWilderness = Wilderness.isInLocation(tile.location);
+      inWildState.set(player, {
+        x: tile.x,
+        y: tile.y,
+        z: tile.z,
+        inWilderness,
+      });
+      refreshWildernessUi(player, tile, inWilderness);
     });
 
     api.onPlayerDisconnect(({ player }) => {

@@ -1,7 +1,27 @@
 import { Location } from "../../model/Location";
 import { Mobile } from "../../entity/impl/Mobile";
+import { Boundary } from "../../model/Boundary";
 
 export class Wilderness {
+    private static readonly MULTI: Boundary[] = [
+        new Boundary(3136, 3327, 3519, 3607, 0),
+        new Boundary(2360, 2445, 5045, 5125, 0),
+        new Boundary(2256, 2287, 4680, 4711, 0),
+        new Boundary(3190, 3327, 3648, 3839, 0),
+        new Boundary(3200, 3390, 3840, 3967, 0),
+        new Boundary(2992, 3007, 3912, 3967, 0),
+        new Boundary(2946, 2959, 3816, 3831, 0),
+        new Boundary(3008, 3199, 3856, 3903, 0),
+        new Boundary(3008, 3071, 3600, 3711, 0),
+        new Boundary(3072, 3327, 3608, 3647, 0),
+        new Boundary(2624, 2690, 2550, 2619, 0),
+        new Boundary(2667, 2685, 3712, 3730, 0),
+        new Boundary(2371, 2422, 5062, 5117, 0),
+        new Boundary(2896, 2927, 3595, 3630, 0),
+        new Boundary(2892, 2932, 4435, 4464, 0),
+        new Boundary(3279, 3307, 3156, 3179, 0),
+    ];
+
     public static isInLocation(location: Location | null | undefined): boolean {
         if (!location) {
             return false;
@@ -30,14 +50,7 @@ export class Wilderness {
     }
 
     public static isMulti(x: number, y: number): boolean {
-        return (
-            (x >= 3155 && y >= 3798) ||
-            (x >= 3020 && x <= 3055 && y >= 3684 && y <= 3711) ||
-            (x >= 3150 && x <= 3195 && y >= 2958 && y <= 3003) ||
-            (x >= 3645 && x <= 3715 && y >= 3454 && y <= 3550) ||
-            (x >= 3150 && x <= 3199 && y >= 3796 && y <= 3869) ||
-            (x >= 2994 && x <= 3041 && y >= 3733 && y <= 3790) ||
-            (x >= 3136 && x <= 3327 && y >= 3527 && y <= 3650)
-        );
+        const location = new Location(x, y, 0);
+        return Wilderness.MULTI.some((boundary) => boundary.inside(location));
     }
 }

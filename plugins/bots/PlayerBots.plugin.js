@@ -67,8 +67,8 @@ const BOT_TREE_OPTIONS = Object.freeze({
 
 const BOT_CONFIG = Object.freeze({
   behaviorMode: BOT_BEHAVIOR_MODE,
-  botCount: 180,
-  fullTimePvpBotCount: 115,
+  botCount: 205,
+  fullTimePvpBotCount: 140,
   botWalkRadius: 10,
   objectIndexCachePath: path.join(
     process.cwd(),

@@ -2,6 +2,7 @@ import { Location } from "../Location";
 import { Mobile } from "../../entity/impl/Mobile";
 import { Area, BasicAttackResponse } from "./Area";
 import { CanAttackResponse } from "../../content/combat/CombatFactory";
+import { Wilderness } from "../../content/wilderness/Wilderness";
 
 export class AreaManager {
     public static areas: Area[] = [];
@@ -84,6 +85,10 @@ export class AreaManager {
     public static inMulti(c: Mobile): boolean {
         if (c.getArea() != null) {
             return c.getArea().isMulti(c);
+        }
+        const location = c.getLocation();
+        if (Wilderness.isInLocation(location)) {
+            return Wilderness.isMulti(location.getX(), location.getY());
         }
         return false;
     }

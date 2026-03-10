@@ -45,6 +45,9 @@ const POST_PVP_COOLDOWN_MAX_MS = 110000;
 const UNSTACK_CHECK_INTERVAL_MS = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE * 2;
 const UNSTACK_COOLDOWN_MS = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE * 3;
 const HOTSPOT_DECISION_JITTER_MS = 2600;
+const HOTSPOT_DYNAMIC_DECISION_JITTER_MS = 4200;
+const SEEKING_RESET_STAGGER_MIN_MS = 250;
+const SEEKING_RESET_STAGGER_MAX_MS = 1800;
 
 const PVP_PHASE = Object.freeze({
   IDLE: "idle",
@@ -60,6 +63,12 @@ function hashUsername(value) {
     hash = (hash * 31 + text.charCodeAt(index)) | 0;
   }
   return Math.abs(hash);
+}
+
+function resolveHotspotCycleJitterMs(username, nowMs, spreadMs) {
+  const safeSpreadMs = Math.max(1, Math.floor(spreadMs));
+  const cycleSeed = Math.floor(Math.max(0, Number(nowMs) || 0) / 7000);
+  return hashUsername(`${username}:${cycleSeed}`) % safeSpreadMs;
 }
 
 class PvpBehavior {
@@ -171,6 +180,14 @@ class PvpBehavior {
     return hashUsername(username) % HOTSPOT_DECISION_JITTER_MS;
   }
 
+  getDynamicHotspotDecisionJitterMs(player, nowMs) {
+    const username = player?.getUsername?.() ?? "";
+    return (
+      this.getHotspotDecisionJitterMs(player) +
+      resolveHotspotCycleJitterMs(username, nowMs, HOTSPOT_DYNAMIC_DECISION_JITTER_MS)
+    );
+  }
+
   resetSeekingState(player, state, nowMs, reason) {
     if (!player || !state) {
       return false;
@@ -184,11 +201,17 @@ class PvpBehavior {
     state.pvp.currentTargetScore = 0;
     state.pvp.targetLockUntil = 0;
     state.pvp.endsAt = 0;
-    state.pvp.nextActionAt = nowMs;
+    state.pvp.nextActionAt =
+      nowMs +
+      randomInRange(SEEKING_RESET_STAGGER_MIN_MS, SEEKING_RESET_STAGGER_MAX_MS) +
+      this.getDynamicHotspotDecisionJitterMs(player, nowMs);
     resetMovementState(player);
     if (state.autonomy) {
       state.autonomy.modeEndsAt = 0;
-      state.autonomy.nextDecisionAt = 0;
+      state.autonomy.nextDecisionAt = Math.max(
+        state.autonomy.nextDecisionAt ?? 0,
+        state.pvp.nextActionAt
+      );
     }
     this.api?.log?.("pvp_seeking_reset", {
       username: player.getUsername?.(),
@@ -295,7 +318,7 @@ class PvpBehavior {
     const nextDecisionAt =
       nowMs +
       (idleDelayByActivity[activity] ?? lingerBase) +
-      this.getHotspotDecisionJitterMs(player);
+      this.getDynamicHotspotDecisionJitterMs(player, nowMs);
     if (!state.autonomy) {
       state.autonomy = {
         nextDecisionAt,
@@ -388,7 +411,7 @@ class PvpBehavior {
         const nextDecisionAt =
           nowMs +
           randomInRange(lingerBase, Math.floor(lingerBase * 2)) +
-          this.getHotspotDecisionJitterMs(sourcePlayer);
+          this.getDynamicHotspotDecisionJitterMs(sourcePlayer, nowMs);
         if (!sourceState.autonomy) {
           sourceState.autonomy = {
             nextDecisionAt,
