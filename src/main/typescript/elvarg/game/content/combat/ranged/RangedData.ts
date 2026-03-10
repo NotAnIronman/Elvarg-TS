@@ -7,7 +7,6 @@ import { Graphic } from '../../../model/Graphic';
 import { GraphicHeight } from '../../../model/GraphicHeight';
 import { Skill } from '../../../model/Skill';
 import { Equipment } from '../../../model/container/impl/Equipment';
-import { PoisonType } from '../../../task/impl/CombatPoisonEffect';
 import { ItemIdentifiers } from '../../../../util/ItemIdentifiers';
 import { Misc } from '../../../../util/Misc';
 
@@ -49,7 +48,10 @@ export class RangedData {
 
             case Ammunition.ENCHANTED_EMERALD_BOLT:
                 target.performGraphic(new Graphic(752));
-                CombatFactory.poisonEntity(target, PoisonType.MILD);
+                CombatFactory.poisonEntity(
+                    target,
+                    p.getEquipment().get(Equipment.WEAPON_SLOT).getId() === ItemIdentifiers.ZARYTE_CROSSBOW ? 27 : 25
+                );
                 break;
 
             case Ammunition.ENCHANTED_JADE_BOLT:

@@ -8,7 +8,6 @@ import { CombatSpecial } from "../../../CombatSpecial";
 import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { CombatFactory } from "../../../CombatFactory";
 import { Misc } from "../../../../../../util/Misc";
-import { PoisonType } from "../../../../../task/impl/CombatPoisonEffect";
 import { Sounds } from "../../../../../Sounds";
 
 export class AbyssalTentacleCombatMethod extends MeleeCombatMethod {
@@ -29,7 +28,7 @@ export class AbyssalTentacleCombatMethod extends MeleeCombatMethod {
         target.performGraphic(AbyssalTentacleCombatMethod.GRAPHIC);
         CombatFactory.freeze(target, 10);
         if (Misc.getRandom(100) < 50) {
-            CombatFactory.poisonEntity(target, PoisonType.EXTRA);
+            CombatFactory.poisonEntity(target, 20);
         }
     }
 }

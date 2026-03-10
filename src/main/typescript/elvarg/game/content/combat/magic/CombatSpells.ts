@@ -10,7 +10,7 @@ import { MagicSpellbook } from "../../../model/MagicSpellbook";
 import { Projectile } from "../../../model/Projectile";
 import { Skill } from "../../../model/Skill";
 import { Sound } from "../../../Sound";
-import { PoisonType } from "../../../task/impl/CombatPoisonEffect";
+import { Misc } from "../../../../util/Misc";
 import { PrayerHandler } from "../../PrayerHandler";
 import { CombatEffectSpell } from "./CombatEffectSpell";
 import { CombatNormalSpell } from "./CombatNormalSpell";
@@ -1359,7 +1359,7 @@ export class CombatSpells {
     public static SMOKE_RUSH = new CombatAncientSpellExtend(
         () => { return new Animation(1978); },
         () => { return null; },
-        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.MILD); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { if (Misc.getRandom(7) === 0) { getCombatFactory().poisonEntity(castOn, 10); } },
         () => { return 0; },
         (cast: Mobile, castOn: Mobile) => { return Projectile.createProjectile(cast, castOn, 384, 0, 20, 43, 31); },
         () => { return new Graphic(385); },
@@ -1442,7 +1442,7 @@ export class CombatSpells {
     public static SMOKE_BURST = new CombatAncientSpellExtend(
         () => { return new Animation(1979); },
         () => { },
-        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.MILD); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { if (Misc.getRandom(7) === 0) { getCombatFactory().poisonEntity(castOn, 10); } },
         () => { return 1; },
         () => { return null; },
         () => { return new Graphic(389); },
@@ -1524,7 +1524,7 @@ export class CombatSpells {
 
         () => { return new Animation(1978); },
         () => { return null; },
-        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.EXTRA); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { if (Misc.getRandom(7) === 0) { getCombatFactory().poisonEntity(castOn, 20); } },
         () => { return 0; },
         (cast: Mobile, castOn: Mobile) => { return Projectile.createProjectile(cast, castOn, 386, 0, 20, 43, 31); },
         () => { return new Graphic(387) },
@@ -1600,7 +1600,7 @@ export class CombatSpells {
 
         () => { return new Animation(1979); },
         () => { return null; },
-        (cast: Mobile, castOn: Mobile, damage: number) => { getCombatFactory().poisonEntity(castOn, PoisonType.SUPER); },
+        (cast: Mobile, castOn: Mobile, damage: number) => { if (Misc.getRandom(7) === 0) { getCombatFactory().poisonEntity(castOn, 20); } },
         () => { return 1; },
         (cast: Mobile, castOn: Mobile) => { return null; },
         () => { return new Graphic(391) },

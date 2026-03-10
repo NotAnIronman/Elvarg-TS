@@ -663,6 +663,31 @@ module.exports = {
       return true;
     });
 
+    api.registerCommand("poisonme", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+
+      const typeToken = String(parts?.[1] ?? "super").trim().toLowerCase();
+      const poisonSeverity =
+        typeToken === "veryweak" || typeToken === "very_weak" || typeToken === "vw"
+          ? 6
+          : typeToken === "weak" || typeToken === "w"
+            ? 11
+            : typeToken === "mild" || typeToken === "m"
+              ? 20
+              : typeToken === "extra" || typeToken === "e"
+                ? 25
+                : typeToken === "venom" || typeToken === "v"
+                  ? 12
+                  : 30;
+
+      player.setPoisonDamage(0);
+      CombatFactory.poisonEntity(player, poisonSeverity, typeToken === "venom" || typeToken === "v" ? 2 : 1);
+      player.getPacketSender().sendMessage(`Poison test applied: ${typeToken}.`);
+      return true;
+    });
+
     api.registerCommand("taskdebug", ({ player }) => {
       if (!requireRights(player, ownerOrDev)) {
         return true;

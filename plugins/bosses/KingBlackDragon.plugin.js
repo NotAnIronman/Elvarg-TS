@@ -10,7 +10,6 @@ const { Projectile } = require("../../src/main/typescript/elvarg/game/model/Proj
 const { PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatEquipment } = require("../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
 const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
-const { PoisonType } = require("../../src/main/typescript/elvarg/game/task/impl/CombatPoisonEffect");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
@@ -151,7 +150,7 @@ class KingBlackDragonCombatMethod extends CombatMethod {
             CombatFactory.freeze(player, 5);
             break;
           case Breath.POISON:
-            CombatFactory.poisonEntity(player, PoisonType.SUPER);
+            CombatFactory.poisonEntity(player, 30);
             break;
           default:
             break;

@@ -687,30 +687,41 @@ export class CombatFactory {
         if (attacker.isPlayer()) {
             const playerAttacker = attacker.getAsPlayer();
 
-            // Randomly apply poison if poisonous weapon/ammunition is equipped.
-            if (damage > 0 && Misc.getRandom(20) <= 5) {
+            // Apply poison using OSRS-style odds and severity.
+            if (damage > 0) {
                 let poisonType: PoisonType | undefined;
-                let rangedPoisonRoll = false;
-
-                if (
-                    combatType == CombatType.MELEE ||
+                let rangedPoison = false;
+                let applyPoison = false;
+                const thrownRangedWeapon =
                     playerAttacker.getWeapon() == WeaponInterfaces.DART ||
                     playerAttacker.getWeapon() == WeaponInterfaces.KNIFE ||
                     playerAttacker.getWeapon() == WeaponInterfaces.THROWNAXE ||
-                    playerAttacker.getWeapon() == WeaponInterfaces.JAVELIN
-                ) {
+                    playerAttacker.getWeapon() == WeaponInterfaces.JAVELIN;
+
+                if (combatType == CombatType.MELEE) {
+                    applyPoison = Misc.getRandom(3) === 0;
                     poisonType = CombatPoisonData.getPoisonType(
                         playerAttacker.getEquipment().get(Equipment.WEAPON_SLOT)
                     );
                 } else if (combatType == CombatType.RANGED) {
-                    rangedPoisonRoll = true;
+                    applyPoison = Misc.getRandom(7) === 0;
+                    rangedPoison = true;
                     poisonType = CombatPoisonData.getPoisonType(
-                        playerAttacker.getEquipment().get(Equipment.AMMUNITION_SLOT)
+                        playerAttacker.getEquipment().get(
+                            thrownRangedWeapon ? Equipment.WEAPON_SLOT : Equipment.AMMUNITION_SLOT
+                        )
                     );
                 }
 
-                if (poisonType && (!rangedPoisonRoll || Misc.getRandom(10) <= 5)) {
-                    CombatFactory.poisonEntity(target, poisonType);
+                if (applyPoison && poisonType) {
+                    const poisonSeverity = rangedPoison
+                        ? CombatPoisonData.getRangedSeverity(poisonType)
+                        : CombatPoisonData.getMeleeSeverity(poisonType);
+                    CombatFactory.poisonEntity(
+                        target,
+                        poisonSeverity,
+                        poisonType === PoisonType.VENOM ? 2 : 1
+                    );
                 }
             }
 
@@ -723,7 +734,7 @@ export class CombatFactory {
         } else if (attacker.isNpc()) {
             const npcAttacker = attacker.getAsNpc();
             if (npcAttacker.getCurrentDefinition().isPoisonous() && Misc.getRandom(10) <= 5) {
-                CombatFactory.poisonEntity(target, PoisonType.SUPER);
+                CombatFactory.poisonEntity(target, 30);
             }
         }
 
@@ -828,30 +839,30 @@ export class CombatFactory {
         return CombatFactory.isAttacking(character) || CombatFactory.isBeingAttacked(character);
     }
 
-    public static poisonEntity(entity: Mobile, poisonType: CombatPoisonData) {
-        // We are already poisoned or the poison type is invalid, do nothing.
-        if (entity.isPoisoned()) {
+    public static poisonEntity(entity: Mobile, poisonSeverity: number, poisonOrbType: number = 1) {
+        if (poisonSeverity <= 0) {
             return;
         }
 
         // If the entity is a player, we check for poison immunity. If they have
         // no immunity then we send them a message telling them that they are
         // poisoned.
+        const alreadyPoisoned = entity.isPoisoned();
         if (entity.isPlayer()) {
             let player = (entity as Player);
             if (!player.getCombat().getPoisonImmunityTimer().finished()) {
                 return;
             }
-            player.getPacketSender().sendMessage("You have been poisoned!");
-            if (poisonType === PoisonType.VENOM) {
-                player.getPacketSender().sendPoisonType(2);
-            } else {
-                player.getPacketSender().sendPoisonType(1);
+            if (!alreadyPoisoned) {
+                player.getPacketSender().sendMessage("You have been poisoned!");
             }
+            player.getPacketSender().sendPoisonType(poisonOrbType);
         }
 
-        entity.setPoisonDamage(CombatPoisonData.getDemage());
-        TaskManager.submit(new CombatPoisonEffect(entity));
+        entity.setPoisonDamage(Math.max(entity.getPoisonDamage(), poisonSeverity));
+        if (!alreadyPoisoned) {
+            TaskManager.submit(new CombatPoisonEffect(entity));
+        }
     }
 
     public static disableProtectionPrayers(player: Player) {
