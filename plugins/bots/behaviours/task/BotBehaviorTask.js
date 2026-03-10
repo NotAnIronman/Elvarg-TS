@@ -28,9 +28,9 @@ class BotBehaviorTask extends Task {
     this.modeValidationIntervalMs = Number.isFinite(options.modeValidationIntervalMs)
       ? Math.max(0, Math.floor(options.modeValidationIntervalMs))
       : 1200;
-    this.handleFullTimePvpRespawn =
-      typeof options.handleFullTimePvpRespawn === "function"
-        ? options.handleFullTimePvpRespawn
+    this.handlePersistentPvpRespawn =
+      typeof options.handlePersistentPvpRespawn === "function"
+        ? options.handlePersistentPvpRespawn
         : null;
     this.idleEntryStride = Number.isFinite(options.idleEntryStride)
       ? Math.max(1, Math.floor(options.idleEntryStride))
@@ -588,6 +588,57 @@ class BotBehaviorTask extends Task {
     return state?.autonomy?.fullTimePvp === true;
   }
 
+  isPersistentPvpBot(state) {
+    return (
+      state?.autonomy?.fullTimePvp === true ||
+      state?.autonomy?.persistentPvpLoadout === true
+    );
+  }
+
+  isWildernessRoamerPvpBot(state) {
+    return state?.autonomy?.wildernessRoamerPvp === true;
+  }
+
+  hasNearbyRealPlayerOpportunity(player, state) {
+    if (!player || !this.isPersistentPvpBot(state)) {
+      return false;
+    }
+    if (state?.mode !== this.behaviorMode.ROAMING) {
+      return false;
+    }
+    const privateArea = player.getPrivateArea?.();
+    const location = player.getLocation?.();
+    const localPlayers = player.getLocalPlayers?.() ?? [];
+    if (!location || localPlayers.length === 0) {
+      return false;
+    }
+    for (const other of localPlayers) {
+      if (!other || other === player) {
+        continue;
+      }
+      if (other.isPlayerBot?.() === true) {
+        continue;
+      }
+      if (!other.isRegistered?.()) {
+        continue;
+      }
+      if ((other.getHitpoints?.() ?? 0) <= 0) {
+        continue;
+      }
+      if (other.getPrivateArea?.() !== privateArea) {
+        continue;
+      }
+      const otherLoc = other.getLocation?.();
+      if (!otherLoc || otherLoc.getZ?.() !== location.getZ?.()) {
+        continue;
+      }
+      if (location.getDistance(otherLoc) <= 3) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   selectWeightedMode(definitions) {
     if (!Array.isArray(definitions) || definitions.length === 0) {
       return null;
@@ -709,8 +760,8 @@ class BotBehaviorTask extends Task {
     }
 
     if (state.deathResetApplied) {
-      if (this.isFullTimePvpBot(state) && this.handleFullTimePvpRespawn) {
-        this.handleFullTimePvpRespawn(entry, nowMs);
+      if (this.isPersistentPvpBot(state) && this.handlePersistentPvpRespawn) {
+        this.handlePersistentPvpRespawn(entry, nowMs);
       }
       // Clear any active preset after respawn, not during the death animation.
       clearBotActivePreset(player, state);
@@ -800,7 +851,11 @@ class BotBehaviorTask extends Task {
     }
 
     if (nowMs < (autonomy.nextDecisionAt ?? 0)) {
-      return;
+      if (this.hasNearbyRealPlayerOpportunity(player, state)) {
+        autonomy.nextDecisionAt = 0;
+      } else {
+        return;
+      }
     }
     if (nowMs < (autonomy.modeEndsAt ?? 0)) {
       return;
@@ -811,11 +866,17 @@ class BotBehaviorTask extends Task {
     }
 
     const forcePvpOnly = this.isFullTimePvpBot(state);
+    const allowedAutonomousModes = Array.isArray(autonomy.allowedAutonomousModes)
+      ? new Set(autonomy.allowedAutonomousModes.filter((mode) => typeof mode === "string"))
+      : null;
     const candidates = [];
     for (const definition of this.autonomousModes) {
       const mode = definition?.mode;
       const weight = Number(definition?.weight ?? 0);
       if (!mode || weight <= 0) {
+        continue;
+      }
+      if (allowedAutonomousModes && !allowedAutonomousModes.has(mode)) {
         continue;
       }
       if (forcePvpOnly && mode !== this.behaviorMode.PVP) {
@@ -825,6 +886,15 @@ class BotBehaviorTask extends Task {
         continue;
       }
       candidates.push(definition);
+    }
+
+    if (this.isWildernessRoamerPvpBot(state)) {
+      const pvpCandidate = candidates.find(
+        (definition) => definition?.mode === this.behaviorMode.PVP
+      );
+      if (pvpCandidate && this.startAutonomousMode(entry, pvpCandidate, nowMs)) {
+        return;
+      }
     }
 
     const selectedMode = this.selectWeightedMode(candidates);

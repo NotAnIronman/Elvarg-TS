@@ -97,6 +97,17 @@ function resolveLoadoutId(config, hotspotId) {
   return weightedPick(filtered.length > 0 ? filtered : configured) ?? fallbackIds[0];
 }
 
+function resolveRoamingLoadoutId(config, options = {}) {
+  const excludeF2p = options.excludeF2p !== false;
+  const fallbackIds = listPvpLoadouts()
+    .map((loadout) => loadout.id)
+    .filter((loadoutId) => (excludeF2p ? !loadoutId.startsWith("f2p_") : true));
+  const configured = buildWeightTable(config?.pvp?.loadoutWeights, fallbackIds).filter((entry) =>
+    excludeF2p ? !entry.value.startsWith("f2p_") : true
+  );
+  return weightedPick(configured.length > 0 ? configured : fallbackIds.map((value) => ({ value, weight: 1 }))) ?? fallbackIds[0];
+}
+
 function resolveAlternativeLoadoutId(config, hotspotId, currentLoadoutId) {
   const fallbackIds = listPvpLoadouts().map((loadout) => loadout.id);
   const configured = buildWeightTable(config?.pvp?.loadoutWeights, fallbackIds);
@@ -147,6 +158,30 @@ function buildAssignedPvpMetadata({
   };
 }
 
+function buildRoamingPvpMetadata({
+  config = {},
+  excludeF2p = true,
+} = {}) {
+  const profileId = resolveProfileId(false, config);
+  const loadoutId = resolveRoamingLoadoutId(config, { excludeF2p });
+  const profile = getPvpProfile(profileId);
+  return {
+    profileId: profile.id,
+    loadoutId,
+    hotspotId: null,
+    engagementStyle: "roaming",
+    preferredCombatStyle:
+      getPvpLoadout(loadoutId).tags.includes("hybrid")
+        ? "hybrid"
+        : getPvpLoadout(loadoutId).tags.includes("range")
+        ? "range"
+        : "melee",
+    escapeThreshold: profile.retreatHpRatio,
+    riskTolerance: profile.riskTolerance,
+    confidenceTier: profile.confidenceTier,
+  };
+}
+
 function assignPvpMetadata(state, options = {}) {
   if (!state?.pvp) {
     return state;
@@ -169,6 +204,7 @@ function assignPvpMetadata(state, options = {}) {
 module.exports = {
   assignPvpMetadata,
   buildAssignedPvpMetadata,
+  buildRoamingPvpMetadata,
   getPvpLoadout,
   getPvpProfile,
   getWildernessHotspot,

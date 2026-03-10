@@ -29,7 +29,7 @@ interface GameSyncTaskInterface {
 }
 
 export class World {
-    private static readonly MAX_PLAYERS = 500;
+    private static readonly MAX_PLAYERS = 1024;
     private static readonly NPC_ACTIVE_REGION_RADIUS = 1;
     private static readonly IDLE_BOT_PROCESS_STRIDE = 2;
     private static readonly BOT_PROCESS_LOD_CHUNK_SIZE_TILES = 32;

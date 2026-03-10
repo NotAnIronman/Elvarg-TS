@@ -63,6 +63,17 @@ class RoamingBehavior {
     return hotspotId ? getWildernessHotspot(hotspotId) : null;
   }
 
+  getAssignedRoamBounds(state) {
+    const roamBounds = state?.roaming?.roamBounds ?? null;
+    return roamBounds &&
+      Number.isFinite(roamBounds.minX) &&
+      Number.isFinite(roamBounds.maxX) &&
+      Number.isFinite(roamBounds.minY) &&
+      Number.isFinite(roamBounds.maxY)
+      ? roamBounds
+      : null;
+  }
+
   getEffectiveWalkRadius(state) {
     const hotspot = this.getAssignedHotspot(state);
     return Number.isFinite(hotspot?.roamRadius)
@@ -90,7 +101,8 @@ class RoamingBehavior {
 
   buildHotspotTargetConstraint(state) {
     const hotspot = this.getAssignedHotspot(state);
-    if (!hotspot?.area) {
+    const area = hotspot?.area ?? this.getAssignedRoamBounds(state);
+    if (!area) {
       return null;
     }
     return (target) => {
@@ -98,11 +110,11 @@ class RoamingBehavior {
         return false;
       }
       return (
-        target.z === hotspot.area.z &&
-        target.x >= hotspot.area.minX &&
-        target.x <= hotspot.area.maxX &&
-        target.y >= hotspot.area.minY &&
-        target.y <= hotspot.area.maxY
+        target.z === area.z &&
+        target.x >= area.minX &&
+        target.x <= area.maxX &&
+        target.y >= area.minY &&
+        target.y <= area.maxY
       );
     };
   }
@@ -224,6 +236,10 @@ class RoamingBehavior {
         ? (target) => baseAcceptTarget(target) === true && hotspotAcceptTarget(target) === true
         : hotspotAcceptTarget ?? baseAcceptTarget;
     const chooseOptions = acceptTarget ? { acceptTarget } : {};
+    const roamBounds = this.getAssignedRoamBounds(state);
+    if (roamBounds) {
+      chooseOptions.bounds = roamBounds;
+    }
     return {
       target: chooseNextTarget(
         player,

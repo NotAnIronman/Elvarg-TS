@@ -47,6 +47,7 @@ const {
 const { assignPvpMetadata } = require("../behaviours/pvp/PvpAssignment");
 const {
   buildAssignedPvpMetadata,
+  buildRoamingPvpMetadata,
   getWildernessHotspot,
   resolveAlternativeLoadoutId,
 } = require("../behaviours/pvp/PvpAssignment");
@@ -226,27 +227,49 @@ function bootPlayerBotsRuntime(options = {}) {
         idleEntryStride: config.idleEntryStride,
         lodConfig: config.lodConfig,
         taskProfiler: config.taskProfiler,
-        handleFullTimePvpRespawn: (entry, nowMs) => {
+        handlePersistentPvpRespawn: (entry, nowMs) => {
           const player = entry?.player;
           const state = entry?.state;
-          if (!player || !state?.autonomy?.fullTimePvp || !state?.pvp) {
+          if (!player || !state?.pvp) {
             return false;
           }
+          if (state.autonomy?.fullTimePvp === true) {
+            const hotspotId = state.pvp.hotspotId ?? null;
+            const hotspot = hotspotId ? getWildernessHotspot(hotspotId) : null;
+            const hotspotLocation = hotspot ? createHotspotAnchorLocation(hotspot) : null;
+            if (hotspotLocation) {
+              player.moveTo(hotspotLocation);
+            }
 
-          const hotspotId = state.pvp.hotspotId ?? null;
-          const hotspot = hotspotId ? getWildernessHotspot(hotspotId) : null;
-          const hotspotLocation = hotspot ? createHotspotAnchorLocation(hotspot) : null;
-          if (hotspotLocation) {
-            player.moveTo(hotspotLocation);
-          }
-
-          const nextLoadoutId = resolveAlternativeLoadoutId(
-            config,
-            hotspotId,
-            state.pvp.loadoutId ?? null
-          );
-          if (nextLoadoutId) {
-            state.pvp.loadoutId = nextLoadoutId;
+            const nextLoadoutId = resolveAlternativeLoadoutId(
+              config,
+              hotspotId,
+              state.pvp.loadoutId ?? null
+            );
+            if (nextLoadoutId) {
+              state.pvp.loadoutId = nextLoadoutId;
+            }
+          } else if (state.autonomy?.wildernessRoamerPvp === true) {
+            const roamBounds = state?.roaming?.roamBounds ?? null;
+            if (
+              roamBounds &&
+              Number.isFinite(roamBounds.minX) &&
+              Number.isFinite(roamBounds.maxX) &&
+              Number.isFinite(roamBounds.minY) &&
+              Number.isFinite(roamBounds.maxY)
+            ) {
+              const x = randomInRange(roamBounds.minX, roamBounds.maxX);
+              const y = randomInRange(roamBounds.minY, roamBounds.maxY);
+              player.moveTo(new Location(x, y, roamBounds.z ?? 0));
+            }
+            const nextMetadata = buildRoamingPvpMetadata({
+              config,
+              excludeF2p: true,
+            });
+            assignPvpMetadata(state, {
+              config,
+              metadata: nextMetadata,
+            });
           }
           state.pvp.targetUsername = null;
           state.pvp.targetPlayer = null;
@@ -260,9 +283,9 @@ function bootPlayerBotsRuntime(options = {}) {
             api: botApi,
           });
 
-          botApi.log("full_time_pvp_respawn_reset", {
+          botApi.log("persistent_pvp_respawn_reset", {
             username: player.getUsername?.(),
-            hotspotId,
+            hotspotId: state.pvp.hotspotId ?? null,
             loadoutId: state.pvp.loadoutId ?? null,
           });
           return true;
@@ -276,6 +299,7 @@ function bootPlayerBotsRuntime(options = {}) {
     botApi,
     botCount: config.botCount,
     fullTimePvpBotCount: config.fullTimePvpBotCount,
+    wildernessRoamerBotCount: config.wildernessRoamerBotCount,
     botBaseCooldownMs: config.botBaseCooldownMs,
     spawn,
     spawnOffsets,
@@ -285,6 +309,11 @@ function bootPlayerBotsRuntime(options = {}) {
     createInitialState,
     buildAssignedPvpMetadata: (meta) =>
       buildAssignedPvpMetadata({
+        ...meta,
+        config,
+      }),
+    buildRoamingPvpMetadata: (meta) =>
+      buildRoamingPvpMetadata({
         ...meta,
         config,
       }),

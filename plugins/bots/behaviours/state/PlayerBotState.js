@@ -144,6 +144,8 @@ function createPvpBehaviorState() {
     confidenceTier: 2,
     currentTargetScore: 0,
     targetLockUntil: 0,
+    pjTargetUsername: null,
+    pjExpiresAt: 0,
     nextUnstackCheckAt: 0,
     nextUnstackAt: 0,
   };
@@ -178,6 +180,8 @@ function clearPvpBehaviorState(state) {
   state.pvp.lastSpecAt = 0;
   state.pvp.currentTargetScore = 0;
   state.pvp.targetLockUntil = 0;
+  state.pvp.pjTargetUsername = null;
+  state.pvp.pjExpiresAt = 0;
   state.pvp.nextUnstackCheckAt = 0;
   state.pvp.nextUnstackAt = 0;
 }
@@ -333,7 +337,10 @@ function clearBotActivePreset(player, state = null) {
   if (!player || player.isPlayerBot?.() !== true) {
     return false;
   }
-  if (state?.autonomy?.fullTimePvp === true) {
+  if (
+    state?.autonomy?.fullTimePvp === true ||
+    state?.autonomy?.persistentPvpLoadout === true
+  ) {
     return false;
   }
   // Avoid visually clearing gear mid-death animation. We clear presets once

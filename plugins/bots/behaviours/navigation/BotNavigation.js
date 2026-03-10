@@ -111,9 +111,11 @@ function chooseNextTarget(player, state, botWalkRadius, options = {}) {
     return null;
   }
 
+  const roamBounds = options?.bounds ?? null;
   const homeX = state.home.x;
   const homeY = state.home.y;
-  const homeZ = state.home.z ?? player.getLocation().getZ();
+  const homeZ =
+    Number.isFinite(roamBounds?.z) ? roamBounds.z : state.home.z ?? player.getLocation().getZ();
   const currentX = player.getLocation().getX();
   const currentY = player.getLocation().getY();
   const previousTarget = state.roaming?.target;
@@ -121,6 +123,38 @@ function chooseNextTarget(player, state, botWalkRadius, options = {}) {
     typeof options.acceptTarget === "function" ? options.acceptTarget : null;
   const radiusSq = botWalkRadius * botWalkRadius;
   const maxAttempts = 24;
+
+  if (roamBounds) {
+    const minX = Math.floor(roamBounds.minX);
+    const maxX = Math.floor(roamBounds.maxX);
+    const minY = Math.floor(roamBounds.minY);
+    const maxY = Math.floor(roamBounds.maxY);
+    if (maxX >= minX && maxY >= minY) {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const targetX = randomInRange(minX, maxX);
+        const targetY = randomInRange(minY, maxY);
+        if (isForbiddenTargetY(targetY)) {
+          continue;
+        }
+        if (targetX === currentX && targetY === currentY) {
+          continue;
+        }
+        if (
+          previousTarget &&
+          targetX === previousTarget.x &&
+          targetY === previousTarget.y &&
+          attempt < maxAttempts - 1
+        ) {
+          continue;
+        }
+        const candidate = { x: targetX, y: targetY, z: homeZ };
+        if (acceptTarget && acceptTarget(candidate) !== true) {
+          continue;
+        }
+        return candidate;
+      }
+    }
+  }
 
   // Keep roaming local to each bot's home tile; ditch crossing remains organic
   // and is only triggered by path-blocked handling when a route is obstructed.

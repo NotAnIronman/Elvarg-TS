@@ -1,6 +1,7 @@
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { GameConstants } = require("../../../../src/main/typescript/elvarg/game/GameConstants");
@@ -9,6 +10,7 @@ const { randomInRange } = require("../navigation/BotNavigation");
 const { PvpCombatExecutionNode } = require("../nodes/pvp/PvpCombatExecutionNode");
 const { PvpDefensiveActionNode } = require("../nodes/pvp/PvpDefensiveActionNode");
 const { PvpFreezeAndKiteNode } = require("../nodes/pvp/PvpFreezeAndKiteNode");
+const { PvpJumpKilledTargetNode } = require("../nodes/pvp/PvpJumpKilledTargetNode");
 const { PvpValidateEngagementNode } = require("../nodes/pvp/PvpValidateEngagementNode");
 const {
   handlePlayerAttackReaction,
@@ -108,6 +110,19 @@ class PvpBehavior {
       scheduleFreezeReview,
       pvpPhase: PVP_PHASE,
     });
+    this.jumpKilledTargetNode = new PvpJumpKilledTargetNode({
+      setPhase: (state, phase) => this.setPhase(state, phase),
+      resolveTargetPlayer: (state) => this.resolveTargetPlayer(state),
+      isValidTarget: (player, target) => this.isValidTarget(player, target),
+      setModePvp,
+      scheduleCombatAction,
+      scheduleReviewTimers,
+      applyGeneratedPvpLoadout: (player, state) =>
+        applyGeneratedPvpLoadout(player, state, { api: this.api }),
+      randomInRange,
+      pvpPhase: PVP_PHASE,
+      behaviorMode: this.behaviorMode,
+    });
     this.combatExecutionNode = new PvpCombatExecutionNode({
       setPhase: (state, phase) => this.setPhase(state, phase),
       tryStepOutOfStack: (player, state, target, nowMs) =>
@@ -172,7 +187,11 @@ class PvpBehavior {
   }
 
   isFullTimePvp(state) {
-    return state?.autonomy?.fullTimePvp === true;
+    return (
+      state?.autonomy?.fullTimePvp === true ||
+      state?.autonomy?.wildernessRoamerPvp === true ||
+      state?.autonomy?.persistentPvpLoadout === true
+    );
   }
 
   getHotspotDecisionJitterMs(player) {
@@ -434,6 +453,52 @@ class PvpBehavior {
         ? isInCombat
         : (candidate) => this.isInCombat(candidate);
 
+    const realPlayerOpponent = this.resolvePreferredRealPlayerOpponent({
+      sourceEntry: entry,
+      pvpMaxDistanceTiles,
+      isInCombat: isInCombatCheck,
+    });
+    if (realPlayerOpponent) {
+      const durationMs = randomInRange(pvpMinMs, pvpMaxMs);
+      if (
+        setModePvp(
+          sourcePlayer,
+          sourceState,
+          realPlayerOpponent,
+          nowMs,
+          durationMs,
+          this.behaviorMode
+        )
+      ) {
+        if (sourceState?.pvp) {
+          sourceState.pvp.phase = PVP_PHASE.COMBAT;
+          scheduleCombatAction(sourceState, nowMs);
+          scheduleReviewTimers(sourceState, nowMs);
+        }
+
+        applyGeneratedPvpLoadout(sourcePlayer, sourceState, {
+          api: this.api,
+        });
+
+        if (sourceAutonomy) {
+          sourceAutonomy.modeEndsAt = nowMs + durationMs;
+          sourceAutonomy.pvpCooldownUntil =
+            nowMs + durationMs + randomInRange(postPvpCooldownMinMs, postPvpCooldownMaxMs);
+          sourceAutonomy.nextDecisionAt = nowMs + durationMs;
+        }
+
+        sourcePlayer.getMovementQueue?.().reset?.();
+        sourcePlayer.getCombat?.()?.attack?.(realPlayerOpponent);
+        this.api?.log?.("bot_pvp_started_real_player", {
+          bot: sourcePlayer.getUsername?.(),
+          target: realPlayerOpponent.getUsername?.(),
+          profileId: sourceState?.pvp?.profileId ?? "standard",
+          hotspotId: sourceState?.pvp?.hotspotId ?? null,
+        });
+        return true;
+      }
+    }
+
     const opponentEntry = pickPvpOpponent({
       sourceEntry: entry,
       entries,
@@ -641,7 +706,9 @@ class PvpBehavior {
     ) {
       return false;
     }
-    if (typeof isInCombat === "function" && isInCombat(candidatePlayer)) {
+    const isMultiEngagement =
+      AreaManager.inMulti(sourcePlayer) && AreaManager.inMulti(candidatePlayer);
+    if (!isMultiEngagement && typeof isInCombat === "function" && isInCombat(candidatePlayer)) {
       return false;
     }
     if (nowMs < (candidateState?.autonomy?.pvpCooldownUntil ?? 0)) {
@@ -650,10 +717,83 @@ class PvpBehavior {
 
     const sourceUsername = sourcePlayer.getUsername?.();
     const candidateUsername = candidatePlayer.getUsername?.();
-    if (this.isTargetedByActivePvp(candidateUsername, entries, sourceUsername)) {
+    if (
+      !isMultiEngagement &&
+      this.isTargetedByActivePvp(candidateUsername, entries, sourceUsername)
+    ) {
       return false;
     }
     return true;
+  }
+
+  resolvePreferredRealPlayerOpponent({ sourceEntry, pvpMaxDistanceTiles, isInCombat }) {
+    const sourcePlayer = sourceEntry?.player;
+    const sourceState = sourceEntry?.state;
+    if (!sourcePlayer || !sourceState) {
+      return null;
+    }
+
+    const sourceProfile = this.getProfile(sourceState);
+    let bestPlayer = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    World.getPlayers().forEach((candidatePlayer) => {
+      if (!candidatePlayer || candidatePlayer === sourcePlayer) {
+        return;
+      }
+      if (candidatePlayer.isPlayerBot?.() === true) {
+        return;
+      }
+      if (!World.isPlayerSessionConnected(candidatePlayer)) {
+        return;
+      }
+      if (!candidatePlayer.isRegistered?.()) {
+        return;
+      }
+      if ((candidatePlayer.getHitpoints?.() ?? 0) <= 0) {
+        return;
+      }
+      if (!Wilderness.isIn(candidatePlayer)) {
+        return;
+      }
+      if (sourcePlayer.getPrivateArea?.() !== candidatePlayer.getPrivateArea?.()) {
+        return;
+      }
+      if (
+        sourcePlayer.getLocation?.().getZ?.() !== candidatePlayer.getLocation?.().getZ?.()
+      ) {
+        return;
+      }
+
+      const distance = sourcePlayer.getLocation().getDistance(candidatePlayer.getLocation());
+      if (distance > pvpMaxDistanceTiles) {
+        return;
+      }
+
+      const isMultiEngagement =
+        AreaManager.inMulti(sourcePlayer) && AreaManager.inMulti(candidatePlayer);
+      if (!isMultiEngagement && typeof isInCombat === "function" && isInCombat(candidatePlayer)) {
+        return;
+      }
+
+      let score = 220 - distance * 5;
+      if (distance <= sourceProfile.chaseDistanceTiles) {
+        score += 18;
+      }
+      if (candidatePlayer.getCombat?.().getTarget?.() === sourcePlayer) {
+        score += 40;
+      }
+      if (isMultiEngagement) {
+        score += 20;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestPlayer = candidatePlayer;
+      }
+    });
+
+    return bestPlayer;
   }
 
   resolveTargetPlayer(state) {
@@ -824,6 +964,17 @@ class PvpBehavior {
     }
 
     const { player, state, nowMs } = resolved;
+
+    const jump = this.jumpKilledTargetNode.tick({
+      player,
+      state,
+      nowMs,
+      pvpMinMs: PVP_DURATION_DEFAULT_MIN_MS,
+      pvpMaxMs: PVP_DURATION_DEFAULT_MAX_MS,
+    });
+    if (jump?.handled) {
+      return jump.status ?? "failure";
+    }
 
     const validation = this.validateEngagementNode.tick({
       player,

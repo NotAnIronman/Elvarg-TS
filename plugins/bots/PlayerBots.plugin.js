@@ -1,6 +1,7 @@
 const path = require("path");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
+const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
@@ -69,6 +70,7 @@ const BOT_CONFIG = Object.freeze({
   behaviorMode: BOT_BEHAVIOR_MODE,
   botCount: 205,
   fullTimePvpBotCount: 140,
+  wildernessRoamerBotCount: 500,
   botWalkRadius: 10,
   objectIndexCachePath: path.join(
     process.cwd(),
@@ -172,6 +174,14 @@ const BOT_CONFIG = Object.freeze({
   modeBehaviorOptions: BOT_MODE_BEHAVIOR_OPTIONS,
   treeOptions: BOT_TREE_OPTIONS,
   pvp: Object.freeze({
+    pjOpportunityWindowMs: 3500,
+    pjObserveDistanceTiles: 12,
+    pjUseChanceByProfile: Object.freeze({
+      novice: 0.18,
+      standard: 0.34,
+      veteran: 0.58,
+      elite: 0.8,
+    }),
     profileWeights: Object.freeze([
       Object.freeze({ value: "novice", weight: 18 }),
       Object.freeze({ value: "standard", weight: 48 }),
@@ -270,10 +280,76 @@ module.exports = {
       }
     });
 
+    api.onPlayerDefeated(({ killer, victim }) => {
+      if (!killer || !victim || killer.isPlayerBot?.() === true) {
+        return;
+      }
+      if (!Wilderness.isIn(killer) || !Wilderness.isIn(victim)) {
+        return;
+      }
+      const nowMs = Date.now();
+      const nearbyObservers = new Set([
+        ...(killer.getLocalPlayers?.() ?? []),
+        ...(victim.getLocalPlayers?.() ?? []),
+      ]);
+      for (const observer of nearbyObservers) {
+        if (!observer || observer === killer || observer === victim) {
+          continue;
+        }
+        if (observer.isPlayerBot?.() !== true || !observer.isRegistered?.()) {
+          continue;
+        }
+        const state = boot.runtime.botStatesByName.get(observer.getUsername?.());
+        if (!state?.pvp) {
+          continue;
+        }
+        if (
+          state.autonomy?.fullTimePvp !== true &&
+          state.autonomy?.wildernessRoamerPvp !== true &&
+          state.autonomy?.persistentPvpLoadout !== true
+        ) {
+          continue;
+        }
+        if (
+          state.mode !== BOT_BEHAVIOR_MODE.PVP &&
+          state.mode !== BOT_BEHAVIOR_MODE.ROAMING
+        ) {
+          continue;
+        }
+        const observerLoc = observer.getLocation?.();
+        const killerLoc = killer.getLocation?.();
+        if (!observerLoc || !killerLoc) {
+          continue;
+        }
+        if (
+          observerLoc.getZ?.() !== killerLoc.getZ?.() ||
+          observerLoc.getDistance?.(killerLoc) > BOT_CONFIG.pvp.pjObserveDistanceTiles
+        ) {
+          continue;
+        }
+        const profileId = state.pvp.profileId ?? "standard";
+        const chance = Number(
+          BOT_CONFIG.pvp.pjUseChanceByProfile?.[profileId] ?? 0.3
+        );
+        if (Math.random() > chance) {
+          continue;
+        }
+        state.pvp.pjTargetUsername = killer.getUsername?.() ?? null;
+        state.pvp.pjExpiresAt = nowMs + BOT_CONFIG.pvp.pjOpportunityWindowMs;
+        if (state.autonomy) {
+          state.autonomy.nextDecisionAt = Math.min(
+            state.autonomy.nextDecisionAt ?? nowMs,
+            nowMs
+          );
+        }
+      }
+    });
+
     botApi.log("registered", {
       spawned: boot.runtime.getSpawnedCount(),
-      totalConfigured: BOT_CONFIG.botCount,
+      totalConfigured: BOT_CONFIG.botCount + BOT_CONFIG.wildernessRoamerBotCount,
       fullTimePvpBotCount: BOT_CONFIG.fullTimePvpBotCount,
+      wildernessRoamerBotCount: BOT_CONFIG.wildernessRoamerBotCount,
       walkRadius: BOT_CONFIG.botWalkRadius,
       decisionTicks: BOT_CONFIG.botDecisionTicks,
       baseCooldownMs: BOT_CONFIG.botBaseCooldownMs,

@@ -127,7 +127,11 @@ function handlePlayerAttackReaction({
     return false;
   }
 
-  if (state?.autonomy?.fullTimePvp === true) {
+  if (
+    state?.autonomy?.fullTimePvp === true ||
+    state?.autonomy?.wildernessRoamerPvp === true ||
+    state?.autonomy?.persistentPvpLoadout === true
+  ) {
     if (state.mode !== behaviorMode.PVP) {
       setModePvp(
         bot,
