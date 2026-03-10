@@ -1149,7 +1149,7 @@ class LoginSession {
       const isIdleKeepAlive = opcode === 0 && size === 0;
       if (!isIdleKeepAlive) {
         if (opcode === PacketConstants.FINALIZED_MAP_REGION_OPCODE) {
-          this.sendLoginDeferredVisibleReplacements();
+          this.sendVisibleRegionReplacementsForCurrentScene();
         }
         this.log("packet_received", {
           opcode,
@@ -1238,10 +1238,7 @@ class LoginSession {
     this.recvBuffer = data.subarray(offset);
   }
 
-  private sendLoginDeferredVisibleReplacements(): void {
-    if (this.loginReplacementsSent) {
-      return;
-    }
+  private sendVisibleRegionReplacementsForCurrentScene(): void {
     const player = this.gamePlayer;
     if (!player || this.stage !== "ESTABLISHED") {
       return;
@@ -1249,7 +1246,6 @@ class LoginSession {
     if (this.socket.readyState !== WebSocket.OPEN) {
       return;
     }
-    this.loginReplacementsSent = true;
     try {
       const loc = player.getLocation();
       MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
@@ -1257,9 +1253,10 @@ class LoginSession {
         loc.getX(),
         loc.getY(),
         6,
-        this.loginInitialRegionId != null ? [this.loginInitialRegionId] : [],
+        !this.loginReplacementsSent && this.loginInitialRegionId != null ? [this.loginInitialRegionId] : [],
         true
       );
+      this.loginReplacementsSent = true;
     } catch (err) {
       this.log("visible_region_replacements_failed", {
         err: (err as Error)?.message ?? String(err),
