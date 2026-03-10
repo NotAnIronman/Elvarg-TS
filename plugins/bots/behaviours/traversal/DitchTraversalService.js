@@ -197,7 +197,7 @@ class DitchTraversalService {
     if (!this.isRoamingCrossProximitySatisfied(player, state, objectY)) {
       return false;
     }
-    clearBotActivePreset(player);
+    clearBotActivePreset(player, state);
     const traversalTargetSnapshot = {
       x: traversalTarget.x ?? null,
       y: traversalTarget.y ?? null,

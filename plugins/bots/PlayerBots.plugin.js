@@ -67,8 +67,8 @@ const BOT_TREE_OPTIONS = Object.freeze({
 
 const BOT_CONFIG = Object.freeze({
   behaviorMode: BOT_BEHAVIOR_MODE,
-  botCount: 130,
-  fullTimePvpBotCount: 65,
+  botCount: 180,
+  fullTimePvpBotCount: 115,
   botWalkRadius: 10,
   objectIndexCachePath: path.join(
     process.cwd(),
@@ -171,6 +171,40 @@ const BOT_CONFIG = Object.freeze({
   }),
   modeBehaviorOptions: BOT_MODE_BEHAVIOR_OPTIONS,
   treeOptions: BOT_TREE_OPTIONS,
+  pvp: Object.freeze({
+    profileWeights: Object.freeze([
+      Object.freeze({ value: "novice", weight: 18 }),
+      Object.freeze({ value: "standard", weight: 48 }),
+      Object.freeze({ value: "veteran", weight: 24 }),
+      Object.freeze({ value: "elite", weight: 10 }),
+    ]),
+    fullTimeProfileWeights: Object.freeze([
+      Object.freeze({ value: "standard", weight: 20 }),
+      Object.freeze({ value: "veteran", weight: 52 }),
+      Object.freeze({ value: "elite", weight: 28 }),
+    ]),
+    loadoutWeights: Object.freeze([
+      Object.freeze({ value: "edge_main_melee", weight: 28 }),
+      Object.freeze({ value: "edge_ranged_melee", weight: 20 }),
+      Object.freeze({ value: "deep_wild_hybrid", weight: 15 }),
+      Object.freeze({ value: "anti_pk_hybrid", weight: 12 }),
+      Object.freeze({ value: "budget_pk", weight: 17 }),
+      Object.freeze({ value: "f2p_strength_pure", weight: 8 }),
+      Object.freeze({ value: "f2p_rune_pure", weight: 10 }),
+      Object.freeze({ value: "f2p_range_ko", weight: 7 }),
+      Object.freeze({ value: "f2p_bind_pure", weight: 3 }),
+      Object.freeze({ value: "f2p_addy_pure", weight: 7 }),
+      Object.freeze({ value: "f2p_mage_pure", weight: 3 }),
+      Object.freeze({ value: "f2p_bind_ko", weight: 4 }),
+      Object.freeze({ value: "rusher", weight: 8 }),
+    ]),
+    hotspotWeights: Object.freeze([
+      Object.freeze({ value: "edge_ditch", weight: 34 }),
+      Object.freeze({ value: "varrock_ditch", weight: 16 }),
+      Object.freeze({ value: "revs_entrance", weight: 12 }),
+      Object.freeze({ value: "green_drags_gate", weight: 10 }),
+    ]),
+  }),
 });
 
 module.exports = {
@@ -227,6 +261,13 @@ module.exports = {
       combatReactionTrigger: boot.combatReactionTrigger,
       pathBlockedHandler: boot.pathBlockedHandler,
       npcAggroPolicyHandler: boot.npcAggroPolicyHandler,
+    });
+
+    api.onSpellRuneBypass((event) => {
+      const player = event?.player;
+      if (player?.isPlayerBot?.() === true) {
+        event.bypass = true;
+      }
     });
 
     botApi.log("registered", {

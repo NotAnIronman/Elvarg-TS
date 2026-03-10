@@ -113,8 +113,11 @@ function createBotPlayer(username, spawn) {
     }
   }
 
-  bot.setLastKnownRegion(bot.getLocation().clone());
-  bot.setRegionHeight(bot.getLocation().getZ());
+  // Full-time PvP bots are assigned explicit hotspot spawns. Persisted player
+  // positions should not drag them back to stale saved coordinates.
+  bot.setLocation(spawn.clone());
+  bot.setLastKnownRegion(spawn.clone());
+  bot.setRegionHeight(spawn.getZ());
   bot.getUpdateFlag().flag(Flag.APPEARANCE);
   World.getAddPlayerQueue().push(bot);
   return bot;

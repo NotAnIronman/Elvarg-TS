@@ -63,9 +63,15 @@ export abstract class Spell {
 
         const items = this.itemsRequired(player);
         if (Array.isArray(items) && items.length > 0) {
-            const suppressedItems = PlayerMagicStaff.suppressRunes(player, items);
+            const bypassRunes =
+                PluginManager.emitSpellRuneBypass(
+                    player,
+                    this.getSpellbook(),
+                    this.spellId()
+                ) === true;
+            const suppressedItems = bypassRunes ? [] : PlayerMagicStaff.suppressRunes(player, items);
 
-            if (!player.getInventory().containsAllItem(suppressedItems)) {
+            if (!bypassRunes && !player.getInventory().containsAllItem(suppressedItems)) {
                 player.getPacketSender().sendMessage("You do not have the required items to cast this spell.");
                 player.getCombat().setCastSpell(null);
                 player.getCombat().reset();
@@ -87,7 +93,7 @@ export abstract class Spell {
                 }
             }
 
-            if (del) {
+            if (del && !bypassRunes) {
                 let item: Item
                 for (item of suppressedItems) {
                     if (item !== null) {

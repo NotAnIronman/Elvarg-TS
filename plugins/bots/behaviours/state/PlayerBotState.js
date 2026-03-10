@@ -116,6 +116,36 @@ function createPvpBehaviorState() {
     targetPlayer: null,
     endsAt: 0,
     nextActionAt: 0,
+    profileId: "standard",
+    loadoutId: "edge_main_melee",
+    generatedArchetypeId: null,
+    generatedPrimaryWeaponId: null,
+    generatedPrimaryAmmoId: null,
+    generatedSpecWeaponId: null,
+    generatedSpecAmmoId: null,
+    hotspotId: null,
+    engagementStyle: "roaming",
+    preferredCombatStyle: "melee",
+    nextTargetReviewAt: 0,
+    nextPrayerReviewAt: 0,
+    nextSpecReviewAt: 0,
+    nextFreezeReviewAt: 0,
+    nextEscapeReviewAt: 0,
+    lastFreezeAt: 0,
+    lastTeleblockAt: 0,
+    lastDamageTakenAt: 0,
+    lastDamageDealtAt: 0,
+    lastFoodAt: 0,
+    lastBrewAt: 0,
+    lastComboEatAt: 0,
+    lastSpecAt: 0,
+    escapeThreshold: 0.24,
+    riskTolerance: 0.3,
+    confidenceTier: 2,
+    currentTargetScore: 0,
+    targetLockUntil: 0,
+    nextUnstackCheckAt: 0,
+    nextUnstackAt: 0,
   };
 }
 
@@ -128,6 +158,28 @@ function clearPvpBehaviorState(state) {
   state.pvp.targetPlayer = null;
   state.pvp.endsAt = 0;
   state.pvp.nextActionAt = 0;
+  state.pvp.generatedArchetypeId = null;
+  state.pvp.generatedPrimaryWeaponId = null;
+  state.pvp.generatedPrimaryAmmoId = null;
+  state.pvp.generatedSpecWeaponId = null;
+  state.pvp.generatedSpecAmmoId = null;
+  state.pvp.nextTargetReviewAt = 0;
+  state.pvp.nextPrayerReviewAt = 0;
+  state.pvp.nextSpecReviewAt = 0;
+  state.pvp.nextFreezeReviewAt = 0;
+  state.pvp.nextEscapeReviewAt = 0;
+  state.pvp.lastFreezeAt = 0;
+  state.pvp.lastTeleblockAt = 0;
+  state.pvp.lastDamageTakenAt = 0;
+  state.pvp.lastDamageDealtAt = 0;
+  state.pvp.lastFoodAt = 0;
+  state.pvp.lastBrewAt = 0;
+  state.pvp.lastComboEatAt = 0;
+  state.pvp.lastSpecAt = 0;
+  state.pvp.currentTargetScore = 0;
+  state.pvp.targetLockUntil = 0;
+  state.pvp.nextUnstackCheckAt = 0;
+  state.pvp.nextUnstackAt = 0;
 }
 
 function createAutonomyState() {
@@ -277,8 +329,11 @@ function clearCombatState(player) {
   player.setCombatFollowing?.(null);
 }
 
-function clearBotActivePreset(player) {
+function clearBotActivePreset(player, state = null) {
   if (!player || player.isPlayerBot?.() !== true) {
+    return false;
+  }
+  if (state?.autonomy?.fullTimePvp === true) {
     return false;
   }
   // Avoid visually clearing gear mid-death animation. We clear presets once
@@ -299,7 +354,7 @@ function clearBotActivePreset(player) {
 }
 
 function applyModeTransitionSideEffects(player, state, mode, options = {}) {
-  clearBotActivePreset(player);
+  clearBotActivePreset(player, state);
   restoreSuppressedAutoRetaliate(player, state, mode);
   if (options.resetMovement !== false) {
     resetMovementState(player);

@@ -115,11 +115,39 @@ class BotStatusReporter {
         }
       }
 
+      const equipmentLines = this.buildContainerLines("Equipment", bot?.getEquipment?.()?.getCopiedItems?.() ?? []);
+      for (const line of equipmentLines) {
+        lines.push(`  ${line}`);
+      }
+
+      const inventoryLines = this.buildContainerLines("Inventory", bot?.getInventory?.()?.getCopiedItems?.() ?? []);
+      for (const line of inventoryLines) {
+        lines.push(`  ${line}`);
+      }
+
       lines.push("");
       fs.appendFileSync(this.diagnoseLogPath, `${lines.join("\n")}\n`, "utf8");
     } catch (_) {
       // Never disrupt player interaction due to diagnostics logging failure.
     }
+  }
+
+  buildContainerLines(label, items) {
+    const validItems = Array.isArray(items)
+      ? items.filter((item) => item && typeof item.getId === "function" && item.getId() > 0)
+      : [];
+    const lines = [`[${label}]`];
+    if (validItems.length === 0) {
+      lines.push("empty");
+      return lines;
+    }
+    for (const item of validItems) {
+      const id = item.getId?.() ?? -1;
+      const amount = item.getAmount?.() ?? 0;
+      const name = item.getDefinition?.()?.getName?.() ?? `item:${id}`;
+      lines.push(`${name} x${amount} (id=${id})`);
+    }
+    return lines;
   }
 }
 

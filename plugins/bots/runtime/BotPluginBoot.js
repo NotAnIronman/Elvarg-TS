@@ -38,6 +38,21 @@ const { ReturnHomeModeHandler } = require("../behaviours/modes/ReturnHomeModeHan
 const { createBotRegistry } = require("./BotRegistry");
 const { BotStatusReporter } = require("./BotStatusReporter");
 const { FlashHintArrowTask } = require("./FlashHintArrowTask");
+const { listPvpProfiles } = require("../behaviours/pvp/PvpProfileRegistry");
+const { listPvpLoadouts } = require("../behaviours/pvp/PvpLoadoutRegistry");
+const {
+  listWildernessHotspots,
+  createHotspotAnchorLocation,
+} = require("../behaviours/pvp/WildernessHotspotRegistry");
+const { assignPvpMetadata } = require("../behaviours/pvp/PvpAssignment");
+const {
+  buildAssignedPvpMetadata,
+  getWildernessHotspot,
+  resolveAlternativeLoadoutId,
+} = require("../behaviours/pvp/PvpAssignment");
+const {
+  applyGeneratedPvpLoadout,
+} = require("../behaviours/policies/PvpLoadoutPolicy");
 
 function collectTrackedObjectIdsFromModes({ modeHandlers, api }) {
   const objectIds = new Set();
@@ -211,6 +226,47 @@ function bootPlayerBotsRuntime(options = {}) {
         idleEntryStride: config.idleEntryStride,
         lodConfig: config.lodConfig,
         taskProfiler: config.taskProfiler,
+        handleFullTimePvpRespawn: (entry, nowMs) => {
+          const player = entry?.player;
+          const state = entry?.state;
+          if (!player || !state?.autonomy?.fullTimePvp || !state?.pvp) {
+            return false;
+          }
+
+          const hotspotId = state.pvp.hotspotId ?? null;
+          const hotspot = hotspotId ? getWildernessHotspot(hotspotId) : null;
+          const hotspotLocation = hotspot ? createHotspotAnchorLocation(hotspot) : null;
+          if (hotspotLocation) {
+            player.moveTo(hotspotLocation);
+          }
+
+          const nextLoadoutId = resolveAlternativeLoadoutId(
+            config,
+            hotspotId,
+            state.pvp.loadoutId ?? null
+          );
+          if (nextLoadoutId) {
+            state.pvp.loadoutId = nextLoadoutId;
+          }
+          state.pvp.targetUsername = null;
+          state.pvp.targetPlayer = null;
+          state.pvp.currentTargetScore = 0;
+          state.pvp.targetLockUntil = 0;
+          state.pvp.endsAt = 0;
+          state.pvp.nextActionAt = nowMs;
+          state.pvp.phase = "seeking";
+
+          applyGeneratedPvpLoadout(player, state, {
+            api: botApi,
+          });
+
+          botApi.log("full_time_pvp_respawn_reset", {
+            username: player.getUsername?.(),
+            hotspotId,
+            loadoutId: state.pvp.loadoutId ?? null,
+          });
+          return true;
+        },
       })
     );
     behaviorTaskStarted = true;
@@ -227,6 +283,20 @@ function bootPlayerBotsRuntime(options = {}) {
     createBotPlayer,
     spawnLocationForIndex,
     createInitialState,
+    buildAssignedPvpMetadata: (meta) =>
+      buildAssignedPvpMetadata({
+        ...meta,
+        config,
+      }),
+    assignPvpMetadata: (state, meta) =>
+      assignPvpMetadata(state, {
+        ...meta,
+        config,
+      }),
+    applyInitialPvpLoadout: (player, state) =>
+      applyGeneratedPvpLoadout(player, state, {
+        api: botApi,
+      }),
     createController,
     ensureBehaviorTaskStarted,
     emitPlayerLogin: (event) => PluginManager.emitPlayerLogin(event),
@@ -306,6 +376,11 @@ function bootPlayerBotsRuntime(options = {}) {
     botStatusReporter,
     flashHintArrowTaskFactory: (player, target) =>
       new FlashHintArrowTask(player, target),
+    pvpCatalogs: {
+      profiles: listPvpProfiles(),
+      loadouts: listPvpLoadouts(),
+      hotspots: listWildernessHotspots(),
+    },
   };
 }
 

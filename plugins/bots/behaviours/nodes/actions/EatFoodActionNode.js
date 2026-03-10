@@ -1,6 +1,7 @@
 const { Animation } = require("../../../../../src/main/typescript/elvarg/game/model/Animation");
 const { Skill } = require("../../../../../src/main/typescript/elvarg/game/model/Skill");
 const { TimerKey } = require("../../../../../src/main/typescript/elvarg/util/timers/TimerKey");
+const { getPvpProfile } = require("../../pvp/PvpAssignment");
 const { resolveBotNodeContext } = require("../context/BotNodeContext");
 
 const EAT_ANIMATION = new Animation(829);
@@ -21,6 +22,13 @@ class EatFoodActionNode {
       return this.minHeal;
     }
     return this.minHeal + Math.floor(Math.random() * (range + 1));
+  }
+
+  resolvePvpProfile(state) {
+    if (state?.mode !== "pvp" || !state?.pvp) {
+      return null;
+    }
+    return getPvpProfile(state.pvp.profileId);
   }
 
   tick(context) {
@@ -45,7 +53,9 @@ class EatFoodActionNode {
       return "failure";
     }
 
-    const lowHpThreshold = Math.max(1, Math.ceil(maxHp * this.lowHpRatio));
+    const pvpProfile = this.resolvePvpProfile(state);
+    const lowHpRatio = Number(pvpProfile?.eatAtHpRatio ?? this.lowHpRatio);
+    const lowHpThreshold = Math.max(1, Math.ceil(maxHp * lowHpRatio));
     if (currentHp > lowHpThreshold) {
       return "failure";
     }
@@ -80,18 +90,34 @@ class EatFoodActionNode {
     skillManager.stopSkillable?.();
     player.performAnimation?.(EAT_ANIMATION);
 
-    const healAmount = this.randomHealAmount();
+    let healAmount = this.randomHealAmount();
+    let comboEatTriggered = false;
+    if (
+      pvpProfile &&
+      Math.random() < Number(pvpProfile.comboEatChance ?? 0) &&
+      currentHp <= Math.max(1, Math.ceil(maxHp * Math.max(0.1, lowHpRatio * 0.72)))
+    ) {
+      healAmount += 6 + Math.floor(Math.random() * 7);
+      comboEatTriggered = true;
+      if (state?.pvp) {
+        state.pvp.lastComboEatAt = nowMs ?? Date.now();
+      }
+    }
     state.virtualFoodChargesRemaining = Math.max(
       0,
       Number(state.virtualFoodChargesRemaining) - 1
     );
     player.heal?.(healAmount);
+    if (state?.pvp) {
+      state.pvp.lastFoodAt = nowMs ?? Date.now();
+    }
     const nextHp = Number(skillManager.getCurrentLevel?.(Skill.HITPOINTS) ?? currentHp);
     this.api?.log?.("bot_imaginary_food_eat", {
       username: player.getUsername?.(),
       currentHp,
       nextHp,
       healAmount,
+      comboEatTriggered,
       chargesRemaining: state.virtualFoodChargesRemaining,
       maxHp,
       threshold: lowHpThreshold,

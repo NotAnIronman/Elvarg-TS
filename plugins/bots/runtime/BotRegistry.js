@@ -1,3 +1,9 @@
+const { getWildernessHotspot } = require("../behaviours/pvp/PvpAssignment");
+const {
+  getEnabledWildernessHotspots,
+  createHotspotAnchorLocation,
+} = require("../behaviours/pvp/WildernessHotspotRegistry");
+
 function createBotRegistry(options) {
   const {
     botApi,
@@ -10,6 +16,9 @@ function createBotRegistry(options) {
     createBotPlayer,
     spawnLocationForIndex,
     createInitialState,
+    buildAssignedPvpMetadata: buildAssignedPvpMetadataFn,
+    assignPvpMetadata: assignPvpMetadataFn,
+    applyInitialPvpLoadout: applyInitialPvpLoadoutFn,
     applyForcedModeForDiagnosis: applyForcedModeForDiagnosisFn,
     createController,
     ensureBehaviorTaskStarted,
@@ -29,6 +38,14 @@ function createBotRegistry(options) {
     typeof applyForcedModeForDiagnosisFn === "function"
       ? applyForcedModeForDiagnosisFn
       : () => {};
+  const assignPvpMetadata =
+    typeof assignPvpMetadataFn === "function" ? assignPvpMetadataFn : () => {};
+  const buildAssignedPvpMetadata =
+    typeof buildAssignedPvpMetadataFn === "function"
+      ? buildAssignedPvpMetadataFn
+      : () => null;
+  const applyInitialPvpLoadout =
+    typeof applyInitialPvpLoadoutFn === "function" ? applyInitialPvpLoadoutFn : () => {};
 
   const botStatesByName = providedBotStatesByName ?? new Map();
   const botmeUsernames = providedBotmeUsernames ?? new Set();
@@ -37,6 +54,65 @@ function createBotRegistry(options) {
   const entriesByUsername = providedEntriesByUsername ?? new Map();
   let spawned = 0;
   let fullTimePvpAssigned = 0;
+  const hotspotSpawnCounts = new Map();
+
+  function buildFullTimePvpHotspotPlan(totalCount) {
+    const hotspots = getEnabledWildernessHotspots().filter(
+      (hotspot) => Number(hotspot?.targetBots ?? 0) > 0
+    );
+    if (totalCount <= 0 || hotspots.length === 0) {
+      return [];
+    }
+    const totalTargetBots = hotspots.reduce(
+      (sum, hotspot) => sum + Math.max(0, Number(hotspot.targetBots ?? 0)),
+      0
+    );
+    if (totalTargetBots <= 0) {
+      return hotspots.map((hotspot) => hotspot.id).slice(0, totalCount);
+    }
+
+    const plan = [];
+    const allocations = hotspots.map((hotspot) => {
+      const rawShare = (totalCount * Number(hotspot.targetBots ?? 0)) / totalTargetBots;
+      const baseCount = Math.floor(rawShare);
+      return {
+        hotspotId: hotspot.id,
+        count: baseCount,
+        remainder: rawShare - baseCount,
+      };
+    });
+
+    let allocated = allocations.reduce((sum, entry) => sum + entry.count, 0);
+    allocations
+      .slice()
+      .sort((a, b) => {
+        if (b.remainder !== a.remainder) {
+          return b.remainder - a.remainder;
+        }
+        return a.hotspotId.localeCompare(b.hotspotId);
+      })
+      .forEach((entry) => {
+        if (allocated >= totalCount) {
+          return;
+        }
+        const target = allocations.find((candidate) => candidate.hotspotId === entry.hotspotId);
+        if (!target) {
+          return;
+        }
+        target.count += 1;
+        allocated += 1;
+      });
+
+    allocations
+      .sort((a, b) => a.hotspotId.localeCompare(b.hotspotId))
+      .forEach((entry) => {
+        for (let i = 0; i < entry.count; i++) {
+          plan.push(entry.hotspotId);
+        }
+      });
+
+    return plan.slice(0, totalCount);
+  }
 
   function addEntry(username, entry) {
     entry.entryIndex = entries.length;
@@ -109,9 +185,23 @@ function createBotRegistry(options) {
   }
 
   function spawnConfiguredBots() {
+    const hotspotCounts = new Map();
+    const fullTimePvpHotspotPlan = buildFullTimePvpHotspotPlan(fullTimePvpBotCount);
     for (let i = 1; i <= botCount; i++) {
       const username = `PlayerBot${i}`;
-      const botSpawn = spawnLocationForIndex(spawn, spawnOffsets, i - 1);
+      const isFullTimePvp = i <= fullTimePvpBotCount;
+      const forcedHotspotId = isFullTimePvp ? fullTimePvpHotspotPlan[i - 1] ?? null : null;
+      const pvpMetadata = buildAssignedPvpMetadata({
+        isFullTimePvp,
+        forcedHotspotId,
+      });
+      const hotspotSpawnIndex = isFullTimePvp && pvpMetadata?.hotspotId
+        ? reserveHotspotSpawnIndex(pvpMetadata.hotspotId)
+        : -1;
+      const hotspotAnchor = isFullTimePvp && pvpMetadata?.hotspotId
+        ? createHotspotSpawn(pvpMetadata.hotspotId, hotspotSpawnIndex)
+        : null;
+      const botSpawn = hotspotAnchor ?? spawnLocationForIndex(spawn, spawnOffsets, i - 1);
       const bot = createBotPlayer(username, botSpawn);
       if (!bot) {
         continue;
@@ -126,15 +216,29 @@ function createBotRegistry(options) {
         },
         behaviorMode
       );
-      if (i <= fullTimePvpBotCount) {
+      const spawnTimingJitterMs = resolveSpawnTimingJitterMs(username);
+      if (state?.autonomy) {
+        state.autonomy.nextDecisionAt = spawnTimingJitterMs;
+      }
+      if (state?.roaming) {
+        state.roaming.nextWalkAt = spawnTimingJitterMs;
+      }
+      if (isFullTimePvp) {
         if (!state.autonomy) {
           state.autonomy = {};
         }
         state.autonomy.fullTimePvp = true;
         state.autonomy.pvpCooldownUntil = 0;
         state.autonomy.modeEndsAt = 0;
-        state.autonomy.nextDecisionAt = 0;
+        state.autonomy.nextDecisionAt = spawnTimingJitterMs;
         fullTimePvpAssigned++;
+      }
+      assignPvpMetadata(state, { isFullTimePvp, metadata: pvpMetadata });
+      if (isFullTimePvp && pvpMetadata?.hotspotId) {
+        hotspotCounts.set(
+          pvpMetadata.hotspotId,
+          (hotspotCounts.get(pvpMetadata.hotspotId) ?? 0) + 1
+        );
       }
       applyForcedModeForDiagnosis(bot, state);
       botStatesByName.set(username, state);
@@ -149,6 +253,9 @@ function createBotRegistry(options) {
           randomInRange(0, botBaseCooldownMs)
         ),
       });
+      if (isFullTimePvp) {
+        applyInitialPvpLoadout(bot, state);
+      }
       emitPlayerLogin({
         player: bot,
         username,
@@ -160,6 +267,7 @@ function createBotRegistry(options) {
       spawned,
       configured: botCount,
       fullTimePvpAssigned,
+      hotspotCounts: Object.fromEntries(hotspotCounts.entries()),
     });
     ensureBehaviorTaskStarted();
   }
@@ -167,6 +275,49 @@ function createBotRegistry(options) {
   function scheduleInitialSpawn() {
     // Defer spawn until all plugins (including persistence provider) have registered.
     setTimeout(() => spawnConfiguredBots(), 0);
+  }
+
+  function resolveSpawnTimingJitterMs(username) {
+    const text = typeof username === "string" ? username : "";
+    let hash = 0;
+    for (let index = 0; index < text.length; index += 1) {
+      hash = (hash * 31 + text.charCodeAt(index)) | 0;
+    }
+    return Math.abs(hash) % 5000;
+  }
+
+  function reserveHotspotSpawnIndex(hotspotId) {
+    const nextIndex = hotspotSpawnCounts.get(hotspotId) ?? 0;
+    hotspotSpawnCounts.set(hotspotId, nextIndex + 1);
+    return nextIndex;
+  }
+
+  function createHotspotSpawn(hotspotId, index) {
+    const hotspot = getWildernessHotspot(hotspotId);
+    const anchor = createHotspotAnchorLocation(hotspot);
+    if (!anchor) {
+      return null;
+    }
+    const area = hotspot?.area;
+    if (!area) {
+      return anchor;
+    }
+    const minX = Math.floor(area.minX);
+    const maxX = Math.floor(area.maxX);
+    const minY = Math.floor(area.minY);
+    const maxY = Math.floor(area.maxY);
+    const width = maxX - minX + 1;
+    const height = maxY - minY + 1;
+    if (width <= 0 || height <= 0) {
+      return anchor;
+    }
+    const seedBase =
+      Math.imul(index + 1, 1103515245) ^
+      Math.imul(hotspotId.length + 17, 12345) ^
+      Math.imul(minX + maxY, 2654435761);
+    const offsetX = Math.abs(seedBase) % width;
+    const offsetY = Math.abs(Math.imul(seedBase ^ 0x9e3779b9, 48271)) % height;
+    return anchor.clone().setX(minX + offsetX).setY(minY + offsetY);
   }
 
   function enableControllerForPlayer(player) {
@@ -191,6 +342,9 @@ function createBotRegistry(options) {
       },
       behaviorMode
     );
+    assignPvpMetadata(state, {
+      isFullTimePvp: false,
+    });
     applyForcedModeForDiagnosis(player, state);
     botStatesByName.set(username, state);
     botmeUsernames.add(username);

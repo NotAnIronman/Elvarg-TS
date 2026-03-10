@@ -6,12 +6,25 @@ const {
   retargetAfterBlocked,
 } = require("../navigation/BotNavigation");
 const {
+  getWildernessHotspot,
+} = require("../pvp/WildernessHotspotRegistry");
+const {
   handlePlayerAttackReaction,
 } = require("../policies/PlayerAttackReactionPolicy");
 const { clearFollowState, setModeRoaming } = require("../state/PlayerBotState");
 const { resolveBotNodeContext } = require("../nodes/context/BotNodeContext");
 
 const DITCH_CONTEXT_TTL_MS = 1500;
+const ROAMING_LINGER_JITTER_MS = 2200;
+
+function hashUsername(value) {
+  const text = typeof value === "string" ? value : "";
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
 
 class RoamingBehavior {
   constructor(botStatesByName, options) {
@@ -34,6 +47,47 @@ class RoamingBehavior {
     this.ditchProbeRadius = Number.isFinite(options.ditchProbeRadius)
       ? Math.max(1, Math.floor(options.ditchProbeRadius))
       : Math.max(12, this.botWalkRadius * 3);
+  }
+
+  getAssignedHotspot(state) {
+    const hotspotId = state?.autonomy?.fullTimePvp ? state?.pvp?.hotspotId : null;
+    return hotspotId ? getWildernessHotspot(hotspotId) : null;
+  }
+
+  getEffectiveWalkRadius(state) {
+    const hotspot = this.getAssignedHotspot(state);
+    return Number.isFinite(hotspot?.roamRadius)
+      ? Math.max(1, Math.floor(hotspot.roamRadius))
+      : this.botWalkRadius;
+  }
+
+  getEffectiveEndpointLingerMs(player, state) {
+    const hotspot = this.getAssignedHotspot(state);
+    const baseLingerMs = Number.isFinite(hotspot?.lingerMs)
+      ? Math.max(0, Math.floor(hotspot.lingerMs))
+      : this.endpointLingerMs;
+    const username = player?.getUsername?.() ?? "";
+    const jitterMs = hashUsername(username) % ROAMING_LINGER_JITTER_MS;
+    return baseLingerMs + jitterMs;
+  }
+
+  buildHotspotTargetConstraint(state) {
+    const hotspot = this.getAssignedHotspot(state);
+    if (!hotspot?.area) {
+      return null;
+    }
+    return (target) => {
+      if (!target) {
+        return false;
+      }
+      return (
+        target.z === hotspot.area.z &&
+        target.x >= hotspot.area.minX &&
+        target.x <= hotspot.area.maxX &&
+        target.y >= hotspot.area.minY &&
+        target.y <= hotspot.area.maxY
+      );
+    };
   }
 
   ensureDitchContext(state) {
@@ -145,11 +199,23 @@ class RoamingBehavior {
       ditchYHint,
       nowMs
     );
-    const chooseOptions = constraint ? { acceptTarget: constraint.acceptTarget } : {};
+    const hotspotAcceptTarget = this.buildHotspotTargetConstraint(state);
+    const baseAcceptTarget =
+      typeof constraint?.acceptTarget === "function" ? constraint.acceptTarget : null;
+    const acceptTarget =
+      typeof hotspotAcceptTarget === "function" && typeof baseAcceptTarget === "function"
+        ? (target) => baseAcceptTarget(target) === true && hotspotAcceptTarget(target) === true
+        : hotspotAcceptTarget ?? baseAcceptTarget;
+    const chooseOptions = acceptTarget ? { acceptTarget } : {};
     return {
-      target: chooseNextTarget(player, state, this.botWalkRadius, chooseOptions),
+      target: chooseNextTarget(
+        player,
+        state,
+        this.getEffectiveWalkRadius(state),
+        chooseOptions
+      ),
       chooseOptions,
-      constraintApplied: !!constraint,
+      constraintApplied: !!acceptTarget,
     };
   }
 
@@ -344,7 +410,8 @@ class RoamingBehavior {
     }
 
     if ((state.roaming.endpointPauseUntil ?? 0) === 0) {
-      state.roaming.endpointPauseUntil = nowMs + this.endpointLingerMs;
+      state.roaming.endpointPauseUntil =
+        nowMs + this.getEffectiveEndpointLingerMs(player, state);
       return "failure";
     }
     if (nowMs < state.roaming.endpointPauseUntil) {
@@ -358,7 +425,7 @@ class RoamingBehavior {
     const nextTarget = chooseNextTarget(
       player,
       state,
-      this.botWalkRadius,
+      this.getEffectiveWalkRadius(state),
       chooseOptions
     );
     if (!nextTarget) {

@@ -20,23 +20,33 @@ export class AbyssalWhipCombatMethod extends MeleeCombatMethod {
     }
 
     handleAfterHitEffects(hit: PendingHit) {
+        if (!hit.isAccurate()) {
+            return;
+        }
+
         const target = hit.getTarget();
         if (target.getHitpoints() <= 0) {
             return;
         }
         target.performGraphic(AbyssalWhipCombatMethod.GRAPHIC);
-        if (target.isPlayer()) {
+
+        // OSRS: in PvP, Energy Drain transfers 10% of the target's run energy to the attacker.
+        if (target.isPlayer() && hit.getAttacker().isPlayer()) {
+            const attacker = hit.getAttacker() as Player;
             const player = target as Player;
-            let totalRunEnergy = player.getRunEnergy() - 25;
-            if (totalRunEnergy < 0) {
-                totalRunEnergy = 0;
-            }
-            player.setRunEnergy(totalRunEnergy);
+            const transferAmount = Math.floor(player.getRunEnergy() * 0.1);
+
+            player.setRunEnergy(Math.max(0, player.getRunEnergy() - transferAmount));
             player.getPacketSender().sendRunEnergy();
-            if (totalRunEnergy === 0) {
+            player.getPacketSender().sendMessage("You feel drained!");
+
+            if (player.getRunEnergy() === 0) {
                 player.setRunning(false);
                 player.getPacketSender().sendRunStatus();
             }
+
+            attacker.setRunEnergy(Math.min(100, attacker.getRunEnergy() + transferAmount));
+            attacker.getPacketSender().sendRunEnergy();
         }
     }
 }

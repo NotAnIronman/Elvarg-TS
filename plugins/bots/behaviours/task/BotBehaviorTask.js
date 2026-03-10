@@ -28,6 +28,10 @@ class BotBehaviorTask extends Task {
     this.modeValidationIntervalMs = Number.isFinite(options.modeValidationIntervalMs)
       ? Math.max(0, Math.floor(options.modeValidationIntervalMs))
       : 1200;
+    this.handleFullTimePvpRespawn =
+      typeof options.handleFullTimePvpRespawn === "function"
+        ? options.handleFullTimePvpRespawn
+        : null;
     this.idleEntryStride = Number.isFinite(options.idleEntryStride)
       ? Math.max(1, Math.floor(options.idleEntryStride))
       : 2;
@@ -644,6 +648,20 @@ class BotBehaviorTask extends Task {
   }
 
   startRoamingFallback(entry, nowMs, reason = "fallback_roaming") {
+    if (this.isFullTimePvpBot(entry?.state)) {
+      const pvpDefinition = this.getAutonomousModeDefinition(this.behaviorMode.PVP);
+      if (pvpDefinition) {
+        return this.startAutonomousMode(
+          entry,
+          {
+            ...pvpDefinition,
+            reason: reason === "fallback_roaming" ? "fallback_pvp" : reason,
+          },
+          nowMs
+        );
+      }
+      return false;
+    }
     const roamingDefinition = this.getAutonomousModeDefinition(this.behaviorMode.ROAMING);
     if (!roamingDefinition) {
       return false;
@@ -675,7 +693,7 @@ class BotBehaviorTask extends Task {
       if (!state.deathResetApplied) {
         this.activateModeWithHandler(
           entry,
-          this.behaviorMode.ROAMING,
+          this.isFullTimePvpBot(state) ? this.behaviorMode.PVP : this.behaviorMode.ROAMING,
           "post_death_reset"
         );
         state.virtualFoodChargesRemaining = null;
@@ -691,8 +709,11 @@ class BotBehaviorTask extends Task {
     }
 
     if (state.deathResetApplied) {
+      if (this.isFullTimePvpBot(state) && this.handleFullTimePvpRespawn) {
+        this.handleFullTimePvpRespawn(entry, nowMs);
+      }
       // Clear any active preset after respawn, not during the death animation.
-      clearBotActivePreset(player);
+      clearBotActivePreset(player, state);
       state.deathResetApplied = false;
       this.scheduleNextDecision(state, nowMs);
     }

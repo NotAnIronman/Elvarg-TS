@@ -10,11 +10,32 @@ export class Graphic {
     constructor(id: number, delay: number);
     constructor(id: number, height: GraphicHeight);
     constructor(id: number, delay: number, height: GraphicHeight);
-    constructor(id: number, delayOrHeight?: number | GraphicHeight, heightArg?: GraphicHeight) {
+    constructor(id: number, priority: Priority);
+    constructor(id: number, height: GraphicHeight, priority: Priority);
+    constructor(id: number, delayOrHeight?: number, heightArg?: number) {
         this.id = id;
-        if (typeof heightArg === "number") {
+        if (
+            typeof heightArg === "number" &&
+            (heightArg === Priority.LOW ||
+                heightArg === Priority.MEDIUM ||
+                heightArg === Priority.HIGH)
+        ) {
+            this.delay = 0;
+            this.height = typeof delayOrHeight === "number" ? (delayOrHeight as GraphicHeight) : GraphicHeight.LOW;
+            this.priority = heightArg as Priority;
+            return;
+        } else if (typeof heightArg === "number") {
             this.delay = typeof delayOrHeight === "number" ? delayOrHeight : 0;
-            this.height = heightArg;
+            this.height = heightArg as GraphicHeight;
+        } else if (
+            delayOrHeight === Priority.LOW ||
+            delayOrHeight === Priority.MEDIUM ||
+            delayOrHeight === Priority.HIGH
+        ) {
+            this.delay = 0;
+            this.height = GraphicHeight.LOW;
+            this.priority = delayOrHeight as Priority;
+            return;
         } else if (typeof delayOrHeight === "number" && delayOrHeight in GraphicHeight) {
             this.delay = 0;
             this.height = delayOrHeight as GraphicHeight;

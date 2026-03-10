@@ -65,8 +65,44 @@ function getGlobalPresetPool() {
   return GLOBAL_PRESETS.filter((preset) => preset != null);
 }
 
+function getGlobalPresetByName(name) {
+  if (typeof name !== "string" || name.length === 0) {
+    return null;
+  }
+  const target = name.trim().toLowerCase();
+  for (const preset of getGlobalPresetPool()) {
+    const presetName = preset?.getName?.();
+    if (typeof presetName === "string" && presetName.trim().toLowerCase() === target) {
+      return preset;
+    }
+  }
+  return null;
+}
+
+function resolvePresetPool(options = {}) {
+  const presetNames = Array.isArray(options?.presetNames)
+    ? options.presetNames.filter((value) => typeof value === "string" && value.length > 0)
+    : [];
+  if (presetNames.length === 0) {
+    return getGlobalPresetPool();
+  }
+  const resolved = presetNames
+    .map((presetName) => getGlobalPresetByName(presetName))
+    .filter((preset) => preset != null);
+  return resolved.length > 0 ? resolved : getGlobalPresetPool();
+}
+
 function pickRandomGlobalPreset() {
-  const pool = getGlobalPresetPool();
+  const pool = resolvePresetPool();
+  if (pool.length === 0) {
+    return null;
+  }
+  const index = Math.floor(Math.random() * pool.length);
+  return pool[index] ?? null;
+}
+
+function pickRandomGlobalPresetFromPool(options = {}) {
+  const pool = resolvePresetPool(options);
   if (pool.length === 0) {
     return null;
   }
@@ -413,11 +449,11 @@ function applyPreset(player, preset) {
   return true;
 }
 
-function applyRandomGlobalPreset(player) {
+function applyRandomGlobalPreset(player, options = {}) {
   if (!player) {
     return null;
   }
-  const preset = pickRandomGlobalPreset();
+  const preset = pickRandomGlobalPresetFromPool(options);
   if (!preset) {
     return null;
   }
@@ -688,6 +724,7 @@ module.exports = {
   name: "Presets",
   applyPreset,
   applyRandomGlobalPreset,
+  getGlobalPresetByName,
   getGlobalPresetPool,
   register(api) {
     api.onPlayerLogin(({ player }) => {

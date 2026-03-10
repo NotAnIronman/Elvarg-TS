@@ -1,6 +1,4 @@
-enum Priority {
-    LOW
-}
+import { Priority } from "./Priority";
 
 export class Animation {
     public static DEFAULT_RESET_ANIMATION: Animation;
@@ -8,10 +6,22 @@ export class Animation {
     public delay: number;
     public priority: Priority;
 
-    constructor(id: number) {
+    constructor(id: number);
+    constructor(id: number, delay: number);
+    constructor(id: number, priority: Priority);
+    constructor(id: number, delayOrPriority?: number | Priority) {
         this.id = id;
-        this.delay = 0;
-        this.priority = Priority.LOW;
+        if (
+            delayOrPriority === Priority.LOW ||
+            delayOrPriority === Priority.MEDIUM ||
+            delayOrPriority === Priority.HIGH
+        ) {
+            this.delay = 0;
+            this.priority = delayOrPriority;
+        } else {
+            this.delay = typeof delayOrPriority === "number" ? delayOrPriority : 0;
+            this.priority = Priority.LOW;
+        }
     }
 
     getId(): number {

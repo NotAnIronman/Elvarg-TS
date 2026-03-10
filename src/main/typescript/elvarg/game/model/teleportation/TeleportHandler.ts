@@ -1,4 +1,3 @@
-
 import { Player } from "../../entity/impl/player/Player";
 import { TeleportType } from "./TeleportType";
 import { Task } from "../../task/Task";
@@ -10,15 +9,45 @@ import { Location } from "../Location";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { Wilderness } from "../../content/wilderness/Wilderness";
 
-class TelportHandlerTask extends Task {
-    execute(): void {
-        this.execFunc();
-        this.stop();
-    }
-    constructor(n1: number, p: Player, b: boolean, private readonly execFunc: Function) {
-        super(n1, p, b);
+class TeleportTask extends Task {
+    private teleportTick = 0;
+
+    constructor(
+        private readonly player: Player,
+        private readonly targetLocation: Location,
+        private readonly teleportType: TeleportType
+    ) {
+        super(1, player, true);
     }
 
+    execute(): void {
+        if (this.teleportTick === this.teleportType.getStartTick() - 2) {
+            if (this.teleportType.getMiddleAnim()) {
+                this.player.performAnimation(this.teleportType.getMiddleAnim());
+            }
+            if (this.teleportType.getMiddleGraphic()) {
+                this.player.performGraphic(this.teleportType.getMiddleGraphic());
+            }
+        } else if (this.teleportTick === this.teleportType.getStartTick()) {
+            TeleportHandler.onTeleporting(this.player);
+            this.player.performAnimation(this.teleportType.getEndAnimation());
+            this.player.performGraphic(this.teleportType.getEndGraphic());
+            this.player.moveTo(this.targetLocation);
+        } else if (this.teleportTick === this.teleportType.getStartTick() + 2) {
+            this.player.getMovementQueue().setBlockMovement(false).reset();
+            this.stop();
+            return;
+        }
+
+        this.teleportTick++;
+    }
+
+    stop(): void {
+        super.stop();
+        this.player.getClickDelay().reset(0);
+        this.player.setUntargetable(false);
+        this.player.setTeleporting(false);
+    }
 }
 
 export class TeleportHandler {
@@ -53,43 +82,19 @@ export class TeleportHandler {
                 return;
             }
         }
+
         player.getMovementQueue().setBlockMovement(true).reset();
         this.onTeleporting(player);
         player.performAnimation(teleportType.getStartAnimation());
         player.performGraphic(teleportType.getStartGraphic());
         player.setUntargetable(true);
         player.setTeleporting(true);
-        Sounds.sendSound(player, Sound.TELEPORT); // assuming that the function Sounds.sendSound is replaced by a local function sendSound. 
-        TaskManager.submit(new TelportHandlerTask(1, player, true, () => {
-            let tick: number = 0;
-            if (tick == teleportType.getStartTick() - 2) {
-                if (teleportType.getMiddleAnim()) {
-                    player.performAnimation(teleportType.getMiddleAnim());
-                }
-                if (teleportType.getMiddleGraphic()) {
-                    player.performGraphic(teleportType.getMiddleGraphic());
-                }
-            } else if (tick == teleportType.getStartTick()) {
-                this.onTeleporting(player);
-                player.performAnimation(teleportType.getEndAnimation());
-                player.performGraphic(teleportType.getEndGraphic());
-                player.setOldPosition(targetLocation);
-            } else if (tick == teleportType.getStartTick() + 2) {
-                player.getMovementQueue().setBlockMovement(false).reset();
-                stop();
-                return;
-            }
-            tick++;
-            stop();
-            player.getClickDelay().reset(0);
-            player.setUntargetable(false);
-        }));
+        Sounds.sendSound(player, Sound.TELEPORT);
+        TaskManager.submit(new TeleportTask(player, targetLocation, teleportType));
         player.getClickDelay().reset();
     }
 
-
-
-    private static onTeleporting(player: Player): void {
+    public static onTeleporting(player: Player): void {
         player.getSkillManager().stopSkillable();
         player.getPacketSender().sendInterfaceRemoval();
         player.getCombat().reset();
@@ -127,5 +132,4 @@ export class TeleportHandler {
 
         return true;
     }
-
 }

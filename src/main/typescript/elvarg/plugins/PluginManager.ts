@@ -33,6 +33,7 @@ import {
   PluginPlayerLoginEvent,
   PluginRegionLoadedEvent,
   PluginSpellDisabledEvent,
+  PluginSpellRuneBypassEvent,
   PluginCanTradeEvent,
   PluginCanBankEvent,
   PluginCanShopEvent,
@@ -112,6 +113,7 @@ export class PluginManager {
   private static playerDeathItemDropHooks: PluginHook<PluginPlayerDeathItemDropEvent>[] = [];
   private static canEquipHooks: PluginHook<PluginCanEquipEvent>[] = [];
   private static spellDisabledHooks: PluginHook<PluginSpellDisabledEvent>[] = [];
+  private static spellRuneBypassHooks: PluginHook<PluginSpellRuneBypassEvent>[] = [];
   private static npcAggressionToleranceHooks: PluginHook<PluginNpcAggressionToleranceEvent>[] = [];
   private static playerDefeatedHooks: PluginHook<PluginPlayerDefeatedEvent>[] = [];
   private static itemOnObjectHooks: PluginHook<PluginItemOnObjectEvent>[] = [];
@@ -753,6 +755,31 @@ export class PluginManager {
       );
       if (event.disabled !== null) {
         return event.disabled;
+      }
+    }
+    return null;
+  }
+
+  public static emitSpellRuneBypass(
+    player: any,
+    spellbook: any,
+    spellId: number
+  ): boolean | null {
+    const event: PluginSpellRuneBypassEvent = {
+      player,
+      spellbook,
+      spellId,
+      bypass: null,
+    };
+    for (const hook of PluginManager.spellRuneBypassHooks) {
+      PluginManager.executeHook(
+        hook,
+        event,
+        "spell_rune_bypass",
+        "spell_rune_bypass"
+      );
+      if (event.bypass !== null) {
+        return event.bypass;
       }
     }
     return null;
@@ -1706,6 +1733,24 @@ export class PluginManager {
           return;
         }
         PluginManager.spellDisabledHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !Number.isInteger(event.spellId)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onSpellRuneBypass: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.spellRuneBypassHooks.push({
           pluginName,
           handler: (event) => {
             if (

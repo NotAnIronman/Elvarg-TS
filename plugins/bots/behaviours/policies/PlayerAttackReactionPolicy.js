@@ -2,7 +2,10 @@ const {
   resolveBankRunResumeMode,
   setModeBankRun,
   setModeFollowBack,
+  setModePvp,
 } = require("../state/PlayerBotState");
+
+const FULL_TIME_PVP_REACTION_DURATION_MS = 30000;
 
 function clampChance(value, fallback = 0.5) {
   const numeric = Number(value);
@@ -122,6 +125,35 @@ function handlePlayerAttackReaction({
 }) {
   if (!bot || !state || !attacker || !behaviorMode) {
     return false;
+  }
+
+  if (state?.autonomy?.fullTimePvp === true) {
+    if (state.mode !== behaviorMode.PVP) {
+      setModePvp(
+        bot,
+        state,
+        attacker,
+        nowMs,
+        FULL_TIME_PVP_REACTION_DURATION_MS,
+        behaviorMode
+      );
+    } else if (state?.pvp) {
+      state.pvp.targetUsername = attacker.getUsername?.() ?? state.pvp.targetUsername;
+      state.pvp.targetPlayer = attacker;
+      state.pvp.endsAt = Math.max(
+        Number(state.pvp.endsAt ?? 0),
+        nowMs + FULL_TIME_PVP_REACTION_DURATION_MS
+      );
+      state.pvp.nextActionAt = nowMs;
+    }
+
+    retaliateAgainstAttacker(bot, attacker, attackerIsPlayerBot);
+    api?.log?.("full_time_pvp_reaction", {
+      bot: bot.getUsername?.() ?? null,
+      attacker: attacker.getUsername?.() ?? null,
+      attackerIsPlayerBot: attackerIsPlayerBot === true,
+    });
+    return true;
   }
 
   const fleeChance = clampChance(playerRunAwayChance, 0.5);

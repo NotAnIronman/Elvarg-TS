@@ -212,6 +212,49 @@ function registerBotCommands(options) {
     });
     return true;
   });
+
+  api.registerCommand("bothotspots", ({ player }) => {
+    if (!hasAdminRights(player)) {
+      player
+        .getPacketSender()
+        .sendMessage("You do not have permission to use this command.");
+      return true;
+    }
+
+    const countsByHotspot = new Map();
+    const countsByLoadout = new Map();
+    const countsByProfile = new Map();
+
+    for (const entry of runtime.entries ?? []) {
+      const state = entry?.state;
+      if (state?.autonomy?.fullTimePvp !== true) {
+        continue;
+      }
+      const hotspotId = state?.pvp?.hotspotId ?? "none";
+      const loadoutId = state?.pvp?.loadoutId ?? "unknown";
+      const profileId = state?.pvp?.profileId ?? "unknown";
+      countsByHotspot.set(hotspotId, (countsByHotspot.get(hotspotId) ?? 0) + 1);
+      countsByLoadout.set(loadoutId, (countsByLoadout.get(loadoutId) ?? 0) + 1);
+      countsByProfile.set(profileId, (countsByProfile.get(profileId) ?? 0) + 1);
+    }
+
+    const formatCounts = (map) =>
+      [...map.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, count]) => `${key}:${count}`)
+        .join(", ");
+
+    player.getPacketSender().sendMessage(
+      `hotspots ${formatCounts(countsByHotspot) || "none"}`
+    );
+    player.getPacketSender().sendMessage(
+      `loadouts ${formatCounts(countsByLoadout) || "none"}`
+    );
+    player.getPacketSender().sendMessage(
+      `profiles ${formatCounts(countsByProfile) || "none"}`
+    );
+    return true;
+  });
 }
 
 module.exports = {

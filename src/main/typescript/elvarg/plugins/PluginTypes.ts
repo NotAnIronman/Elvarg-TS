@@ -170,6 +170,13 @@ export interface PluginSpellDisabledEvent {
   disabled: boolean | null;
 }
 
+export interface PluginSpellRuneBypassEvent {
+  player: any;
+  spellbook: any;
+  spellId: number;
+  bypass: boolean | null;
+}
+
 export interface PluginNpcAggressionToleranceEvent {
   player: any;
   npc: any;
@@ -339,6 +346,7 @@ export interface PluginApi {
   ): void;
   onCanEquip(handler: (event: PluginCanEquipEvent) => void): void;
   onSpellDisabled(handler: (event: PluginSpellDisabledEvent) => void): void;
+  onSpellRuneBypass(handler: (event: PluginSpellRuneBypassEvent) => void): void;
   onNpcAggressionTolerance(
     handler: (event: PluginNpcAggressionToleranceEvent) => void
   ): void;

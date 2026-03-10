@@ -62,6 +62,7 @@ function registerBotStatusInteractions(options = {}) {
       }
 
       botStatusReporter.sendStatus(player, target);
+      botStatusReporter.dumpToDiagnoseLog(player, target, "status_click");
     },
   });
 
