@@ -1,8 +1,6 @@
 import { GameConstants } from "../../../GameConstants";
 import { Sound } from "../../../Sound";
 import { PrayerData, PrayerHandler } from "../../../content/PrayerHandler";
-import { ClanChat } from "../../../content/clan/ClanChat";
-import { ClanChatManager } from "../../../content/clan/ClanChatManager";
 import { CombatFactory } from "../../../content/combat/CombatFactory";
 import { CombatSpecial } from "../../../content/combat/CombatSpecial";
 import { CombatType } from "../../../content/combat/CombatType";
@@ -115,7 +113,7 @@ export class Player extends Mobile {
     private session: PlayerSession;
     private playerInteractingOption: PlayerInteractingOption;
     public status: PlayerStatus = PlayerStatus.NONE;
-    public currentClanChat: ClanChat;
+    public currentClanChat: any;
     public clanChatName: string;
     // Legacy shop field kept for compile compatibility with deprecated core shop classes.
     public shop: any;
@@ -459,12 +457,10 @@ export class Player extends Mobile {
         }
 
         // Increase run energy
-        if (this.runEnergy < 100 && (!this.getMovementQueue().isMovings() || !this.isRunning)) {
+        if (!isBot && this.runEnergy < 100 && (!this.getMovementQueue().isMovings() || !this.isRunning)) {
             if (this.lastRunRecovery.elapsedTime(MovementQueue.runEnergyRestoreDelay(this))) {
                 this.runEnergy++;
-                if (!isBot) {
-                    this.getPacketSender().sendRunEnergy();
-                }
+                this.getPacketSender().sendRunEnergy();
                 this.lastRunRecovery.reset();
             }
         }
@@ -639,7 +635,6 @@ export class Player extends Mobile {
         });
         this.getRelations().updateLists(false);
         BountyHunter.unassign(this);
-        ClanChatManager.leave(this, false);
         TaskManager.cancelTasks(this);
         GameConstants.PLAYER_PERSISTENCE.save(this);
 
@@ -666,12 +661,16 @@ export class Player extends Mobile {
         this.getSkillManager().ensureCombatBaseline();
         WeaponInterfaces.assign(this);
         const autocastSpell = this.getCombat().getAutocastSpell();
-        if (autocastSpell != null && this.getEquipment().hasStaffEquipped()) {
+        if (autocastSpell != null && autocastSpell.getSpellbook?.() !== this.getSpellbook()) {
+            this.getCombat().setAutocastSpell(null);
+            this.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
+        } else if (autocastSpell != null && this.getEquipment().hasStaffEquipped()) {
             Autocasting.setAutocast(this, autocastSpell);
         } else {
             // No autocast selected on login: clear regular/defensive autocast mode bits.
             this.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
         }
+        this.getPacketSender().sendTabInterface(6, this.getSpellbook().getInterfaceId());
 
         // Keep baseline right-click player interactions available outside wilderness/duel areas.
         this.getPacketSender().sendInteractionOption("Follow", 3, false);
@@ -1152,11 +1151,11 @@ export class Player extends Mobile {
         this.auguryUnlocked = auguryUnlocked;
     }
 
-    public getCurrentClanChat(): ClanChat {
+    public getCurrentClanChat(): any {
         return this.currentClanChat;
     }
 
-    public setCurrentClanChat(currentClanChat: ClanChat): void {
+    public setCurrentClanChat(currentClanChat: any): void {
         this.currentClanChat = currentClanChat;
     }
 

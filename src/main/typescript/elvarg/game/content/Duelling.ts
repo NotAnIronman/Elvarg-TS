@@ -10,6 +10,7 @@ import { Trading } from "./Trading";
 import { StackType } from "../model/container/StackType";
 import { Item } from "../model/Item";
 import { Location } from "../model/Location";
+import { Wilderness } from "./wilderness/Wilderness";
 
 class PlayerItemContainer extends ItemContainer {
     constructor(player, private readonly execFunc: Function) {
@@ -271,8 +272,14 @@ export class Dueling {
         this.player.getPacketSender().sendConfig(Dueling.RULES_CONFIG_ID, 0);
 
         // Update right click options..
-        this.player.getPacketSender().sendInteractionOption("Challenge", 1, false);
-        this.player.getPacketSender().sendInteractionOption("null", 2, true);
+        if (Wilderness.isIn(this.player)) {
+            this.player.getPacketSender().sendInteractionOption("Attack", 2, true);
+            this.player.getPacketSender().sendInteractionOption("Follow", 3, false);
+            this.player.getPacketSender().sendInteractionOption("Trade With", 4, false);
+        } else {
+            this.player.getPacketSender().sendInteractionOption("Challenge", 1, false);
+            this.player.getPacketSender().sendInteractionOption("null", 2, true);
+        }
 
         // Clear head hint
         this.player.getPacketSender().sendEntityHintRemoval(true);

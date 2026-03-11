@@ -58,6 +58,10 @@ class ProcessPendingMovementActionNode {
     if (!request) {
       return "failure";
     }
+    if (state?.mode === "follow_back") {
+      clearMovementRequest(player);
+      return "failure";
+    }
 
     const loc = player.getLocation?.();
     if (!loc) {

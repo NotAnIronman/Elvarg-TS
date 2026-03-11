@@ -1,6 +1,12 @@
 const { World } = require("../../../../../src/main/typescript/elvarg/game/World");
-const { queueRouteAndFlagAppearance } = require("../../navigation/BotNavigation");
+const { GameConstants } = require("../../../../../src/main/typescript/elvarg/game/GameConstants");
+const { RegionManager } = require("../../../../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { Misc } = require("../../../../../src/main/typescript/elvarg/util/Misc");
+const { clearMovementRequest } = require("../../navigation/BotNavigation");
 const { setModeReturnHome } = require("../../state/PlayerBotState");
+const {
+  ATTR_RECRUIT_OWNER_USERNAME,
+} = require("../../../runtime/BotRecruitConstants");
 const { resolveBotNodeContext } = require("../context/BotNodeContext");
 
 class FollowBackActionNode {
@@ -8,7 +14,6 @@ class FollowBackActionNode {
     this.botStatesByName = botStatesByName;
     this.api = api;
     this.behaviorMode = options.behaviorMode;
-    this.followRepathIntervalMs = options.followRepathIntervalMs;
   }
 
   tick(context) {
@@ -49,47 +54,43 @@ class FollowBackActionNode {
       return "success";
     }
 
+    if (player.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME) === targetUsername) {
+      this.teleportNearFollowTargetIfNeeded(player, followTarget);
+    }
+
     player.setFollowing(followTarget);
     player.setMobileInteraction(followTarget);
     player.setPositionToFace(followTarget.getLocation());
-    if (!state.roaming) {
-      return "failure";
-    }
-    state.roaming.target = {
-      x: followTarget.getLocation().getX(),
-      y: followTarget.getLocation().getY(),
-      z: followTarget.getLocation().getZ(),
-    };
-
-    if (nowMs < (state.nextFollowRepathAt ?? 0)) {
-      return "running";
-    }
-
-    state.nextFollowRepathAt = nowMs + this.followRepathIntervalMs;
-    if (nowMs < (state.roaming.nextWalkAt ?? 0)) {
-      return "running";
-    }
-    if (player.getForceMovement() != null) {
-      return "running";
-    }
-
-    const queue = player.getMovementQueue();
-    if (!queue) {
-      return "failure";
-    }
-    if (queue.size() > 0) {
-      return "running";
-    }
-
-    let targetX = followTarget.getMovementQueue()?.followX;
-    let targetY = followTarget.getMovementQueue()?.followY;
-    if (targetX === -1 || targetY === -1 || targetX == null || targetY == null) {
-      targetX = followTarget.getLocation().getX();
-      targetY = followTarget.getLocation().getY();
-    }
-
-    queueRouteAndFlagAppearance(player, targetX, targetY);
+    clearMovementRequest(player);
     return "running";
+  }
+
+  teleportNearFollowTargetIfNeeded(player, followTarget) {
+    const playerLoc = player.getLocation?.();
+    const targetLoc = followTarget.getLocation?.();
+    if (!playerLoc || !targetLoc) {
+      return;
+    }
+    if (
+      followTarget.isTeleportingReturn?.() !== true &&
+      targetLoc.isWithinDistance?.(
+        playerLoc,
+        GameConstants.PET_FOLLOW_AUTO_TELEPORT_DISTANCE
+      ) === true
+    ) {
+      return;
+    }
+
+    const tiles = [];
+    for (const tile of followTarget.outterTiles?.() ?? []) {
+      if (RegionManager.blocked?.(tile, followTarget.getPrivateArea?.())) {
+        continue;
+      }
+      tiles.push(tile);
+    }
+    const destination =
+      tiles.length > 0 ? tiles[Misc.getRandom(tiles.length - 1)] : targetLoc;
+    player.moveTo?.(destination);
   }
 }
 

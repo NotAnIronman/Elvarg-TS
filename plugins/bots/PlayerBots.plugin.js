@@ -57,7 +57,6 @@ const BOT_MODE_BEHAVIOR_OPTIONS = Object.freeze({
 });
 
 const BOT_TREE_OPTIONS = Object.freeze({
-  followRepathIntervalMs: 500,
   botEatLowHpRatio: 0.45,
   botEatHealMin: 12,
   botEatHealMax: 18,
@@ -246,6 +245,8 @@ module.exports = {
       botStatusReporter: boot.botStatusReporter,
       statusOptionLabel: BOT_CONFIG.status.optionLabel,
       statusInteractionSlot: BOT_CONFIG.status.interactionSlot,
+      runtime: boot.runtime,
+      behaviorMode: BOT_CONFIG.behaviorMode,
     });
 
     registerBotCommands({
@@ -265,83 +266,21 @@ module.exports = {
       api,
       botApi,
       runtime: boot.runtime,
+      behaviorMode: BOT_CONFIG.behaviorMode,
       playerPersistence: GameConstants.PLAYER_PERSISTENCE,
       manualControlPacketOpcodes: BOT_CONFIG.manualControlPacketOpcodes,
       followBackTrigger: boot.followBackTrigger,
       combatReactionTrigger: boot.combatReactionTrigger,
       pathBlockedHandler: boot.pathBlockedHandler,
       npcAggroPolicyHandler: boot.npcAggroPolicyHandler,
+      avengeOpponentPolicy: boot.avengeOpponentPolicy,
+      pvpJumpOnKillPolicy: boot.pvpJumpOnKillPolicy,
     });
 
     api.onSpellRuneBypass((event) => {
       const player = event?.player;
       if (player?.isPlayerBot?.() === true) {
         event.bypass = true;
-      }
-    });
-
-    api.onPlayerDefeated(({ killer, victim }) => {
-      if (!killer || !victim || killer.isPlayerBot?.() === true) {
-        return;
-      }
-      if (!Wilderness.isIn(killer) || !Wilderness.isIn(victim)) {
-        return;
-      }
-      const nowMs = Date.now();
-      const nearbyObservers = new Set([
-        ...(killer.getLocalPlayers?.() ?? []),
-        ...(victim.getLocalPlayers?.() ?? []),
-      ]);
-      for (const observer of nearbyObservers) {
-        if (!observer || observer === killer || observer === victim) {
-          continue;
-        }
-        if (observer.isPlayerBot?.() !== true || !observer.isRegistered?.()) {
-          continue;
-        }
-        const state = boot.runtime.botStatesByName.get(observer.getUsername?.());
-        if (!state?.pvp) {
-          continue;
-        }
-        if (
-          state.autonomy?.fullTimePvp !== true &&
-          state.autonomy?.wildernessRoamerPvp !== true &&
-          state.autonomy?.persistentPvpLoadout !== true
-        ) {
-          continue;
-        }
-        if (
-          state.mode !== BOT_BEHAVIOR_MODE.PVP &&
-          state.mode !== BOT_BEHAVIOR_MODE.ROAMING
-        ) {
-          continue;
-        }
-        const observerLoc = observer.getLocation?.();
-        const killerLoc = killer.getLocation?.();
-        if (!observerLoc || !killerLoc) {
-          continue;
-        }
-        if (
-          observerLoc.getZ?.() !== killerLoc.getZ?.() ||
-          observerLoc.getDistance?.(killerLoc) > BOT_CONFIG.pvp.pjObserveDistanceTiles
-        ) {
-          continue;
-        }
-        const profileId = state.pvp.profileId ?? "standard";
-        const chance = Number(
-          BOT_CONFIG.pvp.pjUseChanceByProfile?.[profileId] ?? 0.3
-        );
-        if (Math.random() > chance) {
-          continue;
-        }
-        state.pvp.pjTargetUsername = killer.getUsername?.() ?? null;
-        state.pvp.pjExpiresAt = nowMs + BOT_CONFIG.pvp.pjOpportunityWindowMs;
-        if (state.autonomy) {
-          state.autonomy.nextDecisionAt = Math.min(
-            state.autonomy.nextDecisionAt ?? nowMs,
-            nowMs
-          );
-        }
       }
     });
 

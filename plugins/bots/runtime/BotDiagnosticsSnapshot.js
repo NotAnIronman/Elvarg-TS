@@ -322,6 +322,9 @@ function createBotDiagnosticsSnapshot({
   const currentTile = readTile(bot?.getLocation?.());
   const faceTile = readTile(bot?.getPositionToFace?.());
   const followUsername = bot?.getFollowing?.()?.getUsername?.() ?? null;
+  const recruitOwnerUsername = bot?.getAttribute?.("botRecruitOwnerUsername") ?? null;
+  const queueSize = resolveQueueSize(queue);
+  const moving = isQueueMoving(queue);
   const recentHistory =
     username && recentBotLogsByUsername instanceof Map
       ? recentBotLogsByUsername.get(username) ?? []
@@ -338,6 +341,9 @@ function createBotDiagnosticsSnapshot({
     currentTile,
     faceTile,
     followUsername,
+    recruitOwnerUsername,
+    queueSize,
+    moving,
     recentHistory,
   };
   snapshot.stuckDiagnosis = buildStuckDiagnosis(snapshot);
@@ -355,7 +361,19 @@ function renderBotDiagnosticsLines({
     return lines;
   }
 
-  const { username, state, nowMs, pendingMovement, currentTile, followUsername, recentHistory } =
+  const {
+    username,
+    state,
+    nowMs,
+    pendingMovement,
+    currentTile,
+    faceTile,
+    followUsername,
+    recruitOwnerUsername,
+    queueSize,
+    moving,
+    recentHistory,
+  } =
     snapshot;
   const diagnosis = snapshot.stuckDiagnosis ?? {
     stuck: false,
@@ -371,6 +389,24 @@ function renderBotDiagnosticsLines({
     )
   );
   lines.push(chatTrim(`[Bot Status] Reason: ${diagnosis.reason}`));
+
+  if (state?.mode === "follow_back" || recruitOwnerUsername) {
+    lines.push(
+      chatTrim(
+        `[Bot Status] Follow: target=${state?.followTargetUsername ?? followUsername ?? "n/a"} recruitOwner=${
+          recruitOwnerUsername ?? "n/a"
+        } face=${formatPoint(faceTile)}`
+      )
+    );
+    lines.push(
+      chatTrim(
+        `[Bot Status] Movement: queue=${queueSize} moving=${moving === true ? "yes" : "no"} pending=${formatPendingMovement(
+          pendingMovement,
+          nowMs
+        )} manualMode=${state?.autonomy?.manualMode ?? "n/a"}`
+      )
+    );
+  }
 
   if (diagnosis.stuck) {
     lines.push(

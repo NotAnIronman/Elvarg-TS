@@ -1,5 +1,4 @@
 import { BackgroundLoader } from "../util/BackgroundLoader";
-import { ClanChatManager } from "./content/clan/ClanChatManager";
 import { CombatPoisonData } from '../game/task/impl/CombatPoisonEffect'
 import { PlayerPunishment } from "../util/PlayerPunishment";
 import { Systems } from "./Systems";
@@ -8,6 +7,7 @@ import { GameEngine } from "./GameEngine";
 import { ObjectSpawnDefinitionLoader } from "./definition/loader/impl/ObjectSpawnDefinitionLoader";
 import { NpcDefinitionLoader } from "./definition/loader/impl/NpcDefinitionLoader";
 import { NpcDropDefinitionLoader } from "./definition/loader/impl/NpcDropDefinitionLoader";
+import { PluginManager } from "../plugins/PluginManager";
 
 export class GameBuilder {
     private backgroundLoader = new BackgroundLoader();
@@ -30,11 +30,12 @@ export class GameBuilder {
         // Make sure the background tasks loaded properly..
         if (!this.backgroundLoader.awaitCompletion())
             throw new Error("Background load did not complete normally!");
+
+        PluginManager.emitServerStartup({ timestamp: Date.now() });
     }
     
     public createBackgroundTasks(): Iterable<() => void> {
         function* tasks(): IterableIterator<() => void> {
-            yield ClanChatManager.init;
             yield CombatPoisonData.init;
             yield PlayerPunishment.init;
     

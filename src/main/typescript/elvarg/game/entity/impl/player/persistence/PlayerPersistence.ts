@@ -1,4 +1,4 @@
-import { Player } from "../Player";
+import type { Player } from "../Player";
 import { LoginDetailsMessage } from "../../../../../net/login/LoginDetailsMessage"
 import { LoginResponses } from "../../../../../net/login/LoginResponses"
 import { DiscordUtil } from "../../../../../util/DiscordUtil"

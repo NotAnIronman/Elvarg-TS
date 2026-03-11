@@ -11,6 +11,7 @@ const { PvpCombatExecutionNode } = require("../nodes/pvp/PvpCombatExecutionNode"
 const { PvpDefensiveActionNode } = require("../nodes/pvp/PvpDefensiveActionNode");
 const { PvpFreezeAndKiteNode } = require("../nodes/pvp/PvpFreezeAndKiteNode");
 const { PvpJumpKilledTargetNode } = require("../nodes/pvp/PvpJumpKilledTargetNode");
+const { ReplenishAfterKillNode } = require("../nodes/pvp/ReplenishAfterKillNode");
 const { PvpValidateEngagementNode } = require("../nodes/pvp/PvpValidateEngagementNode");
 const {
   handlePlayerAttackReaction,
@@ -123,6 +124,7 @@ class PvpBehavior {
       pvpPhase: PVP_PHASE,
       behaviorMode: this.behaviorMode,
     });
+    this.replenishAfterKillNode = new ReplenishAfterKillNode(botStatesByName, api);
     this.combatExecutionNode = new PvpCombatExecutionNode({
       setPhase: (state, phase) => this.setPhase(state, phase),
       tryStepOutOfStack: (player, state, target, nowMs) =>
@@ -964,6 +966,15 @@ class PvpBehavior {
     }
 
     const { player, state, nowMs } = resolved;
+
+    const replenish = this.replenishAfterKillNode.tick({
+      player,
+      state,
+      nowMs,
+    });
+    if (replenish?.handled) {
+      return replenish.status ?? "failure";
+    }
 
     const jump = this.jumpKilledTargetNode.tick({
       player,

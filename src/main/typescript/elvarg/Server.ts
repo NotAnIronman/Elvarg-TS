@@ -78,6 +78,7 @@ export class Server {
       console.info(
         `[shutdown] ${signal} received. Persisting ${onlinePlayers} online players...`
       );
+      PluginManager.emitServerShutdown({ timestamp: Date.now() });
       World.savePlayers();
       console.info("[shutdown] Player persistence completed.");
     } catch (err) {

@@ -202,11 +202,14 @@ function applyPresetAutocastIfDefined(player, preset) {
 
   try {
     const spell = CombatSpells.getCombatSpell(autocastSpellId);
-    if (spell) {
+    if (spell && spell.getSpellbook?.() === player.getSpellbook?.()) {
       Autocasting.setAutocast(player, spell);
+    } else {
+      Autocasting.setAutocast(player, null);
     }
   } catch (_error) {
     // Ignore invalid/missing spell ids for backwards compatibility with older saves.
+    Autocasting.setAutocast(player, null);
   }
 }
 

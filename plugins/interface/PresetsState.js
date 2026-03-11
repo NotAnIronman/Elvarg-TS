@@ -109,6 +109,9 @@ function restorePresetSnapshot(player, options = {}) {
   // packets so tabs (especially equipment) are redrawn immediately client-side.
   player.getInventory?.()?.refreshItems?.();
   player.getEquipment?.()?.refreshItems?.();
+  player
+    .getPacketSender?.()
+    ?.sendTabInterface?.(6, player.getSpellbook?.()?.getInterfaceId?.());
   // Clearing a preset should always clear active/default autocast selection.
   Autocasting.setAutocast?.(player, null);
   WeaponInterfaces.assign?.(player);

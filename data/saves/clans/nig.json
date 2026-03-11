@@ -1,0 +1,67 @@
+{
+  "index": 0,
+  "name": "Nig",
+  "ownerName": "Happysham31",
+  "enterRankOrdinal": 0,
+  "kickRankOrdinal": 7,
+  "talkRankOrdinal": 0,
+  "rankedNames": [
+    {
+      "name": "Happysham31",
+      "ordinal": 7
+    },
+    {
+      "name": "PlayerBot17",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot2",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot13",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot8",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot9",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot4",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot1",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot5",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot15",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot3",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot14",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot7",
+      "ordinal": 0
+    },
+    {
+      "name": "PlayerBot97",
+      "ordinal": 0
+    }
+  ],
+  "bannedNames": []
+}

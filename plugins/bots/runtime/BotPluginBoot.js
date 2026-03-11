@@ -1,4 +1,5 @@
 const { GameConstants } = require("../../../src/main/typescript/elvarg/game/GameConstants");
+const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
 const { PluginManager } = require("../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { TaskManager } = require("../../../src/main/typescript/elvarg/game/task/TaskManager");
 const { World } = require("../../../src/main/typescript/elvarg/game/World");
@@ -25,6 +26,8 @@ const { PathBlockedHandler } = require("../behaviours/traversal/PathBlockedHandl
 const { FollowBackTrigger } = require("../behaviours/handlers/FollowBackTrigger");
 const { CombatReactionTrigger } = require("../behaviours/handlers/CombatReactionTrigger");
 const { NpcAggroPolicyHandler } = require("../behaviours/handlers/NpcAggroPolicyHandler");
+const { AvengeOpponentPolicy } = require("../behaviours/policies/AvengeOpponentPolicy");
+const { PvpJumpOnKillPolicy } = require("../behaviours/policies/PvpJumpOnKillPolicy");
 const {
   validateModeHandlerContracts,
   callModeHook,
@@ -182,6 +185,16 @@ function bootPlayerBotsRuntime(options = {}) {
     options: {
       npcAggroBlockedModes: config.npcAggroBlockedModes,
     },
+  });
+  const pvpJumpOnKillPolicy = new PvpJumpOnKillPolicy({
+    botStatesByName,
+    behaviorMode,
+    config: config.pvp ?? {},
+  });
+  const avengeOpponentPolicy = new AvengeOpponentPolicy({
+    botStatesByName,
+    behaviorMode,
+    config: config.pvp ?? {},
   });
 
   const spawnOffsets = createSpawnOffsets(
@@ -400,6 +413,8 @@ function bootPlayerBotsRuntime(options = {}) {
     modeRegistries,
     pathBlockedHandler,
     npcAggroPolicyHandler,
+    avengeOpponentPolicy,
+    pvpJumpOnKillPolicy,
     followBackTrigger,
     combatReactionTrigger,
     botStatusReporter,

@@ -6,6 +6,9 @@ const {
 const {
   listWildernessRoamingBounds,
 } = require("../behaviours/spawn/WildernessRoamingBounds");
+const {
+  ATTR_BOT_PVP_PROFILE_ID,
+} = require("./BotRecruitConstants");
 
 function createBotRegistry(options) {
   const {
@@ -194,6 +197,28 @@ function createBotRegistry(options) {
     return null;
   }
 
+  function setPersistentRespawnResolver(player, resolver) {
+    if (!player) {
+      return;
+    }
+    if (typeof resolver === "function") {
+      player.__botResolveRespawnLocation = resolver;
+    } else {
+      delete player.__botResolveRespawnLocation;
+    }
+  }
+
+  function syncBotProfileAttribute(player, state) {
+    const profileId = state?.pvp?.profileId ?? "standard";
+    if (!player) {
+      return;
+    }
+    player.setAttribute?.(
+      ATTR_BOT_PVP_PROFILE_ID,
+      profileId
+    );
+  }
+
   function spawnConfiguredBots() {
     const hotspotCounts = new Map();
     const fullTimePvpHotspotPlan = buildFullTimePvpHotspotPlan(fullTimePvpBotCount);
@@ -217,6 +242,15 @@ function createBotRegistry(options) {
         continue;
       }
       bot.setPlayerBot?.(true);
+      if (isFullTimePvp && pvpMetadata?.hotspotId) {
+        const hotspotId = pvpMetadata.hotspotId;
+        setPersistentRespawnResolver(bot, () => {
+          const respawnIndex = reserveHotspotSpawnIndex(hotspotId);
+          return createHotspotSpawn(hotspotId, respawnIndex) ?? botSpawn.clone();
+        });
+      } else {
+        setPersistentRespawnResolver(bot, null);
+      }
 
       const state = createInitialState(
         {
@@ -244,6 +278,7 @@ function createBotRegistry(options) {
         fullTimePvpAssigned++;
       }
       assignPvpMetadata(state, { isFullTimePvp, metadata: pvpMetadata });
+      syncBotProfileAttribute(bot, state);
       if (isFullTimePvp && pvpMetadata?.hotspotId) {
         hotspotCounts.set(
           pvpMetadata.hotspotId,
@@ -285,6 +320,10 @@ function createBotRegistry(options) {
         continue;
       }
       bot.setPlayerBot?.(true);
+      setPersistentRespawnResolver(bot, () =>
+        createWildernessRoamerSpawn(spawn, assignedBounds, randomInRange(0, 1_000_000)) ??
+        botSpawn.clone()
+      );
 
       const state = createInitialState(
         {
@@ -323,8 +362,12 @@ function createBotRegistry(options) {
         isFullTimePvp: false,
         metadata: pvpMetadata,
       });
+      syncBotProfileAttribute(bot, state);
       applyInitialPvpLoadout(bot, state);
       applyForcedModeForDiagnosis(bot, state);
+      bot.setLocation?.(botSpawn.clone());
+      bot.setLastKnownRegion?.(botSpawn.clone());
+      bot.setRegionHeight?.(botSpawn.getZ?.());
       botStatesByName.set(username, state);
       playerBotUsernames.add(username);
 
@@ -341,6 +384,7 @@ function createBotRegistry(options) {
         player: bot,
         username,
       });
+      bot.moveTo?.(botSpawn.clone());
       spawned++;
       wildernessRoamersAssigned++;
     }
@@ -451,6 +495,7 @@ function createBotRegistry(options) {
     assignPvpMetadata(state, {
       isFullTimePvp: false,
     });
+    syncBotProfileAttribute(player, state);
     applyForcedModeForDiagnosis(player, state);
     botStatesByName.set(username, state);
     botmeUsernames.add(username);

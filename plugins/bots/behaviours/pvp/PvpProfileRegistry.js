@@ -106,6 +106,13 @@ const PVP_PROFILES = Object.freeze({
   }),
 });
 
+const PvpProfileId = Object.freeze({
+  NOVICE: "novice",
+  STANDARD: "standard",
+  VETERAN: "veteran",
+  ELITE: "elite",
+});
+
 const PVP_PROFILE_IDS = Object.freeze(Object.keys(PVP_PROFILES));
 
 function getPvpProfile(profileId) {
@@ -117,6 +124,7 @@ function listPvpProfiles() {
 }
 
 module.exports = {
+  PvpProfileId,
   PVP_PROFILE_IDS,
   PVP_PROFILES,
   getPvpProfile,

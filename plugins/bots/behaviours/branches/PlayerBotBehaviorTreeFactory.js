@@ -8,6 +8,9 @@ const { EatFoodActionNode } = require("../nodes/actions/EatFoodActionNode");
 const {
   ProcessPendingMovementActionNode,
 } = require("../nodes/actions/ProcessPendingMovementActionNode");
+const {
+  ClanRecruitActionNode,
+} = require("../nodes/actions/ClanRecruitActionNode");
 const { ReturnHomeActionNode } = require("../nodes/actions/ReturnHomeActionNode");
 
 function requireModeBehavior(modeHandlers, modeValue, label) {
@@ -25,7 +28,6 @@ class PlayerBotBehaviorTreeFactory {
     this.botStatesByName = botStatesByName;
     this.api = api;
     this.behaviorMode = options.behaviorMode;
-    this.followRepathIntervalMs = options.followRepathIntervalMs;
     this.botEatLowHpRatio = options.botEatLowHpRatio;
     this.botEatHealMin = options.botEatHealMin;
     this.botEatHealMax = options.botEatHealMax;
@@ -99,7 +101,13 @@ class PlayerBotBehaviorTreeFactory {
       this.api,
       {
         behaviorMode: this.behaviorMode,
-        followRepathIntervalMs: this.followRepathIntervalMs,
+      }
+    );
+    const clanRecruitActionNode = new ClanRecruitActionNode(
+      this.botStatesByName,
+      this.api,
+      {
+        behaviorMode: this.behaviorMode,
       }
     );
     const roamingCooldownNode = new CooldownNode(
@@ -140,6 +148,7 @@ class PlayerBotBehaviorTreeFactory {
     return new SelectorNode([
       processPendingMovementActionNode,
       new ActionNode((context) => this.eatFoodActionNode.tick(context)),
+      new ActionNode((context) => clanRecruitActionNode.tick(context)),
       new ActionNode((context) => tickCurrentMode(context)),
     ]);
   }

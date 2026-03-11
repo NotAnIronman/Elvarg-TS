@@ -22,7 +22,7 @@ const { Animation } = require("../../src/main/typescript/elvarg/game/model/Anima
 const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
-const { ClanChatManager } = require("../../src/main/typescript/elvarg/game/content/clan/ClanChatManager");
+const { ClanChatManager } = require("../interface/ClanChat.plugin");
 const { NpcDropDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader");
 const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
@@ -147,6 +147,14 @@ function commandTail(raw, parts) {
   return raw.substring(parts[0].length).trim();
 }
 
+function resolvePlayerByCommandTail(raw, parts) {
+  const targetName = commandTail(raw, parts);
+  if (!targetName) {
+    return null;
+  }
+  return World.getPlayerByName(targetName);
+}
+
 function ownerOrDev(player) {
   const rights = player?.getRights?.();
   return rights === PlayerRights.OWNER || rights === PlayerRights.DEVELOPER;
@@ -266,24 +274,28 @@ module.exports = {
     });
 
     api.registerCommand("teleto", ({ player, raw, parts }) => {
-      if (!requireRights(player, ownerOrDev)) {
+      if (!requireRights(player, adminOrAbove)) {
         return true;
       }
-      const target = World.getPlayerByName(commandTail(raw, parts));
-      if (target) {
-        player.moveTo(target.getLocation().clone());
+      const target = resolvePlayerByCommandTail(raw, parts);
+      if (!target) {
+        player.getPacketSender().sendMessage("Usage: ::teleto [playername]");
+        return true;
       }
+      player.moveTo(target.getLocation().clone());
       return true;
     });
 
     api.registerCommand("teletome", ({ player, raw, parts }) => {
-      if (!requireRights(player, ownerOrDev)) {
+      if (!requireRights(player, adminOrAbove)) {
         return true;
       }
-      const target = World.getPlayerByName(commandTail(raw, parts));
-      if (target) {
-        target.moveTo(player.getLocation());
+      const target = resolvePlayerByCommandTail(raw, parts);
+      if (!target) {
+        player.getPacketSender().sendMessage("Usage: ::teletome [playername]");
+        return true;
       }
+      target.moveTo(player.getLocation().clone());
       return true;
     });
 

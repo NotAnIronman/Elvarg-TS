@@ -1,4 +1,3 @@
-import { ClanChatManager } from './content/clan/ClanChatManager';
 import { GameConstants } from './GameConstants';
 import { World } from '../game/World';
 import { TaskManager } from './task/TaskManager';
@@ -83,7 +82,6 @@ export class GameEngine  {
         } catch (e) {
             console.log(e);
             World.savePlayers();
-            ClanChatManager.save();
         } finally {
             const tickEndedAt = Date.now();
             const tickDurationMs = tickEndedAt - tickStartedAt;

@@ -1,12 +1,12 @@
 import { RegionManager } from "../../collision/RegionManager";
-import { Mobile } from "../../entity/impl/Mobile";
+import type { Mobile } from "../../entity/impl/Mobile";
 import { World } from "../../World";
 import { Dueling, DuelRule } from "../../content/Duelling";
 import { CombatFactory } from "../../content/combat/CombatFactory";
 import { ObjectDefinition } from "../../definition/ObjectDefinition";
-import { NPC } from "../../entity/impl/npc/NPC";
+import type { NPC } from "../../entity/impl/npc/NPC";
 import { GameObject } from "../../entity/impl/object/GameObject";
-import { Player } from "../../entity/impl/player/Player";
+import type { Player } from "../../entity/impl/player/Player";
 import { Direction, Directions } from "../Direction";
 import { Location } from "../Location";
 import { Skill } from "../Skill";
@@ -326,7 +326,7 @@ export class MovementQueue {
         if (this.character.getCombatFollowing() != null) {
             return true;
         }
-        if (!this.character.isPlayer() && this.character.getFollowing() != null) {
+        if (this.character.getFollowing() != null) {
             return true;
         }
         return false;
@@ -348,7 +348,7 @@ export class MovementQueue {
                 "movement.process.combat_follow",
                 () => this.processCombatFollowing()
             );
-        } else if (this.character.getFollowing() != null && !this.character.isPlayer()) {
+        } else if (this.character.getFollowing() != null) {
             ServerPerf.measurePhase(
                 "movement.process.follow",
                 () => this.processFollowing()
@@ -467,6 +467,12 @@ export class MovementQueue {
 
     private drainRunEnergy() {
         const player = (this.character as Player);
+        if (player.isPlayerBot?.() === true) {
+            if (player.getRunEnergy() !== 100) {
+                player.setRunEnergy(100);
+            }
+            return;
+        }
         if (player.isRunningReturn()) {
             player.setRunEnergy(player.getRunEnergy() - 1);
             if (player.getRunEnergy() <= 0) {

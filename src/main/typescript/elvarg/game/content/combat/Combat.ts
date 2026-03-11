@@ -6,8 +6,8 @@ import { CombatSpell } from "./magic/CombatSpell";
 import { CombatMethod } from "./method/CombatMethod";
 import { GraniteMaulCombatMethod } from "./method/impl/specials/GraniteMaulCombatMethod";
 import { RangedData, RangedWeapon, Ammunition } from "./ranged/RangedData";
-import { Mobile } from "../../entity/impl/Mobile";
-import { Player } from "../../entity/impl/player/Player";
+import type { Mobile } from "../../entity/impl/Mobile";
+import type { Player } from "../../entity/impl/player/Player";
 import { SecondsTimer } from "../../model/SecondsTimer";
 import { StatementDialogue } from "../../model/dialogues/entries/impl/StatementDialogue";
 import { Stopwatch } from "../../../util/Stopwatch";
@@ -127,6 +127,17 @@ export class Combat {
 
         // Perform the first attack now (in same tick)
         this.performNewAttack(false);
+    }
+
+    public castSpellOn(target: Mobile, spell: CombatSpell) {
+        if (!target || !spell) {
+            return;
+        }
+        this.character.setFollowing(target);
+        this.character.setMobileInteraction(target);
+        this.character.setPositionToFace(target.getLocation());
+        this.setCastSpell(spell);
+        this.attack(target);
     }
 
     /**
@@ -418,6 +429,38 @@ export class Combat {
             return false;
         }
         return damageCache.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT;
+    }
+
+    public getRecentDamagers(): Player[] {
+        const recentDamagers: Player[] = [];
+        for (const [player, damageCache] of this.damageMap.entries()) {
+            if (
+                player != null &&
+                player.isRegistered() &&
+                damageCache != null &&
+                damageCache.getDamage() > 0 &&
+                damageCache.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT
+            ) {
+                recentDamagers.push(player);
+            }
+        }
+        return recentDamagers;
+    }
+
+    public getRecentDamagerEntries(): Array<{ player: Player; damage: number }> {
+        const recentDamagers: Array<{ player: Player; damage: number }> = [];
+        for (const [player, damageCache] of this.damageMap.entries()) {
+            if (
+                player != null &&
+                player.isRegistered() &&
+                damageCache != null &&
+                damageCache.getDamage() > 0 &&
+                damageCache.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT
+            ) {
+                recentDamagers.push({ player, damage: damageCache.getDamage() });
+            }
+        }
+        return recentDamagers;
     }
 
     public getCharacter(): Mobile {

@@ -1,6 +1,6 @@
-import { Packet } from "../net/packet/Packet";
-import { PacketExecutor } from "../net/packet/PacketExecutor";
-import { PlayerPersistence } from "../game/entity/impl/player/persistence/PlayerPersistence";
+import type { Packet } from "../net/packet/Packet";
+import type { PacketExecutor } from "../net/packet/PacketExecutor";
+import type { PlayerPersistence } from "../game/entity/impl/player/persistence/PlayerPersistence";
 
 export interface PluginPacketEvent {
   opcode: number;
@@ -23,6 +23,15 @@ export interface PluginPlayerDisconnectEvent {
 export interface PluginPlayerLogoutEvent {
   player: any;
   username: string;
+}
+
+export interface PluginServerLifecycleEvent {
+  timestamp: number;
+}
+
+export interface PluginFriendEvent {
+  player: any;
+  other: any;
 }
 
 export interface PluginPlayerProcessEvent {
@@ -317,6 +326,10 @@ export interface PluginApi {
   onPlayerLogin(handler: (event: PluginPlayerLoginEvent) => void): void;
   onPlayerDisconnect(handler: (event: PluginPlayerDisconnectEvent) => void): void;
   onPlayerLogout(handler: (event: PluginPlayerLogoutEvent) => void): void;
+  onServerStartup(handler: (event: PluginServerLifecycleEvent) => void): void;
+  onServerShutdown(handler: (event: PluginServerLifecycleEvent) => void): void;
+  onFriendAdd(handler: (event: PluginFriendEvent) => void): void;
+  onFriendRemove(handler: (event: PluginFriendEvent) => void): void;
   onPlayerProcess(handler: (event: PluginPlayerProcessEvent) => void): void;
   onPlayerLevelUp(handler: (event: PluginPlayerLevelUpEvent) => void): void;
   onRegionLoaded(handler: (event: PluginRegionLoadedEvent) => void): void;

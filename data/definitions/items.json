@@ -602817,7 +602817,7 @@
     "id": 20595,
     "name": "Elder chaos hood",
     "examine": "The hood worn by the dangerous elder druids.",
-    "equipmentType": "MED_HELMET",
+    "equipmentType": "HOOD",
     "doubleHanded": false,
     "stackable": false,
     "tradeable": true,

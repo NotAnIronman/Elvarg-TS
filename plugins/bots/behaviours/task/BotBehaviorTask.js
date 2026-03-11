@@ -2,7 +2,10 @@ const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task"
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { peekMovementRequest, randomInRange } = require("../navigation/BotNavigation");
 const { callModeHook } = require("../hooks/ModeHookContract");
-const { clearBotActivePreset } = require("../state/PlayerBotState");
+const { clearBotActivePreset, setModePvp } = require("../state/PlayerBotState");
+const {
+  ATTR_RECRUIT_OWNER_USERNAME,
+} = require("../../runtime/BotRecruitConstants");
 
 const NS_PER_MS = 1_000_000n;
 const MOVING_MODE_DECISION_DELAY_MS = 1500;
@@ -401,6 +404,9 @@ class BotBehaviorTask extends Task {
     if (!player || !state) {
       return true;
     }
+    if (player.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME)) {
+      return true;
+    }
     if (this.isInCombat(player)) {
       return true;
     }
@@ -599,6 +605,96 @@ class BotBehaviorTask extends Task {
     return state?.autonomy?.wildernessRoamerPvp === true;
   }
 
+  clearDeadCombatLinks(entry) {
+    const player = entry?.player;
+    const state = entry?.state;
+    if (!player || !state) {
+      return false;
+    }
+    const combat = player.getCombat?.();
+    const target = combat?.getTarget?.();
+    const attacker = combat?.getAttacker?.();
+    const following = player.getCombatFollowing?.();
+    const staleTarget =
+      (target && (!target.isRegistered?.() || (target.getHitpoints?.() ?? 0) <= 0)) ||
+      (attacker && (!attacker.isRegistered?.() || (attacker.getHitpoints?.() ?? 0) <= 0)) ||
+      (following && (!following.isRegistered?.() || (following.getHitpoints?.() ?? 0) <= 0));
+    if (!staleTarget) {
+      return false;
+    }
+    combat?.reset?.();
+    combat?.setUnderAttack?.(null);
+    player.setFollowing?.(null);
+    player.setCombatFollowing?.(null);
+    player.setMobileInteraction?.(null);
+    player.setPositionToFace?.(null);
+    player.getMovementQueue?.().reset?.();
+    if (state?.pvp) {
+      state.pvp.targetUsername = null;
+      state.pvp.targetPlayer = null;
+      state.pvp.currentTargetScore = 0;
+      state.pvp.targetLockUntil = 0;
+    }
+    return true;
+  }
+
+  tryAdoptCombatAttacker(entry, nowMs) {
+    const player = entry?.player;
+    const state = entry?.state;
+    if (!player || !state || !this.isPersistentPvpBot(state)) {
+      return false;
+    }
+    const combat = player.getCombat?.();
+    const attacker = combat?.getAttacker?.();
+    if (!attacker || attacker === player) {
+      return false;
+    }
+    if (!attacker.isRegistered?.() || (attacker.getHitpoints?.() ?? 0) <= 0) {
+      return false;
+    }
+    const privateArea = player.getPrivateArea?.();
+    if (attacker.getPrivateArea?.() !== privateArea) {
+      return false;
+    }
+
+    const currentTarget = combat?.getTarget?.();
+    const alreadyEngaged =
+      currentTarget === attacker ||
+      player.getCombatFollowing?.() === attacker ||
+      state?.pvp?.targetPlayer === attacker ||
+      state?.pvp?.targetUsername === attacker.getUsername?.();
+    if (alreadyEngaged) {
+      return false;
+    }
+
+    if (state.mode !== this.behaviorMode.PVP) {
+      setModePvp(
+        player,
+        state,
+        attacker,
+        nowMs,
+        30000,
+        this.behaviorMode,
+        { allowInCombatTransition: true }
+      );
+    } else if (state?.pvp) {
+      state.pvp.targetUsername = attacker.getUsername?.() ?? state.pvp.targetUsername;
+      state.pvp.targetPlayer = attacker;
+      state.pvp.endsAt = Math.max(Number(state.pvp.endsAt ?? 0), nowMs + 30000);
+      state.pvp.nextActionAt = nowMs;
+      state.pvp.phase = "combat";
+    }
+
+    player.getMovementQueue?.().reset?.();
+    combat?.attack?.(attacker);
+    this.api?.log?.("persistent_pvp_adopt_attacker", {
+      bot: player.getUsername?.() ?? null,
+      attacker: attacker.getUsername?.() ?? null,
+      attackerIsPlayerBot: attacker.isPlayerBot?.() === true,
+    });
+    return true;
+  }
+
   hasNearbyRealPlayerOpportunity(player, state) {
     if (!player || !this.isPersistentPvpBot(state)) {
       return false;
@@ -769,6 +865,44 @@ class BotBehaviorTask extends Task {
       this.scheduleNextDecision(state, nowMs);
     }
 
+    const recruitOwnerUsername = player.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME);
+    if (recruitOwnerUsername) {
+      const autonomy = this.ensureAutonomyState(state);
+      autonomy.manualMode = this.behaviorMode.FOLLOW_BACK;
+      autonomy.nextDecisionAt = Number.MAX_SAFE_INTEGER;
+      autonomy.modeEndsAt = Number.MAX_SAFE_INTEGER;
+      if (!state.followTargetUsername) {
+        state.followTargetUsername = recruitOwnerUsername;
+      }
+      const combat = player.getCombat?.();
+      const inCombatWithLiveTarget = !!(
+        combat?.getTarget?.() ||
+        combat?.getAttacker?.() ||
+        player.getCombatFollowing?.()
+      );
+      if (
+        state.mode === this.behaviorMode.PVP &&
+        !inCombatWithLiveTarget
+      ) {
+        this.activateModeWithHandler(
+          entry,
+          this.behaviorMode.FOLLOW_BACK,
+          "recruit_resume_follow"
+        );
+      }
+      if (
+        state.mode !== this.behaviorMode.FOLLOW_BACK &&
+        state.mode !== this.behaviorMode.PVP
+      ) {
+        this.activateModeWithHandler(
+          entry,
+          this.behaviorMode.FOLLOW_BACK,
+          "recruit_lock"
+        );
+      }
+      return;
+    }
+
     const manualMode = autonomy.manualMode ?? null;
     if (manualMode) {
       const isTransient = this.transientModes.has(state.mode);
@@ -843,6 +977,11 @@ class BotBehaviorTask extends Task {
         }
         return;
       }
+    }
+
+    if (this.tryAdoptCombatAttacker(entry, nowMs)) {
+      this.ensureDecisionScheduled(state, nowMs);
+      return;
     }
 
     if (this.isInCombat(player)) {
@@ -938,6 +1077,7 @@ class BotBehaviorTask extends Task {
         if (!player || !state) {
           continue;
         }
+        this.clearDeadCombatLinks(entry);
         if (sampleEntry && this._profileWindow) {
           this._profileWindow.sampledEntries += 1;
           if (modeProfile) {

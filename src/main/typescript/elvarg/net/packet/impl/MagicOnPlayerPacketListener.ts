@@ -38,9 +38,6 @@ export class MagicOnPlayerPacketListener implements PacketExecutor {
       return;
     }
 
-    player.setPositionToFace(attacked.getLocation());
-    player.getCombat().setCastSpell(spell);
-
-    player.getCombat().attack(attacked);
+    player.getCombat().castSpellOn(attacked, spell);
   }
 }

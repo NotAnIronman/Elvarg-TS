@@ -92,11 +92,7 @@ class PvpFreezeAndKiteNode {
       combat.reset?.();
     }
 
-    player.setFollowing?.(target);
-    player.setMobileInteraction?.(target);
-    player.setPositionToFace?.(target.getLocation?.());
-    combat.setCastSpell?.(freezeSpell);
-    combat.attack?.(target);
+    combat.castSpellOn?.(target, freezeSpell);
     pvp.lastFreezeAt = nowMs;
     this.scheduleCombatAction?.(state, nowMs);
     this.setPhase?.(state, this.pvpPhase?.COMBAT ?? "combat");

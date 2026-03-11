@@ -1,30 +1,35 @@
 import { Entity } from "../Entity";
 import { Sound } from "../../Sound";
-import { Combat } from "../../content/combat/Combat";
-import { CombatType } from "../../content/combat/CombatType";
-import { HitDamage } from "../../content/combat/hit/HitDamage";
-import { PendingHit } from "../../content/combat/hit/PendingHit";
+import type { CombatType } from "../../content/combat/CombatType";
+import type { HitDamage } from "../../content/combat/hit/HitDamage";
+import type { PendingHit } from "../../content/combat/hit/PendingHit";
 import type { NPC } from "./npc/NPC";
 import type { Player } from "./player/Player";
-import { Animation } from "../../model/Animation";
+import type { Combat } from "../../content/combat/Combat";
+import type { Animation } from "../../model/Animation";
 import { Direction } from "../../model/Direction";
 import { Flag } from "../../model/Flag";
-import { Graphic } from "../../model/Graphic";
+import type { Graphic } from "../../model/Graphic";
 import { Location } from "../../model/Location";
 import { UpdateFlag } from "../../model/UpdateFlag";
-import { MovementQueue } from "../../model/movement/MovementQueue";
+import type { MovementQueue } from "../../model/movement/MovementQueue";
 import { Task } from "../../task/Task";
 import { TaskManager } from "../../task/TaskManager";
 import { Stopwatch } from "../../../util/Stopwatch";
 import { TimerRepository } from "../../../util/timers/TimerRepository";
-import { RegionManager } from "../../collision/RegionManager";
 import { Misc } from "../../../util/Misc";
-import { Boundary } from "../../model/Boundary";
+import type { Boundary } from "../../model/Boundary";
 
 const getPlayerCtor = () =>
   require("./player/Player").Player as typeof import("./player/Player").Player;
 const getNpcCtor = () =>
   require("./npc/NPC").NPC as typeof import("./npc/NPC").NPC;
+const getCombatCtor = () =>
+  require("../../content/combat/Combat").Combat as typeof import("../../content/combat/Combat").Combat;
+const getMovementQueueCtor = () =>
+  require("../../model/movement/MovementQueue").MovementQueue as typeof import("../../model/movement/MovementQueue").MovementQueue;
+const getRegionManager = () =>
+  require("../../collision/RegionManager").RegionManager as typeof import("../../collision/RegionManager").RegionManager;
 
 class MobileTask extends Task {
     constructor(ticks: number, private readonly execFunc: Function) {
@@ -41,8 +46,8 @@ export abstract class Mobile extends Entity {
     private index: number;
     public lastKnownRegion: Location;
     private timers = new TimerRepository();
-    private combat = new Combat(this);
-    private movementQueue = new MovementQueue(this);
+    private combat: Combat;
+    private movementQueue: MovementQueue;
     public forcedChat: string;
     public walkingDirection: Direction = Direction.NONE;
     public runningDirection: Direction = Direction.NONE;
@@ -87,6 +92,8 @@ export abstract class Mobile extends Entity {
         super(position);
         // Ensure we always have a baseline region; movement/updates rely on this.
         this.lastKnownRegion = position.clone();
+        this.combat = new (getCombatCtor())(this);
+        this.movementQueue = new (getMovementQueueCtor())(this);
     }
 
     public abstract onAdd(): void;
@@ -124,7 +131,7 @@ export abstract class Mobile extends Entity {
             let randomY: number = Misc.random(requestedY - radius, requestedY + radius);
             let randomLocation: Location = new Location(randomX, randomY, height);
 
-            if (!RegionManager.blocked(randomLocation, null)) {
+            if (!getRegionManager().blocked(randomLocation, null)) {
                 chosen = randomLocation;
                 break;
             }
@@ -149,7 +156,7 @@ export abstract class Mobile extends Entity {
             const randomX = Misc.random(bounds.getX(), bounds.getX2());
             const randomY = Misc.random(bounds.getY(), bounds.getY2());
             const randomLocation = new Location(randomX, randomY, height);
-            if (!RegionManager.blocked(randomLocation, null)) {
+            if (!getRegionManager().blocked(randomLocation, null)) {
                 chosen = randomLocation;
                 break;
             }

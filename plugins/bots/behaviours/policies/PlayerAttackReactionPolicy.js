@@ -83,7 +83,7 @@ function startRunAwayBankRun({
   return true;
 }
 
-function retaliateAgainstAttacker(bot, attacker, attackerIsPlayerBot) {
+function retaliateAgainstAttacker(bot, attacker, attackerIsPlayerBot, forceImmediate = false) {
   if (!bot || !attacker) {
     return;
   }
@@ -97,7 +97,7 @@ function retaliateAgainstAttacker(bot, attacker, attackerIsPlayerBot) {
     return;
   }
 
-  if (attackerIsPlayerBot) {
+  if (attackerIsPlayerBot || forceImmediate === true) {
     bot.getMovementQueue?.().reset?.();
     combat.attack(attacker);
     return;
@@ -139,7 +139,8 @@ function handlePlayerAttackReaction({
         attacker,
         nowMs,
         FULL_TIME_PVP_REACTION_DURATION_MS,
-        behaviorMode
+        behaviorMode,
+        { allowInCombatTransition: true }
       );
     } else if (state?.pvp) {
       state.pvp.targetUsername = attacker.getUsername?.() ?? state.pvp.targetUsername;
@@ -151,7 +152,7 @@ function handlePlayerAttackReaction({
       state.pvp.nextActionAt = nowMs;
     }
 
-    retaliateAgainstAttacker(bot, attacker, attackerIsPlayerBot);
+    retaliateAgainstAttacker(bot, attacker, attackerIsPlayerBot, true);
     api?.log?.("full_time_pvp_reaction", {
       bot: bot.getUsername?.() ?? null,
       attacker: attacker.getUsername?.() ?? null,

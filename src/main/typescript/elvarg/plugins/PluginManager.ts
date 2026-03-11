@@ -31,6 +31,8 @@ import {
   PluginCommandEvent,
   PluginPlayerDisconnectEvent,
   PluginPlayerLoginEvent,
+  PluginServerLifecycleEvent,
+  PluginFriendEvent,
   PluginRegionLoadedEvent,
   PluginSpellDisabledEvent,
   PluginSpellRuneBypassEvent,
@@ -93,6 +95,10 @@ export class PluginManager {
   private static loginHooks: PluginHook<PluginPlayerLoginEvent>[] = [];
   private static disconnectHooks: PluginHook<PluginPlayerDisconnectEvent>[] = [];
   private static logoutHooks: PluginHook<PluginPlayerLogoutEvent>[] = [];
+  private static serverStartupHooks: PluginHook<PluginServerLifecycleEvent>[] = [];
+  private static serverShutdownHooks: PluginHook<PluginServerLifecycleEvent>[] = [];
+  private static friendAddHooks: PluginHook<PluginFriendEvent>[] = [];
+  private static friendRemoveHooks: PluginHook<PluginFriendEvent>[] = [];
   private static playerProcessHooks: PluginHook<PluginPlayerProcessEvent>[] = [];
   private static playerLevelUpHooks: PluginHook<PluginPlayerLevelUpEvent>[] = [];
   private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
@@ -445,6 +451,42 @@ export class PluginManager {
     }
     for (const hook of PluginManager.logoutHooks) {
       PluginManager.executeHook(hook, event, "logout", "player_logout");
+    }
+  }
+
+  public static emitServerStartup(event: PluginServerLifecycleEvent): void {
+    if (PluginManager.serverStartupHooks.length === 0) {
+      return;
+    }
+    for (const hook of PluginManager.serverStartupHooks) {
+      PluginManager.executeHook(hook, event, "server_startup", "server_startup");
+    }
+  }
+
+  public static emitServerShutdown(event: PluginServerLifecycleEvent): void {
+    if (PluginManager.serverShutdownHooks.length === 0) {
+      return;
+    }
+    for (const hook of PluginManager.serverShutdownHooks) {
+      PluginManager.executeHook(hook, event, "server_shutdown", "server_shutdown");
+    }
+  }
+
+  public static emitFriendAdd(event: PluginFriendEvent): void {
+    if (PluginManager.friendAddHooks.length === 0) {
+      return;
+    }
+    for (const hook of PluginManager.friendAddHooks) {
+      PluginManager.executeHook(hook, event, "friend_add", "friend_add");
+    }
+  }
+
+  public static emitFriendRemove(event: PluginFriendEvent): void {
+    if (PluginManager.friendRemoveHooks.length === 0) {
+      return;
+    }
+    for (const hook of PluginManager.friendRemoveHooks) {
+      PluginManager.executeHook(hook, event, "friend_remove", "friend_remove");
     }
   }
 
@@ -1418,6 +1460,46 @@ export class PluginManager {
           pluginName,
           handler: (event) => {
             if (!event || !event.player || !event.username) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onServerStartup: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.serverStartupHooks.push({ pluginName, handler });
+      },
+      onServerShutdown: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.serverShutdownHooks.push({ pluginName, handler });
+      },
+      onFriendAdd: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.friendAddHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.other) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onFriendRemove: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.friendRemoveHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.other) {
               return;
             }
             handler(event);

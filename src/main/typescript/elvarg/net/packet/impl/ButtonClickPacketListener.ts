@@ -4,21 +4,8 @@ import { Autocasting } from "../../../game/content/combat/magic/Autocasting";
 import { BonusManager } from "../../../game/model/equipment/BonusManager";
 import { FightType } from "../../../game/content/combat/FightType";
 import { PrayerHandler } from "../../../game/content/PrayerHandler";
-// import { Emotes } from '../../../game/content/Emotes';
-// import { PrayerHandler } from '../../../game/content/PrayerHandler';
-// import { ClanChatManager } from '../../../game/content/clan/ClanChatManager';
-// import { WeaponInterfaces } from '../../../game/content/combat/WeaponInterfaces';
-// import { Autocasting } from '../../../game/content/combat/magic/Autocasting';
-// import { EffectSpells } from '../../../game/content/combat/magic/EffectSpells';
-// import { QuestHandler, Quests } from '../../../game/content/quests/QuestHandler';
-// import { Player } from '../../../game/entity/impl/player/Player';
-// import { Bank } from '../../../game/model/container/impl/Bank';
-// import { DialogueOption } from '../../../game/model/dialogues/DialogueOption';
-// import { BonusManager } from '../../../game/model/equipment/BonusManager';
-// import { PlayerRights } from '../../../game/model/rights/PlayerRights';
 import { Packet } from "../Packet";
 import { PluginManager } from "../../../plugins/PluginManager";
-// import { Dueling } from '../../../game/content/Duelling';
 
 export class ButtonClickPacketListener implements PacketExecutor {
   public static readonly FIRST_DIALOGUE_OPTION_OF_FIVE: number = 2494;
@@ -64,53 +51,6 @@ export class ButtonClickPacketListener implements PacketExecutor {
   private static readonly OPEN_ADVANCED_OPTIONS: number = 42524;
   private static readonly OPEN_KEY_BINDINGS: number = 42552;
 
-  // public static handlers(player: Player, button: number): boolean {
-  //   if (PrayerHandler.togglePrayer(player, button)) {
-  //     return true;
-  //   }
-  //   if (Autocasting.handleWeaponInterface(player, button)
-  //     || Autocasting.handleAutocastTab(player, button)
-  //     || Autocasting.toggleAutocast(player, button)) {
-  //     return true;
-  //   }
-  //   if (WeaponInterfaces.changeCombatSettings(player, button)) {
-  //     BonusManager.update(player);
-  //     return true;
-  //   }
-  //   if (EffectSpells.handleSpell(player, button)) {
-  //     return true;
-  //   }
-  //   if (Bank.handleButton(player, button, 0)) {
-  //     return true;
-  //   }
-  //   if (Emotes.doEmote(player, button)) {
-  //     return true;
-  //   }
-  //   if (ClanChatManager.handleButton(player, button, 0)) {
-  //     return true;
-  //   }
-  //   if (player.getSkillManager().pressedSkill(button)) {
-  //     return true;
-  //   }
-  //   if (player.getQuickPrayers().handleButton(button)) {
-  //     return true;
-  //   }
-  //   if (player.getDueling().checkRules(button)) {
-  //     return true;
-  //   }
-  //   if (Smithing.handleButton(player, button)) {
-  //     return true;
-  //   }
-  //   if (Quests.handleQuestButtonClick(player, button)) {
-  //     return true;
-  //   }
-  //   if (MinigameHandler.handleButtonClick(player, button)) {
-  //     return true;
-  //   }
-  //   return false;
-  // }
-
-  // execute(player: Player, packet: Packet): void {
   execute(player: any, packet: Packet): void {
     let button = packet.readInt();
 

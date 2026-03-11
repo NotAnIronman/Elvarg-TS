@@ -1,6 +1,6 @@
 import { GameConstants } from '../GameConstants'
 import { ObjectDefinition } from '../definition/ObjectDefinition'
-import { Mobile } from '../entity/impl/Mobile'
+import type { Mobile } from '../entity/impl/Mobile'
 import { GameObject } from '../entity/impl/object/GameObject'
 import { MapObjects } from '../entity/impl/object/MapObjects'
 import { Direction } from '../model/Direction'

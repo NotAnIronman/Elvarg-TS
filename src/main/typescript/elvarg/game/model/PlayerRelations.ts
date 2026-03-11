@@ -1,7 +1,6 @@
 import { Player } from "../entity/impl/player/Player";
 import { World } from "../World";
 import { Misc } from "../../util/Misc";
-import { ClanChatManager } from "../content/clan/ClanChatManager";
 
 export class PlayerRelations {
     private static readonly MAX_FRIENDS = 200;
@@ -55,7 +54,14 @@ export class PlayerRelations {
         return this.ignoreSet.has(username);
     }
 
+    private rebuildRelationSets(): void {
+        this.friendSet = new Set<bigint>(this.friendList);
+        this.ignoreSet = new Set<bigint>(this.ignoreList);
+    }
+
     updateLists(online: boolean) {
+        this.rebuildRelationSets();
+
         if (this.status === PrivateChatStatus.OFF) {
             online = false;
         }
@@ -141,6 +147,7 @@ export class PlayerRelations {
     }
 
     public onLogin(player: Player): PlayerRelations {
+        this.rebuildRelationSets();
         this.sendIgnores();
         this.sendFriends();
         this.sendPrivateStatus();
@@ -170,10 +177,6 @@ export class PlayerRelations {
             const friend = World.getPlayerByName(name);
             if (friend) {
                 friend.getRelations().updateLists(true);
-                ClanChatManager.updateRank(ClanChatManager.getClanChat(this.player), friend);
-                if (this.player.getInterfaceId() === ClanChatManager.CLAN_CHAT_SETUP_INTERFACE_ID) {
-                    ClanChatManager.clanChatSetupInterface(this.player);
-                }
             }
         }
     }
@@ -196,10 +199,6 @@ export class PlayerRelations {
             const unfriend = World.getPlayerByName(name);
             if (unfriend) {
                 unfriend.getRelations().updateLists(false);
-                ClanChatManager.updateRank(ClanChatManager.getClanChat(this.player), unfriend);
-                if (this.player.getInterfaceId() === ClanChatManager.CLAN_CHAT_SETUP_INTERFACE_ID) {
-                    ClanChatManager.clanChatSetupInterface(this.player);
-                }
             }
         } else {
             this.player.getPacketSender().sendMessage("This player is not on your friends list!");

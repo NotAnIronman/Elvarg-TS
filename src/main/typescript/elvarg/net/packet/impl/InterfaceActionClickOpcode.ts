@@ -1,7 +1,3 @@
-// import { ClanChatManager } from "../../../game/content/clan/ClanChatManager";
-// import { Bank } from "../../../game/model/container/impl/Bank";
-// import { TeleportHandler } from "../../../game/model/teleportation/TeleportHandler";
-// import { Player } from "../../../game/entity/impl/player/Player";
 import { Packet } from "../Packet";
 import { PacketExecutor } from "../PacketExecutor";
 import { PluginManager } from "../../../plugins/PluginManager";
@@ -11,7 +7,6 @@ import { BonusManager } from "../../../game/model/equipment/BonusManager";
 import { FightType } from "../../../game/content/combat/FightType";
 
 export class InterfaceActionClickOpcode implements PacketExecutor {
-  // execute(player: Player, packet: Packet) {
   execute(player: any, packet: Packet) {
     let interfaceId = packet.readInt();
     let action = packet.readByte();
@@ -104,17 +99,5 @@ export class InterfaceActionClickOpcode implements PacketExecutor {
     ) {
       return;
     }
-
-    // if (Bank.handleButton(player, interfaceId, action)) {
-    //     return;
-    // }
-
-    // if (ClanChatManager.handleButton(player, interfaceId, action)) {
-    //     return;
-    // }
-
-    // if (TeleportHandler.handleButton(player, interfaceId, action)) {
-    //     return;
-    // }
   }
 }

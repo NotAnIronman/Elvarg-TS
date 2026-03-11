@@ -146,6 +146,9 @@ function createPvpBehaviorState() {
     targetLockUntil: 0,
     pjTargetUsername: null,
     pjExpiresAt: 0,
+    pjVictimUsername: null,
+    pjVictimExpiresAt: 0,
+    replenishAfterKillPending: false,
     nextUnstackCheckAt: 0,
     nextUnstackAt: 0,
   };
@@ -182,6 +185,9 @@ function clearPvpBehaviorState(state) {
   state.pvp.targetLockUntil = 0;
   state.pvp.pjTargetUsername = null;
   state.pvp.pjExpiresAt = 0;
+  state.pvp.pjVictimUsername = null;
+  state.pvp.pjVictimExpiresAt = 0;
+  state.pvp.replenishAfterKillPending = false;
   state.pvp.nextUnstackCheckAt = 0;
   state.pvp.nextUnstackAt = 0;
 }
@@ -453,7 +459,8 @@ function setModeFollowBack(
   followTarget,
   nowMs,
   followBackDurationMs,
-  behaviorMode
+  behaviorMode,
+  options = {}
 ) {
   if (!player || !state || !followTarget) {
     return false;
@@ -463,17 +470,23 @@ function setModeFollowBack(
     return false;
   }
 
-  if (!transitionToMode(player, state, behaviorMode, "FOLLOW_BACK")) {
+  if (
+    !transitionToMode(player, state, behaviorMode, "FOLLOW_BACK", {
+      allowInCombatTransition: options.allowInCombatTransition === true,
+    })
+  ) {
     return false;
   }
   state.followTargetUsername = followTargetUsername;
   state.followUntilMs = nowMs + followBackDurationMs;
   state.nextFollowRepathAt = 0;
-  state.roaming.target = {
-    x: followTarget.getLocation().getX(),
-    y: followTarget.getLocation().getY(),
-    z: followTarget.getLocation().getZ(),
-  };
+  clearMovementRequest(player);
+  player.getMovementQueue?.()?.reset?.();
+  clearRoamingBehaviorState(state);
+  if (player.getRunEnergy?.() > 0) {
+    player.setRunning?.(true);
+    player.getPacketSender?.()?.sendRunStatus?.();
+  }
   player.setFollowing(followTarget);
   player.setMobileInteraction(followTarget);
   player.setPositionToFace(followTarget.getLocation());
@@ -592,7 +605,8 @@ function setModePvp(
   targetPlayer,
   nowMs,
   durationMs,
-  behaviorMode
+  behaviorMode,
+  options = {}
 ) {
   if (!player || !state || !targetPlayer || durationMs <= 0) {
     return false;
@@ -602,7 +616,11 @@ function setModePvp(
     return false;
   }
 
-  if (!transitionToMode(player, state, behaviorMode, "PVP")) {
+  if (
+    !transitionToMode(player, state, behaviorMode, "PVP", {
+      allowInCombatTransition: options.allowInCombatTransition === true,
+    })
+  ) {
     return false;
   }
   if (!state.pvp) {
@@ -614,6 +632,10 @@ function setModePvp(
   state.pvp.targetPlayer = targetPlayer;
   state.pvp.endsAt = nowMs + durationMs;
   state.pvp.nextActionAt = nowMs;
+  if (player.getRunEnergy?.() > 0) {
+    player.setRunning?.(true);
+    player.getPacketSender?.()?.sendRunStatus?.();
+  }
   player.setFollowing(targetPlayer);
   player.setMobileInteraction(targetPlayer);
   player.setPositionToFace(targetPlayer.getLocation());

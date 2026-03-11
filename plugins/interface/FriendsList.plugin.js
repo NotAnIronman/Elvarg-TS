@@ -1,6 +1,7 @@
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
+const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 
 function readUsername(packet) {
   if (!packet || packet.getSize() < 8) {
@@ -29,9 +30,21 @@ const friendPacketListener = {
       switch (packet.getOpcode()) {
         case PacketConstants.ADD_FRIEND_OPCODE:
           player.getRelations().addFriend(username);
+          {
+            const other = World.getPlayerByName(Misc.formatName(Misc.longToString(username)));
+            if (other) {
+              PluginManager.emitFriendAdd({ player, other });
+            }
+          }
           return;
         case PacketConstants.REMOVE_FRIEND_OPCODE:
           player.getRelations().deleteFriend(username);
+          {
+            const other = World.getPlayerByName(Misc.formatName(Misc.longToString(username)));
+            if (other) {
+              PluginManager.emitFriendRemove({ player, other });
+            }
+          }
           return;
         case PacketConstants.SEND_PM_OPCODE: {
           const size = packet.getSize();

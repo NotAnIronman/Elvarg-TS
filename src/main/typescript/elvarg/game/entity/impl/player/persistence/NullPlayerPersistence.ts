@@ -1,4 +1,4 @@
-import { Player } from "../Player";
+import type { Player } from "../Player";
 import { PlayerPersistence } from "./PlayerPersistence";
 import { PlayerSave } from "./PlayerSave";
 

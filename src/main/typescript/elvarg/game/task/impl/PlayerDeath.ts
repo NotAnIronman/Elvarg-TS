@@ -25,7 +25,25 @@ export class PlayerDeathTask extends Task {
     constructor(player: Player) {
         super(1, false);
         this.player = player;
+        (this.player as any).__recentDeathDamagerEntries =
+            this.player.getCombat().getRecentDamagerEntries();
         this.killer = player.getCombat().getKiller(true);
+    }
+
+    private resolveBotRespawnLocation(): Location | null {
+        if (!this.player?.isPlayerBot?.()) {
+            return null;
+        }
+        const resolver = (this.player as any).__botResolveRespawnLocation;
+        if (typeof resolver === "function") {
+            try {
+                const resolved = resolver();
+                return Location.readTile(resolved);
+            } catch (err) {
+                console.error("[PlayerDeathTask] bot respawn resolver failed", err);
+            }
+        }
+        return null;
     }
 
     public execute() {
@@ -145,6 +163,7 @@ export class PlayerDeathTask extends Task {
                     // Notify defeat hooks for all deaths so plugins can apply
                     // post-death cleanup even when no killer is present.
                     PluginManager.emitPlayerDefeated(this.killer ?? null, this.player);
+                    (this.player as any).__recentDeathDamagerEntries = null;
 
                     let handledDeath: boolean = false;
 
@@ -153,7 +172,8 @@ export class PlayerDeathTask extends Task {
                     }
 
                     if (!handledDeath) {
-                        this.player.moveTo(GameConstants.DEFAULT_LOCATION);
+                        const botRespawn = this.resolveBotRespawnLocation();
+                        this.player.moveTo(botRespawn ?? GameConstants.DEFAULT_LOCATION);
                     }
 
                     // Stop the event..
@@ -198,7 +218,7 @@ export class PlayerDeathTask extends Task {
             super.stop();
             console.error(e);
             this.player.resetAttributes();
-            this.player.moveTo(GameConstants.DEFAULT_LOCATION);
+            this.player.moveTo(this.resolveBotRespawnLocation() ?? GameConstants.DEFAULT_LOCATION);
         }
     }
 
