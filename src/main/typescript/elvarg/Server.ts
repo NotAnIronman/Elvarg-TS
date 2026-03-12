@@ -7,6 +7,8 @@ if (typeof (global as any).navigator === "undefined") {
 (global as any).Image = (global as any).Image ?? function () { return {}; };
 (global as any).HTMLCanvasElement = (global as any).HTMLCanvasElement ?? function () {};
 import * as path from "path";
+import * as fs from "fs";
+import Module = require("module");
 import { GameBuilder } from "./game/GameBuilder";
 // import { GameConstants } from "./game/GameConstants";
 import { World } from "./game/World";
@@ -35,6 +37,77 @@ export class Server {
     if (Server.consolePatched) return;
     ServerLogger.install(path.join(process.cwd(), "logs", "server.log"));
     Server.consolePatched = true;
+  }
+
+  private static installProductionPathResolver() {
+    const moduleAny = Module as any;
+    if (moduleAny.__elvargProdPathResolverInstalled) {
+      return;
+    }
+    moduleAny.__elvargProdPathResolverInstalled = true;
+
+    const originalResolveFilename = moduleAny._resolveFilename;
+    const cwd = process.cwd();
+    const sourceRoot = path.join(cwd, "src", "main", "typescript", "elvarg");
+    const distRoot = path.join(cwd, "dist");
+    const pluginsRoot = path.join(cwd, "plugins");
+    const brokenPluginsPrefix = `${path.sep}Users${path.sep}plugins${path.sep}`;
+
+    const resolveCandidate = (request: string, parent?: NodeModule): string => {
+      if (typeof request !== "string" || request.length === 0) {
+        return request;
+      }
+
+      const parentFilename =
+        parent && typeof (parent as any).filename === "string"
+          ? (parent as any).filename
+          : null;
+      const absoluteRequest =
+        path.isAbsolute(request)
+          ? request
+          : parentFilename
+            ? path.resolve(path.dirname(parentFilename), request)
+            : request;
+
+      if (absoluteRequest.startsWith(sourceRoot)) {
+        const relativePath = path.relative(sourceRoot, absoluteRequest);
+        return path.join(distRoot, relativePath);
+      }
+
+      if (absoluteRequest.startsWith(brokenPluginsPrefix)) {
+        const relativePath = absoluteRequest.slice(brokenPluginsPrefix.length);
+        return path.join(pluginsRoot, relativePath);
+      }
+
+      return request;
+    };
+
+    moduleAny._resolveFilename = function patchedResolveFilename(
+      request: string,
+      parent: NodeModule | undefined,
+      isMain: boolean,
+      options: any
+    ) {
+      try {
+        return originalResolveFilename.call(this, request, parent, isMain, options);
+      } catch (originalError) {
+        const rewritten = resolveCandidate(request, parent);
+        if (rewritten === request) {
+          throw originalError;
+        }
+
+        const directExists =
+          fs.existsSync(rewritten) ||
+          fs.existsSync(`${rewritten}.js`) ||
+          fs.existsSync(`${rewritten}.json`) ||
+          fs.existsSync(`${rewritten}.node`);
+        if (!directExists) {
+          throw originalError;
+        }
+
+        return originalResolveFilename.call(this, rewritten, parent, isMain, options);
+      }
+    };
   }
 
   private static installGlobalCrashHandlers() {
@@ -99,6 +172,7 @@ export class Server {
       Server.setupFileLogging();
       Server.installGlobalCrashHandlers();
       Server.installGracefulShutdownHandlers();
+      Server.installProductionPathResolver();
 
       const productionArg = args.find((arg) => arg === "0" || arg === "1");
       if (productionArg) {

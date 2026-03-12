@@ -304,8 +304,8 @@ export class RegionManager {
         }
 
         switch (objectId) {
-            case 14233: // pest control gates
-            case 14235: // pest control gates
+            case 14233:
+            case 14235:
                 return;
         }
 

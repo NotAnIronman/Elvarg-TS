@@ -101,9 +101,6 @@ export class Sound {
     public static DROP_ITEM = new Sound(376, 1, 25, 0)
     public static PICK_UP_ITEM = new Sound(358, 1, 25, 0)
 
-
-    public static SET_UP_BARRICADE = new Sound(358, 1, 0, 0)
-
     public static FIRE_LIGHT = new Sound(375, 1, 50, 0)
     public static FIRE_SUCCESSFUL = new Sound(608, 1, 0, 0)
     public static FIRE_FIRST_ATTEMPT = new Sound(2584, 1, 0, 0)

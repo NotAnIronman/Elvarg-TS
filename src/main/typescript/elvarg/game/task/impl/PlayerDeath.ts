@@ -82,18 +82,19 @@ export class PlayerDeathTask extends Task {
                         const playerItems = this.player.getInventory().getValidItems().concat(this.player.getEquipment().getValidItems());
                         const position = deathPosition;
                         let dropped = false;
+                        let pluginHandledDrop = false;
 
                         for (let item of playerItems) {
-                            if (
-                                PluginManager.emitPlayerDeathItemDrop({
-                                    player: this.player,
-                                    killer: this.killer ?? null,
-                                    item,
-                                    location: position,
-                                    shouldDropItems: shouldDropItemsOnDeath,
-                                    handled: false,
-                                })
-                            ) {
+                            const handled = PluginManager.emitPlayerDeathItemDrop({
+                                player: this.player,
+                                killer: this.killer ?? null,
+                                item,
+                                location: position,
+                                shouldDropItems: shouldDropItemsOnDeath,
+                                handled: false,
+                            });
+                            if (handled) {
+                                pluginHandledDrop = true;
                                 continue;
                             }
 
@@ -131,7 +132,7 @@ export class PlayerDeathTask extends Task {
                             if (this.killer.getArea() != null) {
                                 this.killer.getArea().defeated(this.killer, this.player);
                             }
-                            if (shouldDropItemsOnDeath && !dropped) {
+                            if (shouldDropItemsOnDeath && !dropped && !pluginHandledDrop) {
                                 this.killer.getPacketSender().sendMessage(`${this.player.getUsername()} had no valuable items to be dropped.`);
                             }
                         }

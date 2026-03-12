@@ -1,5 +1,6 @@
 import { NPC } from './entity/impl/npc/NPC';
 import * as path from 'path';
+import * as fs from 'fs';
 import 'reflect-metadata';
 
 // require-all is a CommonJS export; import via require to avoid default interop issues.
@@ -12,10 +13,18 @@ export class Systems {
       dirname: npcDir,
       filter: /^(?!.*base).*\.js$/,
       recursive: true,
-      map: (name, path) => require(path).default
+      map: (name, path) => {
+        if (!fs.existsSync(path) || fs.statSync(path).isDirectory()) {
+          return null;
+        }
+        return require(path).default;
+      }
     });
 
-    const npcClasses = Object.values(npcOverrideClasses).filter((clazz: any) => Reflect.hasOwnMetadata('Ids', clazz.prototype));
+    const npcClasses = Object.values(npcOverrideClasses)
+      .filter((clazz: any) => clazz != null)
+      .filter((clazz: any) => typeof clazz === 'function' && clazz.prototype != null)
+      .filter((clazz: any) => Reflect.hasOwnMetadata('Ids', clazz.prototype));
     const implementationClasses = npcClasses.filter((clazz: any) => clazz.prototype instanceof NPC);
     NPC.initImplementations(implementationClasses);
   }

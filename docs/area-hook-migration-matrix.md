@@ -35,9 +35,7 @@ Replace `Area` subclass dependency inversion with explicit plugin hooks for game
    - `canAttack`, `canTeleport`, death handling, object handling.
 2. Castle Wars:
    - waiting/game area state transitions, object interactions, equipment constraints.
-3. Pest Control:
-   - spell restrictions, object routing, death behavior.
-4. Fight Caves / Barrows / Godwars / KBD:
+3. Fight Caves / Barrows / Godwars / KBD:
    - mostly policy hooks and object/teleport constraints.
 
 ## Migration Rule

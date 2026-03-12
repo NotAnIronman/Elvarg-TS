@@ -2,7 +2,6 @@ import { Task } from "../Task";
 import { World } from "../../World";
 import { NPC } from "../../entity/impl/npc/NPC";
 import { NPCDropGenerator } from '../../../game/entity/impl/npc/NPCDropGenerator'
-import { Barricades } from "../../entity/impl/npc/impl/Barricades";
 import { Player } from "../../entity/impl/player/Player";
 import { Animation } from "../../model/Animation";
 import { Priority } from "../../model/Priority";
@@ -73,9 +72,6 @@ export class NPCDeathTask extends Task {
         this.npc.setNpcTransformationId(-1);
         if (!skipDefaultRespawn && this.npc.getDefinition().getRespawn() > 0) {
             TaskManager.submit(new NPCRespawnTask(this.npc, this.npc.getDefinition().getRespawn()));
-        }
-        if (this.npc.isBarricade()) {
-            Barricades.checkTile(this.npc.getLocation());
         }
         World.getRemoveNPCQueue().push(this.npc);
     }

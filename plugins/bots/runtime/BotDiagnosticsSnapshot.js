@@ -388,6 +388,20 @@ function renderBotDiagnosticsLines({
       } ${statusLabel}`
     )
   );
+  const pvpLoadoutId = state?.pvp?.loadoutId ?? "n/a";
+  const equipmentItems = bot?.getEquipment?.()?.getCopiedItems?.() ?? [];
+  const equipped = Array.isArray(equipmentItems)
+    ? equipmentItems.filter((item) => item && item.getId?.() > 0)
+    : [];
+  lines.push(
+    chatTrim(
+      `[Bot Status] Loadout: pvp=${pvpLoadoutId} preset=${
+        bot?.getCurrentPreset?.()?.getName?.() ?? "none"
+      } equipped=${equipped.length} primaryWeaponId=${
+        state?.pvp?.generatedPrimaryWeaponId ?? "n/a"
+      }`
+    )
+  );
   lines.push(chatTrim(`[Bot Status] Reason: ${diagnosis.reason}`));
 
   if (state?.mode === "follow_back" || recruitOwnerUsername) {

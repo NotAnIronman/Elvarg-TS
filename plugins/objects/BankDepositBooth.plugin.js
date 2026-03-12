@@ -81,12 +81,11 @@ function decodeDepositAction(opcode, payload) {
 }
 
 function handleDepositContainerAction(player, opcode, payload) {
+  const decoded = decodeDepositAction(opcode, payload);
+  if (!decoded || decoded.iface !== CONTAINER) return false;
   if (PluginManager.emitCanBank(player) === false) {
     return true;
   }
-
-  const decoded = decodeDepositAction(opcode, payload);
-  if (!decoded || decoded.iface !== CONTAINER) return false;
 
   if (decoded.amount == null) {
     player.setEnteredAmountAction({

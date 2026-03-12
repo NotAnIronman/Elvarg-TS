@@ -345,7 +345,8 @@ function clearBotActivePreset(player, state = null) {
   }
   if (
     state?.autonomy?.fullTimePvp === true ||
-    state?.autonomy?.persistentPvpLoadout === true
+    state?.autonomy?.persistentPvpLoadout === true ||
+    player.getAttribute?.("botRecruitOwnerUsername")
   ) {
     return false;
   }

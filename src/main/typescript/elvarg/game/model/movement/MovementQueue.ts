@@ -24,6 +24,7 @@ import { Action } from "../Action";
 import { GameConstants } from "../../GameConstants";
 import { FastDeque } from "../../../util/FastDeque";
 import { ServerPerf } from "../../../util/ServerPerf";
+import { Wilderness } from "../../content/wilderness/Wilderness";
 import * as fs from "fs";
 import * as path from "path";
 export class MovementQueue {
@@ -408,6 +409,7 @@ export class MovementQueue {
         if (this.character.isPlayer()) {
             if (moved) {
                 this.handleRegionChange();
+                this.syncWildernessStateForMovedPlayer();
                 this.drainRunEnergy();
                 this.character.getAsPlayer().setOldPosition(oldPosition);
             }
@@ -482,6 +484,36 @@ export class MovementQueue {
             }
             player.getPacketSender().sendRunEnergy();
         }
+    }
+
+    private syncWildernessStateForMovedPlayer() {
+        const player = this.character as Player;
+        if (player.isPlayerBot?.() === true) {
+            return;
+        }
+
+        const location = player.getLocation();
+        const packetSender = player.getPacketSender();
+        const inWilderness = Wilderness.isInLocation(location);
+
+        if (inWilderness) {
+            const wildernessLevel = Wilderness.levelForY(location.getY());
+            const multiIcon = Wilderness.isMulti(location.getX(), location.getY()) ? 1 : 0;
+            const combatTag = multiIcon === 1 ? "@red@M@whi@" : "@gre@S@whi@";
+            player.setWildernessLevel(wildernessLevel);
+            player.setMultiIcon(multiIcon);
+            packetSender.sendInteractionOption("Attack", 2, true);
+            packetSender.sendWalkableInterface(197);
+            packetSender.sendString(`${combatTag} Lvl ${wildernessLevel}`, 199);
+            packetSender.sendMultiIcon(multiIcon);
+            return;
+        }
+
+        player.setWildernessLevel(0);
+        player.setMultiIcon(0);
+        packetSender.sendWalkableInterface(-1);
+        packetSender.sendInteractionOption("null", 2, true);
+        packetSender.sendMultiIcon(0);
     }
 
     public static runEnergyRestoreDelay(p: Player) {

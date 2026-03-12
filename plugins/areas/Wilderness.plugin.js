@@ -29,6 +29,12 @@ function readPlayerTile(player) {
   return { location, ...tile };
 }
 
+function formatWildernessLevelText(tile) {
+  const level = Wilderness.levelForY(tile.y);
+  const combatTag = Wilderness.isMulti(tile.x, tile.y) ? "@red@M@whi@" : "@gre@S@whi@";
+  return `${combatTag} Lvl ${level}`;
+}
+
 function refreshWildernessUi(player, tile, inWilderness) {
   if (!player || player?.isPlayerBot?.() === true || !tile) {
     return;
@@ -44,7 +50,7 @@ function refreshWildernessUi(player, tile, inWilderness) {
     if (player.getWildernessLevel() !== level) {
       player.setWildernessLevel(level);
     }
-    player.getPacketSender().sendString(`Level: ${level}`, 199);
+    player.getPacketSender().sendString(formatWildernessLevelText(tile), 199);
 
     const multiIcon = Wilderness.isMulti(tile.x, tile.y) ? 1 : 0;
     if (player.getMultiIcon() !== multiIcon) {
@@ -169,16 +175,18 @@ module.exports = {
         inWilderness,
       };
 
-      if (!isBot && inWilderness !== wasInWilderness) {
-        refreshWildernessUi(player, tile, inWilderness);
-      }
-
       if (inWilderness) {
+        if (!isBot) {
+          // Reassert wilderness UI while moving in wild; other interface/setup
+          // packets can clear the attack option or walkable interface after entry.
+          refreshWildernessUi(player, tile, true);
+        }
+
         const level = Wilderness.levelForY(tile.y);
         if (player.getWildernessLevel() !== level) {
           player.setWildernessLevel(level);
           if (!isBot) {
-          player.getPacketSender().sendString(`Level: ${level}`, 199);
+            player.getPacketSender().sendString(formatWildernessLevelText(tile), 199);
           }
         }
 
@@ -190,6 +198,10 @@ module.exports = {
           }
         }
       } else {
+        if (!isBot && wasInWilderness) {
+          refreshWildernessUi(player, tile, false);
+        }
+
         if (player.getWildernessLevel() !== 0) {
           player.setWildernessLevel(0);
         }

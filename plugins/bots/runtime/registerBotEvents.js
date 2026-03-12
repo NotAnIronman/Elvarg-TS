@@ -18,6 +18,10 @@ const {
   armRecruitFollowBack,
   recallRecruitedBot,
 } = require("./BotRecruitRuntime");
+const {
+  clearBotDeathLootPlan,
+  handleBotDeathItemDrop,
+} = require("./BotDeathLoot");
 
 const CLAN_ASSIST_DURATION_MS = 30000;
 
@@ -167,6 +171,10 @@ function registerBotEvents(options) {
     }
   });
 
+  api.onPlayerDeathItemDrop((event) => {
+    handleBotDeathItemDrop(event, runtime);
+  });
+
   api.onEstablishedPacket((event) => {
     const nowMs = Date.now();
     handleClanRecruitAssist({
@@ -238,6 +246,7 @@ function registerBotEvents(options) {
   }
 
   api.onPlayerDefeated((event) => {
+    clearBotDeathLootPlan(event?.victim);
     recallClanRecruitsOnOwnerDefeat({
       runtime,
       behaviorMode,

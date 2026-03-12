@@ -142,9 +142,13 @@ module.exports = {
         return true;
       }
 
-      const sub = (parts[1] || "once").toLowerCase();
-      const limitArg = parseIntArg(parts[2]);
-      const intervalArg = parseIntArg(parts[3]);
+      const firstArg = (parts[1] || "").toLowerCase();
+      const legacyLimitArg = parseIntArg(parts[1]);
+      const legacyIntervalArg = parseIntArg(parts[2]);
+      const usingLegacyNumericForm = legacyLimitArg !== null;
+      const sub = usingLegacyNumericForm ? "on" : firstArg || "once";
+      const limitArg = usingLegacyNumericForm ? legacyLimitArg : parseIntArg(parts[2]);
+      const intervalArg = usingLegacyNumericForm ? legacyIntervalArg : parseIntArg(parts[3]);
       const limit = limitArg && limitArg > 0 ? Math.min(limitArg, MAX_LIMIT) : DEFAULT_LIMIT;
       const intervalMs =
         intervalArg && intervalArg >= MIN_INTERVAL_MS

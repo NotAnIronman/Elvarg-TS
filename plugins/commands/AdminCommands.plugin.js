@@ -147,12 +147,44 @@ function commandTail(raw, parts) {
   return raw.substring(parts[0].length).trim();
 }
 
+function normalizePlayerCommandName(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().replace(/^\[+|\]+$/g, "");
+}
+
 function resolvePlayerByCommandTail(raw, parts) {
-  const targetName = commandTail(raw, parts);
+  const targetName = normalizePlayerCommandName(commandTail(raw, parts));
   if (!targetName) {
     return null;
   }
-  return World.getPlayerByName(targetName);
+  const exact = World.getPlayerByName(targetName);
+  if (exact) {
+    return exact;
+  }
+
+  const formatted = String(targetName).trim().toLowerCase();
+  let prefixMatch = null;
+  let prefixCount = 0;
+  World.getPlayers().forEach((player) => {
+    const username = player?.getUsername?.();
+    if (typeof username !== "string" || username.length === 0) {
+      return;
+    }
+    const candidate = username.toLowerCase();
+    if (candidate === formatted) {
+      prefixMatch = player;
+      prefixCount = 1;
+      return;
+    }
+    if (candidate.startsWith(formatted)) {
+      prefixMatch = player;
+      prefixCount++;
+    }
+  });
+
+  return prefixCount === 1 ? prefixMatch : null;
 }
 
 function ownerOrDev(player) {

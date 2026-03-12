@@ -1,20 +1,6 @@
 import { PacketExecutor } from "../PacketExecutor";
 import { Packet } from "../Packet";
 import { PluginManager } from "../../../plugins/PluginManager";
-// import { Player } from "../../../game/entity/impl/player/Player";
-// import { Barricades } from "../../../game/entity/impl/npc/impl/Barricades";
-// import { TeleportHandler } from "../../../game/model/teleportation/TeleportHandler";
-// import { TeleportTablets } from '../../../game/model/teleportation/TeleportTablets'
-// import { TeleportType } from "../../../game/model/teleportation/TeleportType";
-// import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
-// import { Animation } from "../../../game/model/Animation";
-// import { Task } from "../../../game/task/Task";
-// import { TaskManager } from "../../../game/task/TaskManager";
-// import { PacketConstants } from "../PacketConstants";
-// import { CombatSpecial } from "../../../game/content/combat/CombatSpecial";
-// import { ItemDefinition } from "../../../game/definition/ItemDefinition";
-// import { Gambling } from '../../../game/content/Gambiling'
-// import { GameConstants } from "../../../game/GameConstants";
 
 // class ItemActionTask extends Task{
 class ItemActionTask {
@@ -235,10 +221,6 @@ export class ItemActionPacketListener implements PacketExecutor {
 
     // Herblore
     // if (Herblore.cleanHerb(player, itemId)) {
-    //     return;
-    // }
-
-    // if (itemId == Barricades.ITEM_ID && Barricades.canSetup(player)) {
     //     return;
     // }
 

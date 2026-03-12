@@ -7,7 +7,6 @@ import { PendingHit } from "../../../content/combat/hit/PendingHit";
 import { CombatMethod } from "../../../content/combat/method/CombatMethod";
 import { NpcDefinition } from "../../../definition/NpcDefinition";
 import { CoordinateState, NPCMovementCoordinator } from "./NPCMovementCoordinator";
-import { Barricades } from "./impl/Barricades";
 import type { Player } from "../player/Player";
 import { FacingDirection } from "../../../model/FacingDirection";
 import { Direction } from "../../../model/Direction";
@@ -100,8 +99,6 @@ export class NPC extends Mobile {
     private visible: boolean = true;
     private face: FacingDirection = FacingDirection.SOUTH;
     private pet: boolean;
-    public barricadeFireTicks = 8;
-    public barricadeOnFire: boolean;
 
     constructor(id: number, position: Location) {
         super(position)
@@ -115,19 +112,6 @@ export class NPC extends Mobile {
         }
     }
     private static NPC_IMPLEMENTATION_MAP: Map<number, any>;
-
-    handleBarricadeTicks() {
-        if (this.barricadeOnFire && this.barricadeFireTicks > 0) {
-            this.barricadeFireTicks--;
-            if (this.barricadeFireTicks == 0) {
-                if (this.isBarricade()) {
-                    Barricades.checkTile(this.getLocation());
-                }
-                this.barricadeOnFire = false;
-                World.getRemoveNPCQueue().push(this);
-            }
-        }
-    }
 
     /**
      * Creates a new {@link NPC}.
@@ -252,7 +236,6 @@ export class NPC extends Mobile {
             }
 
             this.getCombat().process();
-            this.handleBarricadeTicks();
             AreaManager.process(this);
             if (this.getCombat().getLastAttack().hasElapsed(20000)
                 || this.movementCoordinator.getCoordinateState() == CoordinateState.RETREATING) {
@@ -435,10 +418,6 @@ export class NPC extends Mobile {
      */
     public getDefinition(): NpcDefinition {
         return NpcDefinition.forId(this.id);
-    }
-
-    public isBarricade(): boolean {
-        return [5722, 5723, 5724, 5725].some(n => this.getId() === n);
     }
 
     public getSpawnPosition(): Location {
