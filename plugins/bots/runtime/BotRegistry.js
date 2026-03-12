@@ -1,4 +1,6 @@
 const { getWildernessHotspot } = require("../behaviours/pvp/PvpAssignment");
+const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
+const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const {
   getEnabledWildernessHotspots,
   createHotspotAnchorLocation,
@@ -9,6 +11,8 @@ const {
 const {
   ATTR_BOT_PVP_PROFILE_ID,
 } = require("./BotRecruitConstants");
+
+const WILDERNESS_SPAWN_TILE_PROBE_LIMIT = 256;
 
 function createBotRegistry(options) {
   const {
@@ -312,8 +316,9 @@ function createBotRegistry(options) {
     for (let i = 1; i <= wildernessRoamerBotCount; i++) {
       const username = `WildernessBot${i}`;
       const assignedBounds = wildernessBounds[(i - 1) % wildernessBounds.length] ?? null;
+      const initialSpawnSeed = randomInRange(0, 1_000_000_000);
       const botSpawn =
-        createWildernessRoamerSpawn(spawn, assignedBounds, i - 1) ??
+        createWildernessRoamerSpawn(spawn, assignedBounds, initialSpawnSeed) ??
         spawnLocationForIndex(spawn, spawnOffsets, botCount + i - 1);
       const bot = createBotPlayer(username, botSpawn);
       if (!bot) {
@@ -461,13 +466,28 @@ function createBotRegistry(options) {
     }
     const width = maxX - minX + 1;
     const height = maxY - minY + 1;
+    const totalTiles = width * height;
+    if (totalTiles <= 0) {
+      return null;
+    }
     const seedBase =
       Math.imul(index + 1, 1103515245) ^
       Math.imul((bounds.id?.length ?? 7) + 37, 12345) ^
       Math.imul(minX + maxY + z, 2654435761);
-    const offsetX = Math.abs(seedBase) % width;
-    const offsetY = Math.abs(Math.imul(seedBase ^ 0x9e3779b9, 48271)) % height;
-    return baseSpawn.clone().setX(minX + offsetX).setY(minY + offsetY).setZ(z);
+    const startIndex = Math.abs(seedBase) % totalTiles;
+    const rawStep = Math.abs(Math.imul(seedBase ^ 0x9e3779b9, 48271)) % totalTiles;
+    const step = rawStep === 0 ? 1 : rawStep;
+    const attempts = Math.min(totalTiles, WILDERNESS_SPAWN_TILE_PROBE_LIMIT);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const tileIndex = (startIndex + attempt * step) % totalTiles;
+      const offsetX = tileIndex % width;
+      const offsetY = Math.floor(tileIndex / width);
+      const candidate = new Location(minX + offsetX, minY + offsetY, z);
+      if (!RegionManager.blocked(candidate, null)) {
+        return candidate;
+      }
+    }
+    return baseSpawn.clone().setX(minX).setY(minY).setZ(z);
   }
 
   function enableControllerForPlayer(player) {

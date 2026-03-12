@@ -1,4 +1,5 @@
 const { GameConstants } = require("../../../src/main/typescript/elvarg/game/GameConstants");
+const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
 const { PluginManager } = require("../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { TaskManager } = require("../../../src/main/typescript/elvarg/game/task/TaskManager");
@@ -57,6 +58,38 @@ const {
 const {
   applyGeneratedPvpLoadout,
 } = require("../behaviours/policies/PvpLoadoutPolicy");
+
+const WILDERNESS_RESPAWN_TILE_PROBE_LIMIT = 64;
+
+function chooseWalkableTileInBounds(roamBounds, fallbackLocation) {
+  if (
+    !roamBounds ||
+    !Number.isFinite(roamBounds.minX) ||
+    !Number.isFinite(roamBounds.maxX) ||
+    !Number.isFinite(roamBounds.minY) ||
+    !Number.isFinite(roamBounds.maxY)
+  ) {
+    return fallbackLocation ?? null;
+  }
+
+  const minX = Math.floor(roamBounds.minX);
+  const maxX = Math.floor(roamBounds.maxX);
+  const minY = Math.floor(roamBounds.minY);
+  const maxY = Math.floor(roamBounds.maxY);
+  const z = Math.floor(roamBounds.z ?? fallbackLocation?.getZ?.() ?? 0);
+  for (let attempt = 0; attempt < WILDERNESS_RESPAWN_TILE_PROBE_LIMIT; attempt += 1) {
+    const candidate = new Location(
+      randomInRange(minX, maxX),
+      randomInRange(minY, maxY),
+      z
+    );
+    if (!RegionManager.blocked(candidate, null)) {
+      return candidate;
+    }
+  }
+
+  return fallbackLocation ?? null;
+}
 
 function collectTrackedObjectIdsFromModes({ modeHandlers, api }) {
   const objectIds = new Set();
@@ -264,16 +297,12 @@ function bootPlayerBotsRuntime(options = {}) {
             }
           } else if (state.autonomy?.wildernessRoamerPvp === true) {
             const roamBounds = state?.roaming?.roamBounds ?? null;
-            if (
-              roamBounds &&
-              Number.isFinite(roamBounds.minX) &&
-              Number.isFinite(roamBounds.maxX) &&
-              Number.isFinite(roamBounds.minY) &&
-              Number.isFinite(roamBounds.maxY)
-            ) {
-              const x = randomInRange(roamBounds.minX, roamBounds.maxX);
-              const y = randomInRange(roamBounds.minY, roamBounds.maxY);
-              player.moveTo(new Location(x, y, roamBounds.z ?? 0));
+            const respawnTile = chooseWalkableTileInBounds(
+              roamBounds,
+              player.getLocation?.()?.clone?.() ?? null
+            );
+            if (respawnTile) {
+              player.moveTo(respawnTile);
             }
             const nextMetadata = buildRoamingPvpMetadata({
               config,

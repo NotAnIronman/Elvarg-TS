@@ -10,6 +10,15 @@ const { SecondsTimer } = require("../../src/main/typescript/elvarg/game/model/Se
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
+const {
+  getActiveBotRuntime,
+} = require("../bots/runtime/BotRuntimeRegistry");
+const {
+  releaseRecruitedBotToAutonomy,
+} = require("../bots/runtime/BotRecruitRuntime");
+const {
+  applyGeneratedPvpLoadout,
+} = require("../bots/behaviours/policies/PvpLoadoutPolicy");
 
 const FILE_DIRECTORY = path.join(process.cwd(), "data", "saves", "clans");
 const MAX_CLANS = 3000;
@@ -31,6 +40,41 @@ function rangeInclusive(start, end) {
     values.push(value);
   }
   return values;
+}
+
+function areClanFriendlyFireTargets(attacker, target) {
+  if (!attacker || !target || attacker === target) {
+    return false;
+  }
+  const attackerClan = attacker.getCurrentClanChat?.();
+  const targetClan = target.getCurrentClanChat?.();
+  return attackerClan != null && attackerClan === targetClan;
+}
+
+function isClanBotMember(player) {
+  return player?.isPlayerBot?.() === true;
+}
+
+function reloadClanBotLoadout(owner, bot) {
+  if (!owner || !bot || bot.isRegistered?.() !== true) {
+    return false;
+  }
+  const { runtime } = getActiveBotRuntime();
+  const botUsername = bot.getUsername?.();
+  const botState = botUsername ? runtime?.botStatesByName?.get?.(botUsername) ?? null : null;
+  if (!botState?.pvp) {
+    owner.getPacketSender?.().sendMessage?.("That bot does not have a PvP loadout to refresh.");
+    return true;
+  }
+  const applied = applyGeneratedPvpLoadout(bot, botState);
+  if (!applied) {
+    owner.getPacketSender?.().sendMessage?.("Failed to refresh that bot's loadout.");
+    return true;
+  }
+  owner
+    .getPacketSender?.()
+    .sendMessage?.(`Reloaded ${bot.getUsername?.()}'s loadout.`);
+  return true;
 }
 
 const CLAN_CHAT_BUTTON_IDS = [
@@ -638,6 +682,21 @@ class ClanChatManager {
 
       clan.addBannedName(member.getUsername());
       this.leave(member, true);
+      if (member.isPlayerBot?.() === true) {
+        const { runtime, behaviorMode } = getActiveBotRuntime();
+        const memberUsername = member.getUsername?.();
+        const botState = memberUsername
+          ? runtime?.botStatesByName?.get?.(memberUsername) ?? null
+          : null;
+        if (botState) {
+          releaseRecruitedBotToAutonomy(
+            member,
+            botState,
+            behaviorMode,
+            Date.now()
+          );
+        }
+      }
       this.sendChatMessage(
         clan,
         `<col=16777215>[<col=255>${clan.getName()}<col=16777215>]<col=3300CC> ${member.getUsername()} has been kicked from the channel by ${player.getUsername()}.`
@@ -825,6 +884,17 @@ class ClanChatManager {
     }
 
     if (clan && target && target !== player.username) {
+      const targetPlayer = World.getPlayerByName(target);
+      if (targetPlayer?.isPlayerBot?.() === true) {
+        if (menuId === 0) {
+          return reloadClanBotLoadout(player, targetPlayer);
+        }
+        if (menuId >= 1 && menuId <= 6) {
+          player.getPacketSender().sendMessage("Bot clan members cannot be promoted or demoted.");
+          return true;
+        }
+      }
+
       if (menuId >= 0 && menuId <= 5) {
         const rank = ClanChatRank.forMenuId(menuId);
         const targetRank = clan.getRank(target);
@@ -1115,6 +1185,20 @@ module.exports = {
 
     api.onPlayerLogout(({ player }) => {
       ClanChatManager.leave(player, false);
+    });
+
+    api.onCanAttack((event) => {
+      if (event.allow !== null) {
+        return;
+      }
+      const { attacker, target } = event;
+      if (!areClanFriendlyFireTargets(attacker, target)) {
+        return;
+      }
+      attacker
+        ?.getPacketSender?.()
+        ?.sendMessage?.("You cannot attack a player who is in your clan chat.");
+      event.allow = false;
     });
 
     const syncClanRankState = ({ player, other }) => {

@@ -56,6 +56,15 @@ function isActiveClanRecruit(owner, bot) {
   return ownerClan != null && bot.getCurrentClanChat?.() === ownerClan;
 }
 
+function sharesClanChat(left, right) {
+  if (!left || !right || left === right) {
+    return false;
+  }
+  const leftClan = left.getCurrentClanChat?.();
+  const rightClan = right.getCurrentClanChat?.();
+  return leftClan != null && leftClan === rightClan;
+}
+
 function handleClanRecruitAssist({ runtime, behaviorMode, player, packet, nowMs }) {
   if (!runtime || !behaviorMode || !player || player.isPlayerBot?.() === true) {
     return;
@@ -63,6 +72,9 @@ function handleClanRecruitAssist({ runtime, behaviorMode, player, packet, nowMs 
 
   const target = resolveAttackedPlayer(packet);
   if (!target || target === player || target.isRegistered?.() !== true) {
+    return;
+  }
+  if (sharesClanChat(player, target)) {
     return;
   }
 

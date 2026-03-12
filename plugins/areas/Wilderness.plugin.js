@@ -29,6 +29,15 @@ function readPlayerTile(player) {
   return { location, ...tile };
 }
 
+function shareClanChat(attacker, target) {
+  if (!attacker || !target || attacker === target) {
+    return false;
+  }
+  const attackerClan = attacker.getCurrentClanChat?.();
+  const targetClan = target.getCurrentClanChat?.();
+  return attackerClan != null && attackerClan === targetClan;
+}
+
 function formatWildernessLevelText(tile) {
   const level = Wilderness.levelForY(tile.y);
   const combatTag = Wilderness.isMulti(tile.x, tile.y) ? "@red@M@whi@" : "@gre@S@whi@";
@@ -265,6 +274,13 @@ module.exports = {
       }
       const { attacker, target } = event;
       if (!attacker?.isPlayer?.() || !target?.isPlayer?.()) {
+        return;
+      }
+      if (shareClanChat(attacker, target)) {
+        attacker
+          .getPacketSender?.()
+          .sendMessage?.("You cannot attack a player who is in your clan chat.");
+        event.allow = false;
         return;
       }
       const attackerLevel = attacker?.getWildernessLevel?.() | 0;
