@@ -33,6 +33,26 @@ const CLAN_CHAT_MEMBER_BUTTON_START = 37144;
 const CLAN_CHAT_MEMBER_BUTTON_END = 37243;
 const CLAN_CHAT_FRIEND_BUTTON_START = 38752;
 const CLAN_CHAT_FRIEND_BUTTON_END = 38951;
+const CLAN_CHAT_MEMBER_DEFAULT_ACTIONS = Object.freeze([
+  "Promote to Recruit",
+  "Promote to Corporal",
+  "Promote to Sergeant",
+  "Promote to Lieutenant",
+  "Promote to Captain",
+  "Promote to General",
+  "Demote",
+  "Kick",
+]);
+const CLAN_CHAT_BOT_MEMBER_ACTIONS = Object.freeze([
+  "Re-loadout",
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  "Kick",
+]);
 
 function rangeInclusive(start, end) {
   const values = [];
@@ -66,6 +86,7 @@ function reloadClanBotLoadout(owner, bot) {
     owner.getPacketSender?.().sendMessage?.("That bot does not have a PvP loadout to refresh.");
     return true;
   }
+  botState.pvp.generatedArchetypeId = null;
   const applied = applyGeneratedPvpLoadout(bot, botState);
   if (!applied) {
     owner.getPacketSender?.().sendMessage?.("Failed to refresh that bot's loadout.");
@@ -460,7 +481,16 @@ class ClanChatManager {
         const rank = clan.getPlayerRank(other);
         const image = rank ? rank.getSpriteId() : -1;
         const prefix = image !== -1 ? `<img=${image}>` : "";
-        member.getPacketSender().sendString(`${prefix}${other.getUsername()}`, childId++);
+        member.getPacketSender().sendString(`${prefix}${other.getUsername()}`, childId);
+        member
+          .getPacketSender()
+          .sendInterfaceActions(
+            childId,
+            isClanBotMember(other)
+              ? CLAN_CHAT_BOT_MEMBER_ACTIONS
+              : CLAN_CHAT_MEMBER_DEFAULT_ACTIONS
+          );
+        childId += 1;
       }
       member.getPacketSender().clearInterfaceText(childId, CLAN_CHAT_MEMBER_BUTTON_END);
 

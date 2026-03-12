@@ -696,6 +696,20 @@ export class PacketSender {
     return this;
   }
 
+  public sendInterfaceActions(
+    id: number,
+    actions: Array<string | null | undefined>
+  ): PacketSender {
+    const out = new PacketBuilder(125, PacketType.VARIABLE);
+    out.putInt(id);
+    out.put(Math.max(0, Math.min(255, actions?.length ?? 0)));
+    for (const action of actions ?? []) {
+      out.putString(String(action ?? ""));
+    }
+    this.player.getSession().write(out);
+    return this;
+  }
+
   public clearInterfaceText(start: number, end: number): PacketSender {
     for (let i = start; i <= end; i++) {
       this.player.getFrameUpdater().interfaceTextMap.remove(i);
