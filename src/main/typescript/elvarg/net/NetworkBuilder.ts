@@ -1377,8 +1377,9 @@ class LoginSession {
 
 export class NetworkBuilder {
   public initialize(port: number): void {
-    const wss = new WebSocketServer({ port, host: "127.0.0.1" });
+    const host = process.env.HOST || process.env.BIND_HOST || "0.0.0.0";
+    const wss = new WebSocketServer({ port, host });
     wss.on("connection", (socket) => new LoginSession(socket));
-    console.log(`WebSocket login server started on port ${port}`);
+    console.log(`WebSocket login server started on ${host}:${port}`);
   }
 }
