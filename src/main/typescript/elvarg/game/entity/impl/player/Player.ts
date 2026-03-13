@@ -135,7 +135,7 @@ export class Player extends Mobile {
     private skillAnimation: number;
     private drainingPrayer = false;
     private prayerPointDrain = 0;
-    private spellbook: MagicSpellbook;
+    private spellbook: MagicSpellbook = MagicSpellbook.NORMAL;
     private destroyItem = -1;
     private updateInventory: boolean; // Updates inventory on next tick
     private newPlayer: boolean;
