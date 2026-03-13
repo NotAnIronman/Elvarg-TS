@@ -50,15 +50,23 @@ function buildWeightTable(source, fallbackValues) {
     .filter((value) => value != null);
 }
 
-function resolveProfileId(isFullTimePvp, config) {
+function resolveProfileId(config) {
   const fallbackIds = listPvpProfiles().map((profile) => profile.id);
-  const source = isFullTimePvp
-    ? config?.pvp?.fullTimeProfileWeights
-    : config?.pvp?.profileWeights;
+  const source = config?.pvp?.profileWeights;
   return (
     weightedPick(buildWeightTable(source, fallbackIds)) ??
-    (isFullTimePvp ? "veteran" : "standard")
+    "standard"
   );
+}
+
+function resolveHotspotProfileId(config, hotspotId) {
+  const hotspot = hotspotId ? getWildernessHotspot(hotspotId) : null;
+  const allowedProfiles = Array.isArray(hotspot?.allowedProfiles) && hotspot.allowedProfiles.length > 0
+    ? hotspot.allowedProfiles
+    : listPvpProfiles().map((profile) => profile.id);
+  const configured = buildWeightTable(config?.pvp?.profileWeights, allowedProfiles)
+    .filter((entry) => allowedProfiles.includes(entry.value));
+  return weightedPick(configured.length > 0 ? configured : allowedProfiles) ?? allowedProfiles[0] ?? "standard";
 }
 
 function resolveHotspotId(config, profileId) {
@@ -129,40 +137,11 @@ function resolveAlternativeLoadoutId(config, hotspotId, currentLoadoutId) {
   return weightedPick(filtered.length > 0 ? filtered : configured) ?? currentLoadoutId ?? fallbackIds[0];
 }
 
-function buildAssignedPvpMetadata({
-  isFullTimePvp = false,
-  config = {},
-  forcedHotspotId = null,
-} = {}) {
-  const profileId = resolveProfileId(isFullTimePvp, config);
-  const hotspotId =
-    typeof forcedHotspotId === "string" && forcedHotspotId.length > 0
-      ? forcedHotspotId
-      : resolveHotspotId(config, profileId);
-  const loadoutId = resolveLoadoutId(config, hotspotId);
-  const profile = getPvpProfile(profileId);
-  return {
-    profileId: profile.id,
-    loadoutId,
-    hotspotId,
-    engagementStyle: hotspotId ? "hotspot" : "roaming",
-    preferredCombatStyle:
-    getPvpLoadout(loadoutId).tags.includes("hybrid")
-      ? "hybrid"
-      : getPvpLoadout(loadoutId).tags.includes("range")
-      ? "range"
-      : "melee",
-    escapeThreshold: profile.retreatHpRatio,
-    riskTolerance: profile.riskTolerance,
-    confidenceTier: profile.confidenceTier,
-  };
-}
-
 function buildRoamingPvpMetadata({
   config = {},
   excludeF2p = true,
 } = {}) {
-  const profileId = resolveProfileId(false, config);
+  const profileId = resolveProfileId(config);
   const loadoutId = resolveRoamingLoadoutId(config, { excludeF2p });
   const profile = getPvpProfile(profileId);
   return {
@@ -182,6 +161,30 @@ function buildRoamingPvpMetadata({
   };
 }
 
+function buildHotspotPvpMetadata({
+  config = {},
+  hotspotId = null,
+} = {}) {
+  const profileId = resolveHotspotProfileId(config, hotspotId);
+  const loadoutId = resolveLoadoutId(config, hotspotId);
+  const profile = getPvpProfile(profileId);
+  return {
+    profileId: profile.id,
+    loadoutId,
+    hotspotId,
+    engagementStyle: hotspotId ? "hotspot" : "roaming",
+    preferredCombatStyle:
+      getPvpLoadout(loadoutId).tags.includes("hybrid")
+        ? "hybrid"
+        : getPvpLoadout(loadoutId).tags.includes("range")
+        ? "range"
+        : "melee",
+    escapeThreshold: profile.retreatHpRatio,
+    riskTolerance: profile.riskTolerance,
+    confidenceTier: profile.confidenceTier,
+  };
+}
+
 function assignPvpMetadata(state, options = {}) {
   if (!state?.pvp) {
     return state;
@@ -189,7 +192,7 @@ function assignPvpMetadata(state, options = {}) {
   const metadata =
     options?.metadata && typeof options.metadata === "object"
       ? options.metadata
-      : buildAssignedPvpMetadata(options);
+      : buildRoamingPvpMetadata(options);
   state.pvp.profileId = metadata.profileId;
   state.pvp.loadoutId = metadata.loadoutId;
   state.pvp.hotspotId = metadata.hotspotId;
@@ -203,7 +206,7 @@ function assignPvpMetadata(state, options = {}) {
 
 module.exports = {
   assignPvpMetadata,
-  buildAssignedPvpMetadata,
+  buildHotspotPvpMetadata,
   buildRoamingPvpMetadata,
   getPvpLoadout,
   getPvpProfile,

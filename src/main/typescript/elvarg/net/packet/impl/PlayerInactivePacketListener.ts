@@ -3,10 +3,12 @@ import { Packet } from "../Packet";
 import { PacketExecutor } from "../PacketExecutor";
 
 export class PlayerInactivePacketListener implements PacketExecutor {
-  // execute(player: Player, packet: Packet) {
-  //     //CALLED EVERY 3 MINUTES OF INACTIVITY
-  // }
   execute(player: any, packet: Packet) {
-    //CALLED EVERY 3 MINUTES OF INACTIVITY
+    if (!player || player.getHitpoints?.() <= 0) {
+      return;
+    }
+    if (player.canLogout?.()) {
+      player.requestLogout?.();
+    }
   }
 }

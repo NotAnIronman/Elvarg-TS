@@ -22,6 +22,8 @@ import { GameSyncTask } from './entity/updating/sync/GameSyncTask';
 import { PluginManager } from '../plugins/PluginManager';
 import { ServerPerf } from '../util/ServerPerf';
 
+const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
+
 interface GameSyncTaskInterface {
     isParallel: boolean;
     isPlayerTask: boolean;
@@ -40,7 +42,7 @@ export class World {
     private static readonly BOT_PROCESS_LOD_FAR_STRIDE = 12;
     private static readonly UPDATE_BUCKET_RADIUS = 2;
     private static readonly PLAYER_UPDATE_BUCKET_COMPARE_ENABLED =
-        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "1") === "1";
+        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "0") === "1";
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
@@ -173,6 +175,9 @@ export class World {
         let failed = 0;
         this.players.forEach(player => {
             if (!player) {
+                return;
+            }
+            if (player.getAttribute?.(ATTR_SKIP_PERSISTENCE) === true) {
                 return;
             }
             try {
@@ -574,7 +579,7 @@ export class World {
 
     public savePlayers() {
         World.players.forEach((p) => {
-            if (p) {
+            if (p && p.getAttribute?.(ATTR_SKIP_PERSISTENCE) !== true) {
                 GameConstants.PLAYER_PERSISTENCE.save(p);
             }
         });

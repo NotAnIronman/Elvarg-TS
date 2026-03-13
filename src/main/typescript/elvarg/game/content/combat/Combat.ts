@@ -30,6 +30,7 @@ export class Combat {
     public ammunition: Ammunition;
     private target: Mobile;
     private attacker: Mobile;
+    private graniteMaulSpecialQueued = false;
     private method: CombatMethod;
     private cachedResolvedMethod: CombatMethod | null = null;
     private cachedResolvedMethodCycle = -1;
@@ -168,10 +169,10 @@ export class Combat {
         return this.target != null || this.attacker != null || this.hitQueue.hasPendingWork();
     }
 
-    public performNewAttack(instant: boolean) {
+    public performNewAttack(instant: boolean): boolean {
         if (this.target == null || (this.character != null && this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack())) {
             // Don't process attacks for NPC's who don't fight back
-            return;
+            return false;
         }
         this.character.setCombatFollowing(this.target);
 
@@ -188,11 +189,11 @@ export class Combat {
 
         if (!instant && this.character.getTimers().has(TimerKey.COMBAT_ATTACK)) {
             if (!this.character.isPlayer()) {
-                return;
+                return false;
             }
             const player = this.character.getAsPlayer();
             if (!player.isSpecialActivated() || player.getCombatSpecial() !== CombatSpecial.GRANITE_MAUL) {
-                return;
+                return false;
             }
         }
 
@@ -215,17 +216,17 @@ export class Combat {
             () => this.resolveCanReachForCurrentCycle(this.method, target)
         )) {
             // Make sure the character is within reach before processing combat
-            return;
+            return false;
         }
         if (this.target !== target || target == null) {
-            return;
+            return false;
         }
 
         if (!ServerPerf.measurePhase(
             "combat.process.can_attack.valid_target",
             () => CombatFactory.validTarget(this.character, target)
         )) {
-            return;
+            return false;
         }
 
         switch (ServerPerf.measurePhase(
@@ -249,7 +250,7 @@ export class Combat {
                     this.method.hits(this.character, this.target)
                 );
                 if (hits == null)
-                    return;
+                    return false;
                 for (let hit of hits) {
                     CombatFactory.addPendingHit(hit);
                 }
@@ -270,27 +271,28 @@ export class Combat {
                         CombatSpecial.updateBar(p);
                     }
                 }
-                break;
+                this.setGraniteMaulSpecialQueued(false);
+                return true;
             }
             case CanAttackResponse.ALREADY_UNDER_ATTACK: {
                 if (this.character.isPlayer()) {
                     this.character.getAsPlayer().getPacketSender().sendMessage("You are already under attack!");
                 }
                 this.character.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.CANT_ATTACK_IN_AREA: {
                 this.character.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED: {
-                break;
+                return false;
             }
             case CanAttackResponse.LEVEL_DIFFERENCE_TOO_GREAT: {
                 this.character.getAsPlayer().getPacketSender().sendMessage("Your level difference is too great.");
                 this.character.getAsPlayer().getPacketSender().sendMessage("You need to move deeper into the Wilderness.");
                 this.character.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY: {
                 let p = this.character.getAsPlayer();
@@ -298,64 +300,74 @@ export class Combat {
                 p.setSpecialActivated(false);
                 CombatSpecial.updateBar(this.character.getAsPlayer());
                 p.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.STUNNED: {
                 let p = this.character.getAsPlayer();
                 p.getPacketSender().sendMessage("You're currently stunned and cannot attack.");
                 p.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.DUEL_NOT_STARTED_YET: {
                 let p = this.character.getAsPlayer();
                 p.getPacketSender().sendMessage("The duel has not started yet!");
                 p.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.DUEL_WRONG_OPPONENT: {
                 let p = this.character.getAsPlayer();
                 p.getPacketSender().sendMessage("This is not your opponent!");
                 p.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.DUEL_MELEE_DISABLED: {
                 let p = this.character.getAsPlayer();
                 StatementDialogue.send(p, "Melee has been disabled in this duel!");
                 p.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.DUEL_RANGED_DISABLED: {
                 let p = this.character.getAsPlayer();
                 StatementDialogue.send(p, "Ranged has been disabled in this duel!");
                 p.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.DUEL_MAGIC_DISABLED: {
                 let p = this.character.getAsPlayer();
                 StatementDialogue.send(p, "Magic has been disabled in this duel!");
                 p.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.TARGET_IS_IMMUNE: {
                 if (this.character.isPlayer()) {
     (this.character as Player).getPacketSender().sendMessage("This npc is currently immune to attacks.");
 }
                 this.character.getCombat().reset();
-                break;
+                return false;
             }
             case CanAttackResponse.INVALID_TARGET: {
                 this.character.getCombat().reset();
-                break;
+                return false;
             }
         }
+        return false;
     }
 
     public reset() {
         this.setTarget(null);
         this.character.setCombatFollowing(null);
         this.character.setMobileInteraction(null);
+        this.setGraniteMaulSpecialQueued(false);
         this.invalidateResolvedMethodCache();
         this.invalidateCanReachCache();
+    }
+
+    public isGraniteMaulSpecialQueued(): boolean {
+        return this.graniteMaulSpecialQueued;
+    }
+
+    public setGraniteMaulSpecialQueued(queued: boolean): void {
+        this.graniteMaulSpecialQueued = queued;
     }
     /**
 * Adds damage to the damage map, as long as the argued amount of damage is

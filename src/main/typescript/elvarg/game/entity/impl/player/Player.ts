@@ -61,6 +61,8 @@ import { World } from "../../../World";
 import { PluginManager } from "../../../../plugins/PluginManager";
 import { ServerPerf } from "../../../../util/ServerPerf";
 
+const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
+
 export class Player extends Mobile {
     private static readonly MAX_PLAYER_PRESETS = 10;
     getSize(): number {
@@ -621,7 +623,9 @@ export class Player extends Mobile {
 
     onLogout() {
         // Notify us
-        console.log("[World] Deregistering player - [username, host] : [" + this.getUsername() + ", " + this.getHostAddress() + "]");
+        if (!this.isPlayerBot()) {
+            console.log("[World] Deregistering player - [username, host] : [" + this.getUsername() + ", " + this.getHostAddress() + "]");
+        }
 
         this.getPacketSender().sendInterfaceRemoval();
 
@@ -638,7 +642,9 @@ export class Player extends Mobile {
         this.getRelations().updateLists(false);
         BountyHunter.unassign(this);
         TaskManager.cancelTasks(this);
-        GameConstants.PLAYER_PERSISTENCE.save(this);
+        if (this.getAttribute?.(ATTR_SKIP_PERSISTENCE) !== true) {
+            GameConstants.PLAYER_PERSISTENCE.save(this);
+        }
 
         const ch: any = this.getSession()?.getChannel();
         if (ch && ch.connected) {
@@ -652,7 +658,9 @@ export class Player extends Mobile {
     */
     public onLogin() {
         // Attempt to register the player..
-        console.log("[World] Registering player - [username, host] : [" + this.getUsername() + ", " + this.getHostAddress() + "]");
+        if (!this.isPlayerBot()) {
+            console.log("[World] Registering player - [username, host] : [" + this.getUsername() + ", " + this.getHostAddress() + "]");
+        }
 
         // Minimal bring-up until the opcode stream is fully aligned.
         this.setNeedsPlacement(true);

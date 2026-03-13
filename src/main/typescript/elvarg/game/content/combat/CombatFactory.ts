@@ -502,6 +502,9 @@ export class CombatFactory {
                     const special = getPlayerCombatSpecial(player);
 
                     if (player.isSpecialActivated() && special != null) {
+                        if (special === CombatSpecial.GRANITE_MAUL && player.getCombat().isGraniteMaulSpecialQueued()) {
+                            return CanAttackResponse.CAN_ATTACK;
+                        }
                         if (player.getSpecialPercentage() < special.getDrainAmount()) {
                             return CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY;
                         }

@@ -5,7 +5,7 @@ const {
   setModePvp,
 } = require("../state/PlayerBotState");
 
-const FULL_TIME_PVP_REACTION_DURATION_MS = 30000;
+const PERSISTENT_PVP_REACTION_DURATION_MS = 30000;
 
 function clampChance(value, fallback = 0.5) {
   const numeric = Number(value);
@@ -128,7 +128,6 @@ function handlePlayerAttackReaction({
   }
 
   if (
-    state?.autonomy?.fullTimePvp === true ||
     state?.autonomy?.wildernessRoamerPvp === true ||
     state?.autonomy?.persistentPvpLoadout === true
   ) {
@@ -138,7 +137,7 @@ function handlePlayerAttackReaction({
         state,
         attacker,
         nowMs,
-        FULL_TIME_PVP_REACTION_DURATION_MS,
+        PERSISTENT_PVP_REACTION_DURATION_MS,
         behaviorMode,
         { allowInCombatTransition: true }
       );
@@ -147,13 +146,13 @@ function handlePlayerAttackReaction({
       state.pvp.targetPlayer = attacker;
       state.pvp.endsAt = Math.max(
         Number(state.pvp.endsAt ?? 0),
-        nowMs + FULL_TIME_PVP_REACTION_DURATION_MS
+        nowMs + PERSISTENT_PVP_REACTION_DURATION_MS
       );
       state.pvp.nextActionAt = nowMs;
     }
 
     retaliateAgainstAttacker(bot, attacker, attackerIsPlayerBot, true);
-    api?.log?.("full_time_pvp_reaction", {
+    api?.log?.("persistent_pvp_reaction", {
       bot: bot.getUsername?.() ?? null,
       attacker: attacker.getUsername?.() ?? null,
       attackerIsPlayerBot: attackerIsPlayerBot === true,

@@ -225,8 +225,32 @@ function loadoutToPreset(name, player) {
   );
 }
 
+function getSpellbookDisplayName(spellbook) {
+  const MagicSpellbook =
+    require("../../src/main/typescript/elvarg/game/model/MagicSpellbook").MagicSpellbook;
+  if (spellbook === MagicSpellbook.ANCIENT) {
+    return "Ancient";
+  }
+  if (spellbook === MagicSpellbook.LUNAR) {
+    return "Lunar";
+  }
+  if (spellbook === MagicSpellbook.NORMAL) {
+    return "Normal";
+  }
+  return "Normal";
+}
+
+function isPresetBlockedInWilderness(player) {
+  return Wilderness.isIn(player) && !isPlayerBot(player) && player.getRights() !== PlayerRights.DEVELOPER;
+}
+
 function openPresetInterface(player, preset = null) {
   if (!player) {
+    return false;
+  }
+
+  if (isPresetBlockedInWilderness(player)) {
+    player.getPacketSender().sendMessage("You can't open presets in the wilderness!");
     return false;
   }
 
@@ -243,7 +267,7 @@ function openPresetInterface(player, preset = null) {
     sender.sendString(String(selected.getStats()?.[4] ?? ""), 45011); // Ranged
     sender.sendString(String(selected.getStats()?.[5] ?? ""), 45012); // Prayer
     sender.sendString(String(selected.getStats()?.[6] ?? ""), 45013); // Magic
-    sender.sendString(`@yel@${String(selected.getSpellbook()).toLowerCase()}`, 45014);
+    sender.sendString(`@yel@${getSpellbookDisplayName(selected.getSpellbook())}`, 45014);
   } else {
     sender.sendString("Presets", 45002);
     for (let i = 0; i <= 6; i++) {
@@ -305,11 +329,9 @@ function applyPreset(player, preset) {
 
   sender.sendInterfaceRemoval();
 
-  if (Wilderness.isIn(player)) {
-    if (!isPlayerBot(player) && player.getRights() !== PlayerRights.DEVELOPER) {
-      sender.sendMessage("You can't load a preset in the wilderness!");
-      return false;
-    }
+  if (isPresetBlockedInWilderness(player)) {
+    sender.sendMessage("You can't load a preset in the wilderness!");
+    return false;
   }
 
   if (player.getDueling().inDuel()) {

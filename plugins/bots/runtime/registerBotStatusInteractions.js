@@ -19,6 +19,9 @@ const {
   PlayerOptionPacketListener,
 } = require("../../../src/main/typescript/elvarg/net/packet/impl/PlayerOptionPacketListener");
 const {
+  PlayerRights,
+} = require("../../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
+const {
   recallRecruitedBot,
 } = require("./BotRecruitRuntime");
 
@@ -110,7 +113,9 @@ function registerBotStatusInteractions(options = {}) {
       recallRecruitedBot(member, owner, botState, behaviorMode);
     }
   };
-  const shouldShowRecruitOption = (player) => !!getOwnedClan(player);
+  const shouldShowRecruitOption = (player) => player?.isPlayerBot?.() !== true;
+  const shouldShowStatusOption = (player) =>
+    player?.isPlayerBot?.() !== true && player?.getRights?.() === PlayerRights.DEVELOPER;
   const syncInteractionOptions = (player, force = false) => {
     if (player?.isPlayerBot?.() === true) {
       return;
@@ -129,7 +134,11 @@ function registerBotStatusInteractions(options = {}) {
       player.setAttribute?.(ATTR_RECRUIT_OPTION_VISIBLE, visible);
     }
     if (force) {
-      sender.sendInteractionOption?.(statusOptionLabel, statusInteractionSlot, false);
+      sender.sendInteractionOption?.(
+        shouldShowStatusOption(player) ? statusOptionLabel : "null",
+        statusInteractionSlot,
+        false
+      );
     }
   };
   const recruitBot = (owner, bot) => {

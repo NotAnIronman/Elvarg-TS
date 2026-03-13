@@ -347,6 +347,13 @@ function getPetDisplayName(pet) {
 }
 
 function normalizeSkillName(skill) {
+  const skillName =
+    skill?.getName?.() ??
+    skill?.name ??
+    (typeof skill === "number" && typeof Skill?.[skill] === "string" ? Skill[skill] : null);
+  if (typeof skillName === "string" && skillName.length > 0) {
+    return skillName.toLowerCase().replace(/_/g, " ");
+  }
   if (typeof skill === "number" && typeof Skill?.[skill] === "string") {
     return Skill[skill].toLowerCase().replace(/_/g, " ");
   }

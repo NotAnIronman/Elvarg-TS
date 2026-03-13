@@ -16,6 +16,9 @@ const {
   getRecruitReturnDelayMs,
 } = require("./BotRecruitConstants");
 const {
+  ATTR_SKIP_PERSISTENCE,
+} = require("./BotPersistenceConstants");
+const {
   setModePvp,
 } = require("../behaviours/state/PlayerBotState");
 const {
@@ -185,7 +188,11 @@ function registerBotEvents(options) {
   } = options;
 
   api.onPlayerDisconnect(({ player, username }) => {
-    if (player && player.isPlayerBot?.()) {
+    if (
+      player &&
+      player.isPlayerBot?.() &&
+      player.getAttribute?.(ATTR_SKIP_PERSISTENCE) !== true
+    ) {
       try {
         playerPersistence.save(player);
       } catch (err) {

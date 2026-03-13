@@ -3,6 +3,12 @@
     "id": 0,
     "name": "General Store",
     "originalStock": [
+      { "id": 590, "amount": 2000000000 },
+      { "id": 1351, "amount": 2000000000 },
+      { "id": 1265, "amount": 2000000000 },
+      { "id": 946, "amount": 2000000000 },
+      { "id": 2347, "amount": 2000000000 },
+      { "id": 1755, "amount": 2000000000 }
     ]
   },
   {

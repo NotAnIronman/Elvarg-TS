@@ -591,12 +591,12 @@ class BotBehaviorTask extends Task {
   }
 
   isFullTimePvpBot(state) {
-    return state?.autonomy?.fullTimePvp === true;
+    return false;
   }
 
   isPersistentPvpBot(state) {
     return (
-      state?.autonomy?.fullTimePvp === true ||
+      state?.autonomy?.wildernessRoamerPvp === true ||
       state?.autonomy?.persistentPvpLoadout === true
     );
   }

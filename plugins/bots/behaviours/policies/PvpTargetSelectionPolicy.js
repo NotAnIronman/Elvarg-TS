@@ -53,8 +53,7 @@ function pickPvpOpponent({
   }
 
   const sourceHotspotId = sourceState?.pvp?.hotspotId ?? null;
-  const requireSameHotspot =
-    sourceEntry?.state?.autonomy?.fullTimePvp === true && sourceHotspotId != null;
+  const requireSameHotspot = false;
 
   const candidates = [];
   for (const other of entries) {

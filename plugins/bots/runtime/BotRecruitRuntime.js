@@ -130,7 +130,6 @@ function releaseRecruitedBotToAutonomy(
     botState.pvp.endsAt = 0;
     botState.pvp.nextActionAt = nowMs;
     if (
-      botState.autonomy?.fullTimePvp === true ||
       botState.autonomy?.wildernessRoamerPvp === true ||
       botState.autonomy?.persistentPvpLoadout === true
     ) {

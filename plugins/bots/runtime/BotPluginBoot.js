@@ -46,14 +46,11 @@ const { listPvpProfiles } = require("../behaviours/pvp/PvpProfileRegistry");
 const { listPvpLoadouts } = require("../behaviours/pvp/PvpLoadoutRegistry");
 const {
   listWildernessHotspots,
-  createHotspotAnchorLocation,
 } = require("../behaviours/pvp/WildernessHotspotRegistry");
 const { assignPvpMetadata } = require("../behaviours/pvp/PvpAssignment");
 const {
-  buildAssignedPvpMetadata,
+  buildHotspotPvpMetadata,
   buildRoamingPvpMetadata,
-  getWildernessHotspot,
-  resolveAlternativeLoadoutId,
 } = require("../behaviours/pvp/PvpAssignment");
 const {
   applyGeneratedPvpLoadout,
@@ -279,23 +276,7 @@ function bootPlayerBotsRuntime(options = {}) {
           if (!player || !state?.pvp) {
             return false;
           }
-          if (state.autonomy?.fullTimePvp === true) {
-            const hotspotId = state.pvp.hotspotId ?? null;
-            const hotspot = hotspotId ? getWildernessHotspot(hotspotId) : null;
-            const hotspotLocation = hotspot ? createHotspotAnchorLocation(hotspot) : null;
-            if (hotspotLocation) {
-              player.moveTo(hotspotLocation);
-            }
-
-            const nextLoadoutId = resolveAlternativeLoadoutId(
-              config,
-              hotspotId,
-              state.pvp.loadoutId ?? null
-            );
-            if (nextLoadoutId) {
-              state.pvp.loadoutId = nextLoadoutId;
-            }
-          } else if (state.autonomy?.wildernessRoamerPvp === true) {
+          if (state.autonomy?.wildernessRoamerPvp === true) {
             const roamBounds = state?.roaming?.roamBounds ?? null;
             const respawnTile = chooseWalkableTileInBounds(
               roamBounds,
@@ -340,7 +321,6 @@ function bootPlayerBotsRuntime(options = {}) {
   runtime = createBotRegistry({
     botApi,
     botCount: config.botCount,
-    fullTimePvpBotCount: config.fullTimePvpBotCount,
     wildernessRoamerBotCount: config.wildernessRoamerBotCount,
     botBaseCooldownMs: config.botBaseCooldownMs,
     spawn,
@@ -349,8 +329,8 @@ function bootPlayerBotsRuntime(options = {}) {
     createBotPlayer,
     spawnLocationForIndex,
     createInitialState,
-    buildAssignedPvpMetadata: (meta) =>
-      buildAssignedPvpMetadata({
+    buildHotspotPvpMetadata: (meta) =>
+      buildHotspotPvpMetadata({
         ...meta,
         config,
       }),
@@ -376,6 +356,9 @@ function bootPlayerBotsRuntime(options = {}) {
     resetMovementState,
     clearFollowState,
     randomInRange,
+    startupLogger: (summary) => {
+      api?.log?.("bot_startup_spawned", summary);
+    },
     botStatesByName,
     botmeUsernames,
     playerBotUsernames,

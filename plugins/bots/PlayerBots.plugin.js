@@ -68,9 +68,8 @@ const BOT_TREE_OPTIONS = Object.freeze({
 
 const BOT_CONFIG = Object.freeze({
   behaviorMode: BOT_BEHAVIOR_MODE,
-  botCount: 205,
-  fullTimePvpBotCount: 140,
-  wildernessRoamerBotCount: 500,
+  botCount: 85,
+  wildernessRoamerBotCount: 760,
   botWalkRadius: 10,
   objectIndexCachePath: path.join(
     process.cwd(),
@@ -188,11 +187,6 @@ const BOT_CONFIG = Object.freeze({
       Object.freeze({ value: "veteran", weight: 24 }),
       Object.freeze({ value: "elite", weight: 10 }),
     ]),
-    fullTimeProfileWeights: Object.freeze([
-      Object.freeze({ value: "standard", weight: 20 }),
-      Object.freeze({ value: "veteran", weight: 52 }),
-      Object.freeze({ value: "elite", weight: 28 }),
-    ]),
     loadoutWeights: Object.freeze([
       Object.freeze({ value: "edge_main_melee", weight: 28 }),
       Object.freeze({ value: "edge_ranged_melee", weight: 20 }),
@@ -289,7 +283,6 @@ module.exports = {
     botApi.log("registered", {
       spawned: boot.runtime.getSpawnedCount(),
       totalConfigured: BOT_CONFIG.botCount + BOT_CONFIG.wildernessRoamerBotCount,
-      fullTimePvpBotCount: BOT_CONFIG.fullTimePvpBotCount,
       wildernessRoamerBotCount: BOT_CONFIG.wildernessRoamerBotCount,
       walkRadius: BOT_CONFIG.botWalkRadius,
       decisionTicks: BOT_CONFIG.botDecisionTicks,

@@ -59,7 +59,7 @@ class RoamingBehavior {
   }
 
   getAssignedHotspot(state) {
-    const hotspotId = state?.autonomy?.fullTimePvp ? state?.pvp?.hotspotId : null;
+    const hotspotId = null;
     return hotspotId ? getWildernessHotspot(hotspotId) : null;
   }
 

@@ -1,8 +1,8 @@
-const { getWildernessHotspot } = require("../behaviours/pvp/PvpAssignment");
 const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
 const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const {
   getEnabledWildernessHotspots,
+  getWildernessHotspot,
   createHotspotAnchorLocation,
 } = require("../behaviours/pvp/WildernessHotspotRegistry");
 const {
@@ -11,6 +11,9 @@ const {
 const {
   ATTR_BOT_PVP_PROFILE_ID,
 } = require("./BotRecruitConstants");
+const {
+  ATTR_SKIP_PERSISTENCE,
+} = require("./BotPersistenceConstants");
 
 const WILDERNESS_SPAWN_TILE_PROBE_LIMIT = 256;
 
@@ -18,7 +21,6 @@ function createBotRegistry(options) {
   const {
     botApi,
     botCount,
-    fullTimePvpBotCount = 0,
     wildernessRoamerBotCount = 0,
     botBaseCooldownMs,
     spawn,
@@ -27,7 +29,7 @@ function createBotRegistry(options) {
     createBotPlayer,
     spawnLocationForIndex,
     createInitialState,
-    buildAssignedPvpMetadata: buildAssignedPvpMetadataFn,
+    buildHotspotPvpMetadata: buildHotspotPvpMetadataFn,
     buildRoamingPvpMetadata: buildRoamingPvpMetadataFn,
     assignPvpMetadata: assignPvpMetadataFn,
     applyInitialPvpLoadout: applyInitialPvpLoadoutFn,
@@ -40,6 +42,7 @@ function createBotRegistry(options) {
     resetMovementState,
     clearFollowState,
     randomInRange,
+    startupLogger,
     botStatesByName: providedBotStatesByName,
     botmeUsernames: providedBotmeUsernames,
     playerBotUsernames: providedPlayerBotUsernames,
@@ -52,9 +55,9 @@ function createBotRegistry(options) {
       : () => {};
   const assignPvpMetadata =
     typeof assignPvpMetadataFn === "function" ? assignPvpMetadataFn : () => {};
-  const buildAssignedPvpMetadata =
-    typeof buildAssignedPvpMetadataFn === "function"
-      ? buildAssignedPvpMetadataFn
+  const buildHotspotPvpMetadata =
+    typeof buildHotspotPvpMetadataFn === "function"
+      ? buildHotspotPvpMetadataFn
       : () => null;
   const buildRoamingPvpMetadata =
     typeof buildRoamingPvpMetadataFn === "function"
@@ -69,35 +72,32 @@ function createBotRegistry(options) {
   const entries = providedEntries ?? [];
   const entriesByUsername = providedEntriesByUsername ?? new Map();
   let spawned = 0;
-  let fullTimePvpAssigned = 0;
   let wildernessRoamersAssigned = 0;
   const hotspotSpawnCounts = new Map();
 
-  function buildFullTimePvpHotspotPlan(totalCount) {
+  function buildWildernessHotspotPlan(totalCount) {
     const hotspots = getEnabledWildernessHotspots().filter(
       (hotspot) => Number(hotspot?.targetBots ?? 0) > 0
     );
     if (totalCount <= 0 || hotspots.length === 0) {
       return [];
     }
+
     const totalTargetBots = hotspots.reduce(
       (sum, hotspot) => sum + Math.max(0, Number(hotspot.targetBots ?? 0)),
       0
     );
     if (totalTargetBots <= 0) {
-      return hotspots.map((hotspot) => hotspot.id).slice(0, totalCount);
+      return new Array(totalCount).fill(null);
     }
 
+    const hotspotCount = Math.min(totalCount, totalTargetBots);
     const plan = [];
-    const allocations = hotspots.map((hotspot) => {
-      const rawShare = (totalCount * Number(hotspot.targetBots ?? 0)) / totalTargetBots;
-      const baseCount = Math.floor(rawShare);
-      return {
-        hotspotId: hotspot.id,
-        count: baseCount,
-        remainder: rawShare - baseCount,
-      };
-    });
+    const allocations = hotspots.map((hotspot) => ({
+      hotspotId: hotspot.id,
+      count: Math.floor((hotspotCount * Number(hotspot.targetBots ?? 0)) / totalTargetBots),
+      remainder: ((hotspotCount * Number(hotspot.targetBots ?? 0)) / totalTargetBots) % 1,
+    }));
 
     let allocated = allocations.reduce((sum, entry) => sum + entry.count, 0);
     allocations
@@ -109,7 +109,7 @@ function createBotRegistry(options) {
         return a.hotspotId.localeCompare(b.hotspotId);
       })
       .forEach((entry) => {
-        if (allocated >= totalCount) {
+        if (allocated >= hotspotCount) {
           return;
         }
         const target = allocations.find((candidate) => candidate.hotspotId === entry.hotspotId);
@@ -123,11 +123,14 @@ function createBotRegistry(options) {
     allocations
       .sort((a, b) => a.hotspotId.localeCompare(b.hotspotId))
       .forEach((entry) => {
-        for (let i = 0; i < entry.count; i++) {
+        for (let i = 0; i < entry.count; i += 1) {
           plan.push(entry.hotspotId);
         }
       });
 
+    while (plan.length < totalCount) {
+      plan.push(null);
+    }
     return plan.slice(0, totalCount);
   }
 
@@ -224,37 +227,19 @@ function createBotRegistry(options) {
   }
 
   function spawnConfiguredBots() {
-    const hotspotCounts = new Map();
-    const fullTimePvpHotspotPlan = buildFullTimePvpHotspotPlan(fullTimePvpBotCount);
     for (let i = 1; i <= botCount; i++) {
       const username = `PlayerBot${i}`;
-      const isFullTimePvp = i <= fullTimePvpBotCount;
-      const forcedHotspotId = isFullTimePvp ? fullTimePvpHotspotPlan[i - 1] ?? null : null;
-      const pvpMetadata = buildAssignedPvpMetadata({
-        isFullTimePvp,
-        forcedHotspotId,
+      const pvpMetadata = buildRoamingPvpMetadata({
+        excludeF2p: true,
       });
-      const hotspotSpawnIndex = isFullTimePvp && pvpMetadata?.hotspotId
-        ? reserveHotspotSpawnIndex(pvpMetadata.hotspotId)
-        : -1;
-      const hotspotAnchor = isFullTimePvp && pvpMetadata?.hotspotId
-        ? createHotspotSpawn(pvpMetadata.hotspotId, hotspotSpawnIndex)
-        : null;
-      const botSpawn = hotspotAnchor ?? spawnLocationForIndex(spawn, spawnOffsets, i - 1);
+      const botSpawn = spawnLocationForIndex(spawn, spawnOffsets, i - 1);
       const bot = createBotPlayer(username, botSpawn);
       if (!bot) {
         continue;
       }
       bot.setPlayerBot?.(true);
-      if (isFullTimePvp && pvpMetadata?.hotspotId) {
-        const hotspotId = pvpMetadata.hotspotId;
-        setPersistentRespawnResolver(bot, () => {
-          const respawnIndex = reserveHotspotSpawnIndex(hotspotId);
-          return createHotspotSpawn(hotspotId, respawnIndex) ?? botSpawn.clone();
-        });
-      } else {
-        setPersistentRespawnResolver(bot, null);
-      }
+      bot.setAttribute?.(ATTR_SKIP_PERSISTENCE, false);
+      setPersistentRespawnResolver(bot, null);
 
       const state = createInitialState(
         {
@@ -271,24 +256,8 @@ function createBotRegistry(options) {
       if (state?.roaming) {
         state.roaming.nextWalkAt = spawnTimingJitterMs;
       }
-      if (isFullTimePvp) {
-        if (!state.autonomy) {
-          state.autonomy = {};
-        }
-        state.autonomy.fullTimePvp = true;
-        state.autonomy.pvpCooldownUntil = 0;
-        state.autonomy.modeEndsAt = 0;
-        state.autonomy.nextDecisionAt = spawnTimingJitterMs;
-        fullTimePvpAssigned++;
-      }
-      assignPvpMetadata(state, { isFullTimePvp, metadata: pvpMetadata });
+      assignPvpMetadata(state, { metadata: pvpMetadata });
       syncBotProfileAttribute(bot, state);
-      if (isFullTimePvp && pvpMetadata?.hotspotId) {
-        hotspotCounts.set(
-          pvpMetadata.hotspotId,
-          (hotspotCounts.get(pvpMetadata.hotspotId) ?? 0) + 1
-        );
-      }
       applyForcedModeForDiagnosis(bot, state);
       botStatesByName.set(username, state);
       playerBotUsernames.add(username);
@@ -302,9 +271,6 @@ function createBotRegistry(options) {
           randomInRange(0, botBaseCooldownMs)
         ),
       });
-      if (isFullTimePvp) {
-        applyInitialPvpLoadout(bot, state);
-      }
       emitPlayerLogin({
         player: bot,
         username,
@@ -313,22 +279,43 @@ function createBotRegistry(options) {
     }
 
     const wildernessBounds = listWildernessRoamingBounds();
+    const wildernessHotspotPlan = buildWildernessHotspotPlan(wildernessRoamerBotCount);
     for (let i = 1; i <= wildernessRoamerBotCount; i++) {
-      const username = `WildernessBot${i}`;
-      const assignedBounds = wildernessBounds[(i - 1) % wildernessBounds.length] ?? null;
+      const username = `WildyBot${i}`;
+      const assignedHotspotId = wildernessHotspotPlan[i - 1] ?? null;
+      const assignedHotspot = assignedHotspotId ? getWildernessHotspot(assignedHotspotId) : null;
+      const assignedBounds =
+        assignedHotspot?.area ??
+        wildernessBounds[(i - 1) % wildernessBounds.length] ??
+        null;
       const initialSpawnSeed = randomInRange(0, 1_000_000_000);
+      const hotspotSpawnIndex =
+        assignedHotspotId != null ? reserveHotspotSpawnIndex(assignedHotspotId) : -1;
+      const hotspotSpawn =
+        assignedHotspotId != null ? createHotspotSpawn(assignedHotspotId, hotspotSpawnIndex) : null;
       const botSpawn =
+        hotspotSpawn ??
         createWildernessRoamerSpawn(spawn, assignedBounds, initialSpawnSeed) ??
         spawnLocationForIndex(spawn, spawnOffsets, botCount + i - 1);
-      const bot = createBotPlayer(username, botSpawn);
+      const bot = createBotPlayer(username, botSpawn, {
+        loadPersistence: false,
+        saveRandomizedAppearance: false,
+      });
       if (!bot) {
         continue;
       }
       bot.setPlayerBot?.(true);
-      setPersistentRespawnResolver(bot, () =>
-        createWildernessRoamerSpawn(spawn, assignedBounds, randomInRange(0, 1_000_000)) ??
-        botSpawn.clone()
-      );
+      bot.setAttribute?.(ATTR_SKIP_PERSISTENCE, true);
+      setPersistentRespawnResolver(bot, () => {
+        if (assignedHotspotId != null) {
+          const respawnIndex = reserveHotspotSpawnIndex(assignedHotspotId);
+          return createHotspotSpawn(assignedHotspotId, respawnIndex) ?? botSpawn.clone();
+        }
+        return (
+          createWildernessRoamerSpawn(spawn, assignedBounds, randomInRange(0, 1_000_000)) ??
+          botSpawn.clone()
+        );
+      });
 
       const state = createInitialState(
         {
@@ -352,19 +339,23 @@ function createBotRegistry(options) {
       state.roaming.nextWalkAt = spawnTimingJitterMs;
       if (assignedBounds) {
         state.roaming.roamBounds = {
-          id: assignedBounds.id ?? null,
-          minX: assignedBounds.minX,
-          maxX: assignedBounds.maxX,
-          minY: assignedBounds.minY,
-          maxY: assignedBounds.maxY,
-          z: assignedBounds.z ?? botSpawn.getZ(),
+          id: assignedHotspotId ?? assignedBounds.id ?? null,
+          minX: assignedBounds.minX ?? assignedHotspot?.area?.minX,
+          maxX: assignedBounds.maxX ?? assignedHotspot?.area?.maxX,
+          minY: assignedBounds.minY ?? assignedHotspot?.area?.minY,
+          maxY: assignedBounds.maxY ?? assignedHotspot?.area?.maxY,
+          z: assignedBounds.z ?? assignedHotspot?.area?.z ?? botSpawn.getZ(),
         };
       }
-      const pvpMetadata = buildRoamingPvpMetadata({
-        excludeF2p: true,
-      });
+      const pvpMetadata =
+        assignedHotspotId != null
+          ? buildHotspotPvpMetadata({
+              hotspotId: assignedHotspotId,
+            })
+          : buildRoamingPvpMetadata({
+              excludeF2p: true,
+            });
       assignPvpMetadata(state, {
-        isFullTimePvp: false,
         metadata: pvpMetadata,
       });
       syncBotProfileAttribute(bot, state);
@@ -394,13 +385,15 @@ function createBotRegistry(options) {
       wildernessRoamersAssigned++;
     }
 
-    botApi.log("spawn_complete", {
+    const spawnSummary = {
       spawned,
       configured: botCount + wildernessRoamerBotCount,
-      fullTimePvpAssigned,
       wildernessRoamersAssigned,
-      hotspotCounts: Object.fromEntries(hotspotCounts.entries()),
-    });
+    };
+    botApi.log("spawn_complete", spawnSummary);
+    if (typeof startupLogger === "function") {
+      startupLogger(spawnSummary);
+    }
     ensureBehaviorTaskStarted();
   }
 
@@ -416,40 +409,6 @@ function createBotRegistry(options) {
       hash = (hash * 31 + text.charCodeAt(index)) | 0;
     }
     return Math.abs(hash) % 5000;
-  }
-
-  function reserveHotspotSpawnIndex(hotspotId) {
-    const nextIndex = hotspotSpawnCounts.get(hotspotId) ?? 0;
-    hotspotSpawnCounts.set(hotspotId, nextIndex + 1);
-    return nextIndex;
-  }
-
-  function createHotspotSpawn(hotspotId, index) {
-    const hotspot = getWildernessHotspot(hotspotId);
-    const anchor = createHotspotAnchorLocation(hotspot);
-    if (!anchor) {
-      return null;
-    }
-    const area = hotspot?.area;
-    if (!area) {
-      return anchor;
-    }
-    const minX = Math.floor(area.minX);
-    const maxX = Math.floor(area.maxX);
-    const minY = Math.floor(area.minY);
-    const maxY = Math.floor(area.maxY);
-    const width = maxX - minX + 1;
-    const height = maxY - minY + 1;
-    if (width <= 0 || height <= 0) {
-      return anchor;
-    }
-    const seedBase =
-      Math.imul(index + 1, 1103515245) ^
-      Math.imul(hotspotId.length + 17, 12345) ^
-      Math.imul(minX + maxY, 2654435761);
-    const offsetX = Math.abs(seedBase) % width;
-    const offsetY = Math.abs(Math.imul(seedBase ^ 0x9e3779b9, 48271)) % height;
-    return anchor.clone().setX(minX + offsetX).setY(minY + offsetY);
   }
 
   function createWildernessRoamerSpawn(baseSpawn, bounds, index) {
@@ -490,6 +449,40 @@ function createBotRegistry(options) {
     return baseSpawn.clone().setX(minX).setY(minY).setZ(z);
   }
 
+  function reserveHotspotSpawnIndex(hotspotId) {
+    const nextIndex = hotspotSpawnCounts.get(hotspotId) ?? 0;
+    hotspotSpawnCounts.set(hotspotId, nextIndex + 1);
+    return nextIndex;
+  }
+
+  function createHotspotSpawn(hotspotId, index) {
+    const hotspot = getWildernessHotspot(hotspotId);
+    const anchor = createHotspotAnchorLocation(hotspot);
+    if (!anchor) {
+      return null;
+    }
+    const area = hotspot?.area;
+    if (!area) {
+      return anchor;
+    }
+    const minX = Math.floor(area.minX);
+    const maxX = Math.floor(area.maxX);
+    const minY = Math.floor(area.minY);
+    const maxY = Math.floor(area.maxY);
+    const width = maxX - minX + 1;
+    const height = maxY - minY + 1;
+    if (width <= 0 || height <= 0) {
+      return anchor;
+    }
+    const seedBase =
+      Math.imul(index + 1, 1103515245) ^
+      Math.imul(hotspotId.length + 17, 12345) ^
+      Math.imul(minX + maxY, 2654435761);
+    const offsetX = Math.abs(seedBase) % width;
+    const offsetY = Math.abs(Math.imul(seedBase ^ 0x9e3779b9, 48271)) % height;
+    return anchor.clone().setX(minX + offsetX).setY(minY + offsetY);
+  }
+
   function enableControllerForPlayer(player) {
     if (!player || !player.isRegistered()) {
       return { ok: false, reason: "not_registered" };
@@ -513,7 +506,6 @@ function createBotRegistry(options) {
       behaviorMode
     );
     assignPvpMetadata(state, {
-      isFullTimePvp: false,
     });
     syncBotProfileAttribute(player, state);
     applyForcedModeForDiagnosis(player, state);

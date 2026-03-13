@@ -65,7 +65,9 @@ function buildRandomAppearanceLook() {
   return look;
 }
 
-function createBotPlayer(username, spawn) {
+function createBotPlayer(username, spawn, options = {}) {
+  const loadPersistence = options.loadPersistence !== false;
+  const saveRandomizedAppearance = options.saveRandomizedAppearance !== false;
   const existing =
     World.getPlayerByName(username) ||
     World.getAddPlayerQueue().find((p) => p && p.getUsername() === username);
@@ -85,31 +87,35 @@ function createBotPlayer(username, spawn) {
 
   let appliedPersistence = false;
   let hasValidSavedAppearance = false;
-  try {
-    const persistence = GameConstants.PLAYER_PERSISTENCE;
-    const playerSave = persistence?.load?.(username);
-    if (playerSave && typeof playerSave.applyToPlayer === "function") {
-      const rawAppearance =
-        typeof playerSave.getAppearance === "function"
-          ? playerSave.getAppearance()
-          : playerSave?.appearance;
-      hasValidSavedAppearance =
-        Array.isArray(rawAppearance) && rawAppearance.length >= 13;
-      playerSave.applyToPlayer(bot);
-      appliedPersistence = true;
+  if (loadPersistence) {
+    try {
+      const persistence = GameConstants.PLAYER_PERSISTENCE;
+      const playerSave = persistence?.load?.(username);
+      if (playerSave && typeof playerSave.applyToPlayer === "function") {
+        const rawAppearance =
+          typeof playerSave.getAppearance === "function"
+            ? playerSave.getAppearance()
+            : playerSave?.appearance;
+        hasValidSavedAppearance =
+          Array.isArray(rawAppearance) && rawAppearance.length >= 13;
+        playerSave.applyToPlayer(bot);
+        appliedPersistence = true;
+      }
+    } catch (err) {
+      console.error(`[PlayerBots] Failed to load persistence for ${username}`, err);
     }
-  } catch (err) {
-    console.error(`[PlayerBots] Failed to load persistence for ${username}`, err);
   }
 
   // Older bot saves often have empty/missing appearance arrays; randomize once
   // so bots don't collapse to the same default look.
   if (!appliedPersistence || !hasValidSavedAppearance) {
     bot.getAppearance().setLookArray(buildRandomAppearanceLook());
-    try {
-      GameConstants.PLAYER_PERSISTENCE?.save?.(bot);
-    } catch (err) {
-      console.error(`[PlayerBots] Failed to save randomized appearance for ${username}`, err);
+    if (saveRandomizedAppearance) {
+      try {
+        GameConstants.PLAYER_PERSISTENCE?.save?.(bot);
+      } catch (err) {
+        console.error(`[PlayerBots] Failed to save randomized appearance for ${username}`, err);
+      }
     }
   }
 

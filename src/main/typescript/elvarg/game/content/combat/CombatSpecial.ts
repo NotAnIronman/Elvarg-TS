@@ -419,7 +419,16 @@ export class CombatSpecial {
 
                 const target = player.getCombat().getTarget();
                 if (target != null && CombatFactory.getMethod(player).type() == CombatType.MELEE) {
-                    player.getCombat().performNewAttack(true);
+                    const drainAmount = spec.getDrainAmount();
+                    player.getCombat().setGraniteMaulSpecialQueued(true);
+                    CombatSpecial.drain(player, drainAmount);
+                    const attacked = player.getCombat().performNewAttack(true);
+                    if (!attacked) {
+                        player.getCombat().setGraniteMaulSpecialQueued(false);
+                        player.incrementSpecialPercentage(drainAmount);
+                        player.setSpecialActivated(false);
+                        CombatSpecial.updateBar(player);
+                    }
                     return;
                 } else {
                     // Uninformed player using gmaul without being in combat..

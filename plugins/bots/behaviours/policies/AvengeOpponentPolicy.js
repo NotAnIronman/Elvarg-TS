@@ -20,8 +20,7 @@ class AvengeOpponentPolicy {
   isPersistentPvpState(state) {
     return !!(
       state?.pvp &&
-      (state.autonomy?.fullTimePvp === true ||
-        state.autonomy?.wildernessRoamerPvp === true ||
+      (state.autonomy?.wildernessRoamerPvp === true ||
         state.autonomy?.persistentPvpLoadout === true)
     );
   }

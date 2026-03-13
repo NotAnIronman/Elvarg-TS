@@ -1,5 +1,9 @@
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const {
+  CombatFactory,
+  CanAttackResponse,
+} = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
@@ -51,6 +55,7 @@ const HOTSPOT_DECISION_JITTER_MS = 2600;
 const HOTSPOT_DYNAMIC_DECISION_JITTER_MS = 4200;
 const SEEKING_RESET_STAGGER_MIN_MS = 250;
 const SEEKING_RESET_STAGGER_MAX_MS = 1800;
+const HIGH_WILDNESS_AGGRESSION_LEVEL = 48;
 
 const PVP_PHASE = Object.freeze({
   IDLE: "idle",
@@ -190,7 +195,6 @@ class PvpBehavior {
 
   isFullTimePvp(state) {
     return (
-      state?.autonomy?.fullTimePvp === true ||
       state?.autonomy?.wildernessRoamerPvp === true ||
       state?.autonomy?.persistentPvpLoadout === true
     );
@@ -256,7 +260,7 @@ class PvpBehavior {
     }
 
     this.setPhase(state, PVP_PHASE.SEEKING);
-    const fullTimePvp = state?.autonomy?.fullTimePvp === true;
+    const fullTimePvp = this.isFullTimePvp(state);
     const pvpCooldownUntil = Number(state?.autonomy?.pvpCooldownUntil ?? 0);
     if (!fullTimePvp && Number.isInteger(nowMs) && nowMs < pvpCooldownUntil) {
       return false;
@@ -293,6 +297,9 @@ class PvpBehavior {
   }
 
   resolveHotspotEngagementDecision(player, state, nowMs) {
+    if (this.isHighWildernessAggressionActive(player)) {
+      return true;
+    }
     if (!this.isFullTimePvp(state)) {
       return true;
     }
@@ -382,6 +389,95 @@ class PvpBehavior {
     return Math.floor(engagedBots / 2);
   }
 
+  getWildernessLevel(player) {
+    if (!player) {
+      return 0;
+    }
+    const resolved = Number(player.getWildernessLevel?.() ?? 0);
+    if (Number.isFinite(resolved) && resolved > 0) {
+      return Math.floor(resolved);
+    }
+    const location = player.getLocation?.();
+    const y = Number(location?.getY?.() ?? Number.NaN);
+    return Number.isFinite(y) ? Wilderness.levelForY(y) : 0;
+  }
+
+  isHighWildernessAggressionActive(player) {
+    return this.getWildernessLevel(player) >= HIGH_WILDNESS_AGGRESSION_LEVEL;
+  }
+
+  shouldPrioritizeRealPlayerAggro(sourcePlayer, targetPlayer) {
+    return (
+      this.isHighWildernessAggressionActive(sourcePlayer) ||
+      this.isHighWildernessAggressionActive(targetPlayer)
+    );
+  }
+
+  canInitiatePlayerAttack(attacker, target) {
+    if (!attacker || !target) {
+      return false;
+    }
+    const method = CombatFactory.getMethod(attacker);
+    return (
+      CombatFactory.canAttack(attacker, method, target) === CanAttackResponse.CAN_ATTACK
+    );
+  }
+
+  tryStartRealPlayerEngagement({
+    sourcePlayer,
+    sourceState,
+    sourceAutonomy,
+    targetPlayer,
+    nowMs,
+    durationMs,
+    postPvpCooldownMinMs,
+    postPvpCooldownMaxMs,
+  }) {
+    if (
+      !sourcePlayer ||
+      !sourceState ||
+      !targetPlayer ||
+      !setModePvp(
+        sourcePlayer,
+        sourceState,
+        targetPlayer,
+        nowMs,
+        durationMs,
+        this.behaviorMode
+      )
+    ) {
+      return false;
+    }
+
+    if (sourceState?.pvp) {
+      sourceState.pvp.phase = PVP_PHASE.COMBAT;
+      scheduleCombatAction(sourceState, nowMs);
+      scheduleReviewTimers(sourceState, nowMs);
+    }
+
+    applyGeneratedPvpLoadout(sourcePlayer, sourceState, {
+      api: this.api,
+    });
+
+    if (sourceAutonomy) {
+      sourceAutonomy.modeEndsAt = nowMs + durationMs;
+      sourceAutonomy.pvpCooldownUntil =
+        nowMs + durationMs + randomInRange(postPvpCooldownMinMs, postPvpCooldownMaxMs);
+      sourceAutonomy.nextDecisionAt = nowMs + durationMs;
+    }
+
+    sourcePlayer.getMovementQueue?.().reset?.();
+    sourcePlayer.getCombat?.()?.attack?.(targetPlayer);
+    this.api?.log?.("bot_pvp_started_real_player", {
+      bot: sourcePlayer.getUsername?.(),
+      target: targetPlayer.getUsername?.(),
+      profileId: sourceState?.pvp?.profileId ?? "standard",
+      hotspotId: sourceState?.pvp?.hotspotId ?? null,
+      highWildAggro: this.shouldPrioritizeRealPlayerAggro(sourcePlayer, targetPlayer),
+    });
+    return true;
+  }
+
   tryStartMode({
     entry,
     entries,
@@ -418,6 +514,35 @@ class PvpBehavior {
     }
     this.setPhase(sourceState, PVP_PHASE.SEEKING);
 
+    const isInCombatCheck =
+      typeof isInCombat === "function"
+        ? isInCombat
+        : (candidate) => this.isInCombat(candidate);
+
+    const realPlayerOpponent = this.resolvePreferredRealPlayerOpponent({
+      sourceEntry: entry,
+      pvpMaxDistanceTiles,
+      isInCombat: isInCombatCheck,
+    });
+    if (
+      realPlayerOpponent &&
+      this.shouldPrioritizeRealPlayerAggro(sourcePlayer, realPlayerOpponent)
+    ) {
+      const durationMs = randomInRange(pvpMinMs, pvpMaxMs);
+      if (this.tryStartRealPlayerEngagement({
+        sourcePlayer,
+        sourceState,
+        sourceAutonomy,
+        targetPlayer: realPlayerOpponent,
+        nowMs,
+        durationMs,
+        postPvpCooldownMinMs,
+        postPvpCooldownMaxMs,
+      })) {
+        return true;
+      }
+    }
+
     if (!this.resolveHotspotEngagementDecision(sourcePlayer, sourceState, nowMs)) {
       return false;
     }
@@ -449,54 +574,18 @@ class PvpBehavior {
         return false;
       }
     }
-
-    const isInCombatCheck =
-      typeof isInCombat === "function"
-        ? isInCombat
-        : (candidate) => this.isInCombat(candidate);
-
-    const realPlayerOpponent = this.resolvePreferredRealPlayerOpponent({
-      sourceEntry: entry,
-      pvpMaxDistanceTiles,
-      isInCombat: isInCombatCheck,
-    });
     if (realPlayerOpponent) {
       const durationMs = randomInRange(pvpMinMs, pvpMaxMs);
-      if (
-        setModePvp(
-          sourcePlayer,
-          sourceState,
-          realPlayerOpponent,
-          nowMs,
-          durationMs,
-          this.behaviorMode
-        )
-      ) {
-        if (sourceState?.pvp) {
-          sourceState.pvp.phase = PVP_PHASE.COMBAT;
-          scheduleCombatAction(sourceState, nowMs);
-          scheduleReviewTimers(sourceState, nowMs);
-        }
-
-        applyGeneratedPvpLoadout(sourcePlayer, sourceState, {
-          api: this.api,
-        });
-
-        if (sourceAutonomy) {
-          sourceAutonomy.modeEndsAt = nowMs + durationMs;
-          sourceAutonomy.pvpCooldownUntil =
-            nowMs + durationMs + randomInRange(postPvpCooldownMinMs, postPvpCooldownMaxMs);
-          sourceAutonomy.nextDecisionAt = nowMs + durationMs;
-        }
-
-        sourcePlayer.getMovementQueue?.().reset?.();
-        sourcePlayer.getCombat?.()?.attack?.(realPlayerOpponent);
-        this.api?.log?.("bot_pvp_started_real_player", {
-          bot: sourcePlayer.getUsername?.(),
-          target: realPlayerOpponent.getUsername?.(),
-          profileId: sourceState?.pvp?.profileId ?? "standard",
-          hotspotId: sourceState?.pvp?.hotspotId ?? null,
-        });
+      if (this.tryStartRealPlayerEngagement({
+        sourcePlayer,
+        sourceState,
+        sourceAutonomy,
+        targetPlayer: realPlayerOpponent,
+        nowMs,
+        durationMs,
+        postPvpCooldownMinMs,
+        postPvpCooldownMaxMs,
+      })) {
         return true;
       }
     }
@@ -771,6 +860,9 @@ class PvpBehavior {
       if (distance > pvpMaxDistanceTiles) {
         return;
       }
+      if (!this.canInitiatePlayerAttack(sourcePlayer, candidatePlayer)) {
+        return;
+      }
 
       const isMultiEngagement =
         AreaManager.inMulti(sourcePlayer) && AreaManager.inMulti(candidatePlayer);
@@ -779,6 +871,9 @@ class PvpBehavior {
       }
 
       let score = 220 - distance * 5;
+      if (this.shouldPrioritizeRealPlayerAggro(sourcePlayer, candidatePlayer)) {
+        score += 1000;
+      }
       if (distance <= sourceProfile.chaseDistanceTiles) {
         score += 18;
       }

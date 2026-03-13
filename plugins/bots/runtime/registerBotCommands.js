@@ -227,7 +227,7 @@ function registerBotCommands(options) {
 
     for (const entry of runtime.entries ?? []) {
       const state = entry?.state;
-      if (state?.autonomy?.fullTimePvp !== true) {
+      if (state?.autonomy?.wildernessRoamerPvp !== true) {
         continue;
       }
       const hotspotId = state?.pvp?.hotspotId ?? "none";

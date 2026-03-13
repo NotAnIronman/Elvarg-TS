@@ -8,6 +8,7 @@ import { Sounds } from "../../Sounds";
 import { Location } from "../Location";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { Wilderness } from "../../content/wilderness/Wilderness";
+import { PlayerRights } from "../rights/PlayerRights";
 
 class TeleportTask extends Task {
     private teleportTick = 0;
@@ -103,6 +104,11 @@ export class TeleportHandler {
     public static checkReqs(player: Player, targetLocation: Location): boolean {
         if (player.busy()) {
             player.getPacketSender().sendMessage("You cannot do that right now.");
+            return false;
+        }
+
+        if (Wilderness.isIn(player) && player.getWildernessLevel() > 20 && player.getRights() !== PlayerRights.DEVELOPER) {
+            player.getPacketSender().sendMessage("You must be below level 20 of Wilderness to use teleportation spells.");
             return false;
         }
 

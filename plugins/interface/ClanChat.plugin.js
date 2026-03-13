@@ -10,6 +10,7 @@ const { SecondsTimer } = require("../../src/main/typescript/elvarg/game/model/Se
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
+const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const {
   getActiveBotRuntime,
 } = require("../bots/runtime/BotRuntimeRegistry");
@@ -78,6 +79,10 @@ function isClanBotMember(player) {
 function reloadClanBotLoadout(owner, bot) {
   if (!owner || !bot || bot.isRegistered?.() !== true) {
     return false;
+  }
+  if (Wilderness.isIn(owner)) {
+    owner.getPacketSender?.().sendMessage?.("You can't reload bot loadouts in the wilderness.");
+    return true;
   }
   const { runtime } = getActiveBotRuntime();
   const botUsername = bot.getUsername?.();

@@ -8,6 +8,7 @@ export class TaskManager {
     private static activeTasks: Task[] = [];
     private static readonly SLOW_TASK_WARN_MS = 50;
     private static readonly SLOW_TASK_LOG_COOLDOWN_MS = 3000;
+    private static readonly SLOW_TASK_WARN_ENABLED = (process.env.TASK_SLOW_WARN_ENABLED ?? "1") !== "0";
     private static lastSlowTaskLogAtByName = new Map<string, number>();
     
     private constructor() {
@@ -81,6 +82,9 @@ export class TaskManager {
     }
 
     private static logSlowTaskTick(taskName: string, durationMs: number): void {
+        if (!TaskManager.SLOW_TASK_WARN_ENABLED) {
+            return;
+        }
         if (durationMs < TaskManager.SLOW_TASK_WARN_MS) {
             return;
         }
