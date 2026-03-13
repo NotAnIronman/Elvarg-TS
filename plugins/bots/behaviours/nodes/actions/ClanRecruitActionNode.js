@@ -230,24 +230,20 @@ class ClanRecruitActionNode {
     if (!candidate || candidate === bot || candidate === owner) {
       return null;
     }
+    if (candidate.isPlayer?.() !== true) {
+      return null;
+    }
     if (candidate.isRegistered?.() !== true || (candidate.getHitpoints?.() ?? 0) <= 0) {
       return null;
     }
     if (candidate.getPrivateArea?.() !== bot.getPrivateArea?.()) {
       return null;
     }
-    if (!this.isCurrentAssistTarget(bot, candidate)) {
+    const ownerClan = owner.getCurrentClanChat?.();
+    if (ownerClan != null && candidate.getCurrentClanChat?.() === ownerClan) {
       return null;
     }
     return candidate;
-  }
-
-  isCurrentAssistTarget(bot, candidate) {
-    const combat = bot.getCombat?.();
-    const target = combat?.getTarget?.();
-    const attacker = combat?.getAttacker?.();
-    const following = bot.getCombatFollowing?.();
-    return target === candidate || attacker === candidate || following === candidate;
   }
 
   teleportNearFollowerIfNeeded(bot, follower) {

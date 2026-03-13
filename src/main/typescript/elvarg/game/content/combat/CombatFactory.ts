@@ -32,6 +32,7 @@ import { BasicAttackResponse } from "../../model/areas/Area";
 import { Equipment } from "../../model/container/impl/Equipment";
 import { MovementQueue } from "../../model/movement/MovementQueue";
 import { PathFinder } from "../../model/movement/path/PathFinder";
+import { BonusManager } from "../../model/equipment/BonusManager";
 import { PlayerRights } from "../../model/rights/PlayerRights";
 import { Task } from "../../task/Task";
 import { TaskManager } from "../../task/TaskManager";
@@ -51,6 +52,12 @@ import { Wilderness } from "../wilderness/Wilderness";
 import { ZaryteCrossbowCombatMethod } from "./method/impl/specials/ZaryteCrossbowCombatMethod";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { ServerPerf } from "../../../util/ServerPerf";
+import {
+    CRYSTAL_BOW_SHOTS_PER_STAGE,
+    getNextCrystalBowItemId,
+    isChargedCrystalBow,
+    isEmptyCrystalBow,
+} from "./ranged/CrystalBow";
 
 const normalizeAreaResponse = (response: CanAttackResponse | BasicAttackResponse): CanAttackResponse => {
     if (response === BasicAttackResponse.CAN_ATTACK) {
@@ -1070,6 +1077,16 @@ export class CombatFactory {
             return true;
         }
 
+        if (rangedWeapon === RangedWeapon.CRYSTAL_BOW) {
+            const weaponId = player.getEquipment().getItems()[Equipment.WEAPON_SLOT]?.getId?.() ?? -1;
+            if (isEmptyCrystalBow(weaponId)) {
+                player.getPacketSender().sendMessage("Your crystal bow has no charges left.");
+                player.getCombat().reset();
+                return false;
+            }
+            return true;
+        }
+
         if (ammoData == null) {
             player.getPacketSender().sendMessage("You don't have any ammunition to fire.");
             player.getCombat().reset();
@@ -1141,6 +1158,45 @@ export class CombatFactory {
             if (player.decrementAndGetBlowpipeScales() <= 0) {
                 player.getPacketSender().sendMessage("Your Toxic blowpipe has run out of scales!");
                 player.getCombat().reset();
+            }
+            return;
+        }
+
+        if (rangedWeapon === RangedWeapon.CRYSTAL_BOW) {
+            const weaponItem = player.getEquipment().get(Equipment.WEAPON_SLOT);
+            const weaponId = weaponItem?.getId?.() ?? -1;
+            if (!isChargedCrystalBow(weaponId)) {
+                return;
+            }
+            if (player.getCrystalBowTrackedStageItemId() !== weaponId) {
+                player.setCrystalBowTrackedStageItemId(weaponId);
+                player.setCrystalBowShotsInStage(0);
+            }
+
+            let shotsInStage = Number(player.getCrystalBowShotsInStage() ?? 0);
+            let currentWeaponId = weaponId;
+            for (let shot = 0; shot < amount; shot++) {
+                shotsInStage += 1;
+                if (shotsInStage < CRYSTAL_BOW_SHOTS_PER_STAGE) {
+                    continue;
+                }
+                shotsInStage = 0;
+                const nextWeaponId = getNextCrystalBowItemId(currentWeaponId);
+                if (nextWeaponId == null || nextWeaponId === currentWeaponId) {
+                    continue;
+                }
+                currentWeaponId = nextWeaponId;
+                weaponItem.setId(nextWeaponId);
+            }
+
+            player.setCrystalBowTrackedStageItemId(currentWeaponId);
+            player.setCrystalBowShotsInStage(shotsInStage);
+            player.getEquipment().refreshItems();
+            BonusManager.update(player);
+            player.getUpdateFlag().flag(Flag.APPEARANCE);
+
+            if (isEmptyCrystalBow(currentWeaponId)) {
+                player.getPacketSender().sendMessage("Your crystal bow has run out of charges.");
             }
             return;
         }

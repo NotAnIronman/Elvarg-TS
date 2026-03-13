@@ -68,6 +68,8 @@ export class PlayerSave {
     private recoilDamage: number;
     private poisonDamage: number;
     private blowpipeScales: number;
+    private crystalBowShotsInStage: number;
+    private crystalBowTrackedStageItemId: number;
     private poisonImmunityTimer: number;
     private fireImmunityTimer: number;
     private teleblockTimer: number;
@@ -250,6 +252,22 @@ export class PlayerSave {
 
     public setBlowpipeScales(blowpipeScales: number): void {
         this.blowpipeScales = blowpipeScales;
+    }
+
+    public getCrystalBowShotsInStage(): number {
+        return this.crystalBowShotsInStage;
+    }
+
+    public setCrystalBowShotsInStage(crystalBowShotsInStage: number): void {
+        this.crystalBowShotsInStage = crystalBowShotsInStage;
+    }
+
+    public getCrystalBowTrackedStageItemId(): number {
+        return this.crystalBowTrackedStageItemId;
+    }
+
+    public setCrystalBowTrackedStageItemId(crystalBowTrackedStageItemId: number): void {
+        this.crystalBowTrackedStageItemId = crystalBowTrackedStageItemId;
     }
 
     public getPoisonImmunityTimer(): number {
@@ -678,6 +696,8 @@ export class PlayerSave {
         player.setPoints(this.points);
         player.setPoisonDamage(this.poisonDamage);
         player.setBlowpipeScales(this.blowpipeScales);
+        player.setCrystalBowShotsInStage(this.crystalBowShotsInStage);
+        player.setCrystalBowTrackedStageItemId(this.crystalBowTrackedStageItemId);
 
         // RC pouches
         player.setPouches(this.pouches);
@@ -776,6 +796,8 @@ export class PlayerSave {
         playerSave.points = player.getPoints();
         playerSave.poisonDamage = player.getPoisonDamage();
         playerSave.blowpipeScales = player.getBlowpipeScales();
+        playerSave.crystalBowShotsInStage = player.getCrystalBowShotsInStage();
+        playerSave.crystalBowTrackedStageItemId = player.getCrystalBowTrackedStageItemId();
 
         // RC pouches
         playerSave.pouches = (player.getPouches() ?? []).map((pouchState: any) => ({

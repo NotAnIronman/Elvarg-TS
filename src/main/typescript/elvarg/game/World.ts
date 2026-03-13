@@ -616,6 +616,12 @@ export class World {
                     existingPlayer.requestLogout();
                 }
                 World.players.add(player);
+                if (
+                    player.isPlayerBot?.() !== true &&
+                    World.isPlayerSessionConnected(player)
+                ) {
+                    player.getPacketSender?.().sendDetails?.();
+                }
             }
         });
 

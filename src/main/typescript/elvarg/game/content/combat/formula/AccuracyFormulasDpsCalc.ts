@@ -9,6 +9,7 @@ import { Skill } from "../../../model/Skill";
 import { applyMeleeAttackAccuracyModifiers, applyRangedAttackAccuracyModifiers, applyMagicAttackAccuracyModifiers, applyMeleeDefenseModifiers, applyRangedDefenseModifiers, applyMagicDefenseModifiers } from "../EquipmentEffects";
 import type { Player } from '../../../entity/impl/player/Player';
 import { World } from "../../../World";
+import { CombatEquipment } from "../CombatEquipment";
 
 type RollCacheEntry = {
     cycle: number;
@@ -53,30 +54,88 @@ export class AccuracyFormulasDpsCalc {
         return Math.random();
     }
 
+    private static randomInclusive(max: number): number {
+        return Misc.randomInclusive(0, Math.max(0, Math.floor(max)));
+    }
+
+    private static meleeAttackPrayerBonus(player: Player): number {
+        if (PrayerHandler.isActivated(player, PrayerHandler.CLARITY_OF_THOUGHT)) {
+            return 1.05;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.IMPROVED_REFLEXES)) {
+            return 1.10;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.INCREDIBLE_REFLEXES)) {
+            return 1.15;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.CHIVALRY)) {
+            return 1.15;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.PIETY)) {
+            return 1.20;
+        }
+        return 1;
+    }
+
+    private static defencePrayerBonus(player: Player): number {
+        if (PrayerHandler.isActivated(player, PrayerHandler.THICK_SKIN)) {
+            return 1.05;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.ROCK_SKIN)) {
+            return 1.10;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.STEEL_SKIN)) {
+            return 1.15;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.CHIVALRY)) {
+            return 1.20;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.PIETY)) {
+            return 1.25;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.RIGOUR)) {
+            return 1.25;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.AUGURY)) {
+            return 1.25;
+        }
+        return 1;
+    }
+
+    private static rangedAttackPrayerBonus(player: Player): number {
+        if (PrayerHandler.isActivated(player, PrayerHandler.SHARP_EYE)) {
+            return 1.05;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.HAWK_EYE)) {
+            return 1.10;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.EAGLE_EYE)) {
+            return 1.15;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.RIGOUR)) {
+            return 1.20;
+        }
+        return 1;
+    }
+
+    private static magicAttackPrayerBonus(player: Player): number {
+        if (PrayerHandler.isActivated(player, PrayerHandler.MYSTIC_WILL)) {
+            return 1.05;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.MYSTIC_LORE)) {
+            return 1.10;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.MYSTIC_MIGHT)) {
+            return 1.15;
+        } else if (PrayerHandler.isActivated(player, PrayerHandler.AUGURY)) {
+            return 1.25;
+        }
+        return 1;
+    }
+
     public static rollAccuracy(entity: any, enemy: any, style: any) {
-        if (style === CombatType.MELEE && CombatFactory.fullVeracs(entity) && Misc.getRandom(4) === 1) {
+        if (style === CombatType.MELEE && CombatFactory.fullVeracs(entity) && this.randomInclusive(3) === 0) {
             return true;
         }
 
         if (style === CombatType.MELEE) {
             let attRoll = AccuracyFormulasDpsCalc.attackMeleeRoll(entity);
-            let defRoll = AccuracyFormulasDpsCalc.defenseMeleeRoll(entity, enemy);
-
-            let hitChance = this.hitChance(attRoll, defRoll);
-            return hitChance > this.randomFloat();
+            let defRoll = AccuracyFormulasDpsCalc.calcDefenseMeleeRoll(entity, enemy);
+            return this.randomInclusive(attRoll) > this.randomInclusive(defRoll);
 
         } else if (style === CombatType.RANGED) {
             let attRoll = AccuracyFormulasDpsCalc.attackRangedRoll(entity);
             let defRoll = AccuracyFormulasDpsCalc.defenseRangedRoll(enemy);
-
-            let hitChance = this.hitChance(attRoll, defRoll);
-            return hitChance > this.randomFloat();
+            return this.randomInclusive(attRoll) > this.randomInclusive(defRoll);
         } else if (style === CombatType.MAGIC) {
             let attRoll = AccuracyFormulasDpsCalc.attackMagicRoll(entity);
             let defRoll = AccuracyFormulasDpsCalc.defenseMagicRoll(enemy);
-
-            let hitChance = this.hitChance(attRoll, defRoll);
-            return hitChance > this.randomFloat();
+            return this.randomInclusive(attRoll) > this.randomInclusive(defRoll);
         }
         return false;
     }
@@ -84,9 +143,9 @@ export class AccuracyFormulasDpsCalc {
     public static hitChance(attRoll: number, defRoll: number) {
 
         if (attRoll > defRoll) {
-            return 1 - ((defRoll + 2) / (2 * attRoll + 1));
+            return 1 - ((defRoll + 2) / (2 * (attRoll + 1)));
         } else {
-            return attRoll / (2 * defRoll + 1);
+            return attRoll / (2 * (defRoll + 1));
         }
     }
 
@@ -95,40 +154,28 @@ export class AccuracyFormulasDpsCalc {
         if (cache.effectiveAttackLevel != null) {
             return cache.effectiveAttackLevel;
         }
-        let att = 8;
-
         if (entity.isNpc()) {
-            att += entity.getAsNpc().getCurrentDefinition().getStats()[0];
+            const att = entity.getAsNpc().getCurrentDefinition().getStats()[0] + 9;
             cache.effectiveAttackLevel = att;
             return att;
         }
 
         let player = entity.getAsPlayer();
-
-        att += player.getSkillManager().getCurrentLevel(Skill.ATTACK);
-
-        let prayerBonus = 1;
-
-        // Prayer additions
-        if (PrayerHandler.isActivated(player, PrayerHandler.CLARITY_OF_THOUGHT)) {
-            prayerBonus = 1.05;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.IMPROVED_REFLEXES)) {
-            prayerBonus = 1.10;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.INCREDIBLE_REFLEXES)) {
-            prayerBonus = 1.15;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.CHIVALRY)) {
-            prayerBonus = 1.15;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.PIETY)) {
-            prayerBonus = 1.20;
-        }
-
-        att *= prayerBonus;
+        let att = Math.floor(
+            player.getSkillManager().getCurrentLevel(Skill.ATTACK) *
+            AccuracyFormulasDpsCalc.meleeAttackPrayerBonus(player)
+        );
 
         let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.ACCURATE)
             att += 3;
         else if (fightStyle == FightStyle.CONTROLLED)
             att += 1;
+        att += 8;
+
+        if (CombatEquipment.wearingVoid(player, CombatType.MELEE)) {
+            att = Math.floor(att * 1.1);
+        }
 
         att = applyMeleeAttackAccuracyModifiers(player, att);
 
@@ -186,37 +233,16 @@ export class AccuracyFormulasDpsCalc {
         if (cache.effectiveDefenseLevel != null) {
             return cache.effectiveDefenseLevel;
         }
-        let def = 1;
-
         if (enemy.isNpc()) {
-            cache.effectiveDefenseLevel = enemy.getAsNpc().getCurrentDefinition().getStats()[2];
+            cache.effectiveDefenseLevel = enemy.getAsNpc().getCurrentDefinition().getStats()[2] + 9;
             return cache.effectiveDefenseLevel;
         }
 
         let player = enemy.getAsPlayer();
-        def = player.getSkillManager().getCurrentLevel(Skill.DEFENCE);
-
-
-        let prayerBonus = 1;
-
-        // Prayer additions
-        if (PrayerHandler.isActivated(enemy, PrayerHandler.THICK_SKIN)) {
-            prayerBonus = 1.05;
-        } else if (PrayerHandler.isActivated(enemy, PrayerHandler.ROCK_SKIN)) {
-            prayerBonus = 1.10;
-        } else if (PrayerHandler.isActivated(enemy, PrayerHandler.STEEL_SKIN)) {
-            prayerBonus = 1.15;
-        } else if (PrayerHandler.isActivated(enemy, PrayerHandler.CHIVALRY)) {
-            prayerBonus = 1.20;
-        } else if (PrayerHandler.isActivated(enemy, PrayerHandler.PIETY)) {
-            prayerBonus = 1.25;
-        } else if (PrayerHandler.isActivated(enemy, PrayerHandler.RIGOUR)) {
-            prayerBonus = 1.25;
-        } else if (PrayerHandler.isActivated(enemy, PrayerHandler.AUGURY)) {
-            prayerBonus = 1.25;
-        }
-
-        def *= prayerBonus;
+        let def = Math.floor(
+            player.getSkillManager().getCurrentLevel(Skill.DEFENCE) *
+            AccuracyFormulasDpsCalc.defencePrayerBonus(player)
+        );
 
         let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.DEFENSIVE)
@@ -284,10 +310,11 @@ export class AccuracyFormulasDpsCalc {
             enemy.getAsPlayer().getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_RANGE]
             : 0);
 
+        defLevel = applyRangedDefenseModifiers(enemy, defLevel);
         defLevel *= defRange + 64;
 
-        cache.defenseRangedRoll = defLevel;
-        return defLevel;
+        cache.defenseRangedRoll = Math.floor(defLevel);
+        return cache.defenseRangedRoll;
     }
 
     private static effectiveRangedAttack(entity: Mobile) {
@@ -295,33 +322,26 @@ export class AccuracyFormulasDpsCalc {
         if (cache.effectiveRangedAttack != null) {
             return cache.effectiveRangedAttack;
         }
-        let rngStrength = 8;
-
         if (entity.isNpc()) {
             // Prayer bonuses don't apply to NPCs (yet)
-            cache.effectiveRangedAttack = rngStrength + entity.getAsNpc().getCurrentDefinition().getStats()[3];
+            cache.effectiveRangedAttack = entity.getAsNpc().getCurrentDefinition().getStats()[3] + 9;
             return cache.effectiveRangedAttack;
         }
 
         let player = entity.getAsPlayer();
-        rngStrength += player.getSkillManager().getCurrentLevel(Skill.RANGED);
-
-        // Prayers
-        let prayerMod = 1.0;
-        if (PrayerHandler.isActivated(player, PrayerHandler.SHARP_EYE)) {
-            prayerMod = 1.05;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.HAWK_EYE)) {
-            prayerMod = 1.10;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.EAGLE_EYE)) {
-            prayerMod = 1.15;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.RIGOUR)) {
-            prayerMod = 1.23;
-        }
-        rngStrength = (rngStrength * prayerMod);
+        let rngStrength = Math.floor(
+            player.getSkillManager().getCurrentLevel(Skill.RANGED) *
+            AccuracyFormulasDpsCalc.rangedAttackPrayerBonus(player)
+        );
 
         let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.ACCURATE)
             rngStrength += 3;
+        rngStrength += 8;
+
+        if (CombatEquipment.wearingVoid(player, CombatType.RANGED)) {
+            rngStrength = Math.floor(rngStrength * 1.1);
+        }
 
         rngStrength = applyRangedAttackAccuracyModifiers(player, rngStrength);
 
@@ -351,38 +371,29 @@ export class AccuracyFormulasDpsCalc {
         if (cache.effectiveMagicLevel != null) {
             return cache.effectiveMagicLevel;
         }
-        let mag = 8;
-
         if (entity.isNpc()) {
             // Prayer bonuses don't apply to NPCs (yet)
-            mag += entity.getAsNpc().getCurrentDefinition().getStats()[4];
+            const mag = entity.getAsNpc().getCurrentDefinition().getStats()[4] + 9;
             cache.effectiveMagicLevel = mag;
             return mag;
         }
 
         let player = entity.getAsPlayer();
-        mag += player.getSkillManager().getCurrentLevel(Skill.MAGIC);
+        let mag = Math.floor(
+            player.getSkillManager().getCurrentLevel(Skill.MAGIC) *
+            AccuracyFormulasDpsCalc.magicAttackPrayerBonus(player)
+        );
 
-        let prayerBonus = 1;
-
-        // Prayer additions
-        if (PrayerHandler.isActivated(player, PrayerHandler.MYSTIC_WILL)) {
-            prayerBonus = 1.05;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.MYSTIC_LORE)) {
-            prayerBonus = 1.10;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.MYSTIC_MIGHT)) {
-            prayerBonus = 1.15;
-        } else if (PrayerHandler.isActivated(player, PrayerHandler.AUGURY)) {
-            prayerBonus = 1.25;
+        if (CombatEquipment.wearingVoid(player, CombatType.MAGIC)) {
+            mag = Math.floor(mag * 1.45);
         }
-
-        mag *= prayerBonus;
 
         let fightStyle = player.getFightType().getStyle();
         if (fightStyle == FightStyle.ACCURATE)
             mag += 3;
         else if (fightStyle == FightStyle.DEFENSIVE)
             mag += 1;
+        mag += 9;
 
         mag = applyMagicAttackAccuracyModifiers(player, mag);
 
@@ -395,14 +406,30 @@ export class AccuracyFormulasDpsCalc {
         if (cache.defenseMagicRoll != null) {
             return cache.defenseMagicRoll;
         }
-        let defLevel = AccuracyFormulasDpsCalc.effectiveMagicLevel(enemy);
+        let defLevel: number;
+
+        if (enemy.isNpc()) {
+            defLevel = enemy.getAsNpc().getCurrentDefinition().getStats()[4] + 9;
+        } else {
+            const player = enemy.getAsPlayer();
+            const magicLevel = Math.floor(
+                player.getSkillManager().getCurrentLevel(Skill.MAGIC) *
+                AccuracyFormulasDpsCalc.magicAttackPrayerBonus(player)
+            );
+            const defenceLevel = Math.floor(
+                player.getSkillManager().getCurrentLevel(Skill.DEFENCE) *
+                AccuracyFormulasDpsCalc.defencePrayerBonus(player)
+            );
+            defLevel = Math.floor((magicLevel * 0.7) + (defenceLevel * 0.3)) + 8;
+            defLevel = applyMagicDefenseModifiers(player, defLevel);
+        }
 
         let defRange = (enemy.isNpc() ? 0 : enemy.getAsPlayer().getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_MAGIC]);
 
         defLevel *= (defRange + 64);
 
-        cache.defenseMagicRoll = defLevel;
-        return defLevel;
+        cache.defenseMagicRoll = Math.floor(defLevel);
+        return cache.defenseMagicRoll;
     }
 
     public static attackMagicRoll(entity: Mobile): number {
@@ -415,7 +442,7 @@ export class AccuracyFormulasDpsCalc {
         let attRoll = AccuracyFormulasDpsCalc.effectiveMagicLevel(entity);
         attRoll *= (accuracyBonus + 64);
 
-        cache.attackMagicRoll = attRoll;
-        return attRoll;
+        cache.attackMagicRoll = Math.floor(attRoll);
+        return cache.attackMagicRoll;
     }
 }

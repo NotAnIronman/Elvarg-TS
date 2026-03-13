@@ -1,6 +1,10 @@
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Packet } = require("../../../../src/main/typescript/elvarg/net/packet/Packet");
 const { PacketConstants } = require("../../../../src/main/typescript/elvarg/net/packet/PacketConstants");
+const {
+  CombatFactory,
+  CanAttackResponse,
+} = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { callModeHook } = require("../hooks/ModeHookContract");
 const {
   handlePlayerAttackReaction,
@@ -52,6 +56,14 @@ class CombatReactionTrigger {
 
     const state = this.botStatesByName.get(followedUsername);
     if (!state) {
+      return;
+    }
+
+    const combatMethod = CombatFactory.getMethod(player);
+    if (
+      CombatFactory.canAttack(player, combatMethod, followed) !==
+      CanAttackResponse.CAN_ATTACK
+    ) {
       return;
     }
 

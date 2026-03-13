@@ -3,6 +3,8 @@ import { ItemDefinition } from "../../definition/ItemDefinition";
 import { DamageFormulas } from "../../content/combat/formula/DamageFormulas";
 import { RangedWeapon } from "../../content/combat/ranged/RangedData";
 import { Ammunition } from "../../content/combat/ranged/RangedData";
+import { Equipment } from "../container/impl/Equipment";
+import { getCrystalBowAttackBonus, getCrystalBowRangedStrength, isCrystalBow } from "../../content/combat/ranged/CrystalBow";
 
 export class BonusManager {
     public static readonly ATTACK_STAB = 0;
@@ -62,6 +64,21 @@ export class BonusManager {
                     }
                     bonuses[i] += definition.getBonuses()[i];
                 }
+            }
+        }
+
+        const weaponId = player.getEquipment().getItems()[Equipment.WEAPON_SLOT]?.getId?.() ?? -1;
+        if (isCrystalBow(weaponId)) {
+            const weaponDefinition = ItemDefinition.forId(weaponId);
+            const definitionBonuses = weaponDefinition?.getBonuses?.() ?? [];
+            const rangedAttackBonus = getCrystalBowAttackBonus(weaponId);
+            const rangedStrengthBonus = getCrystalBowRangedStrength(weaponId);
+            if (rangedAttackBonus != null) {
+                bonuses[BonusManager.ATTACK_RANGE] +=
+                    rangedAttackBonus - Number(definitionBonuses[BonusManager.ATTACK_RANGE] ?? 0);
+            }
+            if (rangedStrengthBonus != null) {
+                bonuses[11] += rangedStrengthBonus - Number(definitionBonuses[11] ?? 0);
             }
         }
 

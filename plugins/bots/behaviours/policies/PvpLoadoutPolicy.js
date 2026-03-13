@@ -411,6 +411,54 @@ function chooseHybridWearSet() {
   };
 }
 
+function chooseAncientsHybridWearSet(profile) {
+  if (isVeteranOrEliteProfile(profile)) {
+    return {
+      head: choose([ItemIdentifiers.AHRIMS_HOOD, ItemIdentifiers.HELM_OF_NEITIZNOT, ...MAGE_HATS]),
+      cape: choose(MAGE_CAPES),
+      body: ItemIdentifiers.AHRIMS_ROBETOP,
+      legs: ItemIdentifiers.AHRIMS_ROBESKIRT,
+      gloves: choose([ItemIdentifiers.BARROWS_GLOVES, ...MAGE_GLOVES, ...RANGE_GLOVES]),
+      boots: choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.CLIMBING_BOOTS, ...MAGE_BOOTS, ...RANGE_BOOTS]),
+      offhand: choose(MAGE_OFFHANDS),
+    };
+  }
+  return chooseHybridWearSet();
+}
+
+function chooseEliteDarkBowSpecPrimary(magicPackage) {
+  return (
+    weightedPick([
+      {
+        weight: 5,
+        weaponId: magicPackage?.staffId ?? ItemIdentifiers.ANCIENT_STAFF,
+        ammoId: null,
+        usesAvas: false,
+        useOffhand: true,
+      },
+      {
+        weight: 2,
+        weaponId: ItemIdentifiers.DRAGON_CROSSBOW,
+        ammoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        usesAvas: true,
+        useOffhand: false,
+      },
+      {
+        weight: 2,
+        weaponId: ItemIdentifiers.CRYSTAL_BOW_FULL,
+        ammoId: null,
+        usesAvas: true,
+        useOffhand: false,
+      },
+    ]) ?? {
+      weaponId: magicPackage?.staffId ?? ItemIdentifiers.ANCIENT_STAFF,
+      ammoId: null,
+      usesAvas: false,
+      useOffhand: true,
+    }
+  );
+}
+
 function choosePureHybridWearSet() {
   return {
     head: choose([ItemIdentifiers.COIF, ItemIdentifiers.GREY_HAT, ...MAGE_HATS]),
@@ -573,20 +621,65 @@ function buildEdgeMeleeInventory(specWeaponId, options = {}) {
 }
 
 function buildRangeToMeleeInventory(specWeaponId, ammoId, ammoAmount, options = {}) {
-  const inventory = [
+  const inventory = compact([
     item(specWeaponId),
-    item(ammoId, ammoAmount),
+    ammoId != null ? item(ammoId, ammoAmount) : null,
     item(ItemIdentifiers.RANGING_POTION_4_),
     item(ItemIdentifiers.SUPER_ATTACK_4_),
     item(ItemIdentifiers.SUPER_STRENGTH_4_),
     item(ItemIdentifiers.SUPER_RESTORE_4_),
     item(ItemIdentifiers.SARADOMIN_BREW_4_),
-  ];
+  ]);
   const karams = Number(options.comboEatCount ?? 4);
   const sharks = 28 - inventory.length - karams;
   inventory.push(...repeat(ItemIdentifiers.COOKED_KARAMBWAN, 1, karams));
   fillFood(inventory, ItemIdentifiers.SHARK, sharks);
   return inventory.slice(0, 28);
+}
+
+function isVeteranOrEliteProfile(profile) {
+  return profile?.id === "veteran" || profile?.id === "elite";
+}
+
+function isEliteProfile(profile) {
+  return profile?.id === "elite";
+}
+
+function chooseEliteSpecWeapon() {
+  return choose([
+    ItemIdentifiers.DRAGON_CLAWS,
+    ItemIdentifiers.ARMADYL_GODSWORD,
+    ItemIdentifiers.BANDOS_GODSWORD,
+    ItemIdentifiers.SARADOMIN_GODSWORD,
+    ItemIdentifiers.ZAMORAK_GODSWORD,
+    ItemIdentifiers.ANCIENT_GODSWORD,
+  ]);
+}
+
+function profileAllowedForArchetype(archetype, profile) {
+  const allowedProfiles = Array.isArray(archetype?.minimumProfileIds)
+    ? archetype.minimumProfileIds
+    : null;
+  if (allowedProfiles && allowedProfiles.length > 0) {
+    return allowedProfiles.includes(profile?.id ?? "standard");
+  }
+  const minimumConfidenceTier = Number(archetype?.minimumConfidenceTier ?? 0);
+  if (minimumConfidenceTier > 0) {
+    return Number(profile?.confidenceTier ?? 2) >= minimumConfidenceTier;
+  }
+  return true;
+}
+
+function chooseVoidBody(profile) {
+  return isEliteProfile(profile)
+    ? ItemIdentifiers.ELITE_VOID_TOP
+    : ItemIdentifiers.VOID_KNIGHT_TOP;
+}
+
+function chooseVoidLegs(profile) {
+  return isEliteProfile(profile)
+    ? ItemIdentifiers.ELITE_VOID_ROBE
+    : ItemIdentifiers.VOID_KNIGHT_ROBE;
 }
 
 function buildHybridInventory(options = {}) {
@@ -626,6 +719,28 @@ function buildHybridInventory(options = {}) {
   inventory.push(...repeat(ItemIdentifiers.COOKED_KARAMBWAN, 1, karams));
   const sharks = 28 - inventory.length + extraFood;
   fillFood(inventory, ItemIdentifiers.SHARK, Math.max(0, sharks));
+  return inventory.slice(0, 28);
+}
+
+function buildDarkBowSpecInventory(options = {}) {
+  const {
+    specAmmoAmount = 90,
+    rangingPotionCount = 1,
+    restoreCount = randomBetween(2, 4),
+    brewCount = randomBetween(1, 3),
+    comboEatCount = randomBetween(4, 6),
+  } = options;
+
+  const inventory = [
+    item(ItemIdentifiers.DARK_BOW),
+    item(ItemIdentifiers.DRAGON_ARROW, specAmmoAmount),
+  ];
+
+  inventory.push(...repeat(ItemIdentifiers.RANGING_POTION_4_, 1, rangingPotionCount));
+  inventory.push(...repeat(ItemIdentifiers.SUPER_RESTORE_4_, 1, restoreCount));
+  inventory.push(...repeat(ItemIdentifiers.SARADOMIN_BREW_4_, 1, brewCount));
+  inventory.push(...repeat(ItemIdentifiers.COOKED_KARAMBWAN, 1, comboEatCount));
+  fillFood(inventory, ItemIdentifiers.SHARK, 28 - inventory.length);
   return inventory.slice(0, 28);
 }
 
@@ -1048,26 +1163,32 @@ const ARCHETYPES = Object.freeze({
     spellbook: MagicSpellbook.LUNAR,
     stats: [75, 70, 99, 99, 94, 70, 94],
     autocastSpellId: -1,
-    equipment: () =>
+    equipment: (magicPackage, profile) =>
       compact([
         item(choose([ItemIdentifiers.HELM_OF_NEITIZNOT, ItemIdentifiers.WARRIOR_HELM, ...BLACK_MASKS])),
         item(choose([ItemIdentifiers.OBSIDIAN_CAPE, ItemIdentifiers.STRENGTH_CAPE_T_])),
         item(ItemIdentifiers.ABYSSAL_WHIP),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(ItemIdentifiers.RUNE_PLATEBODY),
+        item(
+          isVeteranOrEliteProfile(profile)
+            ? ItemIdentifiers.FIGHTER_TORSO
+            : ItemIdentifiers.RUNE_PLATEBODY
+        ),
         item(ItemIdentifiers.RUNE_DEFENDER),
         item(ItemIdentifiers.RUNE_PLATELEGS),
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.CLIMBING_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
       ]),
-    inventory: () =>
+    inventory: (magicPackage, profile) =>
       buildEdgeMeleeInventory(
-        choose([
-          ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
-          ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
-          ItemIdentifiers.ANCIENT_GODSWORD,
-        ]),
+        isEliteProfile(profile)
+          ? chooseEliteSpecWeapon()
+          : choose([
+              ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+              ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+              ItemIdentifiers.ANCIENT_GODSWORD,
+            ]),
         { comboEatCount: 5 }
       ),
   }),
@@ -1077,20 +1198,29 @@ const ARCHETYPES = Object.freeze({
     spellbook: MagicSpellbook.LUNAR,
     stats: [70, 45, 99, 95, 90, 52, 94],
     autocastSpellId: -1,
-    equipment: () =>
+    equipment: (magicPackage, profile) =>
       compact([
         item(choose([ItemIdentifiers.WARRIOR_HELM, ...BLACK_MASKS])),
         item(ItemIdentifiers.OBSIDIAN_CAPE),
         item(ItemIdentifiers.ABYSSAL_WHIP),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(ItemIdentifiers.RUNE_PLATEBODY),
+        item(
+          isVeteranOrEliteProfile(profile)
+            ? ItemIdentifiers.FIGHTER_TORSO
+            : ItemIdentifiers.RUNE_PLATEBODY
+        ),
         item(ItemIdentifiers.RUNE_DEFENDER),
         item(ItemIdentifiers.RUNE_PLATELEGS),
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(ItemIdentifiers.CLIMBING_BOOTS),
         item(ItemIdentifiers.RING_OF_RECOIL),
       ]),
-    inventory: () => buildEdgeMeleeInventory(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_),
+    inventory: (magicPackage, profile) =>
+      buildEdgeMeleeInventory(
+        isEliteProfile(profile)
+          ? chooseEliteSpecWeapon()
+          : ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_
+      ),
   }),
   zerker_dscim: Object.freeze({
     id: "zerker_dscim",
@@ -1098,20 +1228,29 @@ const ARCHETYPES = Object.freeze({
     spellbook: MagicSpellbook.LUNAR,
     stats: [60, 45, 99, 92, 85, 52, 94],
     autocastSpellId: -1,
-    equipment: () =>
+    equipment: (magicPackage, profile) =>
       compact([
         item(choose([ItemIdentifiers.WARRIOR_HELM, ...BLACK_MASKS])),
         item(ItemIdentifiers.OBSIDIAN_CAPE),
         item(ItemIdentifiers.DRAGON_SCIMITAR),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(ItemIdentifiers.RUNE_PLATEBODY),
+        item(
+          isVeteranOrEliteProfile(profile)
+            ? ItemIdentifiers.FIGHTER_TORSO
+            : ItemIdentifiers.RUNE_PLATEBODY
+        ),
         item(ItemIdentifiers.RUNE_DEFENDER),
         item(ItemIdentifiers.RUNE_PLATELEGS),
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(ItemIdentifiers.CLIMBING_BOOTS),
         item(ItemIdentifiers.RING_OF_RECOIL),
       ]),
-    inventory: () => buildEdgeMeleeInventory(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_),
+    inventory: (magicPackage, profile) =>
+      buildEdgeMeleeInventory(
+        isEliteProfile(profile)
+          ? chooseEliteSpecWeapon()
+          : ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_
+      ),
   }),
   msb_gmaul: Object.freeze({
     id: "msb_gmaul",
@@ -1119,21 +1258,33 @@ const ARCHETYPES = Object.freeze({
     spellbook: MagicSpellbook.NORMAL,
     stats: [50, 1, 99, 88, 99, 1, 1],
     autocastSpellId: -1,
-    equipment: () =>
+    equipment: (magicPackage, profile) =>
       compact([
         item(choose([...RANGE_HEADS, ItemIdentifiers.SPINED_HELM])),
         item(choose(RANGE_CAPES)),
-        item(ItemIdentifiers.MAGIC_SHORTBOW),
+        item(
+          isVeteranOrEliteProfile(profile)
+            ? ItemIdentifiers.CRYSTAL_BOW_FULL
+            : ItemIdentifiers.MAGIC_SHORTBOW
+        ),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(choose(RANGE_BODIES)),
+        item(
+          isVeteranOrEliteProfile(profile)
+            ? ItemIdentifiers.FIGHTER_TORSO
+            : choose(RANGE_BODIES)
+        ),
         null,
         item(choose(RANGE_LEGS)),
         item(choose(RANGE_GLOVES)),
         item(choose(RANGE_BOOTS)),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.RUNE_ARROW, 120),
       ]),
-    inventory: () => buildRangeToMeleeInventory(ItemIdentifiers.GRANITE_MAUL, ItemIdentifiers.RUNE_ARROW, 150),
+    inventory: (magicPackage, profile) =>
+      buildRangeToMeleeInventory(
+        isEliteProfile(profile) ? chooseEliteSpecWeapon() : ItemIdentifiers.GRANITE_MAUL,
+        isVeteranOrEliteProfile(profile) ? null : ItemIdentifiers.RUNE_ARROW,
+        isVeteranOrEliteProfile(profile) ? 0 : 150
+      ),
   }),
   rcb_dds: Object.freeze({
     id: "rcb_dds",
@@ -1168,25 +1319,118 @@ const ARCHETYPES = Object.freeze({
     spellbook: MagicSpellbook.NORMAL,
     stats: [60, 1, 92, 90, 99, 31, 1],
     autocastSpellId: -1,
-    equipment: () =>
+    equipment: (magicPackage, profile) =>
       compact([
         item(choose([...RANGE_HEADS, ItemIdentifiers.SPINED_HELM])),
         item(choose(RANGE_CAPES)),
-        item(ItemIdentifiers.MAGIC_SHORTBOW),
+        item(
+          isVeteranOrEliteProfile(profile)
+            ? ItemIdentifiers.CRYSTAL_BOW_FULL
+            : ItemIdentifiers.MAGIC_SHORTBOW
+        ),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(choose(RANGE_BODIES)),
+        item(
+          isVeteranOrEliteProfile(profile)
+            ? ItemIdentifiers.FIGHTER_TORSO
+            : choose(RANGE_BODIES)
+        ),
         null,
         item(choose(RANGE_LEGS)),
         item(choose(RANGE_GLOVES)),
         item(choose(RANGE_BOOTS)),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.RUNE_ARROW, 150),
+      ]),
+    inventory: (magicPackage, profile) =>
+      buildRangeToMeleeInventory(
+        isEliteProfile(profile)
+          ? chooseEliteSpecWeapon()
+          : ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+        isVeteranOrEliteProfile(profile) ? null : ItemIdentifiers.RUNE_ARROW,
+        isVeteranOrEliteProfile(profile) ? 0 : 175
+      ),
+  }),
+  dark_bow_ags: Object.freeze({
+    id: "dark_bow_ags",
+    weight: 8,
+    minimumProfileIds: ["elite"],
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [75, 45, 99, 96, 99, 70, 94],
+    autocastSpellId: -1,
+    equipment: () =>
+      compact([
+        item(choose([...RANGE_HEADS, ItemIdentifiers.SPINED_HELM])),
+        item(ItemIdentifiers.AVAS_ACCUMULATOR),
+        item(ItemIdentifiers.DARK_BOW),
+        item(ItemIdentifiers.AMULET_OF_GLORY),
+        item(ItemIdentifiers.FIGHTER_TORSO),
+        null,
+        item(choose(RANGE_LEGS)),
+        item(ItemIdentifiers.BARROWS_GLOVES),
+        item(choose([ItemIdentifiers.DRAGON_BOOTS, ...RANGE_BOOTS])),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+        item(ItemIdentifiers.DRAGON_ARROW, 60),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
-        ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
-        ItemIdentifiers.RUNE_ARROW,
-        175
+        ItemIdentifiers.ARMADYL_GODSWORD,
+        ItemIdentifiers.DRAGON_ARROW,
+        90
+      ),
+  }),
+  void_dcb_claws: Object.freeze({
+    id: "void_dcb_claws",
+    weight: 8,
+    minimumProfileIds: ["veteran", "elite"],
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [75, 42, 99, 94, 99, 42, 94],
+    autocastSpellId: -1,
+    equipment: (magicPackage, profile) =>
+      compact([
+        item(ItemIdentifiers.VOID_RANGER_HELM),
+        item(ItemIdentifiers.AVAS_ACCUMULATOR),
+        item(ItemIdentifiers.DRAGON_CROSSBOW),
+        item(ItemIdentifiers.AMULET_OF_GLORY),
+        item(chooseVoidBody(profile)),
+        null,
+        item(chooseVoidLegs(profile)),
+        item(ItemIdentifiers.VOID_KNIGHT_GLOVES),
+        item(choose([ItemIdentifiers.SNAKESKIN_BOOTS, ItemIdentifiers.RANGER_BOOTS, ItemIdentifiers.DRAGON_BOOTS])),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+        item(ItemIdentifiers.DRAGON_BOLTS_E_, 90),
+      ]),
+    inventory: () =>
+      buildRangeToMeleeInventory(
+        ItemIdentifiers.DRAGON_CLAWS,
+        ItemIdentifiers.DRAGON_BOLTS_E_,
+        120
+      ),
+  }),
+  void_ballista_ags: Object.freeze({
+    id: "void_ballista_ags",
+    weight: 4,
+    minimumProfileIds: ["elite"],
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [75, 45, 99, 95, 99, 45, 94],
+    autocastSpellId: -1,
+    equipment: (magicPackage, profile) =>
+      compact([
+        item(ItemIdentifiers.VOID_RANGER_HELM),
+        item(ItemIdentifiers.AVAS_ACCUMULATOR),
+        item(ItemIdentifiers.HEAVY_BALLISTA),
+        item(ItemIdentifiers.AMULET_OF_GLORY),
+        item(chooseVoidBody(profile)),
+        null,
+        item(chooseVoidLegs(profile)),
+        item(ItemIdentifiers.VOID_KNIGHT_GLOVES),
+        item(choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.RANGER_BOOTS])),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+        item(ItemIdentifiers.DRAGON_JAVELIN, 60),
+      ]),
+    inventory: () =>
+      buildRangeToMeleeInventory(
+        ItemIdentifiers.ARMADYL_GODSWORD,
+        ItemIdentifiers.DRAGON_JAVELIN,
+        80
       ),
   }),
   ancients_hybrid: Object.freeze({
@@ -1201,8 +1445,8 @@ const ARCHETYPES = Object.freeze({
         preferAncients: false,
         hotspotId: state?.pvp?.hotspotId,
       }),
-    equipment: (magicPackage) => {
-      const wear = chooseHybridWearSet();
+    equipment: (magicPackage, profile) => {
+      const wear = chooseAncientsHybridWearSet(profile);
       return compact([
         item(wear.head),
         item(wear.cape),
@@ -1219,6 +1463,48 @@ const ARCHETYPES = Object.freeze({
     inventory: (magicPackage) =>
       buildHybridInventory({ spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT }),
   }),
+  elite_ancients_dbow: Object.freeze({
+    id: "elite_ancients_dbow",
+    weight: 12,
+    minimumProfileIds: ["elite"],
+    spellbook: MagicSpellbook.ANCIENT,
+    stats: [99, 99, 99, 99, 99, 99, 99],
+    autocastSpellId: ICE_BARRAGE_SPELL_ID,
+    resolveMagicPackage: (profile, state) =>
+      buildMagicPackage(profile, {
+        allowAncients: true,
+        preferAncients: true,
+        hotspotId: state?.pvp?.hotspotId,
+      }),
+    equipment: (magicPackage, profile) => {
+      const wear = chooseAncientsHybridWearSet(profile);
+      const primary = chooseEliteDarkBowSpecPrimary(magicPackage);
+      const capeId = primary.usesAvas
+        ? choose([ItemIdentifiers.AVAS_ACCUMULATOR, wear.cape])
+        : wear.cape;
+      const offhandId = primary.useOffhand ? wear.offhand : null;
+      return compact([
+        item(choose([ItemIdentifiers.AHRIMS_HOOD, ItemIdentifiers.HELM_OF_NEITIZNOT, ...MAGE_HATS])),
+        item(capeId),
+        item(primary.weaponId),
+        item(ItemIdentifiers.AMULET_OF_GLORY),
+        item(choose([ItemIdentifiers.AHRIMS_ROBETOP, ItemIdentifiers.KARILS_LEATHERTOP, wear.body])),
+        item(offhandId),
+        item(choose([ItemIdentifiers.AHRIMS_ROBESKIRT, ItemIdentifiers.BLACK_DHIDE_CHAPS, wear.legs])),
+        item(choose([ItemIdentifiers.BARROWS_GLOVES, ...MAGE_GLOVES, ...RANGE_GLOVES])),
+        item(choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.RANGER_BOOTS, ...MAGE_BOOTS, ...RANGE_BOOTS])),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+        primary.ammoId != null ? item(primary.ammoId, 80) : null,
+      ]);
+    },
+    inventory: () =>
+      buildDarkBowSpecInventory({
+        specAmmoAmount: 90,
+        restoreCount: randomBetween(3, 4),
+        brewCount: randomBetween(2, 3),
+        comboEatCount: randomBetween(4, 5),
+      }),
+  }),
   tribrid_main: Object.freeze({
     id: "tribrid_main",
     weight: 22,
@@ -1231,8 +1517,8 @@ const ARCHETYPES = Object.freeze({
         preferAncients: false,
         hotspotId: state?.pvp?.hotspotId,
       }),
-    equipment: () => {
-      const wear = chooseHybridWearSet();
+    equipment: (magicPackage, profile) => {
+      const wear = chooseAncientsHybridWearSet(profile);
       return compact([
         item(wear.head),
         item(choose([ItemIdentifiers.AVAS_ACCUMULATOR, wear.cape])),
@@ -1483,6 +1769,78 @@ const ARCHETYPES = Object.freeze({
         150
       ),
   }),
+  ags_zerker: Object.freeze({
+    id: "ags_zerker",
+    weight: 12,
+    minimumProfileIds: ["veteran", "elite"],
+    spellbook: MagicSpellbook.LUNAR,
+    stats: [75, 45, 99, 97, 90, 70, 94],
+    autocastSpellId: -1,
+    equipment: () =>
+      compact([
+        item(ItemIdentifiers.BERSERKER_HELM),
+        item(ItemIdentifiers.OBSIDIAN_CAPE),
+        item(ItemIdentifiers.ABYSSAL_WHIP),
+        item(ItemIdentifiers.AMULET_OF_GLORY),
+        item(ItemIdentifiers.FIGHTER_TORSO),
+        item(ItemIdentifiers.RUNE_DEFENDER),
+        item(ItemIdentifiers.RUNE_PLATELEGS),
+        item(ItemIdentifiers.BARROWS_GLOVES),
+        item(ItemIdentifiers.DRAGON_BOOTS),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+      ]),
+    inventory: () => buildEdgeMeleeInventory(ItemIdentifiers.ARMADYL_GODSWORD, { comboEatCount: 5 }),
+  }),
+  obby_mauler: Object.freeze({
+    id: "obby_mauler",
+    weight: 10,
+    minimumProfileIds: ["veteran", "elite"],
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [1, 1, 99, 82, 70, 31, 1],
+    autocastSpellId: -1,
+    equipment: () =>
+      compact([
+        item(ItemIdentifiers.BERSERKER_HELM),
+        item(ItemIdentifiers.OBSIDIAN_CAPE),
+        item(ItemIdentifiers.TZHAAR_KET_OM),
+        item(ItemIdentifiers.AMULET_OF_STRENGTH),
+        item(ItemIdentifiers.FIGHTER_TORSO),
+        null,
+        item(ItemIdentifiers.OBSIDIAN_PLATELEGS),
+        item(ItemIdentifiers.BARROWS_GLOVES),
+        item(ItemIdentifiers.CLIMBING_BOOTS),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+      ]),
+    inventory: () => buildEdgeMeleeInventory(ItemIdentifiers.DRAGON_CLAWS, { comboEatCount: 6 }),
+  }),
+  ballista_pure: Object.freeze({
+    id: "ballista_pure",
+    weight: 10,
+    minimumProfileIds: ["veteran", "elite"],
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [75, 1, 95, 85, 99, 52, 94],
+    autocastSpellId: -1,
+    equipment: () =>
+      compact([
+        item(choose([...RANGE_HEADS, ItemIdentifiers.VOID_RANGER_HELM])),
+        item(ItemIdentifiers.AVAS_ACCUMULATOR),
+        item(ItemIdentifiers.HEAVY_BALLISTA),
+        item(ItemIdentifiers.AMULET_OF_GLORY),
+        item(choose([ItemIdentifiers.BLACK_DHIDE_BODY, ItemIdentifiers.RED_DHIDE_BODY, ItemIdentifiers.SPINED_BODY])),
+        null,
+        item(choose([ItemIdentifiers.BLACK_DHIDE_CHAPS, ItemIdentifiers.RED_DHIDE_CHAPS, ItemIdentifiers.SPINED_CHAPS])),
+        item(choose(RANGE_GLOVES)),
+        item(choose(RANGE_BOOTS)),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+        item(ItemIdentifiers.DRAGON_JAVELIN, 70),
+      ]),
+    inventory: () =>
+      buildRangeToMeleeInventory(
+        ItemIdentifiers.DRAGON_CLAWS,
+        ItemIdentifiers.DRAGON_JAVELIN,
+        90
+      ),
+  }),
   gmaul_rusher: Object.freeze({
     id: "gmaul_rusher",
     weight: 26,
@@ -1570,7 +1928,9 @@ function getArchetypeChoices(loadoutId) {
 function buildGeneratedPreset(player, state) {
   const loadoutId = state?.pvp?.loadoutId ?? "edge_main_melee";
   const profile = getPvpProfile(state?.pvp?.profileId);
-  const choices = getArchetypeChoices(loadoutId);
+  const choices = getArchetypeChoices(loadoutId).filter((entry) =>
+    profileAllowedForArchetype(entry, profile)
+  );
   const savedArchetypeId = state?.pvp?.generatedArchetypeId ?? null;
   const archetype =
     choices.find((entry) => entry.id === savedArchetypeId) ?? weightedPick(choices);
@@ -1638,6 +1998,7 @@ function applyGeneratedPvpLoadout(player, state, options = {}) {
       inventory.find?.((entry) => {
         const itemId = entry?.getId?.() ?? -1;
         return (
+          itemId === ItemIdentifiers.DARK_BOW ||
           itemId === ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_ ||
           itemId === ItemIdentifiers.ANCIENT_GODSWORD ||
           itemId === ItemIdentifiers.GRANITE_MAUL ||
@@ -1647,7 +2008,12 @@ function applyGeneratedPvpLoadout(player, state, options = {}) {
         );
       })?.getId?.() ?? null;
     state.pvp.generatedSpecAmmoId =
-      state.pvp.generatedSpecWeaponId === ItemIdentifiers.MAGIC_SHORTBOW ||
+      state.pvp.generatedSpecWeaponId === ItemIdentifiers.DARK_BOW
+        ? inventory.find?.((entry) => {
+            const itemId = entry?.getId?.() ?? -1;
+            return itemId === ItemIdentifiers.DRAGON_ARROW;
+          })?.getId?.() ?? null
+        : state.pvp.generatedSpecWeaponId === ItemIdentifiers.MAGIC_SHORTBOW ||
       state.pvp.generatedSpecWeaponId === ItemIdentifiers.MAGIC_SHORTBOW_I_ ||
       state.pvp.generatedSpecWeaponId === ItemIdentifiers.MAGIC_SHORTBOW_3
         ? inventory.find?.((entry) => {

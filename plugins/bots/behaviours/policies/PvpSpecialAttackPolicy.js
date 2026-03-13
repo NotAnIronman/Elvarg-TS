@@ -9,6 +9,7 @@ const { getPvpProfile } = require("../pvp/PvpAssignment");
 
 const SUPPORTED_SPEC_WEAPONS = Object.freeze([
   ItemIdentifiers.ANCIENT_GODSWORD,
+  ItemIdentifiers.DARK_BOW,
   ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
   ItemIdentifiers.GRANITE_MAUL,
   ItemIdentifiers.MAGIC_SHORTBOW,
@@ -18,6 +19,7 @@ const SUPPORTED_SPEC_WEAPONS = Object.freeze([
 
 const SWITCHABLE_SPEC_WEAPONS = new Set([
   ItemIdentifiers.ANCIENT_GODSWORD,
+  ItemIdentifiers.DARK_BOW,
   ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
   ItemIdentifiers.GRANITE_MAUL,
   ItemIdentifiers.MAGIC_SHORTBOW,
@@ -133,6 +135,14 @@ function shouldUseSpecNow(player, target, state, profile, special, weaponId) {
     weaponId === ItemIdentifiers.MAGIC_SHORTBOW_3
   ) {
     chance -= 0.08;
+  }
+
+  if (weaponId === ItemIdentifiers.DARK_BOW) {
+    if (targetHpRatio <= finisherHpRatio + 0.1) {
+      chance += 0.12;
+    } else if (!pressure) {
+      chance -= 0.04;
+    }
   }
 
   chance = Math.max(0.05, Math.min(0.95, chance));

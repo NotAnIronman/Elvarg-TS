@@ -3,6 +3,10 @@ const { Packet } = require("../../../src/main/typescript/elvarg/net/packet/Packe
 const { PacketConstants } = require("../../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { AreaManager } = require("../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const {
+  CombatFactory,
+  CanAttackResponse,
+} = require("../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
+const {
   ClanChatManager,
 } = require("../../interface/ClanChat.plugin");
 const {
@@ -56,6 +60,17 @@ function isActiveClanRecruit(owner, bot) {
   return ownerClan != null && bot.getCurrentClanChat?.() === ownerClan;
 }
 
+function canStartPlayerAttack(attacker, target) {
+  if (!attacker || !target) {
+    return false;
+  }
+  const combatMethod = CombatFactory.getMethod(attacker);
+  return (
+    CombatFactory.canAttack(attacker, combatMethod, target) ===
+    CanAttackResponse.CAN_ATTACK
+  );
+}
+
 function sharesClanChat(left, right) {
   if (!left || !right || left === right) {
     return false;
@@ -72,6 +87,9 @@ function handleClanRecruitAssist({ runtime, behaviorMode, player, packet, nowMs 
 
   const target = resolveAttackedPlayer(packet);
   if (!target || target === player || target.isRegistered?.() !== true) {
+    return;
+  }
+  if (!canStartPlayerAttack(player, target)) {
     return;
   }
   if (sharesClanChat(player, target)) {

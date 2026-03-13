@@ -174,6 +174,8 @@ export class Player extends Mobile {
     private amountDonated: number;
     // Blowpipe
     public blowpipeScales: number;
+    private crystalBowShotsInStage = 0;
+    private crystalBowTrackedStageItemId = -1;
     // Bounty hunter
     public targetKills: number;
     public normalKills: number;
@@ -1341,6 +1343,22 @@ export class Player extends Mobile {
 
     public decrementAndGetBlowpipeScales(): number {
         return this.blowpipeScales--;
+    }
+
+    public getCrystalBowShotsInStage(): number {
+        return this.crystalBowShotsInStage;
+    }
+
+    public setCrystalBowShotsInStage(crystalBowShotsInStage: number) {
+        this.crystalBowShotsInStage = crystalBowShotsInStage;
+    }
+
+    public getCrystalBowTrackedStageItemId(): number {
+        return this.crystalBowTrackedStageItemId;
+    }
+
+    public setCrystalBowTrackedStageItemId(crystalBowTrackedStageItemId: number) {
+        this.crystalBowTrackedStageItemId = crystalBowTrackedStageItemId;
     }
 
     public getCurrentPet(): NPC {

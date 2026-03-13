@@ -257,6 +257,8 @@ class JsonPlayerPersistence extends PlayerPersistence {
         recoilDamage: 0,
         poisonDamage: 0,
         blowpipeScales: 0,
+        crystalBowShotsInStage: 0,
+        crystalBowTrackedStageItemId: -1,
         barrowsCrypt: 0,
         barrowsChests: 0,
         killedBrothers: [],

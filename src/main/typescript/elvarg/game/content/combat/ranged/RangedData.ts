@@ -9,6 +9,7 @@ import { Skill } from '../../../model/Skill';
 import { Equipment } from '../../../model/container/impl/Equipment';
 import { ItemIdentifiers } from '../../../../util/ItemIdentifiers';
 import { Misc } from '../../../../util/Misc';
+import { CRYSTAL_BOW_ALL_WEAPON_IDS, CRYSTAL_BOW_PROJECTILE_ID, isCrystalBow } from './CrystalBow';
 
 const getFightType = () => require("../FightType").FightType as typeof import("../FightType").FightType;
 
@@ -248,6 +249,7 @@ export class Ammunition {
     public static readonly TOKTZ_XIL_UL = new Ammunition(6522, null, 442, 58)
 
     public static readonly BOLT_RACK = new Ammunition(4740, null, 27, 55)
+    public static readonly CRYSTAL_BOW = new Ammunition(ItemIdentifiers.CRYSTAL_BOW_FULL, null, CRYSTAL_BOW_PROJECTILE_ID, 0)
 
     private static NO_GROUND_DROP: Set<Ammunition> = new Set([
         Ammunition.BRONZE_JAVELIN,
@@ -275,6 +277,9 @@ export class Ammunition {
     public static getFor(p: Player): Ammunition {
         // First try to get a throw weapon as ammo
         const weapon = Number(p.getEquipment().getItems()[Equipment.WEAPON_SLOT].getId());
+        if (isCrystalBow(weapon)) {
+            return Ammunition.CRYSTAL_BOW;
+        }
         const throwWeapon = Ammunition.rangedAmmunition.get(weapon);
 
         // Toxic blowpipe should always fire dragon darts.
@@ -343,6 +348,7 @@ export class RangedWeaponType {
     static get LONGBOW() { const FT: any = getFightType(); return new RangedWeaponType(9, 10, FT?.LONGBOW_LONGRANGE ?? null); }
     static get BLOWPIPE() { const FT: any = getFightType(); return new RangedWeaponType(5, 7, FT?.BLOWPIPE_LONGRANGE ?? null); }
     static get SHORTBOW() { const FT: any = getFightType(); return new RangedWeaponType(7, 9, FT?.SHORTBOW_LONGRANGE ?? null); }
+    static get CRYSTAL_BOW() { const FT: any = getFightType(); return new RangedWeaponType(10, 10, FT?.SHORTBOW_LONGRANGE ?? null); }
     static get CROSSBOW() { const FT: any = getFightType(); return new RangedWeaponType(7, 9, FT?.CROSSBOW_LONGRANGE ?? null); }
     static get BALLISTA() { const FT: any = getFightType(); return new RangedWeaponType(7, 9, FT?.BALLISTA_LONGRANGE ?? null); }
 
@@ -375,6 +381,7 @@ export class RangedWeapon {
     public static readonly YEW_SHORTBOW = new RangedWeapon([857], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW], RangedWeaponType.SHORTBOW)
     public static readonly MAGIC_LONGBOW = new RangedWeapon([859], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW, Ammunition.BROAD_ARROW], RangedWeaponType.LONGBOW)
     public static readonly MAGIC_SHORTBOW = new RangedWeapon([861, ItemIdentifiers.MAGIC_SHORTBOW_I_, ItemIdentifiers.MAGIC_SHORTBOW_3], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW, Ammunition.BROAD_ARROW], RangedWeaponType.SHORTBOW)
+    public static readonly CRYSTAL_BOW = new RangedWeapon(CRYSTAL_BOW_ALL_WEAPON_IDS, [Ammunition.CRYSTAL_BOW], RangedWeaponType.CRYSTAL_BOW)
     public static readonly GODBOW = new RangedWeapon([19143, 19149, 19146], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.BROAD_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.SHORTBOW)
     public static readonly ZARYTE_BOW = new RangedWeapon([20171], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.BROAD_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.SHORTBOW)
 

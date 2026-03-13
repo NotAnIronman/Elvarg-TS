@@ -20,6 +20,11 @@ export class CombatEquipment {
         [LEG_SLOT, 8840],
         [HANDS_SLOT, 8842],
     ];
+    public static readonly ELITE_VOID_ARMOUR: [number, number][] = [
+        [BODY_SLOT, ItemIdentifiers.ELITE_VOID_TOP],
+        [LEG_SLOT, ItemIdentifiers.ELITE_VOID_ROBE],
+        [HANDS_SLOT, ItemIdentifiers.VOID_KNIGHT_GLOVES],
+    ];
     public static readonly OBSIDIAN_WEAPONS = [
         746, 747, 6523, 6525, 6526, 6527, 6528
     ];
@@ -54,6 +59,26 @@ export class CombatEquipment {
             attackType == CombatType.RANGED ? CombatEquipment.RANGED_VOID_HELM : CombatEquipment.MELEE_VOID_HELM;
         const equipmentItems = player.getEquipment().getItems();
         for (let [slot, id] of CombatEquipment.VOID_ARMOUR) {
+            if (equipmentItems[slot].getId() == id) {
+                correctEquipment++;
+            }
+        }
+        if (equipmentItems[SHIELD_SLOT].getId() == CombatEquipment.VOID_KNIGHT_DEFLECTOR) {
+            correctEquipment++;
+        }
+        return correctEquipment >= 3 && equipmentItems[HEAD_SLOT].getId() == helmet;
+    }
+
+    public static wearingEliteVoid(player: Player, attackType: CombatType): boolean {
+        let correctEquipment = 0;
+        const helmet =
+            attackType == CombatType.MAGIC
+                ? CombatEquipment.MAGE_VOID_HELM
+                : attackType == CombatType.RANGED
+                ? CombatEquipment.RANGED_VOID_HELM
+                : CombatEquipment.MELEE_VOID_HELM;
+        const equipmentItems = player.getEquipment().getItems();
+        for (let [slot, id] of CombatEquipment.ELITE_VOID_ARMOUR) {
             if (equipmentItems[slot].getId() == id) {
                 correctEquipment++;
             }

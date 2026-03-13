@@ -106,7 +106,7 @@ export class RangedCombatMethod extends CombatMethod {
             character.performGraphic(ammo.getStartGraphic());
         }
 
-        if (!ammo || !rangedWeapon) {
+        if (!rangedWeapon || !ammo) {
             return;
         }
 

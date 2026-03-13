@@ -1,5 +1,6 @@
 "use strict";
 
+const { World } = require("../../../src/main/typescript/elvarg/game/World");
 const { ItemDefinition } = require("../../../src/main/typescript/elvarg/game/definition/ItemDefinition");
 const { ItemOnGroundManager } = require("../../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { Equipment } = require("../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
@@ -9,6 +10,7 @@ const { ItemIds } = require("../../../src/main/typescript/elvarg/util/IdEnums");
 const {
   ATTR_BOT_PVP_PROFILE_ID,
   ATTR_CUSTOM_DEATH_LOOT_DROPPED,
+  ATTR_RECRUIT_OWNER_USERNAME,
 } = require("./BotRecruitConstants");
 const { PvpProfileId } = require("../behaviours/pvp/PvpProfileRegistry");
 
@@ -85,24 +87,64 @@ function resolveProfileId(victim, runtime) {
   );
 }
 
+function resolveBloodMoneyRecipient(killer) {
+  if (!killer) {
+    return null;
+  }
+  if (isRealPlayer(killer)) {
+    return {
+      recipient: killer,
+      viaBot: null,
+    };
+  }
+  if (killer?.isPlayerBot?.() !== true) {
+    return null;
+  }
+
+  const ownerUsername = killer.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME);
+  if (!ownerUsername) {
+    return null;
+  }
+
+  const owner = World.getPlayerByName(ownerUsername);
+  if (!isRealPlayer(owner)) {
+    return null;
+  }
+
+  return {
+    recipient: owner,
+    viaBot: killer,
+  };
+}
+
 function rewardBloodMoney(killer, victim, amount) {
-  if (!killer || amount <= 0) {
+  const payout = resolveBloodMoneyRecipient(killer);
+  if (!payout?.recipient || amount <= 0) {
     return;
   }
+
+  const recipient = payout.recipient;
+  const viaBot = payout.viaBot;
   victim.setAttribute?.(ATTR_CUSTOM_DEATH_LOOT_DROPPED, true);
   if (
-    killer.getInventory?.().contains?.(ItemIdentifiers.BLOOD_MONEY) ||
-    (killer.getInventory?.().getFreeSlots?.() ?? 0) > 0
+    recipient.getInventory?.().contains?.(ItemIdentifiers.BLOOD_MONEY) ||
+    (recipient.getInventory?.().getFreeSlots?.() ?? 0) > 0
   ) {
-    killer.getInventory().adds(ItemIdentifiers.BLOOD_MONEY, amount);
+    recipient.getInventory().adds(ItemIdentifiers.BLOOD_MONEY, amount);
   } else {
     ItemOnGroundManager.registerNonGlobals(
-      killer,
+      recipient,
       new Item(ItemIdentifiers.BLOOD_MONEY, amount),
       victim.getLocation?.()?.clone?.() ?? victim.getLocation?.()
     );
   }
-  killer
+  if (viaBot) {
+    recipient.getPacketSender?.().sendMessage?.(
+      `${viaBot.getUsername?.() ?? "Your bot"} has given you ${amount} blood money from his kill.`
+    );
+    return;
+  }
+  recipient
     .getPacketSender?.()
     .sendMessage?.(`You've received ${amount} blood money for that kill!`);
 }

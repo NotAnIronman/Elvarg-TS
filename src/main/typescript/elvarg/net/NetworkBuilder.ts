@@ -296,7 +296,7 @@ class LoginSession {
 
     const player: PlayerState = {
       username,
-      index: 1,
+      index: 0,
       location: { x: 3089, y: 3524, plane: 0 },
       appearance: this.defaultAppearance(),
     };
@@ -618,6 +618,11 @@ class LoginSession {
 
   private sendInitialPackets(player: PlayerState): number {
     const { location, appearance, username, index } = player;
+    const gamePlayerIndex = this.gamePlayer?.getIndex?.();
+    const detailsIndex =
+      Number.isInteger(gamePlayerIndex) && gamePlayerIndex > 0
+        ? gamePlayerIndex
+        : index;
     // Match Java PacketSender#sendMapRegion semantics:
     // wire values are location.getRegionX()+6 where getRegionX() is (x>>3)-6 => (x>>3).
     const regionX = location.x >> 3;
@@ -675,8 +680,8 @@ class LoginSession {
     // Details (249)
     const details = Buffer.alloc(3);
     details.writeUInt8(((1 + 128) & 0xff) >>> 0, 0);
-    details.writeUInt8(((index >> 8) & 0xff) >>> 0, 1);
-    details.writeUInt8((index & 0xff) >>> 0, 2);
+    details.writeUInt8(((detailsIndex >> 8) & 0xff) >>> 0, 1);
+    details.writeUInt8((detailsIndex & 0xff) >>> 0, 2);
     this.sendPacket(249, details, PacketType.FIXED, "player_details");
 
     // Tabs (71)
