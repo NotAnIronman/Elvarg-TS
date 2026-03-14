@@ -19,12 +19,19 @@ function isPresetActive(player) {
 }
 
 function clearPresetState(player) {
+  commitPresetState(player, { clearSelection: true });
+}
+
+function commitPresetState(player, options = {}) {
   if (!player) {
-    return;
+    return false;
   }
   player.removeFlag?.(PlayerFlags.PRESET_ACTIVE);
   player.setAttribute?.(PlayerFlagAttributes.PRESET_SNAPSHOT, null);
-  player.setCurrentPreset?.(null);
+  if (options.clearSelection === true) {
+    player.setCurrentPreset?.(null);
+  }
+  return true;
 }
 
 function loadSnapshotFromPersistence(player) {
@@ -126,6 +133,7 @@ module.exports = {
   isPresetActive,
   hasPresetSnapshot,
   clearPresetState,
+  commitPresetState,
   markPresetActiveWithSnapshot,
   resolvePresetSnapshot,
   restorePresetSnapshot,

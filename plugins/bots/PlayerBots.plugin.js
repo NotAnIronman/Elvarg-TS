@@ -68,8 +68,8 @@ const BOT_TREE_OPTIONS = Object.freeze({
 
 const BOT_CONFIG = Object.freeze({
   behaviorMode: BOT_BEHAVIOR_MODE,
-  botCount: 85,
-  wildernessRoamerBotCount: 760,
+  botCount: 0,
+  wildernessRoamerBotCount: 845,
   botWalkRadius: 10,
   objectIndexCachePath: path.join(
     process.cwd(),

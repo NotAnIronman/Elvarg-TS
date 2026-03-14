@@ -14,7 +14,6 @@ const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
-const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
@@ -22,6 +21,7 @@ const {
   isPresetActive,
   hasPresetSnapshot,
   clearPresetState,
+  commitPresetState,
   markPresetActiveWithSnapshot,
   restorePresetSnapshot,
 } = require("./PresetsState");
@@ -240,8 +240,25 @@ function getSpellbookDisplayName(spellbook) {
   return "Normal";
 }
 
+function shouldKeepPresetReversible(player) {
+  if (!player) {
+    return false;
+  }
+  if (isPlayerBot(player)) {
+    return true;
+  }
+  return !Wilderness.isIn(player) && !player.getDueling().inDuel();
+}
+
 function isPresetBlockedInWilderness(player) {
-  return Wilderness.isIn(player) && !isPlayerBot(player) && player.getRights() !== PlayerRights.DEVELOPER;
+  return Wilderness.isIn(player) && !isPlayerBot(player);
+}
+
+function commitPresetIfNeeded(player) {
+  if (!player || isPlayerBot(player) || !isPresetActive(player)) {
+    return false;
+  }
+  return commitPresetState(player);
 }
 
 function openPresetInterface(player, preset = null) {
@@ -328,14 +345,8 @@ function applyPreset(player, preset) {
   const oldCombatLevel = player.getSkillManager().getCombatLevel();
 
   sender.sendInterfaceRemoval();
-
   if (isPresetBlockedInWilderness(player)) {
     sender.sendMessage("You can't load a preset in the wilderness!");
-    return false;
-  }
-
-  if (player.getDueling().inDuel()) {
-    sender.sendMessage("You can't load a preset during a duel!");
     return false;
   }
   const alreadyPresetActive = isPresetActive(player) && hasPresetSnapshot(player);
@@ -467,10 +478,14 @@ function applyPreset(player, preset) {
   player.setSpecialPercentage(100);
   CombatSpecial.updateBar(player);
   player.getUpdateFlag().flag(Flag.APPEARANCE);
-  markPresetActiveWithSnapshot(player, {
-    snapshot: alreadyPresetActive ? undefined : prePresetSnapshot,
-    setFlag: true,
-  });
+  if (shouldKeepPresetReversible(player)) {
+    markPresetActiveWithSnapshot(player, {
+      snapshot: alreadyPresetActive ? undefined : prePresetSnapshot,
+      setFlag: true,
+    });
+  } else {
+    commitPresetState(player);
+  }
   return true;
 }
 
@@ -693,56 +708,23 @@ function isAtDefaultRespawn(player) {
 }
 
 function handlePresetTradeRestriction(player, target) {
-  const playerPresetActive = isPresetActive(player);
-  const targetPresetActive = isPresetActive(target);
-  if (!playerPresetActive && !targetPresetActive) {
-    return false;
-  }
-
-  player
-    ?.getPacketSender?.()
-    ?.sendMessage?.("You cannot trade while a Preset is active.");
-
-  if (targetPresetActive) {
-    const requesterName = player?.getUsername?.() ?? "A player";
-    target
-      ?.getPacketSender?.()
-      ?.sendMessage?.(
-        `${requesterName} wants to trade with you, but you cannot trade while a Preset is active.`
-      );
-  }
-
-  return true;
+  commitPresetIfNeeded(player);
+  commitPresetIfNeeded(target);
+  return false;
 }
 
 function handlePresetBankRestriction(player) {
-  if (!isPresetActive(player)) {
-    return false;
-  }
-  player
-    ?.getPacketSender?.()
-    ?.sendMessage?.("You cannot open the bank while a Preset is active.");
-  return true;
+  commitPresetIfNeeded(player);
+  return false;
 }
 
 function handlePresetShopRestriction(player) {
-  if (!isPresetActive(player)) {
-    return false;
-  }
-  player
-    ?.getPacketSender?.()
-    ?.sendMessage?.("You cannot open shops while a Preset is active.");
-  return true;
+  commitPresetIfNeeded(player);
+  return false;
 }
 
 function applyPresetItemDropPolicy(event) {
-  const player = event?.player;
-  if (!isPresetActive(player)) {
-    return;
-  }
-  // Preset mode still allows drop actions, but dropped items must not enter the
-  // world economy. Let core remove the item and suppress the ground spawn only.
-  event.dropToGround = false;
+  commitPresetIfNeeded(event?.player);
 }
 
 module.exports = {
@@ -789,9 +771,7 @@ module.exports = {
     });
 
     api.onShouldDropItemsOnDeath((event) => {
-      if (isPresetActive(event.player)) {
-        event.shouldDrop = false;
-      }
+      commitPresetIfNeeded(event.player);
     });
 
     api.onPlayerDefeated(({ victim }) => {
@@ -799,9 +779,9 @@ module.exports = {
         return;
       }
 
-      const shouldRestorePreset = isPresetActive(victim);
+      commitPresetIfNeeded(victim);
       const shouldOpenPresetInterface = victim.isOpenPresetsOnDeath?.() === true;
-      if (!shouldRestorePreset && !shouldOpenPresetInterface) {
+      if (!shouldOpenPresetInterface) {
         return;
       }
 
@@ -815,10 +795,6 @@ module.exports = {
             this.stop();
             if (!victim || !victim.isRegistered?.() || victim.getHitpoints?.() <= 0) {
               return;
-            }
-
-            if (shouldRestorePreset) {
-              restorePresetSnapshot(victim, { preserveLocation: true });
             }
 
             if (shouldOpenPresetInterface && isAtDefaultRespawn(victim)) {

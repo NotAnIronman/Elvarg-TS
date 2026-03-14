@@ -6,50 +6,11 @@ const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const {
+  commitPresetState,
   isPresetActive,
-  resolvePresetSnapshot,
-  restorePresetSnapshot,
 } = require("../interface/PresetsState");
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
-function openPresetDitchPrompt(api, player, ditchY, sourceY) {
-  if (!api || !player) {
-    return;
-  }
-  const presetSnapshot = resolvePresetSnapshot(player);
-  const snapshotOverride =
-    presetSnapshot && typeof presetSnapshot.applyToPlayer === "function"
-      ? presetSnapshot
-      : null;
-
-  api.sendMultiChatboxPrompt(
-    player,
-    "Presets Forbidden",
-    "Remove the preset and cross",
-    () => {
-      const restored = restorePresetSnapshot(player, {
-        preserveLocation: true,
-        snapshotOverride,
-      });
-      if (!restored) {
-        player
-          .getPacketSender()
-          .sendMessage("Unable to remove your active preset right now.");
-        return;
-      }
-      player
-        .getPacketSender()
-        .sendMessage(
-          "Preset cleared. Your original character state has been restored."
-        );
-      tryCrossWildernessDitch(player, ditchY, sourceY, {
-        skipPresetPrompt: true,
-      });
-    },
-    "I'll stay here for now",
-    () => {}
-  );
-}
 
 function resolveDitchYOffset(player, ditchY, sourceY) {
   const thresholdY = Number.isInteger(ditchY) ? ditchY + 1 : 3522;
@@ -71,9 +32,8 @@ function tryCrossWildernessDitch(player, ditchY, sourceY, options = {}) {
   }
 
   const yOffset = resolveDitchYOffset(player, ditchY, sourceY);
-  if (yOffset < 0 && options.skipPresetPrompt !== true && isPresetActive(player)) {
-    openPresetDitchPrompt(options.promptApi, player, ditchY, sourceY);
-    return { crossed: false, reason: "preset_confirmation_required", elapsed };
+  if (yOffset < 0 && isPresetActive(player)) {
+    commitPresetState(player);
   }
 
   const crossDitch = new Location(0, yOffset);
@@ -98,9 +58,7 @@ module.exports = {
     api.onObjectFirstClick(
       WILDERNESS_DITCH_OBJECT_ID,
       ({ player, location, sourceLocation }) =>
-        tryCrossWildernessDitch(player, location?.y, sourceLocation?.y, {
-          promptApi: api,
-        })
+        tryCrossWildernessDitch(player, location?.y, sourceLocation?.y)
     );
   },
 };

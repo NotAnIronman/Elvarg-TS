@@ -1,5 +1,6 @@
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const { PrayerHandler } = require("../../../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const {
   CombatFactory,
   CanAttackResponse,
@@ -63,6 +64,22 @@ const PVP_PHASE = Object.freeze({
   COMBAT: "combat",
   DEAD: "dead",
 });
+const MANAGED_PVP_PRAYERS = Object.freeze([
+  PrayerHandler.PROTECT_FROM_MAGIC,
+  PrayerHandler.PROTECT_FROM_MISSILES,
+  PrayerHandler.PROTECT_FROM_MELEE,
+  PrayerHandler.PIETY,
+  PrayerHandler.CHIVALRY,
+  PrayerHandler.ULTIMATE_STRENGTH,
+  PrayerHandler.RIGOUR,
+  PrayerHandler.EAGLE_EYE,
+  PrayerHandler.HAWK_EYE,
+  PrayerHandler.SHARP_EYE,
+  PrayerHandler.AUGURY,
+  PrayerHandler.MYSTIC_MIGHT,
+  PrayerHandler.MYSTIC_LORE,
+  PrayerHandler.MYSTIC_WILL,
+]);
 
 function hashUsername(value) {
   const text = typeof value === "string" ? value : "";
@@ -139,6 +156,7 @@ class PvpBehavior {
       scheduleCombatAction,
       scheduleSpecReview,
       scheduleReviewTimers,
+      getProfile: (state) => this.getProfile(state),
       pvpPhase: PVP_PHASE,
     });
   }
@@ -213,6 +231,17 @@ class PvpBehavior {
     );
   }
 
+  clearManagedPvpPrayers(player) {
+    if (!player) {
+      return;
+    }
+    for (const prayerId of MANAGED_PVP_PRAYERS) {
+      if (PrayerHandler.isActivated(player, prayerId)) {
+        PrayerHandler.deactivatePrayer(player, prayerId);
+      }
+    }
+  }
+
   resetSeekingState(player, state, nowMs, reason) {
     if (!player || !state) {
       return false;
@@ -226,6 +255,7 @@ class PvpBehavior {
     state.pvp.currentTargetScore = 0;
     state.pvp.targetLockUntil = 0;
     state.pvp.endsAt = 0;
+    this.clearManagedPvpPrayers(player);
     state.pvp.nextActionAt =
       nowMs +
       randomInRange(SEEKING_RESET_STAGGER_MIN_MS, SEEKING_RESET_STAGGER_MAX_MS) +
@@ -1142,6 +1172,7 @@ class PvpBehavior {
     }
     this.setPhase(state, reason === "dead" ? PVP_PHASE.DEAD : PVP_PHASE.IDLE);
     resetMovementState(player);
+    this.clearManagedPvpPrayers(player);
     setModeRoaming(player, state, this.behaviorMode);
 
     if (state?.autonomy) {

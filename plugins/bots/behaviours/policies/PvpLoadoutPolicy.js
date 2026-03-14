@@ -176,6 +176,8 @@ function fillFood(inventory, foodId, count) {
 }
 
 const MAGE_HATS = Object.freeze([
+  ItemIdentifiers.SKELETAL_HELM,
+  ItemIdentifiers.SKELETAL_HELM_2,
   ItemIdentifiers.MYSTIC_HAT,
   ItemIdentifiers.MYSTIC_HAT_DARK_,
   ItemIdentifiers.MYSTIC_HAT_LIGHT_,
@@ -188,6 +190,8 @@ const MAGE_HATS = Object.freeze([
 ]);
 
 const MAGE_BODIES = Object.freeze([
+  ItemIdentifiers.SKELETAL_TOP,
+  ItemIdentifiers.SKELETAL_TOP_2,
   ItemIdentifiers.MYSTIC_ROBE_TOP,
   ItemIdentifiers.MYSTIC_ROBE_TOP_DARK_,
   ItemIdentifiers.MYSTIC_ROBE_TOP_LIGHT_,
@@ -200,6 +204,8 @@ const MAGE_BODIES = Object.freeze([
 ]);
 
 const MAGE_LEGS = Object.freeze([
+  ItemIdentifiers.SKELETAL_BOTTOMS,
+  ItemIdentifiers.SKELETAL_BOTTOMS_2,
   ItemIdentifiers.MYSTIC_ROBE_BOTTOM,
   ItemIdentifiers.MYSTIC_ROBE_BOTTOM_DARK_,
   ItemIdentifiers.MYSTIC_ROBE_BOTTOM_LIGHT_,
@@ -212,6 +218,8 @@ const MAGE_LEGS = Object.freeze([
 ]);
 
 const MAGE_GLOVES = Object.freeze([
+  ItemIdentifiers.SKELETAL_GLOVES,
+  ItemIdentifiers.SKELETAL_GLOVES_2,
   ItemIdentifiers.MYSTIC_GLOVES,
   ItemIdentifiers.MYSTIC_GLOVES_DARK_,
   ItemIdentifiers.MYSTIC_GLOVES_LIGHT_,
@@ -222,6 +230,8 @@ const MAGE_GLOVES = Object.freeze([
 ]);
 
 const MAGE_BOOTS = Object.freeze([
+  ItemIdentifiers.SKELETAL_BOOTS,
+  ItemIdentifiers.SKELETAL_BOOTS_2,
   ItemIdentifiers.MYSTIC_BOOTS,
   ItemIdentifiers.MYSTIC_BOOTS_DARK_,
   ItemIdentifiers.MYSTIC_BOOTS_LIGHT_,
@@ -376,6 +386,8 @@ const F2P_MAGE_LEGS = Object.freeze([
 ]);
 
 const HYBRID_MAGE_TOPS = Object.freeze([
+  ItemIdentifiers.SKELETAL_TOP,
+  ItemIdentifiers.SKELETAL_TOP_2,
   ItemIdentifiers.MYSTIC_ROBE_TOP,
   ItemIdentifiers.MYSTIC_ROBE_TOP_DARK_,
   ItemIdentifiers.MYSTIC_ROBE_TOP_LIGHT_,
@@ -387,6 +399,10 @@ const HYBRID_MAGE_TOPS = Object.freeze([
 ]);
 
 const HYBRID_RANGE_LEGS = Object.freeze([
+  ItemIdentifiers.SKELETAL_BOTTOMS,
+  ItemIdentifiers.SKELETAL_BOTTOMS_2,
+  ItemIdentifiers.MYSTIC_ROBE_BOTTOM,
+  ItemIdentifiers.SPLITBARK_LEGS,
   ItemIdentifiers.BLACK_DHIDE_CHAPS,
   ItemIdentifiers.RED_DHIDE_CHAPS,
   ItemIdentifiers.BLUE_DHIDE_CHAPS,
@@ -409,6 +425,38 @@ function chooseHybridWearSet() {
     boots: choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.CLIMBING_BOOTS, ...MAGE_BOOTS, ...RANGE_BOOTS]),
     offhand: choose(MAGE_OFFHANDS),
   };
+}
+
+function chooseEdgeMeleeBody(profile) {
+  const options = [
+    ItemIdentifiers.RUNE_PLATEBODY,
+    ItemIdentifiers.RUNE_CHAINBODY,
+    ItemIdentifiers.FIGHTER_TORSO,
+  ];
+  if (isVeteranOrEliteProfile(profile)) {
+    options.push(ItemIdentifiers.GRANITE_BODY);
+  }
+  return choose(options);
+}
+
+function chooseEdgeMeleeLegs(profile) {
+  const options = [
+    ItemIdentifiers.RUNE_PLATELEGS,
+    ItemIdentifiers.RUNE_PLATESKIRT,
+    ItemIdentifiers.OBSIDIAN_PLATELEGS,
+  ];
+  if (isEliteProfile(profile)) {
+    options.push(ItemIdentifiers.DRAGON_PLATELEGS);
+  }
+  return choose(options);
+}
+
+function chooseEdgeMeleeOffhand(profile) {
+  const options = [ItemIdentifiers.RUNE_DEFENDER];
+  if (isVeteranOrEliteProfile(profile)) {
+    options.push(ItemIdentifiers.DRAGON_DEFENDER);
+  }
+  return choose(options);
 }
 
 function chooseAncientsHybridWearSet(profile) {
@@ -1169,13 +1217,9 @@ const ARCHETYPES = Object.freeze({
         item(choose([ItemIdentifiers.OBSIDIAN_CAPE, ItemIdentifiers.STRENGTH_CAPE_T_])),
         item(ItemIdentifiers.ABYSSAL_WHIP),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(
-          isVeteranOrEliteProfile(profile)
-            ? ItemIdentifiers.FIGHTER_TORSO
-            : ItemIdentifiers.RUNE_PLATEBODY
-        ),
-        item(ItemIdentifiers.RUNE_DEFENDER),
-        item(ItemIdentifiers.RUNE_PLATELEGS),
+        item(chooseEdgeMeleeBody(profile)),
+        item(chooseEdgeMeleeOffhand(profile)),
+        item(chooseEdgeMeleeLegs(profile)),
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.CLIMBING_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
@@ -1204,13 +1248,9 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.OBSIDIAN_CAPE),
         item(ItemIdentifiers.ABYSSAL_WHIP),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(
-          isVeteranOrEliteProfile(profile)
-            ? ItemIdentifiers.FIGHTER_TORSO
-            : ItemIdentifiers.RUNE_PLATEBODY
-        ),
-        item(ItemIdentifiers.RUNE_DEFENDER),
-        item(ItemIdentifiers.RUNE_PLATELEGS),
+        item(chooseEdgeMeleeBody(profile)),
+        item(chooseEdgeMeleeOffhand(profile)),
+        item(chooseEdgeMeleeLegs(profile)),
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(ItemIdentifiers.CLIMBING_BOOTS),
         item(ItemIdentifiers.RING_OF_RECOIL),
@@ -1234,13 +1274,9 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.OBSIDIAN_CAPE),
         item(ItemIdentifiers.DRAGON_SCIMITAR),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(
-          isVeteranOrEliteProfile(profile)
-            ? ItemIdentifiers.FIGHTER_TORSO
-            : ItemIdentifiers.RUNE_PLATEBODY
-        ),
-        item(ItemIdentifiers.RUNE_DEFENDER),
-        item(ItemIdentifiers.RUNE_PLATELEGS),
+        item(chooseEdgeMeleeBody(profile)),
+        item(chooseEdgeMeleeOffhand(profile)),
+        item(chooseEdgeMeleeLegs(profile)),
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(ItemIdentifiers.CLIMBING_BOOTS),
         item(ItemIdentifiers.RING_OF_RECOIL),
@@ -1636,9 +1672,9 @@ const ARCHETYPES = Object.freeze({
         item(choose([ItemIdentifiers.OBSIDIAN_CAPE, ItemIdentifiers.AVAS_ACCUMULATOR, wear.cape])),
         item(mainHand),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(usingRangeMainHand ? wear.body : choose([ItemIdentifiers.RUNE_PLATEBODY, wear.body])),
-        item(usingRangeMainHand ? null : choose([ItemIdentifiers.RUNE_DEFENDER, wear.offhand])),
-        item(usingRangeMainHand ? wear.legs : choose([ItemIdentifiers.RUNE_PLATELEGS, wear.legs])),
+        item(usingRangeMainHand ? wear.body : choose([chooseEdgeMeleeBody(), wear.body])),
+        item(usingRangeMainHand ? null : choose([chooseEdgeMeleeOffhand(), wear.offhand])),
+        item(usingRangeMainHand ? wear.legs : choose([chooseEdgeMeleeLegs(), wear.legs])),
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
@@ -1675,9 +1711,9 @@ const ARCHETYPES = Object.freeze({
         item(choose([ItemIdentifiers.AVAS_ACCUMULATOR, ItemIdentifiers.OBSIDIAN_CAPE, wear.cape])),
         item(mainHand),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(usingRangeMainHand ? choose([ItemIdentifiers.BLACK_DHIDE_BODY, wear.body]) : choose([ItemIdentifiers.RUNE_PLATEBODY, wear.body])),
+        item(usingRangeMainHand ? choose([ItemIdentifiers.BLACK_DHIDE_BODY, wear.body]) : choose([chooseEdgeMeleeBody(), wear.body, ItemIdentifiers.BLACK_DHIDE_BODY])),
         null,
-        item(usingRangeMainHand ? choose([ItemIdentifiers.BLACK_DHIDE_CHAPS, wear.legs]) : choose([ItemIdentifiers.RUNE_PLATELEGS, wear.legs])),
+        item(usingRangeMainHand ? choose([ItemIdentifiers.BLACK_DHIDE_CHAPS, wear.legs]) : choose([chooseEdgeMeleeLegs(), wear.legs, ItemIdentifiers.BLACK_DHIDE_CHAPS])),
         item(choose([ItemIdentifiers.MITHRIL_GLOVES, wear.gloves])),
         item(choose([ItemIdentifiers.CLIMBING_BOOTS, wear.boots])),
         item(ItemIdentifiers.RING_OF_RECOIL),
@@ -1706,9 +1742,9 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.OBSIDIAN_CAPE),
         item(ItemIdentifiers.DRAGON_SCIMITAR),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(ItemIdentifiers.RUNE_PLATEBODY),
-        item(ItemIdentifiers.RUNE_DEFENDER),
-        item(ItemIdentifiers.RUNE_PLATELEGS),
+        item(chooseEdgeMeleeBody()),
+        item(chooseEdgeMeleeOffhand()),
+        item(chooseEdgeMeleeLegs()),
         item(ItemIdentifiers.MITHRIL_GLOVES),
         item(ItemIdentifiers.CLIMBING_BOOTS),
         item(ItemIdentifiers.RING_OF_RECOIL),
@@ -1782,9 +1818,9 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.OBSIDIAN_CAPE),
         item(ItemIdentifiers.ABYSSAL_WHIP),
         item(ItemIdentifiers.AMULET_OF_GLORY),
-        item(ItemIdentifiers.FIGHTER_TORSO),
-        item(ItemIdentifiers.RUNE_DEFENDER),
-        item(ItemIdentifiers.RUNE_PLATELEGS),
+        item(choose([ItemIdentifiers.FIGHTER_TORSO, ItemIdentifiers.GRANITE_BODY])),
+        item(chooseEdgeMeleeOffhand({ id: "elite" })),
+        item(chooseEdgeMeleeLegs({ id: "elite" })),
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(ItemIdentifiers.DRAGON_BOOTS),
         item(ItemIdentifiers.RING_OF_RECOIL),
