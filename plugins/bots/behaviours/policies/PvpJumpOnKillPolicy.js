@@ -4,6 +4,13 @@ const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/cont
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 
 const IMMEDIATE_PJ_DURATION_MS = 30000;
+const DEFAULT_PJ_USE_CHANCE_BY_PROFILE = Object.freeze({
+  novice: 0.42,
+  standard: 0.66,
+  veteran: 0.88,
+  elite: 1,
+});
+const DEFAULT_PJ_MAX_RESPONDERS = 3;
 
 class PvpJumpOnKillPolicy {
   constructor(options = {}) {
@@ -20,35 +27,67 @@ class PvpJumpOnKillPolicy {
     );
   }
 
-  resolveSoloRealPlayerDamager(victim) {
+  resolvePrimaryRealPlayerDamager(victim, killer) {
+    if (
+      killer &&
+      killer.isPlayerBot?.() !== true &&
+      killer.isRegistered?.() &&
+      (killer.getHitpoints?.() ?? 0) > 0
+    ) {
+      return killer;
+    }
+
     const damageEntries = [
       ...((victim?.__recentDeathDamagerEntries ?? victim?.getCombat?.().getRecentDamagerEntries?.()) ??
         []),
     ];
-    if (damageEntries.length !== 1) {
-      return null;
+    let bestTarget = null;
+    let bestDamage = -1;
+
+    for (const entry of damageEntries) {
+      const target = entry?.player;
+      if (!target || target.isPlayerBot?.() === true) {
+        continue;
+      }
+      if (!target.isRegistered?.() || (target.getHitpoints?.() ?? 0) <= 0) {
+        continue;
+      }
+
+      const damage = Number(entry?.damage ?? 0);
+      if (damage > bestDamage) {
+        bestTarget = target;
+        bestDamage = damage;
+      }
     }
 
-    const target = damageEntries[0]?.player;
-    if (!target || target.isPlayerBot?.() === true) {
-      return null;
-    }
-    if (!target.isRegistered?.() || (target.getHitpoints?.() ?? 0) <= 0) {
-      return null;
-    }
-    return target;
+    return bestTarget;
   }
 
-  resolveNearbyJumpBot(victim, target, distanceTiles) {
+  getPjUseChance(state) {
+    const profileId = state?.pvp?.profileId ?? "standard";
+    const configuredChance =
+      this.config?.pjUseChanceByProfile?.[profileId] ??
+      DEFAULT_PJ_USE_CHANCE_BY_PROFILE[profileId] ??
+      DEFAULT_PJ_USE_CHANCE_BY_PROFILE.standard;
+    if (!Number.isFinite(configuredChance)) {
+      return DEFAULT_PJ_USE_CHANCE_BY_PROFILE.standard;
+    }
+    return Math.max(0, Math.min(1, configuredChance));
+  }
+
+  shouldUsePj(state) {
+    return Math.random() <= this.getPjUseChance(state);
+  }
+
+  resolveNearbyJumpBots(victim, target, distanceTiles, maxResponders) {
     if (!victim || !target) {
-      return null;
+      return [];
     }
 
     const nearbyPlayers = World.getNearbyPlayersForUpdate?.(victim) ?? [];
     const victimLoc = victim.getLocation?.();
     const victimPrivateArea = victim.getPrivateArea?.();
-    let bestBot = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
+    const candidates = [];
 
     for (const candidate of nearbyPlayers) {
       if (!candidate || candidate === victim || candidate === target) {
@@ -68,6 +107,9 @@ class PvpJumpOnKillPolicy {
       if (!this.isPersistentPvpState(state)) {
         continue;
       }
+      if (!this.shouldUsePj(state)) {
+        continue;
+      }
 
       const candidateLoc = candidate.getLocation?.();
       if (
@@ -78,14 +120,14 @@ class PvpJumpOnKillPolicy {
         continue;
       }
       const distance = victimLoc.getDistance(candidateLoc);
-      if (distance > distanceTiles || distance >= bestDistance) {
+      if (distance > distanceTiles) {
         continue;
       }
-      bestBot = candidate;
-      bestDistance = distance;
+      candidates.push({ bot: candidate, state, distance });
     }
 
-    return bestBot;
+    candidates.sort((left, right) => left.distance - right.distance);
+    return candidates.slice(0, Math.max(1, maxResponders));
   }
 
   signalJump(bot, state, target, nowMs) {
@@ -113,31 +155,29 @@ class PvpJumpOnKillPolicy {
     return true;
   }
 
-  handle({ victim, nowMs = Date.now() }) {
+  handle({ killer, victim, nowMs = Date.now() }) {
     if (!victim || victim.isPlayerBot?.() !== true || !Wilderness.isIn(victim)) {
       return;
     }
 
-    const target = this.resolveSoloRealPlayerDamager(victim);
+    const target = this.resolvePrimaryRealPlayerDamager(victim, killer);
     if (!target || !Wilderness.isIn(target)) {
       return;
     }
 
-    const bot = this.resolveNearbyJumpBot(
+    const jumpCandidates = this.resolveNearbyJumpBots(
       victim,
       target,
-      Number(this.config.pjObserveDistanceTiles ?? 12)
+      Number(this.config.pjObserveDistanceTiles ?? 12),
+      Number(this.config.pjMaxResponders ?? DEFAULT_PJ_MAX_RESPONDERS)
     );
-    if (!bot) {
+    if (jumpCandidates.length === 0) {
       return;
     }
 
-    const state = this.botStatesByName.get(bot.getUsername?.());
-    if (!this.isPersistentPvpState(state)) {
-      return;
+    for (const candidate of jumpCandidates) {
+      this.signalJump(candidate.bot, candidate.state, target, nowMs);
     }
-
-    this.signalJump(bot, state, target, nowMs);
   }
 }
 

@@ -50,13 +50,21 @@ const COMBAT_SKILLS = [
 ];
 
 const GLOBAL_PRESETS = [
-  PredefinedPresets.OBBY_MAULER_57,
   PredefinedPresets.G_MAULER_70,
+  PredefinedPresets.OBBY_MAULER_57,
   PredefinedPresets.DDS_PURE_M_73,
   PredefinedPresets.DDS_PURE_R_73,
   PredefinedPresets.NH_PURE_83,
+  PredefinedPresets.ATT_60_ZERKER_94,
   PredefinedPresets.ATT_70_ZERKER_97,
   PredefinedPresets.MAIN_RUNE_126,
+  PredefinedPresets.MAIN_MELEE_126,
+  PredefinedPresets.MAIN_RCB_TANK_126,
+  PredefinedPresets.DHAROK_126,
+  PredefinedPresets.MAIN_BARRAGE_126,
+  PredefinedPresets.VOID_RANGER_126,
+  PredefinedPresets.VOID_MELEE_126,
+  PredefinedPresets.KARILS_TANK_126,
   PredefinedPresets.MAIN_HYBRID_126,
   PredefinedPresets.MAIN_TRIBRID_126,
 ];
@@ -274,6 +282,8 @@ function openPresetInterface(player, preset = null) {
   const sender = player.getPacketSender();
   const selected = preset ?? null;
   const playerPresets = ensurePlayerPresets(player);
+  const upperGlobalPresets = GLOBAL_PRESETS.slice(0, MAX_PRESETS);
+  const lowerGlobalPresets = GLOBAL_PRESETS.slice(MAX_PRESETS, MAX_PRESETS * 2);
 
   if (selected) {
     sender.sendString(`Presets - ${selected.getName()}`, 45002);
@@ -322,12 +332,15 @@ function openPresetInterface(player, preset = null) {
     sender.sendItemOnInterfaces(45044 + slot, item.getId(), item.getAmount());
   }
 
+  sender.sendString("@whi@Global Presets", 45080);
+  sender.sendString("@whi@More Global Presets", 45092);
+
   for (let i = 0; i < MAX_PRESETS; i++) {
-    sender.sendString(GLOBAL_PRESETS[i]?.getName?.() ?? "Empty", 45070 + i);
+    sender.sendString(upperGlobalPresets[i]?.getName?.() ?? "Empty", 45070 + i);
   }
 
   for (let i = 0; i < MAX_PRESETS; i++) {
-    sender.sendString(playerPresets[i]?.getName?.() ?? "Empty", 45082 + i);
+    sender.sendString(lowerGlobalPresets[i]?.getName?.() ?? "Empty", 45082 + i);
   }
 
   sender.sendConfig(987, player.isOpenPresetsOnDeath() ? 0 : 1);
@@ -674,12 +687,11 @@ function handlePresetButton(player, buttonId) {
 
   if (buttonId >= CUSTOM_PRESET_BUTTON_START && buttonId <= CUSTOM_PRESET_BUTTON_END) {
     const index = buttonId - CUSTOM_PRESET_BUTTON_START;
-    const presets = ensurePlayerPresets(player);
-    const preset = presets[index] ?? null;
-
+    const preset = GLOBAL_PRESETS[MAX_PRESETS + index] ?? null;
     if (!preset) {
-      openPresetInterface(player, null);
-      promptCreatePreset(player, index);
+      player
+        .getPacketSender()
+        .sendMessage("That preset is currently unavailable.");
       return true;
     }
 

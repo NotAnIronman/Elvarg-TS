@@ -63,7 +63,9 @@ class PvpCombatExecutionNode {
     this.tryStepOutOfStack = options.tryStepOutOfStack;
     this.maybeSwitchBackToPrimaryWeapon = options.maybeSwitchBackToPrimaryWeapon;
     this.maybeUseSpecialAttack = options.maybeUseSpecialAttack;
+    this.maybeRunPressureCombatScript = options.maybeRunPressureCombatScript;
     this.scheduleCombatAction = options.scheduleCombatAction;
+    this.scheduleFreezeReview = options.scheduleFreezeReview;
     this.scheduleSpecReview = options.scheduleSpecReview;
     this.scheduleReviewTimers = options.scheduleReviewTimers;
     this.getProfile = options.getProfile;
@@ -158,6 +160,13 @@ class PvpCombatExecutionNode {
     return [...MELEE_OFFENSIVE_PRAYERS];
   }
 
+  forcePrayerSync(player, state, target, nowMs) {
+    if (!player || !state || !target) {
+      return false;
+    }
+    return this.reviewPrayers(player, state, target, nowMs);
+  }
+
   tick(context) {
     const { player, state, nowMs, target } = context ?? {};
     const pvp = state?.pvp;
@@ -183,6 +192,24 @@ class PvpCombatExecutionNode {
       target,
       scheduleSpecReview: this.scheduleSpecReview,
     });
+    const profile = this.getProfile?.(state) ?? null;
+    const pressureResult = this.maybeRunPressureCombatScript?.({
+      player,
+      state,
+      nowMs,
+      target,
+      profile,
+      scheduleCombatAction: this.scheduleCombatAction,
+      scheduleFreezeReview: this.scheduleFreezeReview,
+    });
+    if (pressureResult?.handled === true) {
+      this.forcePrayerSync(player, state, target, nowMs);
+      this.setPhase?.(state, this.pvpPhase?.COMBAT ?? "combat");
+      if (nowMs >= (pvp.nextTargetReviewAt ?? 0)) {
+        this.scheduleReviewTimers?.(state, nowMs);
+      }
+      return "running";
+    }
     this.maybeSwitchBackToPrimaryWeapon?.({
       player,
       state,

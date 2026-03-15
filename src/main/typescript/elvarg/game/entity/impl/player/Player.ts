@@ -642,6 +642,8 @@ export class Player extends Mobile {
         this.getRelations().updateLists(false);
         BountyHunter.unassign(this);
         TaskManager.cancelTasks(this);
+        this.setHasVengeance(false);
+        this.getVengeanceTimer().stop();
         if (this.getAttribute?.(ATTR_SKIP_PERSISTENCE) !== true) {
             GameConstants.PLAYER_PERSISTENCE.save(this);
         }

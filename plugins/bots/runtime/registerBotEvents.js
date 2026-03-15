@@ -22,6 +22,9 @@ const {
   setModePvp,
 } = require("../behaviours/state/PlayerBotState");
 const {
+  randomInRange,
+} = require("../behaviours/navigation/BotNavigation");
+const {
   armRecruitFollowBack,
   recallRecruitedBot,
 } = require("./BotRecruitRuntime");
@@ -31,6 +34,10 @@ const {
 } = require("./BotDeathLoot");
 
 const CLAN_ASSIST_DURATION_MS = 30000;
+const BOT_RESPAWN_REACQUIRE_DELAY_MIN_MS = 3500;
+const BOT_RESPAWN_REACQUIRE_DELAY_MAX_MS = 7000;
+const ATTR_RECRUIT_SINGLEWAY_WARN_UNTIL = "botRecruitSinglewayWarnUntil";
+const RECRUIT_SINGLEWAY_WARN_COOLDOWN_MS = 5000;
 
 function resolveAttackedPlayer(packet) {
   const payload = packet?.getBuffer?.();
@@ -74,6 +81,56 @@ function canStartPlayerAttack(attacker, target) {
   );
 }
 
+function clearPersistentPvpRespawnAggro(victim, runtime, nowMs) {
+  if (!victim || victim.isPlayerBot?.() !== true) {
+    return;
+  }
+
+  const username = victim.getUsername?.();
+  if (!username) {
+    return;
+  }
+
+  const entry = runtime?.entriesByUsername?.get?.(username);
+  const state = entry?.state ?? runtime?.botStatesByName?.get?.(username);
+  if (
+    !state?.pvp ||
+    (state.autonomy?.wildernessRoamerPvp !== true &&
+      state.autonomy?.persistentPvpLoadout !== true)
+  ) {
+    return;
+  }
+
+  victim.getCombat?.().reset?.();
+  victim.getCombat?.().setUnderAttack?.(null);
+  victim.setFollowing?.(null);
+  victim.setCombatFollowing?.(null);
+  victim.setMobileInteraction?.(null);
+  victim.setPositionToFace?.(null);
+  victim.getMovementQueue?.().reset?.();
+
+  state.pvp.phase = "seeking";
+  state.pvp.targetUsername = null;
+  state.pvp.targetPlayer = null;
+  state.pvp.currentTargetScore = 0;
+  state.pvp.targetLockUntil = 0;
+  state.pvp.endsAt = 0;
+  state.pvp.pjTargetUsername = null;
+  state.pvp.pjExpiresAt = 0;
+  state.pvp.pjVictimUsername = null;
+  state.pvp.pjVictimExpiresAt = 0;
+  state.pvp.nextActionAt =
+    nowMs + randomInRange(BOT_RESPAWN_REACQUIRE_DELAY_MIN_MS, BOT_RESPAWN_REACQUIRE_DELAY_MAX_MS);
+
+  if (state.autonomy) {
+    state.autonomy.modeEndsAt = 0;
+    state.autonomy.nextDecisionAt = Math.max(
+      Number(state.autonomy.nextDecisionAt ?? 0),
+      state.pvp.nextActionAt
+    );
+  }
+}
+
 function sharesClanChat(left, right) {
   if (!left || !right || left === right) {
     return false;
@@ -83,16 +140,48 @@ function sharesClanChat(left, right) {
   return leftClan != null && leftClan === rightClan;
 }
 
-function handleClanRecruitAssist({ runtime, behaviorMode, player, packet, nowMs }) {
-  if (!runtime || !behaviorMode || !player || player.isPlayerBot?.() === true) {
-    return;
+function resolveClanRecruitCombatTarget(owner) {
+  if (!owner || owner.isPlayerBot?.() === true) {
+    return null;
   }
+  const candidate =
+    owner.getCombat?.().getTarget?.() ??
+    owner.getCombat?.().getAttacker?.() ??
+    owner.getCombatFollowing?.() ??
+    owner.getInteractingEntity?.() ??
+    null;
+  if (!candidate || candidate === owner) {
+    return null;
+  }
+  if (candidate.isPlayer?.() !== true || candidate.isRegistered?.() !== true) {
+    return null;
+  }
+  if ((candidate.getHitpoints?.() ?? 0) <= 0) {
+    return null;
+  }
+  return candidate;
+}
 
-  const target = resolveAttackedPlayer(packet);
-  if (!target || target === player || target.isRegistered?.() !== true) {
+function maybeWarnRecruitSingleway(bot, owner, nowMs) {
+  if (!bot || !owner) {
     return;
   }
-  if (!canStartPlayerAttack(player, target)) {
+  const warnUntil = Number(owner.getAttribute?.(ATTR_RECRUIT_SINGLEWAY_WARN_UNTIL) ?? 0);
+  if (Number.isFinite(warnUntil) && nowMs < warnUntil) {
+    return;
+  }
+  owner.setAttribute?.(
+    ATTR_RECRUIT_SINGLEWAY_WARN_UNTIL,
+    nowMs + RECRUIT_SINGLEWAY_WARN_COOLDOWN_MS
+  );
+  bot.forceChat?.("Sorry, not in multi- cant help");
+}
+
+function handleClanRecruitAssist({ runtime, behaviorMode, player, target, nowMs }) {
+  if (!runtime || !behaviorMode || !player || player.isPlayerBot?.() === true || !target) {
+    return;
+  }
+  if (target === player || target.isRegistered?.() !== true) {
     return;
   }
   if (sharesClanChat(player, target)) {
@@ -104,7 +193,6 @@ function handleClanRecruitAssist({ runtime, behaviorMode, player, packet, nowMs 
     return;
   }
 
-  let warnedSingle = false;
   for (const [botUsername, entry] of runtime.entriesByUsername ?? []) {
     const bot = entry?.player;
     const state = entry?.state;
@@ -119,24 +207,39 @@ function handleClanRecruitAssist({ runtime, behaviorMode, player, packet, nowMs 
     }
 
     if (!AreaManager.inMulti(player) || !AreaManager.inMulti(bot) || !AreaManager.inMulti(target)) {
-      if (!warnedSingle) {
-        bot.forceChat?.("Sorry, not in multi- cant help");
-        warnedSingle = true;
-      }
+      maybeWarnRecruitSingleway(bot, player, nowMs);
       continue;
     }
 
-    setModePvp(
-      bot,
-      state,
-      target,
-      nowMs,
-      CLAN_ASSIST_DURATION_MS,
-      behaviorMode,
-      { allowInCombatTransition: true }
-    );
-    bot.getMovementQueue?.().reset?.();
-    bot.getCombat?.().attack?.(target);
+    const targetUsername = target.getUsername?.();
+    const combat = bot.getCombat?.();
+    const alreadyHelping =
+      combat?.getTarget?.() === target ||
+      bot.getCombatFollowing?.() === target ||
+      state?.pvp?.targetPlayer === target ||
+      (targetUsername && state?.pvp?.targetUsername === targetUsername);
+
+    if (!alreadyHelping) {
+      setModePvp(
+        bot,
+        state,
+        target,
+        nowMs,
+        CLAN_ASSIST_DURATION_MS,
+        behaviorMode,
+        { allowInCombatTransition: true }
+      );
+      bot.getMovementQueue?.().reset?.();
+    } else if (state?.pvp) {
+      state.pvp.endsAt = Math.max(
+        Number(state.pvp.endsAt ?? 0),
+        nowMs + CLAN_ASSIST_DURATION_MS
+      );
+    }
+
+    if (combat?.getTarget?.() !== target) {
+      bot.getCombat?.().attack?.(target);
+    }
   }
 }
 
@@ -214,13 +317,6 @@ function registerBotEvents(options) {
 
   api.onEstablishedPacket((event) => {
     const nowMs = Date.now();
-    handleClanRecruitAssist({
-      runtime,
-      behaviorMode,
-      player: event?.player,
-      packet: event?.packet,
-      nowMs,
-    });
     followBackTrigger.handleEstablishedPacket(event, nowMs);
     combatReactionTrigger.handleEstablishedPacket(event, nowMs);
 
@@ -244,6 +340,23 @@ function registerBotEvents(options) {
     botApi.log("botme_auto_disabled_manual_input", { username, opcode });
   });
 
+  api.onPlayerProcess(({ player }) => {
+    if (!player || player.isPlayerBot?.() === true) {
+      return;
+    }
+    const target = resolveClanRecruitCombatTarget(player);
+    if (!target) {
+      return;
+    }
+    handleClanRecruitAssist({
+      runtime,
+      behaviorMode,
+      player,
+      target,
+      nowMs: Date.now(),
+    });
+  });
+
   api.onPlayerPathBlocked((event) => {
     const username = event?.username;
     if (!username || !runtime.playerBotUsernames.has(username)) {
@@ -261,6 +374,7 @@ function registerBotEvents(options) {
   if (avengeOpponentPolicy) {
     api.onPlayerDefeated((event) => {
       const victim = event?.victim;
+      clearPersistentPvpRespawnAggro(victim, runtime, Date.now());
       if (victim?.isPlayerBot?.() === true) {
         const recruitOwnerUsername = victim.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME);
         if (recruitOwnerUsername) {

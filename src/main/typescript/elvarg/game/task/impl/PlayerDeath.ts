@@ -189,6 +189,7 @@ export class PlayerDeathTask extends Task {
 
                     // Reset combat..
                     this.player.getCombat().reset();
+                    this.player.getCombat().setUnderAttack(null);
                     this.player.setFollowing(null);
                     this.player.setMobileInteraction(null);
                     this.player.setPositionToFace(null);

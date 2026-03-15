@@ -173,14 +173,15 @@ const BOT_CONFIG = Object.freeze({
   modeBehaviorOptions: BOT_MODE_BEHAVIOR_OPTIONS,
   treeOptions: BOT_TREE_OPTIONS,
   pvp: Object.freeze({
-    pjOpportunityWindowMs: 3500,
-    pjObserveDistanceTiles: 12,
+    pjOpportunityWindowMs: 6000,
+    pjObserveDistanceTiles: 18,
     pjUseChanceByProfile: Object.freeze({
-      novice: 0.18,
-      standard: 0.34,
-      veteran: 0.58,
-      elite: 0.8,
+      novice: 0.42,
+      standard: 0.66,
+      veteran: 0.88,
+      elite: 1,
     }),
+    pjMaxResponders: 3,
     profileWeights: Object.freeze([
       Object.freeze({ value: "novice", weight: 18 }),
       Object.freeze({ value: "standard", weight: 48 }),

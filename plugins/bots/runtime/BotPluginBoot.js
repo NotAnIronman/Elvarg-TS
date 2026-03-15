@@ -299,7 +299,14 @@ function bootPlayerBotsRuntime(options = {}) {
           state.pvp.currentTargetScore = 0;
           state.pvp.targetLockUntil = 0;
           state.pvp.endsAt = 0;
-          state.pvp.nextActionAt = nowMs;
+          player.getCombat?.().reset?.();
+          player.getCombat?.().setUnderAttack?.(null);
+          player.setFollowing?.(null);
+          player.setCombatFollowing?.(null);
+          player.setMobileInteraction?.(null);
+          player.setPositionToFace?.(null);
+          player.getMovementQueue?.().reset?.();
+          state.pvp.nextActionAt = nowMs + randomInRange(3500, 7000);
           state.pvp.phase = "seeking";
 
           applyGeneratedPvpLoadout(player, state, {

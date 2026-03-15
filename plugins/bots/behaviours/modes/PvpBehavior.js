@@ -34,6 +34,9 @@ const {
   maybeUseSpecialAttack,
 } = require("../policies/PvpSpecialAttackPolicy");
 const {
+  maybeRunPressureCombatScript,
+} = require("../policies/PvpPressureCombatPolicy");
+const {
   resetMovementState,
   setModePvp,
   setModeRoaming,
@@ -153,7 +156,9 @@ class PvpBehavior {
         this.tryStepOutOfStack(player, state, target, nowMs),
       maybeSwitchBackToPrimaryWeapon,
       maybeUseSpecialAttack,
+      maybeRunPressureCombatScript,
       scheduleCombatAction,
+      scheduleFreezeReview,
       scheduleSpecReview,
       scheduleReviewTimers,
       getProfile: (state) => this.getProfile(state),
