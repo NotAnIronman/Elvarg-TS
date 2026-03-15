@@ -127,6 +127,18 @@ export class CombatFactory {
                 return CombatFactory.RANGED_COMBAT;
             }
         } else if (attacker.isNpc()) {
+            for (const entry of PluginManager.getNpcCombatMethodProviders()) {
+                const npc = attacker.getAsNpc();
+                const npcId = npc.getId();
+                const npcRealId = npc.getRealId();
+                if (!entry.npcIds.has(npcId) && !entry.npcIds.has(npcRealId)) {
+                    continue;
+                }
+                const override = entry.provider.provide(npc);
+                if (override) {
+                    return override;
+                }
+            }
             return attacker.getAsNpc().getCombatMethod();
         }
 
@@ -756,7 +768,7 @@ export class CombatFactory {
             ) {
                 CombatFactory.handleRecoil(target.getAsPlayer(), attacker, damage);
             }
-            if ((target as any).hasVengeance) {
+            if (target.hasVengeanceReturn()) {
                 CombatFactory.handleVengeance(target, attacker, damage);
             }
         }
@@ -908,10 +920,10 @@ export class CombatFactory {
     }
 
     public static handleVengeance(character: Mobile, attacker: Mobile, damage: number) {
-        let returnDmg = Math.floor(damage * 0.75);
-        if (returnDmg <= 0) {
+        if (damage <= 0) {
             return;
         }
+        const returnDmg = Math.max(1, Math.floor(damage * 0.75));
         attacker.getCombat().getHitQueue().addPendingDamage([new HitDamage(returnDmg, HitMask.RED)]);
         character.forceChat("Taste Vengeance!");
         character.setHasVengeance(false);
@@ -997,7 +1009,14 @@ export class CombatFactory {
     }
 
     static handleRetaliation(attacker: Mobile, target: Mobile) {
-        if (!CombatFactory.isAttacking(target)) {
+        const currentTarget = target.getCombat().getTarget();
+        const hasActiveDifferentTarget =
+            currentTarget != null &&
+            currentTarget !== attacker &&
+            currentTarget.getHitpoints() > 0 &&
+            (typeof currentTarget.isRegistered !== "function" || currentTarget.isRegistered());
+
+        if (!hasActiveDifferentTarget) {
             let auto_ret = false;
             if (target.isPlayer()) {
                 auto_ret =

@@ -712,7 +712,7 @@ class LoginSession {
     this.sendConfig(709, 0);
     this.sendConfig(711, 0);
     this.sendConfig(713, 0);
-    this.sendConfig(172, 1); // auto-retaliate on
+    this.sendConfig(172, this.gamePlayer?.autoRetaliateReturn?.() ? 1 : 0);
 
     // Clear interfaces (219) similar to Java's sendInterfaceRemoval on login
     this.sendPacket(219, Buffer.alloc(0), PacketType.FIXED, "interface_removal");

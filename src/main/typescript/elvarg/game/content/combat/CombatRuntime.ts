@@ -34,7 +34,13 @@ export class CombatRuntime {
 
     if (attacker?.isNpc?.()) {
       for (const entry of PluginManager.getNpcCombatMethodProviders()) {
-        const override = entry.provider.provide(attacker);
+        const npc: any = attacker.getAsNpc ? attacker.getAsNpc() : attacker;
+        const npcId = npc?.getId?.() ?? npc?.id;
+        const npcRealId = npc?.getRealId?.() ?? npcId;
+        if (!entry.npcIds.has(npcId) && !entry.npcIds.has(npcRealId)) {
+          continue;
+        }
+        const override = entry.provider.provide(npc);
         if (override) {
           return override;
         }

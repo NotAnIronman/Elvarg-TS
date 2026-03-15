@@ -2393,8 +2393,14 @@ export class PluginManager {
         }
         const singleton = options?.singleton ?? true;
         let instance: any | null = null;
+        const npcIdSet = new Set(normalized);
         const provider = {
           provide: (npc) => {
+            const npcId = npc?.getId?.() ?? npc?.id;
+            const npcRealId = npc?.getRealId?.() ?? npcId;
+            if (!npcIdSet.has(npcId) && !npcIdSet.has(npcRealId)) {
+              return null;
+            }
             if (singleton) {
               if (!instance) {
                 instance = new methodCtor();

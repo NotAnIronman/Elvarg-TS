@@ -42,6 +42,7 @@ class BotBehaviorTask extends Task {
     this._nextLodRefreshAt = 0;
     this._humanObserverBuckets = new Map();
     this._humanObserverCount = 0;
+    this._humanObserverRevision = 0;
     this._cycleCounter = 0;
     this.taskProfiler = this.resolveTaskProfiler(options.taskProfiler ?? {});
     this._profileWindow = this.createProfileWindow(Date.now());
@@ -155,6 +156,8 @@ class BotBehaviorTask extends Task {
       Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
     const parseChunkSize = (value, fallback) =>
       Number.isFinite(value) ? Math.max(8, Math.floor(value)) : fallback;
+    const parseCacheMs = (value, fallback) =>
+      Number.isFinite(value) ? Math.max(100, Math.floor(value)) : fallback;
 
     const enabled = rawConfig?.enabled !== false;
     const nearDistanceTiles = parseDistance(rawConfig?.nearDistanceTiles, 32);
@@ -172,6 +175,12 @@ class BotBehaviorTask extends Task {
       nearStride: parseStride(rawConfig?.nearStride, 1),
       mediumStride: parseStride(rawConfig?.mediumStride, 2),
       farStride: parseStride(rawConfig?.farStride, this.idleEntryStride),
+      nearCacheMs: parseCacheMs(rawConfig?.nearCacheMs, 200),
+      mediumCacheMs: parseCacheMs(rawConfig?.mediumCacheMs, 450),
+      farCacheMs: parseCacheMs(
+        rawConfig?.farCacheMs,
+        Math.max(600, parseInterval(rawConfig?.refreshIntervalMs, 900))
+      ),
     };
   }
 
@@ -229,40 +238,47 @@ class BotBehaviorTask extends Task {
 
     this._humanObserverBuckets = buckets;
     this._humanObserverCount = observerCount;
+    this._humanObserverRevision += 1;
     this._nextLodRefreshAt = nowMs + this.lodConfig.refreshIntervalMs;
   }
 
-  resolveEntryStride(entry, nowMs) {
-    if (!this.lodConfig.enabled) {
-      return this.idleEntryStride;
-    }
-    this.refreshHumanObservers(nowMs);
-    if (!entry?.player || this._humanObserverCount === 0) {
-      return this.lodConfig.farStride;
-    }
-    if (this.isInteractingWithRealPlayer(entry.player)) {
-      return this.lodConfig.nearStride;
-    }
-
-    const location = entry.player.getLocation?.();
+  getLocationSnapshot(player) {
+    const location = player?.getLocation?.();
     if (!location) {
-      return this.lodConfig.farStride;
+      return null;
     }
     const x = location.getX?.();
     const y = location.getY?.();
     const z = location.getZ?.();
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
-      return this.lodConfig.farStride;
+      return null;
     }
+    return { location, x, y, z };
+  }
 
-    let bestChebyshevDistance = Number.POSITIVE_INFINITY;
+  getStrideCacheTtlMs(stride) {
+    if (stride <= this.lodConfig.nearStride) {
+      return this.lodConfig.nearCacheMs;
+    }
+    if (stride <= this.lodConfig.mediumStride) {
+      return this.lodConfig.mediumCacheMs;
+    }
+    return this.lodConfig.farCacheMs;
+  }
+
+  findNearestHumanObserverDistance(x, y, z, maxDistanceTiles) {
+    if (this._humanObserverCount <= 0) {
+      return Number.POSITIVE_INFINITY;
+    }
     const chunkSize = this.lodConfig.chunkSizeTiles;
     const baseChunkX = Math.floor(x / chunkSize);
     const baseChunkY = Math.floor(y / chunkSize);
-    const chunkRadius = Math.max(
-      1,
-      Math.ceil(this.lodConfig.mediumDistanceTiles / chunkSize)
-    );
+    const searchDistance = Number.isFinite(maxDistanceTiles)
+      ? Math.max(0, maxDistanceTiles)
+      : this.lodConfig.mediumDistanceTiles;
+    const chunkRadius = Math.max(1, Math.ceil(searchDistance / chunkSize));
+    let bestChebyshevDistance = Number.POSITIVE_INFINITY;
+
     for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
       for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
         const bucket = this._humanObserverBuckets.get(
@@ -279,17 +295,67 @@ class BotBehaviorTask extends Task {
           if (distance < bestChebyshevDistance) {
             bestChebyshevDistance = distance;
           }
-          if (bestChebyshevDistance <= this.lodConfig.nearDistanceTiles) {
-            return this.lodConfig.nearStride;
+          if (bestChebyshevDistance <= searchDistance) {
+            return bestChebyshevDistance;
           }
         }
       }
     }
 
-    if (bestChebyshevDistance <= this.lodConfig.mediumDistanceTiles) {
-      return this.lodConfig.mediumStride;
+    return bestChebyshevDistance;
+  }
+
+  resolveEntryStride(entry, nowMs) {
+    if (!this.lodConfig.enabled) {
+      return this.idleEntryStride;
     }
-    return this.lodConfig.farStride;
+    this.refreshHumanObservers(nowMs);
+    if (!entry?.player || this._humanObserverCount === 0) {
+      return this.lodConfig.farStride;
+    }
+    const interactingWithRealPlayer = this.isInteractingWithRealPlayer(entry.player);
+    if (interactingWithRealPlayer) {
+      return this.lodConfig.nearStride;
+    }
+
+    const locationSnapshot = this.getLocationSnapshot(entry.player);
+    if (!locationSnapshot) {
+      return this.lodConfig.farStride;
+    }
+
+    const state = entry?.state;
+    const lodCache = state?.lodStrideCache;
+    if (
+      lodCache &&
+      lodCache.revision === this._humanObserverRevision &&
+      lodCache.expiresAt > nowMs
+    ) {
+      return lodCache.stride;
+    }
+
+    const bestChebyshevDistance = this.findNearestHumanObserverDistance(
+      locationSnapshot.x,
+      locationSnapshot.y,
+      locationSnapshot.z,
+      this.lodConfig.mediumDistanceTiles
+    );
+
+    let stride = this.lodConfig.farStride;
+    if (bestChebyshevDistance <= this.lodConfig.mediumDistanceTiles) {
+      stride = this.lodConfig.mediumStride;
+    }
+    if (bestChebyshevDistance <= this.lodConfig.nearDistanceTiles) {
+      stride = this.lodConfig.nearStride;
+    }
+
+    if (state) {
+      state.lodStrideCache = {
+        stride,
+        revision: this._humanObserverRevision,
+        expiresAt: nowMs + this.getStrideCacheTtlMs(stride),
+      };
+    }
+    return stride;
   }
 
   isInteractingWithRealPlayer(player) {
@@ -695,44 +761,29 @@ class BotBehaviorTask extends Task {
     return true;
   }
 
-  hasNearbyRealPlayerOpportunity(player, state) {
+  hasNearbyRealPlayerOpportunity(player, state, nowMs) {
     if (!player || !this.isPersistentPvpBot(state)) {
       return false;
     }
     if (state?.mode !== this.behaviorMode.ROAMING) {
       return false;
     }
-    const privateArea = player.getPrivateArea?.();
-    const location = player.getLocation?.();
-    const localPlayers = player.getLocalPlayers?.() ?? [];
-    if (!location || localPlayers.length === 0) {
+    this.refreshHumanObservers(nowMs);
+    if (this._humanObserverCount === 0) {
       return false;
     }
-    for (const other of localPlayers) {
-      if (!other || other === player) {
-        continue;
-      }
-      if (other.isPlayerBot?.() === true) {
-        continue;
-      }
-      if (!other.isRegistered?.()) {
-        continue;
-      }
-      if ((other.getHitpoints?.() ?? 0) <= 0) {
-        continue;
-      }
-      if (other.getPrivateArea?.() !== privateArea) {
-        continue;
-      }
-      const otherLoc = other.getLocation?.();
-      if (!otherLoc || otherLoc.getZ?.() !== location.getZ?.()) {
-        continue;
-      }
-      if (location.getDistance(otherLoc) <= 3) {
-        return true;
-      }
+    const locationSnapshot = this.getLocationSnapshot(player);
+    if (!locationSnapshot || player.getPrivateArea?.() != null) {
+      return false;
     }
-    return false;
+    return (
+      this.findNearestHumanObserverDistance(
+        locationSnapshot.x,
+        locationSnapshot.y,
+        locationSnapshot.z,
+        3
+      ) <= 3
+    );
   }
 
   selectWeightedMode(definitions) {
@@ -990,7 +1041,7 @@ class BotBehaviorTask extends Task {
     }
 
     if (nowMs < (autonomy.nextDecisionAt ?? 0)) {
-      if (this.hasNearbyRealPlayerOpportunity(player, state)) {
+      if (this.hasNearbyRealPlayerOpportunity(player, state, nowMs)) {
         autonomy.nextDecisionAt = 0;
       } else {
         return;

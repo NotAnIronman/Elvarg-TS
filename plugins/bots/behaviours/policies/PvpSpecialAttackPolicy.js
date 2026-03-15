@@ -3,6 +3,7 @@
 const { CombatSpecial } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
+const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { ItemIdentifiers } = require("../../../../src/main/typescript/elvarg/util/ItemIdentifiers");
 const { EquipPacketListener } = require("../../../../src/main/typescript/elvarg/net/packet/impl/EquipPacketListener");
 const { getPvpProfile } = require("../pvp/PvpAssignment");
@@ -28,6 +29,7 @@ const SWITCHABLE_SPEC_WEAPONS = new Set([
 ]);
 
 const POST_SPEC_SWITCHBACK_DELAY_MS = 900;
+const ONE_TICK_ATTACK_WINDOW_TICKS = 2;
 
 function getSpecialForWeaponId(weaponId) {
   if (!Number.isInteger(weaponId) || weaponId <= 0) {
@@ -64,6 +66,66 @@ function getTargetHpRatio(target) {
   }
   max = Math.max(1, max);
   return current / max;
+}
+
+function getEffectiveTargetHpRatio(target) {
+  const pendingAwareCurrent = Math.max(
+    0,
+    Number(target?.getHitpointsAfterPendingDamage?.() ?? target?.getHitpoints?.() ?? 0)
+  );
+  let max = pendingAwareCurrent;
+  if (target?.isPlayer?.() === true) {
+    const maxLevel = target?.getSkillManager?.()?.getMaxLevel?.(Skill.HITPOINTS);
+    max = Number(maxLevel ?? pendingAwareCurrent ?? 1);
+  }
+  max = Math.max(1, max);
+  return pendingAwareCurrent / max;
+}
+
+function isVeteranOrEliteProfile(profile) {
+  return profile?.id === "veteran" || profile?.id === "elite";
+}
+
+function isWithinMeleeRange(player, target) {
+  const playerLoc = player?.getLocation?.();
+  const targetLoc = target?.getLocation?.();
+  if (!playerLoc || !targetLoc) {
+    return false;
+  }
+  if (playerLoc.getZ?.() !== targetLoc.getZ?.()) {
+    return false;
+  }
+  return Number(playerLoc.getDistance?.(targetLoc) ?? 99) <= 1;
+}
+
+function resolveInventoryWeapon(player, weaponId) {
+  if (!player || !Number.isInteger(weaponId) || weaponId <= 0) {
+    return null;
+  }
+  const slot = player?.getInventory?.()?.getSlotForItemId?.(weaponId) ?? -1;
+  if (slot < 0) {
+    return null;
+  }
+  return {
+    weaponId,
+    slot,
+    special: getSpecialForWeaponId(weaponId),
+  };
+}
+
+function shouldUseOneTickNow(player, target, state, profile) {
+  if (!isVeteranOrEliteProfile(profile) || !target) {
+    return false;
+  }
+  const targetHpRatio = getEffectiveTargetHpRatio(target);
+  if (targetHpRatio <= Number(profile?.oneTickFinisherHpRatio ?? 0.4)) {
+    return true;
+  }
+  const ownHpRatio = getOwnHpRatio(player);
+  if (ownHpRatio > Number(profile?.oneTickPressureHpRatio ?? 0.3)) {
+    return false;
+  }
+  return Number(state?.pvp?.lastDamageTakenAt ?? 0) > 0;
 }
 
 function resolveInventorySpecWeapon(player, state) {
@@ -237,8 +299,109 @@ function tryActivateSpecial(player) {
     return true;
   }
   const before = player?.isSpecialActivated?.() === true;
+  const beforePercentage = Number(player?.getSpecialPercentage?.() ?? 0);
+  const beforeQueued =
+    player?.getCombat?.()?.isGraniteMaulSpecialQueued?.() === true;
   CombatSpecial.activate(player);
-  return before !== (player?.isSpecialActivated?.() === true) || player?.isSpecialActivated?.() === true;
+  const afterActivated = player?.isSpecialActivated?.() === true;
+  const afterPercentage = Number(player?.getSpecialPercentage?.() ?? 0);
+  const afterQueued =
+    player?.getCombat?.()?.isGraniteMaulSpecialQueued?.() === true;
+  return (
+    before !== afterActivated ||
+    afterActivated === true ||
+    afterQueued !== beforeQueued ||
+    afterPercentage < beforePercentage
+  );
+}
+
+function maybeUseOneTickAttack(context, profile) {
+  const { player, state, target, nowMs, scheduleSpecReview } = context ?? {};
+  const pvp = state?.pvp;
+  if (!player || !pvp || !target || !isVeteranOrEliteProfile(profile)) {
+    return false;
+  }
+
+  const cooldownMs = Math.max(600, Number(profile?.oneTickCooldownMs ?? 3000));
+  if (nowMs < Number(pvp.lastOneTickAt ?? 0) + cooldownMs) {
+    return false;
+  }
+  if (!shouldUseOneTickNow(player, target, state, profile)) {
+    return false;
+  }
+
+  const timers = player.getTimers?.();
+  const attackWindowOpen =
+    timers?.willEndIn?.(TimerKey.COMBAT_ATTACK, ONE_TICK_ATTACK_WINDOW_TICKS) === true ||
+    timers?.has?.(TimerKey.COMBAT_ATTACK) !== true;
+  if (!attackWindowOpen) {
+    return false;
+  }
+
+  const pendingTargetHpRatio = getEffectiveTargetHpRatio(target);
+  const oneTickBaseChance = Number(profile?.oneTickUseChance ?? 0);
+  const gmaulChance = Math.min(
+    0.98,
+    oneTickBaseChance + Number(profile?.oneTickGmaulChance ?? 0)
+  );
+  const gmaulCandidate =
+    getWeaponId(player) === ItemIdentifiers.GRANITE_MAUL
+      ? {
+          weaponId: ItemIdentifiers.GRANITE_MAUL,
+          slot: -1,
+          special: getSpecialForWeaponId(ItemIdentifiers.GRANITE_MAUL),
+        }
+      : resolveInventoryWeapon(player, ItemIdentifiers.GRANITE_MAUL);
+
+  if (
+    gmaulCandidate &&
+    isWithinMeleeRange(player, target) &&
+    Math.random() <= Math.max(0.05, gmaulChance + (pendingTargetHpRatio <= 0.24 ? 0.12 : 0))
+  ) {
+    if (
+      gmaulCandidate.slot >= 0 &&
+      !equipWeaponFromInventory(player, gmaulCandidate.slot, gmaulCandidate.weaponId)
+    ) {
+      return false;
+    }
+    if (tryActivateSpecial(player)) {
+      pvp.lastOneTickAt = nowMs;
+      pvp.lastSpecAt = nowMs;
+      scheduleSpecReview?.(state, nowMs);
+      return true;
+    }
+  }
+
+  const inventorySpec = resolveInventorySpecWeapon(player, state);
+  if (!inventorySpec || inventorySpec.weaponId === ItemIdentifiers.GRANITE_MAUL) {
+    return false;
+  }
+  if (Number(player?.getSpecialPercentage?.() ?? 0) < Number(inventorySpec.special?.getDrainAmount?.() ?? 101)) {
+    return false;
+  }
+
+  let switchChance = Number(profile?.oneTickSwitchChance ?? 0);
+  if (pendingTargetHpRatio <= Number(profile?.oneTickFinisherHpRatio ?? 0.4)) {
+    switchChance += 0.12;
+  }
+  if (Math.random() > Math.max(0.05, Math.min(0.98, switchChance))) {
+    return false;
+  }
+
+  if (!equipWeaponFromInventory(player, inventorySpec.slot, inventorySpec.weaponId)) {
+    return false;
+  }
+  const specAmmoId = Number(pvp.generatedSpecAmmoId ?? -1);
+  if (specAmmoId > 0) {
+    equipAmmoFromInventory(player, specAmmoId);
+  }
+  if (tryActivateSpecial(player)) {
+    pvp.lastOneTickAt = nowMs;
+    pvp.lastSpecAt = nowMs;
+    scheduleSpecReview?.(state, nowMs);
+    return true;
+  }
+  return false;
 }
 
 function maybeUseSpecialAttack(context) {
@@ -247,11 +410,15 @@ function maybeUseSpecialAttack(context) {
   if (!player || !pvp || !target) {
     return false;
   }
+
+  const profile = getPvpProfile(pvp.profileId);
+  if (maybeUseOneTickAttack(context, profile)) {
+    return true;
+  }
   if (nowMs < Number(pvp.nextSpecReviewAt ?? 0)) {
     return false;
   }
 
-  const profile = getPvpProfile(pvp.profileId);
   const currentWeaponId = getWeaponId(player);
   const currentSpecial = player?.getCombatSpecial?.() ?? getSpecialForWeaponId(currentWeaponId);
 

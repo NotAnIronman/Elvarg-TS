@@ -685,6 +685,21 @@ function buildRangeToMeleeInventory(specWeaponId, ammoId, ammoAmount, options = 
   return inventory.slice(0, 28);
 }
 
+function buildDharokInventory(options = {}) {
+  const inventory = [
+    item(ItemIdentifiers.SUPER_COMBAT_POTION_4_),
+    item(ItemIdentifiers.SUPER_RESTORE_4_),
+    item(ItemIdentifiers.SUPER_RESTORE_4_),
+    item(ItemIdentifiers.SARADOMIN_BREW_4_),
+    item(ItemIdentifiers.SARADOMIN_BREW_4_),
+    item(ItemIdentifiers.RING_OF_RECOIL),
+  ];
+  const karams = Number(options.comboEatCount ?? 6);
+  inventory.push(...repeat(ItemIdentifiers.COOKED_KARAMBWAN, 1, karams));
+  fillFood(inventory, ItemIdentifiers.SHARK, 28 - inventory.length);
+  return inventory.slice(0, 28);
+}
+
 function isVeteranOrEliteProfile(profile) {
   return profile?.id === "veteran" || profile?.id === "elite";
 }
@@ -1236,6 +1251,27 @@ const ARCHETYPES = Object.freeze({
         { comboEatCount: 5 }
       ),
   }),
+  full_dharok: Object.freeze({
+    id: "full_dharok",
+    weight: 12,
+    spellbook: MagicSpellbook.LUNAR,
+    stats: [70, 70, 99, 99, 1, 70, 1],
+    autocastSpellId: -1,
+    equipment: () =>
+      compact([
+        item(ItemIdentifiers.DHAROKS_HELM),
+        item(choose([ItemIdentifiers.OBSIDIAN_CAPE, ItemIdentifiers.STRENGTH_CAPE_T_])),
+        item(ItemIdentifiers.DHAROKS_GREATAXE),
+        item(choose([ItemIdentifiers.AMULET_OF_GLORY, ItemIdentifiers.AMULET_OF_FURY])),
+        item(ItemIdentifiers.DHAROKS_PLATEBODY),
+        null,
+        item(ItemIdentifiers.DHAROKS_PLATELEGS),
+        item(ItemIdentifiers.BARROWS_GLOVES),
+        item(choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.CLIMBING_BOOTS])),
+        item(ItemIdentifiers.RING_OF_RECOIL),
+      ]),
+    inventory: () => buildDharokInventory(),
+  }),
   zerker_whip: Object.freeze({
     id: "zerker_whip",
     weight: 24,
@@ -1317,7 +1353,7 @@ const ARCHETYPES = Object.freeze({
       ]),
     inventory: (magicPackage, profile) =>
       buildRangeToMeleeInventory(
-        isEliteProfile(profile) ? chooseEliteSpecWeapon() : ItemIdentifiers.GRANITE_MAUL,
+        ItemIdentifiers.GRANITE_MAUL,
         isVeteranOrEliteProfile(profile) ? null : ItemIdentifiers.RUNE_ARROW,
         isVeteranOrEliteProfile(profile) ? 0 : 150
       ),

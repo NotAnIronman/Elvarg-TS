@@ -139,6 +139,8 @@ function createPvpBehaviorState() {
     lastBrewAt: 0,
     lastComboEatAt: 0,
     lastSpecAt: 0,
+    lastOneTickAt: 0,
+    lastPressureScriptAt: 0,
     escapeThreshold: 0.24,
     riskTolerance: 0.3,
     confidenceTier: 2,
@@ -181,6 +183,8 @@ function clearPvpBehaviorState(state) {
   state.pvp.lastBrewAt = 0;
   state.pvp.lastComboEatAt = 0;
   state.pvp.lastSpecAt = 0;
+  state.pvp.lastOneTickAt = 0;
+  state.pvp.lastPressureScriptAt = 0;
   state.pvp.currentTargetScore = 0;
   state.pvp.targetLockUntil = 0;
   state.pvp.pjTargetUsername = null;

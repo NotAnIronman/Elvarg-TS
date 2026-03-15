@@ -1,5 +1,6 @@
 import { PacketExecutor } from "../PacketExecutor";
 import { WeaponInterfaces } from "../../../game/content/combat/WeaponInterfaces";
+import { EffectSpells } from "../../../game/content/combat/magic/EffectSpells";
 import { Autocasting } from "../../../game/content/combat/magic/Autocasting";
 import { BonusManager } from "../../../game/model/equipment/BonusManager";
 import { FightType } from "../../../game/content/combat/FightType";
@@ -91,6 +92,10 @@ export class ButtonClickPacketListener implements PacketExecutor {
       return;
     }
 
+    if (EffectSpells.handleSpell(player, button)) {
+      return;
+    }
+
     if (
       PluginManager.emitButtonClick({
         player,
@@ -165,6 +170,7 @@ export class ButtonClickPacketListener implements PacketExecutor {
       case ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_5570:
       case ButtonClickPacketListener.TOGGLE_AUTO_RETALIATE_1698:
         player.setAutoRetaliate(!player.autoRetaliateReturn());
+        player.getPacketSender().sendConfig(172, player.autoRetaliateReturn() ? 1 : 0);
         break;
 
       case ButtonClickPacketListener.DESTROY_ITEM:

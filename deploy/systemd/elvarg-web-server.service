@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=toby
-Group=toby
-WorkingDirectory=/home/toby/elvarg-web/elvarg-web-server
+User=root
+Group=root
+WorkingDirectory=/root/elvarg-web-server
 Environment=NODE_ENV=production
 Environment=PORT=49598
 ExecStart=/usr/bin/env yarn start:prod
