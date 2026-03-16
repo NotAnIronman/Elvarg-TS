@@ -16,25 +16,6 @@ const {
 } = require("./BotPersistenceConstants");
 
 const WILDERNESS_SPAWN_TILE_PROBE_LIMIT = 256;
-const FORCED_STARTUP_TEST_BOT_SPAWN = Object.freeze({
-  username: "WildyBot1",
-  location: Object.freeze({
-    x: 2945,
-    y: 3824,
-    z: 0,
-  }),
-});
-
-function isForcedStartupTestTile(location) {
-  if (!location) {
-    return false;
-  }
-  return (
-    location.getX?.() === FORCED_STARTUP_TEST_BOT_SPAWN.location.x &&
-    location.getY?.() === FORCED_STARTUP_TEST_BOT_SPAWN.location.y &&
-    location.getZ?.() === FORCED_STARTUP_TEST_BOT_SPAWN.location.z
-  );
-}
 
 function createBotRegistry(options) {
   const {
@@ -312,16 +293,7 @@ function createBotRegistry(options) {
         assignedHotspotId != null ? reserveHotspotSpawnIndex(assignedHotspotId) : -1;
       const hotspotSpawn =
         assignedHotspotId != null ? createHotspotSpawn(assignedHotspotId, hotspotSpawnIndex) : null;
-      const forcedStartupSpawn =
-        username === FORCED_STARTUP_TEST_BOT_SPAWN.username
-          ? new Location(
-              FORCED_STARTUP_TEST_BOT_SPAWN.location.x,
-              FORCED_STARTUP_TEST_BOT_SPAWN.location.y,
-              FORCED_STARTUP_TEST_BOT_SPAWN.location.z
-            )
-          : null;
       const botSpawn =
-        forcedStartupSpawn ??
         hotspotSpawn ??
         createWildernessRoamerSpawn(spawn, assignedBounds, initialSpawnSeed) ??
         spawnLocationForIndex(spawn, spawnOffsets, botCount + i - 1);
@@ -341,10 +313,7 @@ function createBotRegistry(options) {
           if (respawnTile) {
             return respawnTile;
           }
-          return isForcedStartupTestTile(botSpawn)
-            ? createWildernessRoamerSpawn(spawn, assignedBounds, randomInRange(0, 1_000_000)) ??
-                anchorFallbackForBounds(assignedBounds, botSpawn)
-            : botSpawn.clone();
+          return botSpawn.clone();
         }
         return (
           createWildernessRoamerSpawn(spawn, assignedBounds, randomInRange(0, 1_000_000)) ??

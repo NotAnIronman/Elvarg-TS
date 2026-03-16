@@ -7,8 +7,6 @@ import { Skill } from "../model/Skill";
 import { SkullType } from "../model/SkullType";
 import { BonusManager } from "../model/equipment/BonusManager";
 import { PlayerRights } from "../model/rights/PlayerRights";
-import { Task } from "../task/Task";
-import { TaskManager } from "../task/TaskManager";
 import { Sound } from "../Sound";
 import { Sounds } from "../Sounds";
 import { Misc } from "../../util/Misc";
@@ -396,58 +394,65 @@ export class PrayerHandler {
             return;
         }
         player.setDrainingPrayer(true);
-        let task = new PlayerHandlerTask(player,  () => {
-            let drainEffect = 0;
-            let pointDrain = Number(player.getPrayerPointDrain());
-            if (!Number.isFinite(pointDrain) || pointDrain < 0) {
-                pointDrain = 0;
+    }
+
+    public static processDrain(player: Player) {
+        if (!player.isDrainingPrayer()) {
+            return;
+        }
+
+        let drainEffect = 0;
+        let pointDrain = Number(player.getPrayerPointDrain());
+        if (!Number.isFinite(pointDrain) || pointDrain < 0) {
+            pointDrain = 0;
+        }
+
+        for (let i = 0; i < player.getPrayerActive().length; i++) {
+            if (!player.getPrayerActive()[i]) {
+                continue;
             }
-            for (let i = 0; i < player.getPrayerActive().length; i++) {
-                if (!player.getPrayerActive()[i]) {
-                    continue;
-                }
-                let pd = PrayerData.prayerData.get(i);
-                if (!pd) {
-                    continue;
-                }
-                // OSRS prayer drain uses a per-tick drain effect against a resistance
-                // threshold of 60 + (prayer bonus * 2). Each prayer's effect is its
-                // per-minute drain rate scaled by the 0.6s game tick.
-                drainEffect += pd.drainRate * 0.6;
+            const pd = PrayerData.prayerData.get(i);
+            if (!pd) {
+                continue;
             }
-            if (player.getHitpoints() <= 0 || drainEffect <= 0) {
-                stop();
+            // OSRS prayer drain uses a per-tick drain effect against a resistance
+            // threshold of 60 + (prayer bonus * 2). Each prayer's effect is its
+            // per-minute drain rate scaled by the 0.6s game tick.
+            drainEffect += pd.drainRate * 0.6;
+        }
+
+        if (player.getHitpoints() <= 0 || drainEffect <= 0) {
+            PrayerHandler.stopDrain(player);
+            return;
+        }
+
+        const bonus = player.getBonusManager().getOtherBonus()[BonusManager.PRAYER];
+        const drainResistance = Math.max(1, 60 + (bonus * 2));
+
+        pointDrain += drainEffect;
+        const drainTreshold = Math.floor(pointDrain / drainResistance);
+        if (drainTreshold >= 1) {
+            const total = player.getSkillManager().getCurrentLevel(Skill.PRAYER) - drainTreshold;
+            player.getSkillManager().setCurrentLevel(Skill.PRAYER, total, true);
+            if (player.getSkillManager().getCurrentLevel(Skill.PRAYER) <= 0) {
+                PrayerHandler.deactivatePrayers(player);
+                player.getPacketSender().sendMessage("You have run out of Prayer points!");
+                Sounds.sendSound(player, Sound.PRAYER_DEPLETED);
+                PrayerHandler.stopDrain(player);
                 return;
             }
-            let bonus = player.getBonusManager().getOtherBonus()[BonusManager.PRAYER];
-            const drainResistance = Math.max(1, 60 + (bonus * 2));
-
-            pointDrain += drainEffect;
-            let drainTreshold = Math.floor(pointDrain / drainResistance);
-            if (drainTreshold >= 1) {
-                let total = (player.getSkillManager().getCurrentLevel(Skill.PRAYER) - drainTreshold);
-                player.getSkillManager().setCurrentLevel(Skill.PRAYER, total, true);
-                if (player.getSkillManager().getCurrentLevel(Skill.PRAYER) <= 0) {
-                    PrayerHandler.deactivatePrayers(player);
-                    player.getPacketSender().sendMessage("You have run out of Prayer points!");
-                    Sounds.sendSound(player, Sound.PRAYER_DEPLETED);
-                    stop();
-                    return;
-                }
-                pointDrain -= drainTreshold * drainResistance;
-                if (pointDrain < 0) {
-                    pointDrain = 0;
-                }
+            pointDrain -= drainTreshold * drainResistance;
+            if (pointDrain < 0) {
+                pointDrain = 0;
             }
-            player.setPrayerPointDrain(pointDrain);
+        }
 
-            function stop() {
-                player.setPrayerPointDrain(0);
-                player.setDrainingPrayer(false);
-                task.stop();
-            }
-        });
-        TaskManager.submit(task);
+        player.setPrayerPointDrain(pointDrain);
+    }
+
+    private static stopDrain(player: Player) {
+        player.setPrayerPointDrain(0);
+        player.setDrainingPrayer(false);
     }
 
 
@@ -623,13 +628,3 @@ export class PrayerData {
 }
 
 PrayerData.initializeMaps();
-
-class PlayerHandlerTask extends Task{
-    constructor(p: Player,private readonly execFunc: Function){
-        super(1, false);
-    }
-    execute(): void {
-        this.execFunc();
-    }
-
-}

@@ -79,7 +79,7 @@ const BOT_CONFIG = Object.freeze({
     "object-index.json"
   ),
   // Run bot behavior decisions every 2 game ticks to reduce BT pressure.
-  botDecisionTicks: 2,
+  botDecisionTicks: 3,
   botBaseCooldownMs: 1200,
   botJitterMs: 300,
   ditchAttemptCooldownMs: 1200,
@@ -126,19 +126,19 @@ const BOT_CONFIG = Object.freeze({
   // 1 = every bot every cycle, 2 = every second cycle, 3 = every third, etc.
   // Combat/traversal/transient bots still run every cycle.
   modeValidationIntervalMs: 2500,
-  idleEntryStride: 4,
+  idleEntryStride: 6,
   // Bot LOD simulation:
   // Near real players, bots tick every cycle for responsiveness.
   // Further away, bot behavior-tree work is downsampled.
   lodConfig: Object.freeze({
     enabled: true,
-    refreshIntervalMs: 900,
-    nearDistanceTiles: 15,
+    refreshIntervalMs: 1400,
+    nearDistanceTiles: 12,
     mediumDistanceTiles: 48,
     chunkSizeTiles: 32,
-    nearStride: 2,
-    mediumStride: 4,
-    farStride: 16,
+    nearStride: 3,
+    mediumStride: 6,
+    farStride: 24,
   }),
   wildernessDitchObjectId: ObjectIds.WILDERNESS_DITCH,
   manualControlPacketOpcodes: MANUAL_CONTROL_PACKET_OPCODES,

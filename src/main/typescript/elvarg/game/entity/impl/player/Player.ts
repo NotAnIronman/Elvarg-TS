@@ -469,6 +469,10 @@ export class Player extends Mobile {
             }
         }
 
+        if (this.isDrainingPrayer()) {
+            timed("prayer_drain", () => PrayerHandler.processDrain(this));
+        }
+
         // PlayerBot-specific processing skipped in this runtime.
         // Decrease boosted stats Increase lowered stats
         if (this.getHitpoints() > 0) {

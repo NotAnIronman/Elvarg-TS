@@ -21,11 +21,7 @@ const {
 
 const NS_PER_MS = 1_000_000n;
 const MOVING_MODE_DECISION_DELAY_MS = 1500;
-const FORCED_BLOCKED_STARTUP_TILE = Object.freeze({
-  x: 2945,
-  y: 3824,
-  z: 0,
-});
+const BLOCKED_TILE_CHECK_INTERVAL_MS = 5000;
 
 class BotBehaviorTask extends Task {
   constructor(entries, traversalService, decisionTicks, options = {}) {
@@ -399,6 +395,28 @@ class BotBehaviorTask extends Task {
     return false;
   }
 
+  hasNearbyHumanObserver(player, nowMs, distanceTiles = this.lodConfig.nearDistanceTiles) {
+    if (!player) {
+      return false;
+    }
+    this.refreshHumanObservers(nowMs);
+    if (this._humanObserverCount === 0) {
+      return false;
+    }
+    const locationSnapshot = this.getLocationSnapshot(player);
+    if (!locationSnapshot) {
+      return false;
+    }
+    return (
+      this.findNearestHumanObserverDistance(
+        locationSnapshot.x,
+        locationSnapshot.y,
+        locationSnapshot.z,
+        distanceTiles
+      ) <= distanceTiles
+    );
+  }
+
   ensureAutonomyState(state) {
     if (!state) {
       return null;
@@ -539,7 +557,10 @@ class BotBehaviorTask extends Task {
     }
     if (state.mode === this.behaviorMode?.PVP) {
       const pvpNextActionAt = Number(state.pvp?.nextActionAt ?? 0);
-      if (this.isInCombat(player) || nowMs >= pvpNextActionAt) {
+      if (this.isInCombat(player)) {
+        return true;
+      }
+      if (nowMs >= pvpNextActionAt && this.hasNearbyHumanObserver(player, nowMs)) {
         return true;
       }
       const pvpStride = Math.max(2, stride);
@@ -677,17 +698,6 @@ class BotBehaviorTask extends Task {
     return isPvpOnlyBotState(state);
   }
 
-  isForcedBlockedStartupTile(location) {
-    if (!location) {
-      return false;
-    }
-    return (
-      location.getX?.() === FORCED_BLOCKED_STARTUP_TILE.x &&
-      location.getY?.() === FORCED_BLOCKED_STARTUP_TILE.y &&
-      location.getZ?.() === FORCED_BLOCKED_STARTUP_TILE.z
-    );
-  }
-
   chooseBlockedTileRecoveryLocation(player, state) {
     if (!player || !state) {
       return null;
@@ -726,9 +736,13 @@ class BotBehaviorTask extends Task {
     if (!location || !Wilderness.isInLocation(location)) {
       return false;
     }
+    const blockedTileCheckAt = Number(state.blockedTileCheckAt ?? 0);
+    if (blockedTileCheckAt > nowMs) {
+      return false;
+    }
+    state.blockedTileCheckAt = nowMs + BLOCKED_TILE_CHECK_INTERVAL_MS;
     const privateArea = player.getPrivateArea?.() ?? null;
-    const forcedBlockedTile = this.isForcedBlockedStartupTile(location);
-    if (!forcedBlockedTile && !RegionManager.blocked(location, privateArea)) {
+    if (!RegionManager.blocked(location, privateArea)) {
       return false;
     }
 
@@ -773,7 +787,6 @@ class BotBehaviorTask extends Task {
     player.moveTo?.(recoveryLocation);
     this.api?.log?.("blocked_wilderness_bot_reteleport", {
       username: player.getUsername?.() ?? null,
-      forcedStartupTile: forcedBlockedTile,
       fromX: location.getX?.() ?? null,
       fromY: location.getY?.() ?? null,
       fromZ: location.getZ?.() ?? null,
