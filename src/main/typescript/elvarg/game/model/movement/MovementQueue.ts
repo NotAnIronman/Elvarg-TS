@@ -335,6 +335,14 @@ export class MovementQueue {
 
     public process() {
         const ownerLabel = this.ownerLabel();
+        if (
+            this.points.length === 0 &&
+            !this.isMoving &&
+            this.character.getCombatFollowing() == null &&
+            this.character.getFollowing() == null
+        ) {
+            return;
+        }
 
         if (!this.getMobility().canMove()) {
             if (this.points.length > 0) {
@@ -504,7 +512,6 @@ export class MovementQueue {
             packetSender.sendInteractionOption("Attack", 2, true);
             packetSender.sendWalkableInterface(197);
             packetSender.sendString(`Level ${wildernessLevel}`, 199);
-            packetSender.sendMultiIcon(multiIcon);
             return;
         }
 
@@ -512,7 +519,6 @@ export class MovementQueue {
         player.setMultiIcon(0);
         packetSender.sendWalkableInterface(-1);
         packetSender.sendInteractionOption("null", 2, true);
-        packetSender.sendMultiIcon(0);
     }
 
     public static runEnergyRestoreDelay(p: Player) {
@@ -637,13 +643,14 @@ export class MovementQueue {
             }
         }
 
-        const method = ServerPerf.measurePhase(
-            "movement.process.combat_follow.get_method",
-            () => this.character.getCombat().resolveMethodForCurrentCycle()
-        );
+        let method = null;
 
         let closeEnoughToNeedReachCheck = true;
         if (combatFollow) {
+            method = ServerPerf.measurePhase(
+                "movement.process.combat_follow.get_method",
+                () => this.character.getCombat().resolveMethodForCurrentCycle()
+            );
             let requiredDistance = method.attackDistance(this.character);
             const currentDistance = this.character.calculateDistance(following);
             if (
@@ -770,6 +777,12 @@ export class MovementQueue {
                     this.addSteps(next);
                 }
                 return;
+            }
+            if (method == null) {
+                method = ServerPerf.measurePhase(
+                    "movement.process.combat_follow.get_method",
+                    () => this.character.getCombat().resolveMethodForCurrentCycle()
+                );
             }
             const attackDistance = method.attackDistance(this.character);
 

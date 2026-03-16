@@ -31,6 +31,19 @@ class EatFoodActionNode {
     return getPvpProfile(state.pvp.profileId);
   }
 
+  getCachedPvpEatAtHpRatio(state) {
+    const pvp = state?.pvp;
+    if (!pvp) {
+      return this.lowHpRatio;
+    }
+    const profileId = pvp.profileId ?? "standard";
+    if (pvp.cachedEatAtHpRatioProfileId !== profileId) {
+      pvp.cachedEatAtHpRatioProfileId = profileId;
+      pvp.cachedEatAtHpRatio = Number(getPvpProfile(profileId)?.eatAtHpRatio ?? this.lowHpRatio);
+    }
+    return Number(pvp.cachedEatAtHpRatio ?? this.lowHpRatio);
+  }
+
   tick(context) {
     const resolved = resolveBotNodeContext(context, this.botStatesByName, {
       requireNotBusy: false,
@@ -54,7 +67,8 @@ class EatFoodActionNode {
     }
 
     const pvpProfile = this.resolvePvpProfile(state);
-    const lowHpRatio = Number(pvpProfile?.eatAtHpRatio ?? this.lowHpRatio);
+    const lowHpRatio =
+      state?.mode === "pvp" ? this.getCachedPvpEatAtHpRatio(state) : this.lowHpRatio;
     const lowHpThreshold = Math.max(1, Math.ceil(maxHp * lowHpRatio));
     if (currentHp > lowHpThreshold) {
       return "failure";

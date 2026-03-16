@@ -85,12 +85,18 @@ class MaintainCombatBoostsActionNode {
     const profile = getPvpProfile(state.pvp.profileId);
     const rules = BOOST_RULES_BY_PROFILE[profile?.id];
     if (!rules) {
+      state.pvp.appliedBoostProfileId = null;
+      return "failure";
+    }
+
+    if (state.pvp.appliedBoostProfileId === profile.id) {
       return "failure";
     }
 
     for (const [skill, rule] of rules) {
       ensureBoostLevel(player, skill, rule);
     }
+    state.pvp.appliedBoostProfileId = profile.id;
 
     return "failure";
   }

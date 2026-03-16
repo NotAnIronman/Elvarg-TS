@@ -4,12 +4,9 @@ const { PvpProfileId } = require("../../pvp/PvpProfileRegistry");
 const { isVisibleRealPlayer } = require("../../pvp/PvpTargetFilters");
 const { PrayerHandler } = require("../../../../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatFactory } = require("../../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
-const { Task } = require("../../../../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../../../../src/main/typescript/elvarg/game/task/TaskManager");
-const { Misc } = require("../../../../../src/main/typescript/elvarg/util/Misc");
 const { EatFoodActionNode } = require("../actions/EatFoodActionNode");
 
-const PROTECTION_DURATION_SECONDS = 10;
+const PROTECTION_DURATION_MS = 10_000;
 const RUNNING = Object.freeze({ handled: false, status: "running" });
 
 class ReplenishAfterKillNode {
@@ -20,7 +17,11 @@ class ReplenishAfterKillNode {
   tick(context) {
     const { player, state } = context ?? {};
     const pvp = state?.pvp;
-    if (!player || !state || !pvp || pvp.replenishAfterKillPending !== true) {
+    if (!player || !state || !pvp) {
+      return RUNNING;
+    }
+    this.clearExpiredPrayerProtection(player, pvp);
+    if (pvp.replenishAfterKillPending !== true) {
       return RUNNING;
     }
 
@@ -43,8 +44,22 @@ class ReplenishAfterKillNode {
         : PrayerHandler.PROTECT_FROM_MELEE;
 
     PrayerHandler.activatePrayerPrayerId(player, prayerId);
-    this.schedulePrayerClear(player, prayerId);
+    pvp.replenishPrayerId = prayerId;
+    pvp.replenishPrayerUntil = Date.now() + PROTECTION_DURATION_MS;
     return RUNNING;
+  }
+
+  clearExpiredPrayerProtection(player, pvp) {
+    const expiresAt = Number(pvp?.replenishPrayerUntil ?? 0);
+    if (!Number.isFinite(expiresAt) || expiresAt <= 0 || Date.now() < expiresAt) {
+      return;
+    }
+    const prayerId = Number(pvp?.replenishPrayerId);
+    if (Number.isInteger(prayerId) && PrayerHandler.isActivated(player, prayerId)) {
+      PrayerHandler.deactivatePrayer(player, prayerId);
+    }
+    pvp.replenishPrayerId = null;
+    pvp.replenishPrayerUntil = 0;
   }
 
   findClosestRealLocalPlayer(player) {
@@ -73,31 +88,6 @@ class ReplenishAfterKillNode {
     return Number.isInteger(combatType)
       ? PrayerHandler.getProtectingPrayer(combatType)
       : PrayerHandler.PROTECT_FROM_MELEE;
-  }
-
-  schedulePrayerClear(player, prayerId) {
-    const token = Number(player.__replenishAfterKillPrayerToken ?? 0) + 1;
-    player.__replenishAfterKillPrayerToken = token;
-    TaskManager.submit(
-      new (class extends Task {
-        constructor() {
-          super(Misc.getTicks(PROTECTION_DURATION_SECONDS), false);
-        }
-
-        execute() {
-          this.stop();
-          if (player.__replenishAfterKillPrayerToken !== token) {
-            return;
-          }
-          if (player.isRegistered?.() !== true) {
-            return;
-          }
-          if (PrayerHandler.isActivated(player, prayerId)) {
-            PrayerHandler.deactivatePrayer(player, prayerId);
-          }
-        }
-      })()
-    );
   }
 }
 

@@ -3,6 +3,7 @@ const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const {
   chooseNextTarget,
   peekMovementRequest,
@@ -15,6 +16,7 @@ const {
   resetMovementState,
   setModePvp,
 } = require("../state/PlayerBotState");
+const { getPvpProfile } = require("../pvp/PvpAssignment");
 const {
   ATTR_RECRUIT_OWNER_USERNAME,
 } = require("../../runtime/BotRecruitConstants");
@@ -557,10 +559,13 @@ class BotBehaviorTask extends Task {
     }
     if (state.mode === this.behaviorMode?.PVP) {
       const pvpNextActionAt = Number(state.pvp?.nextActionAt ?? 0);
+      const nearHumanInterest = this.lodConfig.enabled
+        ? stride <= this.lodConfig.nearStride
+        : this.hasNearbyHumanObserver(player, nowMs);
       if (this.isInCombat(player)) {
         return true;
       }
-      if (nowMs >= pvpNextActionAt && this.hasNearbyHumanObserver(player, nowMs)) {
+      if (nowMs >= pvpNextActionAt && nearHumanInterest) {
         return true;
       }
       const pvpStride = Math.max(2, stride);
@@ -698,6 +703,63 @@ class BotBehaviorTask extends Task {
     return isPvpOnlyBotState(state);
   }
 
+  needsLowHpSupport(player, state) {
+    if (!player || !state?.pvp) {
+      return false;
+    }
+    const skillManager = player.getSkillManager?.();
+    if (!skillManager) {
+      return false;
+    }
+    const currentHp = Number(skillManager.getCurrentLevel?.(Skill.HITPOINTS) ?? 0);
+    const maxHp = Number(skillManager.getMaxLevel?.(Skill.HITPOINTS) ?? 0);
+    if (currentHp <= 0 || maxHp <= 0) {
+      return false;
+    }
+    const eatAtHpRatio = this.getCachedPvpEatAtHpRatio(state);
+    const eatThreshold = Math.max(1, Math.ceil(maxHp * eatAtHpRatio));
+    return currentHp <= eatThreshold;
+  }
+
+  getCachedPvpEatAtHpRatio(state) {
+    const pvp = state?.pvp;
+    if (!pvp) {
+      return 0.45;
+    }
+    const profileId = pvp.profileId ?? "standard";
+    if (pvp.cachedEatAtHpRatioProfileId !== profileId) {
+      pvp.cachedEatAtHpRatioProfileId = profileId;
+      pvp.cachedEatAtHpRatio = Number(getPvpProfile(profileId)?.eatAtHpRatio ?? 0.45);
+    }
+    return Number(pvp.cachedEatAtHpRatio ?? 0.45);
+  }
+
+  shouldSkipIdlePvpControllerTick(entry, nowMs) {
+    const player = entry?.player;
+    const state = entry?.state;
+    const pvp = state?.pvp;
+    if (!player || !state || !pvp || !this.isPvpOnlyBot(state)) {
+      return false;
+    }
+    if (state.mode !== this.behaviorMode?.PVP) {
+      return false;
+    }
+    if (this.isInCombat(player)) {
+      return false;
+    }
+    if (pvp.replenishAfterKillPending === true) {
+      return false;
+    }
+    const replenishPrayerUntil = Number(pvp.replenishPrayerUntil ?? 0);
+    if (replenishPrayerUntil > 0 && nowMs >= replenishPrayerUntil) {
+      return false;
+    }
+    if (this.needsLowHpSupport(player, state)) {
+      return false;
+    }
+    return nowMs < Number(pvp.nextActionAt ?? 0);
+  }
+
   chooseBlockedTileRecoveryLocation(player, state) {
     if (!player || !state) {
       return null;
@@ -828,6 +890,18 @@ class BotBehaviorTask extends Task {
       state.pvp.targetLockUntil = 0;
     }
     return true;
+  }
+
+  hasCombatLinks(player) {
+    if (!player) {
+      return false;
+    }
+    const combat = player.getCombat?.();
+    return !!(
+      combat?.getTarget?.() ||
+      combat?.getAttacker?.() ||
+      player.getCombatFollowing?.()
+    );
   }
 
   tryAdoptCombatAttacker(entry, nowMs) {
@@ -1015,6 +1089,9 @@ class BotBehaviorTask extends Task {
     // are cleared after death so the bot resumes normal autonomous behavior.
     if (deadOrDying) {
       if (!state.deathResetApplied) {
+        if (state?.pvp) {
+          state.pvp.appliedBoostProfileId = null;
+        }
         this.activateModeWithHandler(
           entry,
           this.isPvpOnlyBot(state) ? this.behaviorMode.PVP : this.behaviorMode.ROAMING,
@@ -1167,7 +1244,7 @@ class BotBehaviorTask extends Task {
     }
 
     if (nowMs < (autonomy.nextDecisionAt ?? 0)) {
-      if (this.hasNearbyRealPlayerOpportunity(player, state, nowMs)) {
+      if (!this.isPvpOnlyBot(state) && this.hasNearbyRealPlayerOpportunity(player, state, nowMs)) {
         autonomy.nextDecisionAt = 0;
       } else {
         return;
@@ -1182,9 +1259,17 @@ class BotBehaviorTask extends Task {
     }
 
     const forcePvpOnly = this.isPvpOnlyBot(state);
-    const allowedAutonomousModes = Array.isArray(autonomy.allowedAutonomousModes)
-      ? new Set(autonomy.allowedAutonomousModes.filter((mode) => typeof mode === "string"))
-      : null;
+    let allowedAutonomousModes = null;
+    if (Array.isArray(autonomy.allowedAutonomousModes)) {
+      const modeKey = autonomy.allowedAutonomousModes.join("|");
+      if (autonomy.allowedAutonomousModesKey !== modeKey) {
+        autonomy.allowedAutonomousModesKey = modeKey;
+        autonomy.allowedAutonomousModeSet = new Set(
+          autonomy.allowedAutonomousModes.filter((mode) => typeof mode === "string")
+        );
+      }
+      allowedAutonomousModes = autonomy.allowedAutonomousModeSet;
+    }
     const candidates = [];
     for (const definition of this.autonomousModes) {
       const mode = definition?.mode;
@@ -1237,6 +1322,7 @@ class BotBehaviorTask extends Task {
   execute() {
     const now = Date.now();
     this._cycleCounter = (this._cycleCounter + 1) & 0x7fffffff;
+    this.refreshHumanObservers(now);
     for (let index = 0; index < this.entries.length; index++) {
       const entry = this.entries[index];
       const sampleEntry = this.shouldSampleEntry(index);
@@ -1257,7 +1343,9 @@ class BotBehaviorTask extends Task {
         if (this.recoverBlockedWildernessBot(entry, now)) {
           continue;
         }
-        this.clearDeadCombatLinks(entry);
+        if (this.hasCombatLinks(player)) {
+          this.clearDeadCombatLinks(entry);
+        }
         if (sampleEntry && this._profileWindow) {
           this._profileWindow.sampledEntries += 1;
           if (modeProfile) {
@@ -1337,6 +1425,9 @@ class BotBehaviorTask extends Task {
           if (modeProfile) {
             modeProfile.autonomyMs += autonomyMs;
           }
+        }
+        if (this.shouldSkipIdlePvpControllerTick(entry, now)) {
+          continue;
         }
         let controllerStartNs = 0n;
         if (sampleEntry && this._profileWindow) {

@@ -15,6 +15,10 @@ const {
   ClanRecruitActionNode,
 } = require("../nodes/actions/ClanRecruitActionNode");
 const { ReturnHomeActionNode } = require("../nodes/actions/ReturnHomeActionNode");
+const { peekMovementRequest } = require("../navigation/BotNavigation");
+const {
+  ATTR_RECRUIT_OWNER_USERNAME,
+} = require("../../runtime/BotRecruitConstants");
 
 function requireModeBehavior(modeHandlers, modeValue, label) {
   const behavior = modeHandlers?.[modeValue];
@@ -121,10 +125,13 @@ class PlayerBotBehaviorTreeFactory {
       new ActionNode((context) => this.roamingBehavior.tick(context)),
       initialDelayMs
     );
-    const tickCurrentMode = (context) => {
+    const resolveState = (context) => {
       const player = context?.player;
       const username = player?.getUsername?.();
-      const state = username ? this.botStatesByName.get(username) : null;
+      return username ? this.botStatesByName.get(username) : null;
+    };
+    const tickCurrentMode = (context) => {
+      const state = resolveState(context);
       switch (state?.mode) {
         case this.behaviorMode.RETURN_HOME:
           return returnHomeActionNode.tick(context);
@@ -152,10 +159,25 @@ class PlayerBotBehaviorTreeFactory {
       }
     };
     return new SelectorNode([
-      processPendingMovementActionNode,
-      new ActionNode((context) => this.maintainCombatBoostsActionNode.tick(context)),
+      new ActionNode((context) => {
+        if (!peekMovementRequest(context?.player)) {
+          return "failure";
+        }
+        return processPendingMovementActionNode.tick(context);
+      }),
+      new ActionNode((context) => {
+        if (resolveState(context)?.mode !== this.behaviorMode.PVP) {
+          return "failure";
+        }
+        return this.maintainCombatBoostsActionNode.tick(context);
+      }),
       new ActionNode((context) => this.eatFoodActionNode.tick(context)),
-      new ActionNode((context) => clanRecruitActionNode.tick(context)),
+      new ActionNode((context) => {
+        if (!context?.player?.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME)) {
+          return "failure";
+        }
+        return clanRecruitActionNode.tick(context);
+      }),
       new ActionNode((context) => tickCurrentMode(context)),
     ]);
   }
