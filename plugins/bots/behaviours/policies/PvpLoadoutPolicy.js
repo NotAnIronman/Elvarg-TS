@@ -716,6 +716,7 @@ function chooseEliteSpecWeapon() {
     ItemIdentifiers.SARADOMIN_GODSWORD,
     ItemIdentifiers.ZAMORAK_GODSWORD,
     ItemIdentifiers.ANCIENT_GODSWORD,
+    ItemIdentifiers.BARRELCHEST_ANCHOR,
   ]);
 }
 
@@ -1247,6 +1248,7 @@ const ARCHETYPES = Object.freeze({
               ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
               ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
               ItemIdentifiers.ANCIENT_GODSWORD,
+              ItemIdentifiers.BARRELCHEST_ANCHOR,
             ]),
         { comboEatCount: 5 }
       ),
@@ -1295,7 +1297,10 @@ const ARCHETYPES = Object.freeze({
       buildEdgeMeleeInventory(
         isEliteProfile(profile)
           ? chooseEliteSpecWeapon()
-          : ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_
+          : choose([
+              ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+              ItemIdentifiers.BARRELCHEST_ANCHOR,
+            ])
       ),
   }),
   zerker_dscim: Object.freeze({
@@ -1321,7 +1326,10 @@ const ARCHETYPES = Object.freeze({
       buildEdgeMeleeInventory(
         isEliteProfile(profile)
           ? chooseEliteSpecWeapon()
-          : ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_
+          : choose([
+              ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+              ItemIdentifiers.BARRELCHEST_ANCHOR,
+            ])
       ),
   }),
   msb_gmaul: Object.freeze({
@@ -1759,7 +1767,10 @@ const ARCHETYPES = Object.freeze({
     inventory: (magicPackage) =>
       buildAntiPkInventory({
         meleeWeaponId: ItemIdentifiers.DRAGON_SCIMITAR,
-        specWeaponId: ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+        specWeaponId: choose([
+          ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+          ItemIdentifiers.BARRELCHEST_ANCHOR,
+        ]),
         mageWeaponId: magicPackage?.staffId ?? ItemIdentifiers.ANCIENT_STAFF,
         mageBodyId: choose(HYBRID_MAGE_TOPS),
         mageLegId: choose(HYBRID_RANGE_LEGS),
@@ -1785,7 +1796,13 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.CLIMBING_BOOTS),
         item(ItemIdentifiers.RING_OF_RECOIL),
       ]),
-    inventory: () => buildEdgeMeleeInventory(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_),
+    inventory: () =>
+      buildEdgeMeleeInventory(
+        choose([
+          ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+          ItemIdentifiers.BARRELCHEST_ANCHOR,
+        ])
+      ),
   }),
   budget_rcb: Object.freeze({
     id: "budget_rcb",
@@ -2074,6 +2091,7 @@ function applyGeneratedPvpLoadout(player, state, options = {}) {
           itemId === ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_ ||
           itemId === ItemIdentifiers.ANCIENT_GODSWORD ||
           itemId === ItemIdentifiers.GRANITE_MAUL ||
+          itemId === ItemIdentifiers.BARRELCHEST_ANCHOR ||
           itemId === ItemIdentifiers.MAGIC_SHORTBOW ||
           itemId === ItemIdentifiers.MAGIC_SHORTBOW_I_ ||
           itemId === ItemIdentifiers.MAGIC_SHORTBOW_3

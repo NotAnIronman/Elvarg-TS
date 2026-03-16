@@ -853,6 +853,7 @@ module.exports = {
     globalThis.__shopReload = reloadShops;
 
     api.onNpcClick(NpcIds.SHOP_KEEPER, 1, ({ player }) => openGeneralStore(player));
+    api.onNpcClick(NpcIds.EMBLEM_TRADER, 1, ({ player }) => openShopById(player, 2));
 
     api.onEstablishedPacket(({ opcode, packet, player }) => {
       if (opcode === PacketConstants.CLOSE_INTERFACE_OPCODE) {

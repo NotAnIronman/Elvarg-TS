@@ -913,7 +913,7 @@ class LoginSession {
     putByte(
       Math.max(
         1,
-        Math.min(5, Number(this.gamePlayer?.getAttribute?.(LoginSession.GLOW_INTENSITY_ATTRIBUTE) ?? 5) | 0)
+        Math.min(5, Number(this.gamePlayer?.getAttribute?.(LoginSession.GLOW_INTENSITY_ATTRIBUTE) ?? 1) | 0)
       ) & 0xff
     );
     // Loyalty title (empty string, terminator only)

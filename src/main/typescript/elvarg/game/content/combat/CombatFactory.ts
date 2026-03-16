@@ -80,6 +80,19 @@ const getPlayerCombatSpecial = (player: Player): CombatSpecial | null => {
     return ((player as any)?.combatSpecial ?? null) as CombatSpecial | null;
 };
 
+const isDeveloperGraniteMaulSpec = (entity: Mobile): entity is Player => {
+    if (!entity.isPlayer()) {
+        return false;
+    }
+
+    const player = entity.getAsPlayer();
+    return (
+        player.getRights?.() === PlayerRights.DEVELOPER &&
+        player.isSpecialActivated() &&
+        getPlayerCombatSpecial(player) === CombatSpecial.GRANITE_MAUL
+    );
+};
+
 export class CombatFactory {
     private static readonly RANDOM = new RandomGen();
     /**
@@ -217,6 +230,10 @@ export class CombatFactory {
                 hitDamage.multiplyDamage(CombatConstants.ELYSIAN_DAMAGE_REDUCTION);
                 victim.performGraphic(new Graphic(321, 40)); // Elysian spirit shield effect gfx
             }
+        }
+
+        if (type == CombatType.MELEE && isDeveloperGraniteMaulSpec(entity)) {
+            hitDamage = new HitDamage(50, HitMask.RED);
         }
 
         return hitDamage;

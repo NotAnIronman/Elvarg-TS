@@ -9,6 +9,7 @@ import { RestoreSpecialAttackTask } from '../../task/impl/RestoreSpecialAttackTa
 import { Equipment } from "../../model/container/impl/Equipment";
 import { DuelRule } from "../Duelling";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
+import { PlayerRights } from "../../model/rights/PlayerRights";
 import { AbyssalBludgeonCombatMethod } from "./method/impl/specials/AbyssalBludgeonCombatMethod";
 import { AbyssalDaggerCombatMethod } from "./method/impl/specials/AbyssalDaggerCombatMethod";
 import { AbyssalWhipCombatMethod } from "./method/impl/specials/AbyssalWhipCombatMethod";
@@ -406,11 +407,14 @@ export class CombatSpecial {
             CombatSpecial.updateBar(player);
         } else {
             const spec = player.getCombatSpecial();
+            const developerGraniteMaulSpam =
+                spec == CombatSpecial.GRANITE_MAUL &&
+                player.getRights?.() === PlayerRights.DEVELOPER;
             player.setSpecialActivated(true);
             CombatSpecial.updateBar(player);
 
             if (spec == CombatSpecial.GRANITE_MAUL) {
-                if (player.getSpecialPercentage() < player.getCombatSpecial().getDrainAmount()) {
+                if (!developerGraniteMaulSpam && player.getSpecialPercentage() < player.getCombatSpecial().getDrainAmount()) {
                     player.getPacketSender().sendMessage("You do not have enough special attack energy left!");
                     player.setSpecialActivated(false);
                     CombatSpecial.updateBar(player);
@@ -421,11 +425,15 @@ export class CombatSpecial {
                 if (target != null && CombatFactory.getMethod(player).type() == CombatType.MELEE) {
                     const drainAmount = spec.getDrainAmount();
                     player.getCombat().setGraniteMaulSpecialQueued(true);
-                    CombatSpecial.drain(player, drainAmount);
+                    if (!developerGraniteMaulSpam) {
+                        CombatSpecial.drain(player, drainAmount);
+                    }
                     const attacked = player.getCombat().performNewAttack(true);
                     if (!attacked) {
                         player.getCombat().setGraniteMaulSpecialQueued(false);
-                        player.incrementSpecialPercentage(drainAmount);
+                        if (!developerGraniteMaulSpam) {
+                            player.incrementSpecialPercentage(drainAmount);
+                        }
                         player.setSpecialActivated(false);
                         CombatSpecial.updateBar(player);
                     }

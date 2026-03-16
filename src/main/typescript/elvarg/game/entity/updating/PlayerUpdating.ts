@@ -911,7 +911,7 @@ export class PlayerUpdating {
             Number(target.getAttribute(PlayerUpdating.GLOW_PRESET_ATTRIBUTE) ?? 0) & 0xff
         );
         properties.put(
-            Math.max(1, Math.min(5, Number(target.getAttribute(PlayerUpdating.GLOW_INTENSITY_ATTRIBUTE) ?? 5) | 0)) &
+            Math.max(1, Math.min(5, Number(target.getAttribute(PlayerUpdating.GLOW_INTENSITY_ATTRIBUTE) ?? 1) | 0)) &
                 0xff
         );
         properties.putString(target.getLoyaltyTitle());

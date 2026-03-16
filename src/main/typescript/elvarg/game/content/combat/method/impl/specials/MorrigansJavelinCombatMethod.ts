@@ -19,6 +19,7 @@ import { Sounds } from "../../../../../Sounds";
 
 export class MorrigansJavelinCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(806);
+    private static readonly BLEED_TASK_KEY_ATTRIBUTE = "combat:bleed:taskKey";
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
         const distance = character.getLocation().getDistance(target.getLocation());
@@ -43,19 +44,32 @@ export class MorrigansJavelinCombatMethod extends RangedCombatMethod {
     }
 
     handleAfterHitEffects(hit: PendingHit): void {
+        const target = hit.getTarget();
+        const existingTaskKey = target?.isPlayer?.() ? target.getAsPlayer().getAttribute?.(MorrigansJavelinCombatMethod.BLEED_TASK_KEY_ATTRIBUTE) : null;
+        if (existingTaskKey) {
+            TaskManager.cancelTasks(existingTaskKey);
+        }
+        const bleedTaskKey = {};
+        if (target?.isPlayer?.()) {
+            target.getAsPlayer().setAttribute?.(MorrigansJavelinCombatMethod.BLEED_TASK_KEY_ATTRIBUTE, bleedTaskKey);
+        }
+
         TaskManager.submit(new class extends Task {
             private processed = 0;
             private first = true;
             private dealt = 0;
 
             constructor() {
-                super(1);
+                super(1, bleedTaskKey);
             }
 
             execute(): void {
                 const attacker = hit.getAttacker();
                 const target = hit.getTarget();
                 if (!attacker.isRegistered() || !target.isRegistered() || attacker.getHitpoints() <= 0 || target.getHitpoints() <= 0) {
+                    if (target?.isPlayer?.()) {
+                        target.getAsPlayer().setAttribute?.(MorrigansJavelinCombatMethod.BLEED_TASK_KEY_ATTRIBUTE, null);
+                    }
                     this.stop();
                     return;
                 }
@@ -67,6 +81,9 @@ export class MorrigansJavelinCombatMethod extends RangedCombatMethod {
 
                 const damageToDeal = Math.min(5, hit.getTotalDamage() - this.dealt);
                 if (damageToDeal <= 0) {
+                    if (target?.isPlayer?.()) {
+                        target.getAsPlayer().setAttribute?.(MorrigansJavelinCombatMethod.BLEED_TASK_KEY_ATTRIBUTE, null);
+                    }
                     this.stop();
                     return;
                 }

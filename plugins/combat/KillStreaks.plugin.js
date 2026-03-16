@@ -1,5 +1,6 @@
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
+const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 
 const GLOW_PRESET_ATTRIBUTE = "visual:glowPreset";
 const GLOW_INTENSITY_ATTRIBUTE = "visual:glowIntensity";
@@ -21,14 +22,14 @@ const COLOR_TIERS = Object.freeze([
     preset: GLOW_PRESETS.blood,
     label: "Blood",
     messageColorTag: "@red@",
-    intensityThresholds: Object.freeze([3, 5]),
+    intensityThresholds: Object.freeze([3, 4, 5]),
   }),
   Object.freeze({
     minKills: 6,
     preset: GLOW_PRESETS.toxic,
     label: "Toxic",
     messageColorTag: "@gre@",
-    intensityThresholds: Object.freeze([6, 8]),
+    intensityThresholds: Object.freeze([6, 7, 9]),
   }),
   Object.freeze({
     minKills: 10,
@@ -98,7 +99,7 @@ function resolveTierIntensity(tier, killstreak) {
       intensity++;
     }
   }
-  return Math.max(1, Math.min(2, intensity));
+  return Math.max(1, Math.min(3, intensity));
 }
 
 function flagAppearance(player) {
@@ -133,17 +134,17 @@ function syncKillstreakGlow(player) {
       player.getAttribute?.(GLOW_PRESET_ATTRIBUTE),
       GLOW_PRESETS.off
     );
-    const currentGlowIntensity = parseAttributeInt(
-      player.getAttribute?.(GLOW_INTENSITY_ATTRIBUTE),
-      1
-    );
+    const rawCurrentGlowIntensity = player.getAttribute?.(GLOW_INTENSITY_ATTRIBUTE);
+    const hasCurrentGlowIntensity =
+      rawCurrentGlowIntensity !== undefined && rawCurrentGlowIntensity !== null;
+    const currentGlowIntensity = parseAttributeInt(rawCurrentGlowIntensity, 1);
 
     let appearanceDirty = false;
     if (currentGlowPreset !== nextPreset) {
       player.setAttribute?.(GLOW_PRESET_ATTRIBUTE, nextPreset);
       appearanceDirty = true;
     }
-    if (currentGlowIntensity !== nextIntensity) {
+    if (!hasCurrentGlowIntensity || currentGlowIntensity !== nextIntensity) {
       player.setAttribute?.(GLOW_INTENSITY_ATTRIBUTE, nextIntensity);
       appearanceDirty = true;
     }
@@ -167,6 +168,36 @@ function syncKillstreakGlow(player) {
 function formatThresholdAnnouncement(player, tier, streak) {
   const username = player?.getUsername?.() ?? "A player";
   return `@red@[Killstreak] @whi@${username} has reached ${tier.messageColorTag}${tier.label}@whi@ status with ${streak} kills in a row!`;
+}
+
+function shouldIncrementForBotKill(killer, victim) {
+  return (
+    isEligibleKillstreakPlayer(killer) &&
+    victim?.isPlayerBot?.() === true &&
+    killer !== victim &&
+    Wilderness.isIn?.(killer) === true &&
+    Wilderness.isIn?.(victim) === true
+  );
+}
+
+function incrementBotKillstreak(killer) {
+  if (!isEligibleKillstreakPlayer(killer)) {
+    return;
+  }
+  killer.incrementKillstreak?.();
+  const current = normalizeKillstreak(killer);
+  if (current > parseAttributeInt(killer.getHighestKillstreak?.(), 0)) {
+    killer.setHighestKillstreak?.(current);
+    killer
+      .getPacketSender?.()
+      .sendMessage?.(
+        `Congratulations! Your highest killstreak is now ${killer.getHighestKillstreak?.()}.`
+      );
+  } else {
+    killer
+      .getPacketSender?.()
+      .sendMessage?.(`Your killstreak is now ${current}.`);
+  }
 }
 
 function handleVictimDefeat(victim) {
@@ -206,6 +237,9 @@ module.exports = {
     });
 
     api.onPlayerDefeated(({ killer, victim }) => {
+      if (shouldIncrementForBotKill(killer, victim)) {
+        incrementBotKillstreak(killer);
+      }
       handleVictimDefeat(victim);
       handleKillerProgress(killer, victim);
     });
