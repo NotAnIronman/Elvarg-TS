@@ -227,24 +227,24 @@ module.exports = {
     const wakeAttemptAt = new WeakMap();
 
     api.onNpcInteraction((event) => {
-      const npc = event?.npc;
+      const npc = event.npc;
       const variant = resolveVariant(npc);
       if (!variant) {
         return;
       }
       const nowMs = Date.now();
       transformAwake(npc, variant, npcState, nowMs, api, "npc_interaction");
-      const player = event?.player;
+      const player = event.player;
       if (isValidPlayerTarget(player)) {
         tryAggroPlayer(npc, player, npcState, nowMs, api, "npc_interaction");
       }
     });
 
     api.onCanAttack((event) => {
-      if (!event || event.allow !== null) {
+      if (event.allow !== null) {
         return;
       }
-      if (event.attacker?.isPlayer?.() !== true || event.target?.isNpc?.() !== true) {
+      if (event.attacker.isPlayer?.() !== true || event.target.isNpc?.() !== true) {
         return;
       }
       const npc = event.target.getAsNpc?.() ?? event.target;

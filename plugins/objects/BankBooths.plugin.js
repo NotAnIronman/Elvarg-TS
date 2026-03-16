@@ -464,7 +464,7 @@ module.exports = {
   handleBankInterfaceAction,
   register(api) {
     const onBankBoothClick = (event) => {
-      if (!BANK_BOOTH_ID_SET.has(event?.objectId)) {
+      if (!BANK_BOOTH_ID_SET.has(event.objectId)) {
         return;
       }
       if (openBank(event.player)) {

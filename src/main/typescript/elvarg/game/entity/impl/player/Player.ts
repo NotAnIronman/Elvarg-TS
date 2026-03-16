@@ -502,8 +502,8 @@ export class Player extends Mobile {
                             // Should boosted stats be decreased?
                             if (this.decreaseStats.secondsElapsed() >= (PrayerHandler.isActivated(this, PrayerHandler.PRESERVE) ? 72 : 60)) {
 
-                                // Never decrease Hitpoints / Prayer
-                                if (skill != Skill.HITPOINTS && skill != Skill.PRAYER) {
+                                // Never decrease Hitpoints / Prayer, and keep player-bot boosts static.
+                                if (!isBot && skill != Skill.HITPOINTS && skill != Skill.PRAYER) {
                                     this.getSkillManager().decreaseCurrentLevel(skill, 1, 1);
                                 }
 
@@ -889,7 +889,11 @@ export class Player extends Mobile {
     }
 
     public setMultiIcon(multiIcon: number): Player {
+        if (this.multiIcon === multiIcon) {
+            return this;
+        }
         this.multiIcon = multiIcon;
+        this.getPacketSender().sendMultiIcon(multiIcon);
         return this;
     }
 

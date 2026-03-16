@@ -7,6 +7,11 @@ const { EffectTimer } = require("../../src/main/typescript/elvarg/game/model/Eff
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const {
+  DragonfireProtectionTier,
+  processDragonfireProtection,
+  setDragonfireProtection,
+} = require("../combat/DragonfireProtection");
 
 const DRINK_ANIMATION = new Animation(829);
 const DEFAULT_EMPTY_ITEM = ItemIds.VIAL;
@@ -128,8 +133,8 @@ function applyPoisonImmunity(player, seconds, message = true) {
   }
 }
 
-function applyAntifire(player, seconds) {
-  player.getCombat().getFireImmunityTimer().start(seconds);
+function applyAntifire(player, seconds, tier = DragonfireProtectionTier.ANTIFIRE, label = "antifire potion") {
+  setDragonfireProtection(player, { tier, seconds, label });
   player.getPacketSender().sendEffectTimer(seconds, EffectTimer.ANTIFIRE);
 }
 
@@ -513,22 +518,22 @@ registerPotion({
 registerPotion({
   name: "Antifire potion",
   chains: [doseChain("ANTIFIRE_POTION_4_", "ANTIFIRE_POTION_3_", "ANTIFIRE_POTION_2_", "ANTIFIRE_POTION_1_")],
-  effect: (player) => applyAntifire(player, 360),
+  effect: (player) => applyAntifire(player, 360, DragonfireProtectionTier.ANTIFIRE, "antifire potion"),
 });
 registerPotion({
   name: "Extended antifire",
   chains: [doseChain("EXTENDED_ANTIFIRE_4_", "EXTENDED_ANTIFIRE_3_", "EXTENDED_ANTIFIRE_2_", "EXTENDED_ANTIFIRE_1_")],
-  effect: (player) => applyAntifire(player, 720),
+  effect: (player) => applyAntifire(player, 720, DragonfireProtectionTier.ANTIFIRE, "antifire potion"),
 });
 registerPotion({
   name: "Super antifire",
   chains: [doseChain("SUPER_ANTIFIRE_POTION_4_", "SUPER_ANTIFIRE_POTION_3_", "SUPER_ANTIFIRE_POTION_2_", "SUPER_ANTIFIRE_POTION_1_")],
-  effect: (player) => applyAntifire(player, 180),
+  effect: (player) => applyAntifire(player, 180, DragonfireProtectionTier.SUPER_ANTIFIRE, "super antifire potion"),
 });
 registerPotion({
   name: "Extended super antifire",
   chains: [doseChain("EXTENDED_SUPER_ANTIFIRE_4_", "EXTENDED_SUPER_ANTIFIRE_3_", "EXTENDED_SUPER_ANTIFIRE_2_", "EXTENDED_SUPER_ANTIFIRE_1_")],
-  effect: (player) => applyAntifire(player, 360),
+  effect: (player) => applyAntifire(player, 360, DragonfireProtectionTier.SUPER_ANTIFIRE, "super antifire potion"),
 });
 
 registerPotion({
@@ -565,25 +570,25 @@ registerPotion({
   name: "Antifire mix",
   chains: [doseChain("ANTIFIRE_MIX_2_", "ANTIFIRE_MIX_1_")],
   requiresFoodPermission: true,
-  effect: applyMix((player) => applyAntifire(player, 360)),
+  effect: applyMix((player) => applyAntifire(player, 360, DragonfireProtectionTier.ANTIFIRE, "antifire potion")),
 });
 registerPotion({
   name: "Extended antifire mix",
   chains: [doseChain("EXTENDED_ANTIFIRE_MIX_2_", "EXTENDED_ANTIFIRE_MIX_1_")],
   requiresFoodPermission: true,
-  effect: applyMix((player) => applyAntifire(player, 720)),
+  effect: applyMix((player) => applyAntifire(player, 720, DragonfireProtectionTier.ANTIFIRE, "antifire potion")),
 });
 registerPotion({
   name: "Super antifire mix",
   chains: [doseChain("SUPER_ANTIFIRE_MIX_2_", "SUPER_ANTIFIRE_MIX_1_")],
   requiresFoodPermission: true,
-  effect: applyMix((player) => applyAntifire(player, 180)),
+  effect: applyMix((player) => applyAntifire(player, 180, DragonfireProtectionTier.SUPER_ANTIFIRE, "super antifire potion")),
 });
 registerPotion({
   name: "Extended super antifire mix",
   chains: [doseChain("EXTENDED_SUPER_ANTIFIRE_MIX_2_", "EXTENDED_SUPER_ANTIFIRE_MIX_1_")],
   requiresFoodPermission: true,
-  effect: applyMix((player) => applyAntifire(player, 360)),
+  effect: applyMix((player) => applyAntifire(player, 360, DragonfireProtectionTier.SUPER_ANTIFIRE, "super antifire potion")),
 });
 registerPotion({
   name: "Stamina mix",
@@ -788,6 +793,7 @@ module.exports = {
       }
       processStamina(player);
       processDivine(player);
+      processDragonfireProtection(player);
     });
 
     api.log("registered", {

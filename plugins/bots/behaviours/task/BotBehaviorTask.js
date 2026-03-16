@@ -1,14 +1,31 @@
 const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task");
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
-const { peekMovementRequest, randomInRange } = require("../navigation/BotNavigation");
+const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
+const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const {
+  chooseNextTarget,
+  peekMovementRequest,
+  randomInRange,
+} = require("../navigation/BotNavigation");
 const { callModeHook } = require("../hooks/ModeHookContract");
-const { clearBotActivePreset, setModePvp } = require("../state/PlayerBotState");
+const {
+  clearBotActivePreset,
+  isPvpOnlyBotState,
+  resetMovementState,
+  setModePvp,
+} = require("../state/PlayerBotState");
 const {
   ATTR_RECRUIT_OWNER_USERNAME,
 } = require("../../runtime/BotRecruitConstants");
 
 const NS_PER_MS = 1_000_000n;
 const MOVING_MODE_DECISION_DELAY_MS = 1500;
+const FORCED_BLOCKED_STARTUP_TILE = Object.freeze({
+  x: 2945,
+  y: 3824,
+  z: 0,
+});
 
 class BotBehaviorTask extends Task {
   constructor(entries, traversalService, decisionTicks, options = {}) {
@@ -656,19 +673,115 @@ class BotBehaviorTask extends Task {
     return this.autonomousModes.find((definition) => definition?.mode === mode) ?? null;
   }
 
-  isFullTimePvpBot(state) {
-    return false;
+  isPvpOnlyBot(state) {
+    return isPvpOnlyBotState(state);
   }
 
-  isPersistentPvpBot(state) {
+  isForcedBlockedStartupTile(location) {
+    if (!location) {
+      return false;
+    }
     return (
-      state?.autonomy?.wildernessRoamerPvp === true ||
-      state?.autonomy?.persistentPvpLoadout === true
+      location.getX?.() === FORCED_BLOCKED_STARTUP_TILE.x &&
+      location.getY?.() === FORCED_BLOCKED_STARTUP_TILE.y &&
+      location.getZ?.() === FORCED_BLOCKED_STARTUP_TILE.z
     );
   }
 
-  isWildernessRoamerPvpBot(state) {
-    return state?.autonomy?.wildernessRoamerPvp === true;
+  chooseBlockedTileRecoveryLocation(player, state) {
+    if (!player || !state) {
+      return null;
+    }
+    const roamBounds = state?.roaming?.roamBounds ?? null;
+    const privateArea = player.getPrivateArea?.() ?? null;
+    const target = chooseNextTarget(player, state, 12, {
+      bounds: roamBounds,
+      acceptTarget: (candidate) => {
+        if (!candidate) {
+          return false;
+        }
+        const location = new Location(candidate.x, candidate.y, candidate.z);
+        return (
+          Wilderness.isInLocation(location) &&
+          !RegionManager.blocked(location, privateArea)
+        );
+      },
+    });
+    if (!target) {
+      return null;
+    }
+    return new Location(target.x, target.y, target.z);
+  }
+
+  recoverBlockedWildernessBot(entry, nowMs) {
+    const player = entry?.player;
+    const state = entry?.state;
+    if (!player || !state || !this.isPvpOnlyBot(state)) {
+      return false;
+    }
+    if ((player.getHitpoints?.() ?? 0) <= 0 || player.isDyingReturn?.() === true) {
+      return false;
+    }
+    const location = player.getLocation?.();
+    if (!location || !Wilderness.isInLocation(location)) {
+      return false;
+    }
+    const privateArea = player.getPrivateArea?.() ?? null;
+    const forcedBlockedTile = this.isForcedBlockedStartupTile(location);
+    if (!forcedBlockedTile && !RegionManager.blocked(location, privateArea)) {
+      return false;
+    }
+
+    const recoveryLocation = this.chooseBlockedTileRecoveryLocation(player, state);
+    if (!recoveryLocation) {
+      this.api?.log?.("blocked_wilderness_bot_recovery_failed", {
+        username: player.getUsername?.() ?? null,
+        x: location.getX?.() ?? null,
+        y: location.getY?.() ?? null,
+        z: location.getZ?.() ?? null,
+      });
+      return false;
+    }
+
+    resetMovementState(player);
+    player.getCombat?.().reset?.();
+    player.getCombat?.().setUnderAttack?.(null);
+    player.setFollowing?.(null);
+    player.setCombatFollowing?.(null);
+    player.setMobileInteraction?.(null);
+    player.setPositionToFace?.(null);
+
+    if (state?.pvp) {
+      state.pvp.targetUsername = null;
+      state.pvp.targetPlayer = null;
+      state.pvp.currentTargetScore = 0;
+      state.pvp.targetLockUntil = 0;
+      state.pvp.nextActionAt = nowMs + randomInRange(600, 1500);
+      state.pvp.phase = "seeking";
+    }
+    if (state?.roaming) {
+      state.roaming.target = null;
+      state.roaming.pendingRetry = null;
+      state.roaming.nextWalkAt = nowMs + randomInRange(600, 1500);
+    }
+    if (state?.home) {
+      state.home.x = recoveryLocation.getX();
+      state.home.y = recoveryLocation.getY();
+      state.home.z = recoveryLocation.getZ();
+    }
+
+    player.moveTo?.(recoveryLocation);
+    this.api?.log?.("blocked_wilderness_bot_reteleport", {
+      username: player.getUsername?.() ?? null,
+      forcedStartupTile: forcedBlockedTile,
+      fromX: location.getX?.() ?? null,
+      fromY: location.getY?.() ?? null,
+      fromZ: location.getZ?.() ?? null,
+      toX: recoveryLocation.getX(),
+      toY: recoveryLocation.getY(),
+      toZ: recoveryLocation.getZ(),
+    });
+    return true;
   }
 
   clearDeadCombatLinks(entry) {
@@ -707,7 +820,7 @@ class BotBehaviorTask extends Task {
   tryAdoptCombatAttacker(entry, nowMs) {
     const player = entry?.player;
     const state = entry?.state;
-    if (!player || !state || !this.isPersistentPvpBot(state)) {
+    if (!player || !state || !this.isPvpOnlyBot(state)) {
       return false;
     }
     const combat = player.getCombat?.();
@@ -762,7 +875,7 @@ class BotBehaviorTask extends Task {
   }
 
   hasNearbyRealPlayerOpportunity(player, state, nowMs) {
-    if (!player || !this.isPersistentPvpBot(state)) {
+    if (!player || !this.isPvpOnlyBot(state)) {
       return false;
     }
     if (state?.mode !== this.behaviorMode.ROAMING) {
@@ -846,7 +959,7 @@ class BotBehaviorTask extends Task {
   }
 
   startRoamingFallback(entry, nowMs, reason = "fallback_roaming") {
-    if (this.isFullTimePvpBot(entry?.state)) {
+    if (this.isPvpOnlyBot(entry?.state)) {
       const pvpDefinition = this.getAutonomousModeDefinition(this.behaviorMode.PVP);
       if (pvpDefinition) {
         return this.startAutonomousMode(
@@ -891,7 +1004,7 @@ class BotBehaviorTask extends Task {
       if (!state.deathResetApplied) {
         this.activateModeWithHandler(
           entry,
-          this.isFullTimePvpBot(state) ? this.behaviorMode.PVP : this.behaviorMode.ROAMING,
+          this.isPvpOnlyBot(state) ? this.behaviorMode.PVP : this.behaviorMode.ROAMING,
           "post_death_reset"
         );
         state.virtualFoodChargesRemaining = null;
@@ -907,7 +1020,7 @@ class BotBehaviorTask extends Task {
     }
 
     if (state.deathResetApplied) {
-      if (this.isPersistentPvpBot(state) && this.handlePersistentPvpRespawn) {
+      if (this.isPvpOnlyBot(state) && this.handlePersistentPvpRespawn) {
         this.handlePersistentPvpRespawn(entry, nowMs);
       }
       // Clear any active preset after respawn, not during the death animation.
@@ -1055,7 +1168,7 @@ class BotBehaviorTask extends Task {
       return;
     }
 
-    const forcePvpOnly = this.isFullTimePvpBot(state);
+    const forcePvpOnly = this.isPvpOnlyBot(state);
     const allowedAutonomousModes = Array.isArray(autonomy.allowedAutonomousModes)
       ? new Set(autonomy.allowedAutonomousModes.filter((mode) => typeof mode === "string"))
       : null;
@@ -1078,7 +1191,7 @@ class BotBehaviorTask extends Task {
       candidates.push(definition);
     }
 
-    if (this.isWildernessRoamerPvpBot(state)) {
+    if (this.isPvpOnlyBot(state)) {
       const pvpCandidate = candidates.find(
         (definition) => definition?.mode === this.behaviorMode.PVP
       );
@@ -1126,6 +1239,9 @@ class BotBehaviorTask extends Task {
         const state = entry?.state;
         const player = entry?.player;
         if (!player || !state) {
+          continue;
+        }
+        if (this.recoverBlockedWildernessBot(entry, now)) {
           continue;
         }
         this.clearDeadCombatLinks(entry);

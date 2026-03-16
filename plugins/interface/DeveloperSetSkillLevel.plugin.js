@@ -53,13 +53,13 @@ module.exports = {
   name: "DeveloperSetSkillLevel",
   register(api) {
     api.onButtonClick((event) => {
-      if (handleSkillClick(event?.player, event?.buttonId)) {
+      if (handleSkillClick(event.player, event.buttonId)) {
         event.handled = true;
       }
     });
 
     api.onInterfaceActionClick((event) => {
-      if (handleSkillClick(event?.player, event?.buttonId)) {
+      if (handleSkillClick(event.player, event.buttonId)) {
         event.handled = true;
       }
     });

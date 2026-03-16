@@ -8,7 +8,6 @@ class PvpDefensiveActionNode {
     this.stopPvp = options.stopPvp;
     this.isActivelyEngagedWithTarget = options.isActivelyEngagedWithTarget;
     this.getProfile = options.getProfile;
-    this.isFullTimePvp = options.isFullTimePvp;
     this.pvpPhase = options.pvpPhase;
   }
 
@@ -17,14 +16,6 @@ class PvpDefensiveActionNode {
     const pvp = state?.pvp;
     if (!player || !state || !pvp || !target) {
       return { handled: true, status: "failure" };
-    }
-
-    if (this.isFullTimePvp?.(state) === true) {
-      if (player.getForceMovement?.() != null) {
-        this.setPhase?.(state, this.pvpPhase?.COMBAT ?? "combat");
-        return { handled: true, status: "running" };
-      }
-      return { handled: false, status: "running" };
     }
 
     const currentHp = Number(player.getHitpoints?.() ?? 0);

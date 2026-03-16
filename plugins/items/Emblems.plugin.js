@@ -49,7 +49,7 @@ module.exports = {
   name: "Emblems",
   register(api) {
     api.onShouldKeepItemOnDeath((event) => {
-      const itemId = event?.item?.getId?.();
+      const itemId = event.item?.getId?.();
       if (!isEmblemItemId(itemId)) {
         return;
       }
@@ -57,7 +57,7 @@ module.exports = {
     });
 
     api.onPlayerDeathItemDrop((event) => {
-      const itemId = event?.item?.getId?.();
+      const itemId = event.item?.getId?.();
       if (!isEmblemItemId(itemId)) {
         return;
       }

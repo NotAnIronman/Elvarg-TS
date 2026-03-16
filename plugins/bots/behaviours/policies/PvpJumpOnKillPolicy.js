@@ -2,6 +2,7 @@
 
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
+const { isPvpOnlyBotState } = require("../state/PlayerBotState");
 
 const IMMEDIATE_PJ_DURATION_MS = 30000;
 const DEFAULT_PJ_USE_CHANCE_BY_PROFILE = Object.freeze({
@@ -20,11 +21,7 @@ class PvpJumpOnKillPolicy {
   }
 
   isPersistentPvpState(state) {
-    return !!(
-      state?.pvp &&
-      (state.autonomy?.wildernessRoamerPvp === true ||
-        state.autonomy?.persistentPvpLoadout === true)
-    );
+    return isPvpOnlyBotState(state);
   }
 
   resolvePrimaryRealPlayerDamager(victim, killer) {

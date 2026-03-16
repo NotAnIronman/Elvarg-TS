@@ -16,6 +16,8 @@ import * as path from "path";
 
 export class PlayerUpdating {
     private static MAX_NEW_PLAYERS_PER_CYCLE = 25;
+    private static readonly GLOW_PRESET_ATTRIBUTE = "visual:glowPreset";
+    private static readonly GLOW_INTENSITY_ATTRIBUTE = "visual:glowIntensity";
     // Player local count is encoded on 8 bits. Keeping this at 79 starves nearby
     // interactable players in bot-heavy scenes even though the client can track more.
     private static readonly MAX_LOCAL_PLAYERS = 255;
@@ -905,6 +907,13 @@ export class PlayerUpdating {
         properties.putLong(Misc.stringToLongBigInt(target.getUsername()));
         properties.put(target.getSkillManager().getCombatLevel());
         properties.put(target.getRights().getId());
+        properties.put(
+            Number(target.getAttribute(PlayerUpdating.GLOW_PRESET_ATTRIBUTE) ?? 0) & 0xff
+        );
+        properties.put(
+            Math.max(1, Math.min(5, Number(target.getAttribute(PlayerUpdating.GLOW_INTENSITY_ATTRIBUTE) ?? 5) | 0)) &
+                0xff
+        );
         properties.putString(target.getLoyaltyTitle());
 
         out.puts(properties.getBuffer().length, ValueType.C);

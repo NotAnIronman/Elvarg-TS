@@ -37,6 +37,8 @@ const {
   maybeRunPressureCombatScript,
 } = require("../policies/PvpPressureCombatPolicy");
 const {
+  clearFollowState,
+  isPvpOnlyBotState,
   resetMovementState,
   setModePvp,
   setModeRoaming,
@@ -60,6 +62,7 @@ const HOTSPOT_DYNAMIC_DECISION_JITTER_MS = 4200;
 const SEEKING_RESET_STAGGER_MIN_MS = 250;
 const SEEKING_RESET_STAGGER_MAX_MS = 1800;
 const HIGH_WILDNESS_AGGRESSION_LEVEL = 48;
+const DEEP_WILD_FENCE_Y = 3904;
 
 const PVP_PHASE = Object.freeze({
   IDLE: "idle",
@@ -109,7 +112,7 @@ class PvpBehavior {
       setPhase: (state, phase) => this.setPhase(state, phase),
       stopPvp: (player, state, nowMs, reason) =>
         this.stopPvp(player, state, nowMs, reason),
-      isFullTimePvp: (state) => this.isFullTimePvp(state),
+      isPvpOnly: (state) => this.isPvpOnly(state),
       resetSeekingState: (player, state, nowMs, reason) =>
         this.resetSeekingState(player, state, nowMs, reason),
       resolveTargetPlayer: (state) => this.resolveTargetPlayer(state),
@@ -126,7 +129,6 @@ class PvpBehavior {
       isActivelyEngagedWithTarget: (player, target) =>
         this.isActivelyEngagedWithTarget(player, target),
       getProfile: (state) => this.getProfile(state),
-      isFullTimePvp: (state) => this.isFullTimePvp(state),
       pvpPhase: PVP_PHASE,
     });
     this.freezeAndKiteNode = new PvpFreezeAndKiteNode({
@@ -216,11 +218,8 @@ class PvpBehavior {
     return getPvpProfile(state?.pvp?.profileId);
   }
 
-  isFullTimePvp(state) {
-    return (
-      state?.autonomy?.wildernessRoamerPvp === true ||
-      state?.autonomy?.persistentPvpLoadout === true
-    );
+  isPvpOnly(state) {
+    return isPvpOnlyBotState(state);
   }
 
   getHotspotDecisionJitterMs(player) {
@@ -247,6 +246,31 @@ class PvpBehavior {
     }
   }
 
+  isAcrossDeepWildFence(sourcePlayer, targetPlayer) {
+    if (
+      sourcePlayer?.isPlayerBot?.() !== true ||
+      targetPlayer?.isPlayerBot?.() !== true
+    ) {
+      return false;
+    }
+    const sourceLoc = sourcePlayer.getLocation?.();
+    const targetLoc = targetPlayer.getLocation?.();
+    if (!sourceLoc || !targetLoc) {
+      return false;
+    }
+    if (sourceLoc.getZ?.() !== targetLoc.getZ?.()) {
+      return false;
+    }
+    const sourceY = sourceLoc.getY?.();
+    const targetY = targetLoc.getY?.();
+    if (!Number.isFinite(sourceY) || !Number.isFinite(targetY)) {
+      return false;
+    }
+    const sourceNorth = sourceY >= DEEP_WILD_FENCE_Y;
+    const targetNorth = targetY >= DEEP_WILD_FENCE_Y;
+    return sourceNorth !== targetNorth;
+  }
+
   resetSeekingState(player, state, nowMs, reason) {
     if (!player || !state) {
       return false;
@@ -261,6 +285,10 @@ class PvpBehavior {
     state.pvp.targetLockUntil = 0;
     state.pvp.endsAt = 0;
     this.clearManagedPvpPrayers(player);
+    player.getCombat?.()?.reset?.();
+    player.setCombatFollowing?.(null);
+    clearFollowState(player, state);
+    player.setPositionToFace?.(null);
     state.pvp.nextActionAt =
       nowMs +
       randomInRange(SEEKING_RESET_STAGGER_MIN_MS, SEEKING_RESET_STAGGER_MAX_MS) +
@@ -286,7 +314,11 @@ class PvpBehavior {
     if (!player || !state) {
       return false;
     }
-    if (state.mode !== this.behaviorMode.ROAMING) {
+    const pvpOnly = this.isPvpOnly(state);
+    if (
+      state.mode !== this.behaviorMode.ROAMING &&
+      !(pvpOnly && state.mode === this.behaviorMode.PVP)
+    ) {
       return false;
     }
     if (!Wilderness.isIn(player)) {
@@ -295,9 +327,8 @@ class PvpBehavior {
     }
 
     this.setPhase(state, PVP_PHASE.SEEKING);
-    const fullTimePvp = this.isFullTimePvp(state);
     const pvpCooldownUntil = Number(state?.autonomy?.pvpCooldownUntil ?? 0);
-    if (!fullTimePvp && Number.isInteger(nowMs) && nowMs < pvpCooldownUntil) {
+    if (!pvpOnly && Number.isInteger(nowMs) && nowMs < pvpCooldownUntil) {
       return false;
     }
     return true;
@@ -335,7 +366,7 @@ class PvpBehavior {
     if (this.isHighWildernessAggressionActive(player)) {
       return true;
     }
-    if (!this.isFullTimePvp(state)) {
+    if (!this.isPvpOnly(state)) {
       return true;
     }
     const hotspotId = state?.pvp?.hotspotId ?? null;
@@ -368,7 +399,7 @@ class PvpBehavior {
       pick("bait", bait) ||
       pick("fight", fight) ||
       "escape";
-    if (activity === "fight") {
+    if (activity === "fight" || activity === "seek") {
       return true;
     }
 
@@ -531,10 +562,10 @@ class PvpBehavior {
     if (!sourcePlayer || !sourceState) {
       return false;
     }
-    const fullTimePvp = this.isFullTimePvp(sourceState);
+    const pvpOnly = this.isPvpOnly(sourceState);
     if (
       sourceState.mode !== this.behaviorMode.ROAMING &&
-      !(fullTimePvp && sourceState.mode === this.behaviorMode.PVP)
+      !(pvpOnly && sourceState.mode === this.behaviorMode.PVP)
     ) {
       return false;
     }
@@ -544,7 +575,7 @@ class PvpBehavior {
     }
 
     const sourceAutonomy = sourceState?.autonomy ?? null;
-    if (!fullTimePvp && nowMs < (sourceAutonomy?.pvpCooldownUntil ?? 0)) {
+    if (!pvpOnly && nowMs < (sourceAutonomy?.pvpCooldownUntil ?? 0)) {
       return false;
     }
     this.setPhase(sourceState, PVP_PHASE.SEEKING);
@@ -664,7 +695,7 @@ class PvpBehavior {
         this.behaviorMode
       )
     ) {
-      if (fullTimePvp) {
+      if (pvpOnly) {
         this.resetSeekingState(sourcePlayer, sourceState, nowMs, "pvp_pair_failed");
       } else if (typeof startRoaming === "function") {
         startRoaming(entry, nowMs, "pvp_pair_failed");
@@ -746,7 +777,7 @@ class PvpBehavior {
       return false;
     }
 
-    if (this.isFullTimePvp(state)) {
+    if (this.isPvpOnly(state)) {
       return this.resetSeekingState(player, state, nowMs, reason);
     }
 
@@ -797,9 +828,13 @@ class PvpBehavior {
       return false;
     }
     const sourcePlayer = sourceEntry.player;
+    const sourceState = sourceEntry.state;
     const candidatePlayer = candidateEntry.player;
     const candidateState = candidateEntry.state;
-    if (!sourcePlayer || !candidatePlayer || !candidateState) {
+    if (!sourcePlayer || !sourceState || !candidatePlayer || !candidateState) {
+      return false;
+    }
+    if (this.isAcrossDeepWildFence(sourcePlayer, candidatePlayer)) {
       return false;
     }
     if (!candidatePlayer.isRegistered?.()) {
@@ -822,13 +857,13 @@ class PvpBehavior {
     if (
       !(
         candidateState.mode === this.behaviorMode.ROAMING ||
-        (this.isFullTimePvp(candidateState) &&
+        (this.isPvpOnly(candidateState) &&
           candidateState.mode === this.behaviorMode.PVP &&
           !candidateState?.pvp?.targetUsername)
       ) ||
       candidateState.mode === this.behaviorMode.FOLLOW_BACK ||
       candidateState.mode === this.behaviorMode.RETURN_HOME ||
-      (candidateState.mode === this.behaviorMode.PVP && !this.isFullTimePvp(candidateState))
+      (candidateState.mode === this.behaviorMode.PVP && !this.isPvpOnly(candidateState))
     ) {
       return false;
     }
@@ -953,7 +988,7 @@ class PvpBehavior {
     if (!player || !state || !pvp) {
       return false;
     }
-    if (this.isFullTimePvp(state) && !pvp.targetUsername) {
+    if (this.isPvpOnly(state) && !pvp.targetUsername) {
       this.setPhase(state, PVP_PHASE.SEEKING);
       return Wilderness.isIn(player);
     }
@@ -1159,6 +1194,9 @@ class PvpBehavior {
     if (!player || !target || target === player) {
       return false;
     }
+    if (this.isAcrossDeepWildFence(player, target)) {
+      return false;
+    }
     if (!target.isRegistered?.()) {
       return false;
     }
@@ -1172,7 +1210,7 @@ class PvpBehavior {
   }
 
   stopPvp(player, state, nowMs, reason) {
-    if (this.isFullTimePvp(state)) {
+    if (this.isPvpOnly(state)) {
       return this.resetSeekingState(player, state, nowMs, reason);
     }
     this.setPhase(state, reason === "dead" ? PVP_PHASE.DEAD : PVP_PHASE.IDLE);

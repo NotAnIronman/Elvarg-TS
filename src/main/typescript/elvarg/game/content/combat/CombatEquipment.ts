@@ -90,7 +90,9 @@ export class CombatEquipment {
     }
 
     public static hasDragonProtectionGear(player: Player): boolean {
-        return player.getEquipment().get(SHIELD_SLOT).getId() == ItemIdentifiers.ANTI_DRAGON_SHIELD
-            || player.getEquipment().get(SHIELD_SLOT).getId() == ItemIdentifiers.DRAGONFIRE_SHIELD;
+        const shieldId = player.getEquipment().get(SHIELD_SLOT).getId();
+        return shieldId == ItemIdentifiers.ANTI_DRAGON_SHIELD
+            || shieldId == ItemIdentifiers.DRAGONFIRE_SHIELD
+            || shieldId == ItemIdentifiers.DRAGONFIRE_WARD;
     }
 }

@@ -736,7 +736,7 @@ function handlePresetShopRestriction(player) {
 }
 
 function applyPresetItemDropPolicy(event) {
-  commitPresetIfNeeded(event?.player);
+  commitPresetIfNeeded(event.player);
 }
 
 module.exports = {
@@ -787,10 +787,6 @@ module.exports = {
     });
 
     api.onPlayerDefeated(({ victim }) => {
-      if (!victim) {
-        return;
-      }
-
       commitPresetIfNeeded(victim);
       const shouldOpenPresetInterface = victim.isOpenPresetsOnDeath?.() === true;
       if (!shouldOpenPresetInterface) {

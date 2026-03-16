@@ -4,6 +4,7 @@ const { GameConstants } = require("../../../src/main/typescript/elvarg/game/Game
 const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Misc } = require("../../../src/main/typescript/elvarg/util/Misc");
 const {
+  isPvpOnlyBotState,
   setModeFollowBack,
   setModeRoaming,
 } = require("../behaviours/state/PlayerBotState");
@@ -129,10 +130,7 @@ function releaseRecruitedBotToAutonomy(
     botState.pvp.targetLockUntil = 0;
     botState.pvp.endsAt = 0;
     botState.pvp.nextActionAt = nowMs;
-    if (
-      botState.autonomy?.wildernessRoamerPvp === true ||
-      botState.autonomy?.persistentPvpLoadout === true
-    ) {
+    if (isPvpOnlyBotState(botState)) {
       botState.pvp.phase = "seeking";
     } else {
       botState.pvp.phase = "idle";

@@ -155,7 +155,7 @@ module.exports = {
   name: "MakeOverMage",
   register(api) {
     api.onNpcInteraction((event) => {
-      if (!event || event.clickType !== 1 || !MAKEOVER_NPC_ID_SET.has(event.npcId)) {
+      if (event.clickType !== 1 || !MAKEOVER_NPC_ID_SET.has(event.npcId)) {
         return;
       }
       openMakeoverInterface(event.player);
@@ -163,9 +163,6 @@ module.exports = {
     });
 
     api.onButtonClick((event) => {
-      if (!event || !event.player) {
-        return;
-      }
       if (handleMakeoverButton(event.player, event.buttonId)) {
         event.handled = true;
       }

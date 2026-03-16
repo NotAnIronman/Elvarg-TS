@@ -117,8 +117,8 @@ function handleDepositButton(player, button) {
 }
 
 function isDepositBooth(event) {
-  if (DEPOSIT_BOX_IDS.includes(event?.objectId)) return true;
-  const name = event?.object?.getDefinition?.()?.name;
+  if (DEPOSIT_BOX_IDS.includes(event.objectId)) return true;
+  const name = event.object?.getDefinition?.()?.name;
   return typeof name === "string" && name.trim().toLowerCase() === "bank deposit box";
 }
 

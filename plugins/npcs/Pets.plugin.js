@@ -765,23 +765,14 @@ module.exports = {
     });
 
     api.onPlayerLogout(({ player }) => {
-      if (!player) {
-        return;
-      }
       pickup(player, player.getCurrentPet?.());
     });
 
     api.onPlayerDisconnect(({ player }) => {
-      if (!player) {
-        return;
-      }
       pickup(player, player.getCurrentPet?.());
     });
 
     api.onPlayerLogin(({ player }) => {
-      if (!player) {
-        return;
-      }
       summonOwnedPetOnBotLogin(player);
     });
 

@@ -68,6 +68,77 @@ const NPC_FACING_ALIASES = Object.freeze({
   SOUTHEAST: "SOUTH_EAST",
   SOUTH_EAST: "SOUTH_EAST",
 });
+const GLOW_PRESET_ATTRIBUTE = "visual:glowPreset";
+const GLOW_INTENSITY_ATTRIBUTE = "visual:glowIntensity";
+const GLOW_CYCLE_TASK_KEY_ATTRIBUTE = "visual:glowCycleTaskKey";
+const GLOW_CYCLE_PRESETS = Object.freeze([
+  "blood",
+  "toxic",
+  "ice",
+  "gold",
+  "royal",
+  "infernal",
+]);
+const GLOW_CYCLE_STEP_TICKS = 5;
+const GLOW_CYCLE_INTENSITY = 2;
+const GLOW_PRESETS = Object.freeze({
+  off: 0,
+  none: 0,
+  blood: 1,
+  gold: 2,
+  toxic: 3,
+  ice: 4,
+  royal: 5,
+  infernal: 6,
+});
+
+function cancelGlowCycle(target) {
+  const cycleTaskKey = target?.getAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE);
+  if (!cycleTaskKey) {
+    return false;
+  }
+  TaskManager.cancelTasks(cycleTaskKey);
+  target.setAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE, null);
+  return true;
+}
+
+function applyGlowState(target, glowPreset, glowIntensity) {
+  target.setAttribute(GLOW_PRESET_ATTRIBUTE, glowPreset);
+  target.setAttribute(GLOW_INTENSITY_ATTRIBUTE, glowIntensity);
+  target.getUpdateFlag().flag(Flag.APPEARANCE);
+}
+
+function startGlowCycle(target) {
+  cancelGlowCycle(target);
+  const cycleTaskKey = {};
+  target.setAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE, cycleTaskKey);
+
+  let presetIndex = 0;
+  const applyCurrentPreset = () => {
+    const presetName = GLOW_CYCLE_PRESETS[presetIndex % GLOW_CYCLE_PRESETS.length];
+    const glowPreset = GLOW_PRESETS[presetName] ?? GLOW_PRESETS.off;
+    applyGlowState(target, glowPreset, GLOW_CYCLE_INTENSITY);
+    presetIndex++;
+  };
+
+  applyCurrentPreset();
+
+  TaskManager.submit(
+    new (class extends Task {
+      constructor() {
+        super(GLOW_CYCLE_STEP_TICKS, cycleTaskKey, false);
+      }
+
+      execute() {
+        if (!target?.isRegistered?.() || target.getAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE) !== cycleTaskKey) {
+          this.stop();
+          return;
+        }
+        applyCurrentPreset();
+      }
+    })()
+  );
+}
 
 function parseIntArg(value) {
   const parsed = Number.parseInt(value, 10);
@@ -302,6 +373,82 @@ module.exports = {
       player
         .getPacketSender()
         .sendMessage(`Coords: ${location.getX()}, ${location.getY()}, ${location.getZ()}`);
+      return true;
+    });
+
+    api.registerCommand("glow", ({ player, raw, parts }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      const presetToken = String(parts[1] ?? "").trim().toLowerCase();
+      if (!presetToken) {
+        player
+          .getPacketSender()
+          .sendMessage("Usage: ::glow off|blood|gold|toxic|ice|royal|infernal|cycle [1-5] [player]");
+        return true;
+      }
+
+      if (presetToken === "cycle") {
+        cancelGlowCycle(player);
+        startGlowCycle(player);
+        player
+          .getPacketSender()
+          .sendMessage("You are now cycling through the killstreak glows every 3 seconds.");
+        return true;
+      }
+
+      let glowPreset = GLOW_PRESETS[presetToken];
+      if (glowPreset === undefined) {
+        const parsedPreset = parseIntArg(presetToken);
+        if (parsedPreset === null || parsedPreset < 0 || parsedPreset > 6) {
+          player
+            .getPacketSender()
+            .sendMessage("Glow presets: off, blood, gold, toxic, ice, royal, infernal, cycle");
+          return true;
+        }
+        glowPreset = parsedPreset;
+      }
+
+      let glowIntensity = 5;
+      let target = player;
+      const rawTail = commandTail(raw, parts);
+      let targetTail = rawTail.substring(presetToken.length).trim();
+      if (targetTail.length > 0) {
+        const firstTailToken = String(targetTail.split(/\s+/)[0] ?? "").trim();
+        const parsedIntensity = parseIntArg(firstTailToken);
+        if (parsedIntensity !== null) {
+          if (parsedIntensity < 1 || parsedIntensity > 5) {
+            player.getPacketSender().sendMessage("Glow intensity must be between 1 and 5.");
+            return true;
+          }
+          glowIntensity = parsedIntensity;
+          targetTail = targetTail.substring(firstTailToken.length).trim();
+        }
+      }
+      if (targetTail.length > 0) {
+        target = resolvePlayerByCommandTail(`glow ${targetTail}`, ["glow"]);
+        if (!target) {
+          player.getPacketSender().sendMessage(`Player ${targetTail} is not online.`);
+          return true;
+        }
+      }
+
+      cancelGlowCycle(target);
+      applyGlowState(target, glowPreset, glowIntensity);
+
+      const targetLabel = target === player ? "You" : target.getUsername();
+      const presetLabel =
+        Object.keys(GLOW_PRESETS).find((key) => GLOW_PRESETS[key] === glowPreset && key !== "none") ??
+        String(glowPreset);
+      player
+        .getPacketSender()
+        .sendMessage(
+          `${targetLabel} ${
+            glowPreset === 0
+              ? "no longer have a glow"
+              : `now use ${presetLabel} glow at intensity ${glowIntensity}`
+          }.`
+        );
       return true;
     });
 

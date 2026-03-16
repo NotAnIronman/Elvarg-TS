@@ -1,4 +1,5 @@
 const { callModeHook } = require("../behaviours/hooks/ModeHookContract");
+const { isPvpOnlyBotState } = require("../behaviours/state/PlayerBotState");
 
 function registerBotCommands(options) {
   const {
@@ -227,7 +228,7 @@ function registerBotCommands(options) {
 
     for (const entry of runtime.entries ?? []) {
       const state = entry?.state;
-      if (state?.autonomy?.wildernessRoamerPvp !== true) {
+      if (!isPvpOnlyBotState(state)) {
         continue;
       }
       const hotspotId = state?.pvp?.hotspotId ?? "none";

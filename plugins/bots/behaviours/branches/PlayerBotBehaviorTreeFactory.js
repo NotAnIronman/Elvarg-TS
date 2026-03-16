@@ -6,6 +6,9 @@ const {
 const { FollowBackActionNode } = require("../nodes/actions/FollowBackActionNode");
 const { EatFoodActionNode } = require("../nodes/actions/EatFoodActionNode");
 const {
+  MaintainCombatBoostsActionNode,
+} = require("../nodes/actions/MaintainCombatBoostsActionNode");
+const {
   ProcessPendingMovementActionNode,
 } = require("../nodes/actions/ProcessPendingMovementActionNode");
 const {
@@ -77,6 +80,9 @@ class PlayerBotBehaviorTreeFactory {
       maxHeal: this.botEatHealMax,
       maxCharges: this.botEatMaxCharges,
     });
+    this.maintainCombatBoostsActionNode = new MaintainCombatBoostsActionNode(
+      botStatesByName
+    );
   }
 
   create(cooldownMs, initialDelayMs) {
@@ -147,6 +153,7 @@ class PlayerBotBehaviorTreeFactory {
     };
     return new SelectorNode([
       processPendingMovementActionNode,
+      new ActionNode((context) => this.maintainCombatBoostsActionNode.tick(context)),
       new ActionNode((context) => this.eatFoodActionNode.tick(context)),
       new ActionNode((context) => clanRecruitActionNode.tick(context)),
       new ActionNode((context) => tickCurrentMode(context)),

@@ -74,6 +74,8 @@ const LOGIN_SESSION_VERBOSE_LOGGING_ENABLED =
   (process.env.LOGIN_SESSION_VERBOSE_LOGGING ?? "0") === "1";
 
 class LoginSession {
+  private static readonly GLOW_PRESET_ATTRIBUTE = "visual:glowPreset";
+  private static readonly GLOW_INTENSITY_ATTRIBUTE = "visual:glowIntensity";
   private stage: LoginStage = "HANDSHAKE";
   private serverSeeds: [number, number] | null = null;
   private encryptor: IsaacRandom | null = null;
@@ -905,6 +907,15 @@ class LoginSession {
     putByte(this.gamePlayer?.getSkillManager?.()?.getCombatLevel?.() ?? 3);
     // Rights (PLAYER_RIGHTS ordinal)
     putByte(this.gamePlayer?.getRights()?.getId?.() ?? 0);
+    // Client glow preset sync
+    putByte(Number(this.gamePlayer?.getAttribute?.(LoginSession.GLOW_PRESET_ATTRIBUTE) ?? 0) & 0xff);
+    // Client glow intensity sync
+    putByte(
+      Math.max(
+        1,
+        Math.min(5, Number(this.gamePlayer?.getAttribute?.(LoginSession.GLOW_INTENSITY_ATTRIBUTE) ?? 5) | 0)
+      ) & 0xff
+    );
     // Loyalty title (empty string, terminator only)
     putByte(0);
 

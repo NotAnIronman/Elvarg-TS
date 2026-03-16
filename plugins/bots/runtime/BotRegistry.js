@@ -16,6 +16,25 @@ const {
 } = require("./BotPersistenceConstants");
 
 const WILDERNESS_SPAWN_TILE_PROBE_LIMIT = 256;
+const FORCED_STARTUP_TEST_BOT_SPAWN = Object.freeze({
+  username: "WildyBot1",
+  location: Object.freeze({
+    x: 2945,
+    y: 3824,
+    z: 0,
+  }),
+});
+
+function isForcedStartupTestTile(location) {
+  if (!location) {
+    return false;
+  }
+  return (
+    location.getX?.() === FORCED_STARTUP_TEST_BOT_SPAWN.location.x &&
+    location.getY?.() === FORCED_STARTUP_TEST_BOT_SPAWN.location.y &&
+    location.getZ?.() === FORCED_STARTUP_TEST_BOT_SPAWN.location.z
+  );
+}
 
 function createBotRegistry(options) {
   const {
@@ -293,7 +312,16 @@ function createBotRegistry(options) {
         assignedHotspotId != null ? reserveHotspotSpawnIndex(assignedHotspotId) : -1;
       const hotspotSpawn =
         assignedHotspotId != null ? createHotspotSpawn(assignedHotspotId, hotspotSpawnIndex) : null;
+      const forcedStartupSpawn =
+        username === FORCED_STARTUP_TEST_BOT_SPAWN.username
+          ? new Location(
+              FORCED_STARTUP_TEST_BOT_SPAWN.location.x,
+              FORCED_STARTUP_TEST_BOT_SPAWN.location.y,
+              FORCED_STARTUP_TEST_BOT_SPAWN.location.z
+            )
+          : null;
       const botSpawn =
+        forcedStartupSpawn ??
         hotspotSpawn ??
         createWildernessRoamerSpawn(spawn, assignedBounds, initialSpawnSeed) ??
         spawnLocationForIndex(spawn, spawnOffsets, botCount + i - 1);
@@ -309,7 +337,14 @@ function createBotRegistry(options) {
       setPersistentRespawnResolver(bot, () => {
         if (assignedHotspotId != null) {
           const respawnIndex = reserveHotspotSpawnIndex(assignedHotspotId);
-          return createHotspotSpawn(assignedHotspotId, respawnIndex) ?? botSpawn.clone();
+          const respawnTile = createHotspotSpawn(assignedHotspotId, respawnIndex);
+          if (respawnTile) {
+            return respawnTile;
+          }
+          return isForcedStartupTestTile(botSpawn)
+            ? createWildernessRoamerSpawn(spawn, assignedBounds, randomInRange(0, 1_000_000)) ??
+                anchorFallbackForBounds(assignedBounds, botSpawn)
+            : botSpawn.clone();
         }
         return (
           createWildernessRoamerSpawn(spawn, assignedBounds, randomInRange(0, 1_000_000)) ??
@@ -329,9 +364,7 @@ function createBotRegistry(options) {
       if (!state.autonomy) {
         state.autonomy = {};
       }
-      state.autonomy.allowedAutonomousModes = [behaviorMode.ROAMING, behaviorMode.PVP];
-      state.autonomy.wildernessRoamerPvp = true;
-      state.autonomy.persistentPvpLoadout = true;
+      state.autonomy.allowedAutonomousModes = [behaviorMode.PVP];
       state.autonomy.nextDecisionAt = spawnTimingJitterMs;
       if (!state.roaming) {
         state.roaming = {};
@@ -449,6 +482,17 @@ function createBotRegistry(options) {
     return baseSpawn.clone().setX(minX).setY(minY).setZ(z);
   }
 
+  function anchorFallbackForBounds(bounds, fallbackLocation) {
+    if (!bounds || !fallbackLocation) {
+      return fallbackLocation?.clone?.() ?? null;
+    }
+    return fallbackLocation
+      .clone()
+      .setX(Math.floor(bounds.minX ?? fallbackLocation.getX()))
+      .setY(Math.floor(bounds.minY ?? fallbackLocation.getY()))
+      .setZ(Math.floor(bounds.z ?? fallbackLocation.getZ()));
+  }
+
   function reserveHotspotSpawnIndex(hotspotId) {
     const nextIndex = hotspotSpawnCounts.get(hotspotId) ?? 0;
     hotspotSpawnCounts.set(hotspotId, nextIndex + 1);
@@ -472,15 +516,34 @@ function createBotRegistry(options) {
     const width = maxX - minX + 1;
     const height = maxY - minY + 1;
     if (width <= 0 || height <= 0) {
-      return anchor;
+      return RegionManager.blocked(anchor, null) ? null : anchor;
+    }
+    const totalTiles = width * height;
+    if (totalTiles <= 0) {
+      return RegionManager.blocked(anchor, null) ? null : anchor;
     }
     const seedBase =
       Math.imul(index + 1, 1103515245) ^
       Math.imul(hotspotId.length + 17, 12345) ^
-      Math.imul(minX + maxY, 2654435761);
-    const offsetX = Math.abs(seedBase) % width;
-    const offsetY = Math.abs(Math.imul(seedBase ^ 0x9e3779b9, 48271)) % height;
-    return anchor.clone().setX(minX + offsetX).setY(minY + offsetY);
+      Math.imul(minX + maxY + (anchor.getZ?.() ?? 0), 2654435761);
+    const startIndex = Math.abs(seedBase) % totalTiles;
+    const rawStep = Math.abs(Math.imul(seedBase ^ 0x9e3779b9, 48271)) % totalTiles;
+    const step = rawStep === 0 ? 1 : rawStep;
+    const z = Math.floor(area.z ?? anchor.getZ?.() ?? 0);
+    const attempts = Math.min(totalTiles, WILDERNESS_SPAWN_TILE_PROBE_LIMIT);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const tileIndex = (startIndex + attempt * step) % totalTiles;
+      const offsetX = tileIndex % width;
+      const offsetY = Math.floor(tileIndex / width);
+      const candidate = new Location(minX + offsetX, minY + offsetY, z);
+      if (!RegionManager.blocked(candidate, null)) {
+        return candidate;
+      }
+    }
+    if (!RegionManager.blocked(anchor, null)) {
+      return anchor.clone().setZ(z);
+    }
+    return null;
   }
 
   function enableControllerForPlayer(player) {

@@ -19,6 +19,7 @@ const {
   ATTR_SKIP_PERSISTENCE,
 } = require("./BotPersistenceConstants");
 const {
+  isPvpOnlyBotState,
   setModePvp,
 } = require("../behaviours/state/PlayerBotState");
 const {
@@ -93,11 +94,7 @@ function clearPersistentPvpRespawnAggro(victim, runtime, nowMs) {
 
   const entry = runtime?.entriesByUsername?.get?.(username);
   const state = entry?.state ?? runtime?.botStatesByName?.get?.(username);
-  if (
-    !state?.pvp ||
-    (state.autonomy?.wildernessRoamerPvp !== true &&
-      state.autonomy?.persistentPvpLoadout !== true)
-  ) {
+  if (!isPvpOnlyBotState(state)) {
     return;
   }
 

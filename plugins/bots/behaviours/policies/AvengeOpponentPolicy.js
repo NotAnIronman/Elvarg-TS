@@ -3,6 +3,7 @@
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { applyGeneratedPvpLoadout } = require("./PvpLoadoutPolicy");
 const { scheduleCombatAction, scheduleReviewTimers } = require("./PvpTimingPolicy");
+const { isPvpOnlyBotState } = require("../state/PlayerBotState");
 const { setModePvp } = require("../state/PlayerBotState");
 const {
   ATTR_RECRUIT_OWNER_USERNAME,
@@ -18,11 +19,7 @@ class AvengeOpponentPolicy {
   }
 
   isPersistentPvpState(state) {
-    return !!(
-      state?.pvp &&
-      (state.autonomy?.wildernessRoamerPvp === true ||
-        state.autonomy?.persistentPvpLoadout === true)
-    );
+    return isPvpOnlyBotState(state);
   }
 
   clearDeadVictimCombatState(bot, state, victim) {

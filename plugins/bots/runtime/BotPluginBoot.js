@@ -16,6 +16,7 @@ const { createBotPlayer } = require("../behaviours/spawn/BotPlayerFactory");
 const {
   clearFollowState,
   createInitialState,
+  isPvpOnlyBotState,
   resetMovementState,
 } = require("../behaviours/state/PlayerBotState");
 const {
@@ -276,7 +277,7 @@ function bootPlayerBotsRuntime(options = {}) {
           if (!player || !state?.pvp) {
             return false;
           }
-          if (state.autonomy?.wildernessRoamerPvp === true) {
+          if (isPvpOnlyBotState(state)) {
             const roamBounds = state?.roaming?.roamBounds ?? null;
             const respawnTile = chooseWalkableTileInBounds(
               roamBounds,

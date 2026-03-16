@@ -12,20 +12,20 @@ class PvpValidateEngagementNode {
     this.isActivelyEngagedWithTarget = options.isActivelyEngagedWithTarget;
     this.randomInRange = options.randomInRange;
     this.pvpPhase = options.pvpPhase;
-    this.isFullTimePvp = options.isFullTimePvp;
+    this.isPvpOnly = options.isPvpOnly;
     this.resetSeekingState = options.resetSeekingState;
   }
 
   tick(context) {
     const { player, state, nowMs } = context ?? {};
     const pvp = state?.pvp;
-    const fullTimePvp = this.isFullTimePvp?.(state) === true;
+    const pvpOnly = this.isPvpOnly?.(state) === true;
     if (!player || !state || !pvp) {
       return { handled: true, status: "failure", target: null };
     }
     if (!pvp.targetUsername) {
       this.setPhase?.(state, this.pvpPhase?.SEEKING ?? "seeking");
-      if (fullTimePvp) {
+      if (pvpOnly) {
         this.resetSeekingState?.(player, state, nowMs, "missing_target");
       } else {
         this.stopPvp?.(player, state, nowMs, "missing_target");
@@ -42,7 +42,7 @@ class PvpValidateEngagementNode {
     const target = this.resolveTargetPlayer?.(state) ?? null;
     if (!this.isValidTarget?.(player, target)) {
       this.setPhase?.(state, this.pvpPhase?.SEEKING ?? "seeking");
-      if (fullTimePvp) {
+      if (pvpOnly) {
         this.resetSeekingState?.(player, state, nowMs, "invalid_target");
       } else {
         this.stopPvp?.(player, state, nowMs, "invalid_target");
@@ -55,7 +55,7 @@ class PvpValidateEngagementNode {
         pvp.endsAt = nowMs + this.randomInRange?.(8000, 15000);
       } else {
         this.setPhase?.(state, this.pvpPhase?.IDLE ?? "idle");
-        if (fullTimePvp) {
+        if (pvpOnly) {
           this.resetSeekingState?.(player, state, nowMs, "expired");
         } else {
           this.stopPvp?.(player, state, nowMs, "expired");
@@ -69,7 +69,7 @@ class PvpValidateEngagementNode {
     const isMultiEngagement = AreaManager.inMulti(player) && AreaManager.inMulti(target);
     if (!isMultiEngagement && targetTarget && targetTarget !== player) {
       this.setPhase?.(state, this.pvpPhase?.SEEKING ?? "seeking");
-      if (fullTimePvp) {
+      if (pvpOnly) {
         this.resetSeekingState?.(player, state, nowMs, "target_in_other_combat");
       } else {
         this.stopPvp?.(player, state, nowMs, "target_in_other_combat");

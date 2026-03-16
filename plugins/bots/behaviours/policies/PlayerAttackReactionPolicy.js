@@ -1,4 +1,5 @@
 const {
+  isPvpOnlyBotState,
   resolveBankRunResumeMode,
   setModeBankRun,
   setModeFollowBack,
@@ -127,10 +128,7 @@ function handlePlayerAttackReaction({
     return false;
   }
 
-  if (
-    state?.autonomy?.wildernessRoamerPvp === true ||
-    state?.autonomy?.persistentPvpLoadout === true
-  ) {
+  if (isPvpOnlyBotState(state)) {
     if (state.mode !== behaviorMode.PVP) {
       setModePvp(
         bot,

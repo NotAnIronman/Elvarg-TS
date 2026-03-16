@@ -201,6 +201,7 @@ function createAutonomyState() {
     nextDecisionAt: 0,
     modeEndsAt: 0,
     pvpCooldownUntil: 0,
+    allowedAutonomousModes: null,
     manualMode: null,
   };
 }
@@ -343,15 +344,38 @@ function clearCombatState(player) {
   player.setCombatFollowing?.(null);
 }
 
+function listAllowedAutonomousModes(state) {
+  const modes = state?.autonomy?.allowedAutonomousModes;
+  if (!Array.isArray(modes)) {
+    return null;
+  }
+  return modes.filter((mode) => typeof mode === "string" && mode.length > 0);
+}
+
+function allowsAutonomousMode(state, mode) {
+  if (typeof mode !== "string" || mode.length === 0) {
+    return false;
+  }
+  const allowedModes = listAllowedAutonomousModes(state);
+  if (!allowedModes) {
+    return true;
+  }
+  return allowedModes.includes(mode);
+}
+
+function isPvpOnlyBotState(state) {
+  if (state?.pvp == null) {
+    return false;
+  }
+  const allowedModes = listAllowedAutonomousModes(state);
+  return Array.isArray(allowedModes) && allowedModes.length === 1 && allowedModes[0] === "pvp";
+}
+
 function clearBotActivePreset(player, state = null) {
   if (!player || player.isPlayerBot?.() !== true) {
     return false;
   }
-  if (
-    state?.autonomy?.persistentPvpLoadout === true ||
-    state?.autonomy?.wildernessRoamerPvp === true ||
-    player.getAttribute?.("botRecruitOwnerUsername")
-  ) {
+  if (isPvpOnlyBotState(state) || player.getAttribute?.("botRecruitOwnerUsername")) {
     return false;
   }
   // Avoid visually clearing gear mid-death animation. We clear presets once
@@ -721,9 +745,12 @@ function markResumeSoon(state, nowMs = Date.now(), blockedRetargetMinDelayMs = 0
 }
 
 module.exports = {
+  allowsAutonomousMode,
   clearFollowState,
   createInitialState,
+  isPvpOnlyBotState,
   isInsideHomeArea,
+  listAllowedAutonomousModes,
   markResumeSoon,
   resolveBankRunResumeMode,
   resetMovementState,
