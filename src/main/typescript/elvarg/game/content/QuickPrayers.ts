@@ -4,6 +4,7 @@ import { PrayerHandler } from "./PrayerHandler";
 import { PrayerData } from "./PrayerHandler";
 
 export class QuickPrayers {
+    private static readonly PRAYER_VALUES: PrayerData[] = Array.from(PrayerData.values());
     private static get PRAYER_HANDLER() {
         return PrayerHandler;
     }
@@ -123,7 +124,10 @@ export class QuickPrayers {
     private static readonly CONFIG_START = 620;
 
     private player: Player;
-    public prayers: PrayerData[] = Array.from(PrayerData.values());
+    public prayers: PrayerData[] = Array.from(
+        { length: QuickPrayers.PRAYER_VALUES.length },
+        () => null
+    );
     private selectingPrayers: boolean;
     private enabled: boolean;
 
@@ -132,13 +136,22 @@ export class QuickPrayers {
     }
 
     public sendChecks(): void {
-        for (const prayer of PrayerData.values()) {
+        for (const prayer of QuickPrayers.PRAYER_VALUES) {
             this.sendCheck(prayer);
         }
     }
 
     private sendCheck(prayer: PrayerData): void {
-        this.player.getPacketSender().sendConfig(QuickPrayers.CONFIG_START + this.prayers.indexOf(prayer), this.prayers.indexOf(prayer) !== null ? 0 : 1);
+        const prayerIndex = QuickPrayers.PRAYER_VALUES.indexOf(prayer);
+        if (prayerIndex === -1) {
+            return;
+        }
+        this.player
+            .getPacketSender()
+            .sendConfig(
+                QuickPrayers.CONFIG_START + prayerIndex,
+                this.prayers[prayerIndex] != null ? 0 : 1
+            );
     }
 
     private uncheckSelect(toDeselect: number[], exception: number): void {
@@ -151,17 +164,20 @@ export class QuickPrayers {
     }
 
     private uncheck(prayer: PrayerData): void {
-        const index = this.prayers.findIndex(p => p === prayer);
-        if (index !== -1) {
-            this.prayers[index] = null;
+        const prayerIndex = QuickPrayers.PRAYER_VALUES.indexOf(prayer);
+        if (prayerIndex !== -1 && this.prayers[prayerIndex] != null) {
+            this.prayers[prayerIndex] = null;
             this.sendCheck(prayer);
         }
     }
 
     private toggle(index: number): void {
-        const prayer: PrayerData = PrayerData.values()[index];
+        const prayer: PrayerData = QuickPrayers.PRAYER_VALUES[index];
+        if (prayer == null) {
+            return;
+        }
 
-        if (this.prayers.indexOf(prayer) !== -1) {
+        if (this.prayers[index] != null) {
             this.uncheck(prayer);
             return;
         }
@@ -171,10 +187,7 @@ export class QuickPrayers {
             return;
         }
 
-        const indexs = this.prayers.indexOf(prayer);
-        if (indexs !== -1) {
-            this.prayers[indexs] = prayer;
-        }
+        this.prayers[index] = prayer;
         this.sendCheck(prayer);
 
         switch (index) {
@@ -235,7 +248,8 @@ export class QuickPrayers {
         if (this.enabled) {
             for (const prayer of this.prayers) {
                 if (prayer === null) continue;
-                if (QuickPrayers.isActivated(this.player, this.prayers.indexOf(prayer))) {
+                const prayerIndex = QuickPrayers.PRAYER_VALUES.indexOf(prayer);
+                if (prayerIndex !== -1 && QuickPrayers.isActivated(this.player, prayerIndex)) {
                     return;
                 }
             }
@@ -255,15 +269,21 @@ export class QuickPrayers {
                 if (this.enabled) {
                     for (const prayer of this.prayers) {
                         if (prayer === null) continue;
-                        QuickPrayers.deactivatePrayer(this.player, this.prayers.indexOf(prayer));
+                        const prayerIndex = QuickPrayers.PRAYER_VALUES.indexOf(prayer);
+                        if (prayerIndex !== -1) {
+                            QuickPrayers.deactivatePrayer(this.player, prayerIndex);
+                        }
                     }
                     this.enabled = false;
                 } else {
                     let found = false;
                     for (const prayer of this.prayers) {
                         if (prayer === null) continue;
-                        QuickPrayers.activatePrayerPrayerId(this.player, this.prayers.indexOf(prayer));
-                        found = true;
+                        const prayerIndex = QuickPrayers.PRAYER_VALUES.indexOf(prayer);
+                        if (prayerIndex !== -1) {
+                            QuickPrayers.activatePrayerPrayerId(this.player, prayerIndex);
+                            found = true;
+                        }
                     }
                     if (!found) {
                         this.player.getPacketSender().sendMessage("You have not setup any quick-prayers yet.");
@@ -308,6 +328,10 @@ export class QuickPrayers {
     }
 
     public setPrayers(prayers: PrayerData[]): void {
-        this.prayers = prayers;
+        const normalized = Array.from(
+            { length: QuickPrayers.PRAYER_VALUES.length },
+            (_, index) => prayers?.[index] ?? null
+        );
+        this.prayers = normalized;
     }
 }

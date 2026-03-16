@@ -397,7 +397,7 @@ export class PrayerHandler {
         }
         player.setDrainingPrayer(true);
         let task = new PlayerHandlerTask(player,  () => {
-            let drainPerTick = 0;
+            let drainEffect = 0;
             let pointDrain = Number(player.getPrayerPointDrain());
             if (!Number.isFinite(pointDrain) || pointDrain < 0) {
                 pointDrain = 0;
@@ -410,20 +410,20 @@ export class PrayerHandler {
                 if (!pd) {
                     continue;
                 }
-                let drainMinute = pd.drainRate;
-                let drainSeconds = drainMinute / 60;
-                let drainTicks = Misc.getTicks(drainSeconds);
-                drainPerTick += drainTicks;
+                // OSRS prayer drain uses a per-tick drain effect against a resistance
+                // threshold of 60 + (prayer bonus * 2). Each prayer's effect is its
+                // per-minute drain rate scaled by the 0.6s game tick.
+                drainEffect += pd.drainRate * 0.6;
             }
-            if (player.getHitpoints() <= 0 || drainPerTick <= 0) {
+            if (player.getHitpoints() <= 0 || drainEffect <= 0) {
                 stop();
                 return;
             }
             let bonus = player.getBonusManager().getOtherBonus()[BonusManager.PRAYER];
-            drainPerTick /= (1 + (0.0333 * bonus));
+            const drainResistance = Math.max(1, 60 + (bonus * 2));
 
-            pointDrain += drainPerTick;
-            let drainTreshold = Math.floor(pointDrain);
+            pointDrain += drainEffect;
+            let drainTreshold = Math.floor(pointDrain / drainResistance);
             if (drainTreshold >= 1) {
                 let total = (player.getSkillManager().getCurrentLevel(Skill.PRAYER) - drainTreshold);
                 player.getSkillManager().setCurrentLevel(Skill.PRAYER, total, true);
@@ -434,7 +434,7 @@ export class PrayerHandler {
                     stop();
                     return;
                 }
-                pointDrain -= drainTreshold;
+                pointDrain -= drainTreshold * drainResistance;
                 if (pointDrain < 0) {
                     pointDrain = 0;
                 }

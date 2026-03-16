@@ -389,10 +389,15 @@ class JsonPlayerPersistence extends PlayerPersistence {
   }
 
   hydrateQuickPrayers(raw) {
+    const allPrayers = Array.from(PrayerData.values());
     if (!Array.isArray(raw)) {
-      return Array.from(PrayerData.values());
+      return Array.from({ length: allPrayers.length }, () => null);
     }
-    return raw.map((entry) => this.resolvePrayer(entry));
+    const prayers = raw.map((entry) => this.resolvePrayer(entry));
+    while (prayers.length < allPrayers.length) {
+      prayers.push(null);
+    }
+    return prayers.slice(0, allPrayers.length);
   }
 
   resolvePrayer(raw) {
