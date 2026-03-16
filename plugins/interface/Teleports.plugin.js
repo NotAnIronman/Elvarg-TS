@@ -9,14 +9,31 @@ const {
 const HOME_TELEPORT_BUTTON_IDS = new Set([19210, 21741]);
 const TRAINING_TELEPORT_BUTTON_IDS = new Set([1164, 13035, 30064]);
 const PVP_TELEPORT_BUTTON_IDS = new Set([1170, 13053, 30083]);
+const BOSS_MENU_BUTTON_IDS = new Set([7455, 13087, 30138]);
+const BOSS_TELEPORT_BUTTON_IDS = new Set([
+  28151, 28152, 28153, 28154,
+  28155, 28156, 28157, 28158,
+]);
 const PVP_DIALOGUE_OPTION_BUTTON_IDS = new Set([
   2494, 2495, 2496, 2497, 2498,
   2482, 2483, 2484, 2485,
 ]);
 const ATTR_PVP_TELEPORT_PAGE = "teleports:pvp_page";
+const ATTR_BOSS_TELEPORT_PAGE = "teleports:boss_page";
+const DIALOGUE_OPTION_BUTTON_IDS = [2494, 2495, 2496, 2497, 2498, 2482, 2483, 2484, 2485];
 
 // Approximate Chaos Temple surface location matching the current bot hotspot anchor.
 const TRAINING_TELEPORT_DESTINATION = new Location(2955, 3816, 0);
+const BOSS_TELEPORT_DESTINATIONS = new Map([
+  [28151, new Location(3290, 3847, 0)], // Callisto
+  [28152, new Location(3261, 3927, 0)], // Chaos Elemental
+  [28153, new Location(2979, 3846, 0)], // Chaos Fanatic
+  [28154, new Location(2977, 3702, 0)], // Crazy Archaeologist
+  [28155, new Location(3010, 3849, 0)], // King Black Dragon entrance
+  [28156, new Location(3233, 10341, 0)], // Scorpia
+  [28157, new Location(3332, 3734, 0)], // Venenatis
+  [28158, new Location(3219, 3788, 0)], // Vet'ion
+]);
 
 function sendFiveOptionDialogue(player, title, options) {
   player.getPacketSender().sendString(title, 2493);
@@ -26,9 +43,24 @@ function sendFiveOptionDialogue(player, title, options) {
   player.getPacketSender().sendChatboxInterface(2492);
 }
 
-function closePvPTeleportDialogue(player) {
+function closeTeleportDialogue(player) {
   player.setAttribute(ATTR_PVP_TELEPORT_PAGE, null);
+  player.setAttribute(ATTR_BOSS_TELEPORT_PAGE, null);
   player.getPacketSender().sendInterfaceRemoval();
+}
+
+function getDialoguePageIndex(player, attributeKey) {
+  const raw = player.getAttribute(attributeKey);
+  if (Number.isInteger(raw)) {
+    return raw;
+  }
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const parsed = Number(raw);
+    if (Number.isInteger(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 function getPvPTeleportPages() {
@@ -73,6 +105,7 @@ function openPvPTeleportDialogue(player, pageIndex = 0) {
   const pages = getPvPTeleportPages();
   const page = pages[pageIndex] ?? pages[0];
   player.setAttribute(ATTR_PVP_TELEPORT_PAGE, pageIndex);
+  player.setAttribute(ATTR_BOSS_TELEPORT_PAGE, null);
   sendFiveOptionDialogue(
     player,
     page.title,
@@ -81,13 +114,12 @@ function openPvPTeleportDialogue(player, pageIndex = 0) {
 }
 
 function handlePvPTeleportOption(player, buttonId) {
-  const pageIndex = Number(player.getAttribute(ATTR_PVP_TELEPORT_PAGE));
-  if (!Number.isFinite(pageIndex)) {
+  const pageIndex = getDialoguePageIndex(player, ATTR_PVP_TELEPORT_PAGE);
+  if (!Number.isInteger(pageIndex)) {
     return false;
   }
 
-  const optionButtonIds = [2494, 2495, 2496, 2497, 2498, 2482, 2483, 2484, 2485];
-  const optionIndex = optionButtonIds.indexOf(Number(buttonId));
+  const optionIndex = DIALOGUE_OPTION_BUTTON_IDS.indexOf(Number(buttonId));
   if (optionIndex === -1) {
     return false;
   }
@@ -95,12 +127,12 @@ function handlePvPTeleportOption(player, buttonId) {
   const page = getPvPTeleportPages()[pageIndex];
   const option = page?.options?.[optionIndex];
   if (!option) {
-    closePvPTeleportDialogue(player);
+    closeTeleportDialogue(player);
     return true;
   }
 
   if (option.close) {
-    closePvPTeleportDialogue(player);
+    closeTeleportDialogue(player);
     return true;
   }
 
@@ -110,12 +142,87 @@ function handlePvPTeleportOption(player, buttonId) {
   }
 
   if (!option.hotspot) {
-    closePvPTeleportDialogue(player);
+    closeTeleportDialogue(player);
     return true;
   }
 
   const destination = createHotspotAnchorLocation(option.hotspot);
-  closePvPTeleportDialogue(player);
+  closeTeleportDialogue(player);
+  if (!destination || !TeleportHandler.checkReqs(player, destination)) {
+    return true;
+  }
+
+  TeleportHandler.teleport(
+    player,
+    destination,
+    player.getSpellbook().getTeleportType(),
+    false
+  );
+  return true;
+}
+
+function getBossTeleportPages() {
+  return [
+    {
+      title: "Boss teleports",
+      options: [
+        { label: "Callisto", destination: BOSS_TELEPORT_DESTINATIONS.get(28151) },
+        { label: "Chaos Elemental", destination: BOSS_TELEPORT_DESTINATIONS.get(28152) },
+        { label: "Chaos Fanatic", destination: BOSS_TELEPORT_DESTINATIONS.get(28153) },
+        { label: "Crazy Archaeologist", destination: BOSS_TELEPORT_DESTINATIONS.get(28154) },
+        { label: "More options", nextPage: 1 },
+      ],
+    },
+    {
+      title: "Boss teleports",
+      options: [
+        { label: "KBD", destination: BOSS_TELEPORT_DESTINATIONS.get(28155) },
+        { label: "Scorpia", destination: BOSS_TELEPORT_DESTINATIONS.get(28156) },
+        { label: "Venenatis", destination: BOSS_TELEPORT_DESTINATIONS.get(28157) },
+        { label: "Vet'ion", destination: BOSS_TELEPORT_DESTINATIONS.get(28158) },
+        { label: "Back", nextPage: 0 },
+      ],
+    },
+  ];
+}
+
+function openBossTeleportDialogue(player, pageIndex = 0) {
+  const pages = getBossTeleportPages();
+  const page = pages[pageIndex] ?? pages[0];
+  player.setAttribute(ATTR_BOSS_TELEPORT_PAGE, pageIndex);
+  player.setAttribute(ATTR_PVP_TELEPORT_PAGE, null);
+  sendFiveOptionDialogue(
+    player,
+    page.title,
+    page.options.map((option) => option?.label ?? "")
+  );
+}
+
+function handleBossTeleportOption(player, buttonId) {
+  const pageIndex = getDialoguePageIndex(player, ATTR_BOSS_TELEPORT_PAGE);
+  if (!Number.isInteger(pageIndex)) {
+    return false;
+  }
+
+  const optionIndex = DIALOGUE_OPTION_BUTTON_IDS.indexOf(Number(buttonId));
+  if (optionIndex === -1) {
+    return false;
+  }
+
+  const page = getBossTeleportPages()[pageIndex];
+  const option = page?.options?.[optionIndex];
+  if (!option) {
+    closeTeleportDialogue(player);
+    return true;
+  }
+
+  if (Number.isInteger(option.nextPage)) {
+    openBossTeleportDialogue(player, option.nextPage);
+    return true;
+  }
+
+  const destination = option.destination;
+  closeTeleportDialogue(player);
   if (!destination || !TeleportHandler.checkReqs(player, destination)) {
     return true;
   }
@@ -154,8 +261,31 @@ function handleTeleportButton(player, buttonId) {
     return true;
   }
 
+  if (BOSS_MENU_BUTTON_IDS.has(numericButtonId)) {
+    openBossTeleportDialogue(player, 0);
+    return true;
+  }
+
   if (PVP_DIALOGUE_OPTION_BUTTON_IDS.has(numericButtonId)) {
+    if (handleBossTeleportOption(player, numericButtonId)) {
+      return true;
+    }
     return handlePvPTeleportOption(player, numericButtonId);
+  }
+
+  if (BOSS_TELEPORT_BUTTON_IDS.has(numericButtonId)) {
+    const destination = BOSS_TELEPORT_DESTINATIONS.get(numericButtonId);
+    if (!destination || !TeleportHandler.checkReqs(player, destination)) {
+      return true;
+    }
+
+    TeleportHandler.teleport(
+      player,
+      destination,
+      player.getSpellbook().getTeleportType(),
+      false
+    );
+    return true;
   }
 
   if (!TRAINING_TELEPORT_BUTTON_IDS.has(numericButtonId)) {
@@ -181,6 +311,8 @@ module.exports = {
     const allTeleportButtonIds = [
       ...HOME_TELEPORT_BUTTON_IDS,
       ...PVP_TELEPORT_BUTTON_IDS,
+      ...BOSS_MENU_BUTTON_IDS,
+      ...BOSS_TELEPORT_BUTTON_IDS,
       ...PVP_DIALOGUE_OPTION_BUTTON_IDS,
       ...TRAINING_TELEPORT_BUTTON_IDS,
     ];

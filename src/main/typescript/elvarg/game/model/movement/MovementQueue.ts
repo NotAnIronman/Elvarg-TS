@@ -499,12 +499,11 @@ export class MovementQueue {
         if (inWilderness) {
             const wildernessLevel = Wilderness.levelForY(location.getY());
             const multiIcon = Wilderness.isMulti(location.getX(), location.getY()) ? 1 : 0;
-            const combatTag = multiIcon === 1 ? "@red@M@whi@" : "@gre@S@whi@";
             player.setWildernessLevel(wildernessLevel);
             player.setMultiIcon(multiIcon);
             packetSender.sendInteractionOption("Attack", 2, true);
             packetSender.sendWalkableInterface(197);
-            packetSender.sendString(`${combatTag} Lvl ${wildernessLevel}`, 199);
+            packetSender.sendString(`Level ${wildernessLevel}`, 199);
             packetSender.sendMultiIcon(multiIcon);
             return;
         }

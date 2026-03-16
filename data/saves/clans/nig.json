@@ -81,6 +81,10 @@
     {
       "name": "WildyBot5",
       "ordinal": 0
+    },
+    {
+      "name": "WildyBot701",
+      "ordinal": 0
     }
   ],
   "bannedNames": []

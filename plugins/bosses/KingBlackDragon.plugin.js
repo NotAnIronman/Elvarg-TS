@@ -18,9 +18,11 @@ const KING_BLACK_DRAGON_IDS = [
   NpcIdentifiers.KING_BLACK_DRAGON_2,
   NpcIdentifiers.KING_BLACK_DRAGON_3,
 ];
+const KBD_LADDER_DOWN_OBJECT_ID = 18987;
 
 const KingBlackDragonBoundary = new Boundary(2249, 2292, 4672, 4720, 0);
 const KingBlackDragonLocation = new Location(3005, 3850);
+const KingBlackDragonLairLocation = new Location(2271, 4680, 0);
 
 const Breath = {
   DRAGON: 0,
@@ -191,6 +193,12 @@ module.exports = {
     if (!AreaManager.areas.some((area) => area instanceof KingBlackDragonArea)) {
       AreaManager.areas.push(new KingBlackDragonArea());
     }
+
+    api.onObjectFirstClick(KBD_LADDER_DOWN_OBJECT_ID, ({ player }) => {
+      player.moveTo(KingBlackDragonLairLocation);
+      return true;
+    });
+
     api.registerNpcCombatMethodProvider(KING_BLACK_DRAGON_IDS, KingBlackDragonCombatMethod);
   },
 };

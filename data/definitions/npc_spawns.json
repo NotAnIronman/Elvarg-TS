@@ -27,7 +27,8 @@
       "x": 3266,
       "y": 3922,
       "z": 0
-    }
+    },
+    "description": "Chaos Elemental"
   },
   {
     "facing": "SOUTH",
@@ -37,7 +38,8 @@
       "x": 3234,
       "y": 3623,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -47,7 +49,8 @@
       "x": 3240,
       "y": 3622,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -57,7 +60,8 @@
       "x": 3244,
       "y": 3619,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -67,7 +71,8 @@
       "x": 3237,
       "y": 3617,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -77,7 +82,8 @@
       "x": 3231,
       "y": 3617,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -87,7 +93,8 @@
       "x": 3229,
       "y": 3610,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -97,7 +104,8 @@
       "x": 3235,
       "y": 3601,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -107,7 +115,8 @@
       "x": 3243,
       "y": 3610,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -117,7 +126,8 @@
       "x": 3234,
       "y": 3610,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -127,7 +137,8 @@
       "x": 3251,
       "y": 3610,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -137,7 +148,8 @@
       "x": 3241,
       "y": 3616,
       "z": 0
-    }
+    },
+    "description": "Elder Chaos druid"
   },
   {
     "facing": "SOUTH",
@@ -147,7 +159,8 @@
       "x": 2980,
       "y": 3704,
       "z": 0
-    }
+    },
+    "description": "Crazy archaeologist"
   },
   {
     "facing": "SOUTH",
@@ -157,7 +170,8 @@
       "x": 3340,
       "y": 3739,
       "z": 0
-    }
+    },
+    "description": "Venenatis"
   },
   {
     "facing": "EAST",
@@ -167,7 +181,8 @@
       "x": 3314,
       "y": 3840,
       "z": 0
-    }
+    },
+    "description": "Callisto"
   },
   {
     "facing": "EAST",
@@ -177,7 +192,8 @@
       "x": 2982,
       "y": 3847,
       "z": 0
-    }
+    },
+    "description": "Chaos Fanatic"
   },
   {
     "facing": "EAST",
@@ -187,7 +203,8 @@
       "x": 3182,
       "y": 3793,
       "z": 0
-    }
+    },
+    "description": "Vet'ion"
   },
   {
     "facing": "EAST",
@@ -2983,7 +3000,7 @@
   {
     "facing": "SOUTH",
     "radius": 2,
-    "description": "Unknown area Rocks",
+    "description": "Rocks",
     "id": 103,
     "position": {
       "x": 2676,
@@ -3141,7 +3158,8 @@
       "z": 0
     },
     "radius": 5,
-    "facing": -1
+    "facing": -1,
+    "description": "Mage of Zamorak"
   },
   {
     "id": 101,
@@ -3292,5 +3310,1864 @@
     },
     "radius": 3,
     "facing": -1
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 101,
+    "position": {
+      "x": 2667,
+      "y": 3727,
+      "z": 0
+    },
+    "description": "Rocks"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 3050,
+    "position": {
+      "x": 2670,
+      "y": 3726,
+      "z": 0
+    },
+    "description": "Hobgoblin"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 103,
+    "position": {
+      "x": 2673,
+      "y": 3716,
+      "z": 0
+    },
+    "description": "Rocks"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 101,
+    "position": {
+      "x": 2675,
+      "y": 3729,
+      "z": 0
+    },
+    "description": "Rocks"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 3050,
+    "position": {
+      "x": 2672,
+      "y": 3730,
+      "z": 0
+    },
+    "description": "Hobgoblin"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 103,
+    "position": {
+      "x": 2678,
+      "y": 3729,
+      "z": 0
+    },
+    "description": "Rocks"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 101,
+    "position": {
+      "x": 2683,
+      "y": 3716,
+      "z": 0
+    },
+    "description": "Rocks"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3035,
+      "y": 3629,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3034,
+      "y": 3627,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3030,
+      "y": 3627,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3035,
+      "y": 3628,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3036,
+      "y": 3634,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3034,
+      "y": 3636,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3034,
+      "y": 3628,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3033,
+      "y": 3639,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3034,
+      "y": 3637,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3038,
+      "y": 3639,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 2204,
+    "position": {
+      "x": 3046,
+      "y": 3633,
+      "z": 0
+    },
+    "description": "Sam"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3069,
+      "y": 3606,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3020,
+      "y": 3623,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3024,
+      "y": 3638,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3024,
+      "y": 3623,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3023,
+      "y": 3627,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3024,
+      "y": 3636,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3025,
+      "y": 3625,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3022,
+      "y": 3628,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3024,
+      "y": 3633,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3025,
+      "y": 3639,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3027,
+      "y": 3638,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3029,
+      "y": 3626,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3028,
+      "y": 3636,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3033,
+      "y": 3627,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 6606,
+    "position": {
+      "x": 3027,
+      "y": 3637,
+      "z": 0
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3022,
+      "y": 3694,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 8692,
+    "position": {
+      "x": 3024,
+      "y": 3701,
+      "z": 0
+    },
+    "description": "Noterazzo"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 2201,
+    "position": {
+      "x": 3025,
+      "y": 3707,
+      "z": 0
+    },
+    "description": "Neil"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 1026,
+    "position": {
+      "x": 3028,
+      "y": 3702,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3028,
+      "y": 3708,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 1026,
+    "position": {
+      "x": 3031,
+      "y": 3680,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3031,
+      "y": 3702,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 1026,
+    "position": {
+      "x": 3031,
+      "y": 3694,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 1026,
+    "position": {
+      "x": 3029,
+      "y": 3702,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 303,
+    "position": {
+      "x": 3033,
+      "y": 3692,
+      "z": 0
+    },
+    "description": "Speedy Keith"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3038,
+      "y": 3702,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 8688,
+    "position": {
+      "x": 3038,
+      "y": 3707,
+      "z": 0
+    },
+    "description": "Fat Tony"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 1027,
+    "position": {
+      "x": 3037,
+      "y": 3661,
+      "z": 0
+    },
+    "description": "Guard Bandit"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 1026,
+    "position": {
+      "x": 3033,
+      "y": 3683,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3036,
+      "y": 3664,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3042,
+      "y": 3695,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 302,
+    "position": {
+      "x": 3033,
+      "y": 3696,
+      "z": 0
+    },
+    "description": "Donny the lad"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 301,
+    "position": {
+      "x": 3042,
+      "y": 3705,
+      "z": 0
+    },
+    "description": "Black Heather"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3044,
+      "y": 3688,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 1026,
+    "position": {
+      "x": 3040,
+      "y": 3704,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6605,
+    "position": {
+      "x": 3043,
+      "y": 3705,
+      "z": 0
+    },
+    "description": "Bandit"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 2856,
+    "position": {
+      "x": 3052,
+      "y": 3687,
+      "z": 0
+    },
+    "description": "Giant rat"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 2864,
+    "position": {
+      "x": 3052,
+      "y": 3694,
+      "z": 0
+    },
+    "description": "Giant rat"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 1524,
+    "position": {
+      "x": 3054,
+      "y": 3706,
+      "z": 0
+    },
+    "description": "Fishing spot"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 2854,
+    "position": {
+      "x": 3134,
+      "y": 3629,
+      "z": 0
+    },
+    "description": "Rat"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 10380,
+    "position": {
+      "x": 3127,
+      "y": 3629,
+      "z": 0
+    },
+    "description": "Zamorakian Acolyte"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 7456,
+    "position": {
+      "x": 3128,
+      "y": 3631,
+      "z": 0
+    },
+    "description": "Perdu"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 6590,
+    "position": {
+      "x": 3125,
+      "y": 3635,
+      "z": 0
+    },
+    "description": "Sister Scarophia"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 10385,
+    "position": {
+      "x": 3129,
+      "y": 3617,
+      "z": 0
+    },
+    "description": "Refugee"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 10377,
+    "position": {
+      "x": 3127,
+      "y": 3634,
+      "z": 0
+    },
+    "description": "Ferox"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 10383,
+    "position": {
+      "x": 3130,
+      "y": 3619,
+      "z": 0
+    },
+    "description": "Refugee"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 10378,
+    "position": {
+      "x": 3132,
+      "y": 3618,
+      "z": 0
+    },
+    "description": "Sigismund"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 10389,
+    "position": {
+      "x": 3135,
+      "y": 3629,
+      "z": 0
+    },
+    "description": "Banker"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 10390,
+    "position": {
+      "x": 3135,
+      "y": 3627,
+      "z": 0
+    },
+    "description": "Mercenary"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 10379,
+    "position": {
+      "x": 3134,
+      "y": 3633,
+      "z": 0
+    },
+    "description": "Zamorakian Acolyte"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 10381,
+    "position": {
+      "x": 3134,
+      "y": 3635,
+      "z": 0
+    },
+    "description": "Zamorakian Acolyte"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3161,
+      "y": 3601,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3164,
+      "y": 3595,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3168,
+      "y": 3587,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3168,
+      "y": 3604,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3166,
+      "y": 3601,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3165,
+      "y": 3598,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3168,
+      "y": 3593,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 6604,
+    "position": {
+      "x": 3170,
+      "y": 3590,
+      "z": 0
+    },
+    "description": "Mammoth"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 6594,
+    "position": {
+      "x": 3198,
+      "y": 3686,
+      "z": 0
+    },
+    "description": "Ent"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 512,
+    "position": {
+      "x": 2977,
+      "y": 3570,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 512,
+    "position": {
+      "x": 2976,
+      "y": 3564,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 512,
+    "position": {
+      "x": 2983,
+      "y": 3574,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 510,
+    "position": {
+      "x": 2980,
+      "y": 3565,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 512,
+    "position": {
+      "x": 2981,
+      "y": 3568,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 512,
+    "position": {
+      "x": 2983,
+      "y": 3573,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 510,
+    "position": {
+      "x": 2990,
+      "y": 3567,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 510,
+    "position": {
+      "x": 2990,
+      "y": 3564,
+      "z": 0
+    },
+    "description": "Dark wizard"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 263,
+    "position": {
+      "x": 2974,
+      "y": 3618,
+      "z": 0
+    },
+    "description": "Green dragon"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 264,
+    "position": {
+      "x": 2978,
+      "y": 3610,
+      "z": 0
+    },
+    "description": "Green dragon"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 260,
+    "position": {
+      "x": 2986,
+      "y": 3619,
+      "z": 0
+    },
+    "description": "Green dragon"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 3024,
+    "position": {
+      "x": 3037,
+      "y": 3565,
+      "z": 0
+    },
+    "description": "Scorpion"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 3024,
+    "position": {
+      "x": 3031,
+      "y": 3575,
+      "z": 0
+    },
+    "description": "Scorpion"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 3024,
+    "position": {
+      "x": 3024,
+      "y": 3580,
+      "z": 0
+    },
+    "description": "Scorpion"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 3024,
+    "position": {
+      "x": 3036,
+      "y": 3569,
+      "z": 0
+    },
+    "description": "Scorpion"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 3024,
+    "position": {
+      "x": 3045,
+      "y": 3570,
+      "z": 0
+    },
+    "description": "Scorpion"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 3024,
+    "position": {
+      "x": 3055,
+      "y": 3570,
+      "z": 0
+    },
+    "description": "Scorpion"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 3024,
+    "position": {
+      "x": 3060,
+      "y": 3567,
+      "z": 0
+    },
+    "description": "Scorpion"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3024,
+      "y": 3625,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3025,
+      "y": 3636,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3028,
+      "y": 3636,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3029,
+      "y": 3627,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3030,
+      "y": 3637,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3035,
+      "y": 3628,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3035,
+      "y": 3622,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 531,
+    "position": {
+      "x": 3036,
+      "y": 3640,
+      "z": 1
+    },
+    "description": "Dark warrior"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 71,
+    "position": {
+      "x": 3009,
+      "y": 3591,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 70,
+    "position": {
+      "x": 3008,
+      "y": 3591,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 73,
+    "position": {
+      "x": 3016,
+      "y": 3597,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 72,
+    "position": {
+      "x": 3012,
+      "y": 3597,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 70,
+    "position": {
+      "x": 3024,
+      "y": 3595,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 71,
+    "position": {
+      "x": 3023,
+      "y": 3590,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 73,
+    "position": {
+      "x": 3023,
+      "y": 3595,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 73,
+    "position": {
+      "x": 3022,
+      "y": 3598,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 70,
+    "position": {
+      "x": 3018,
+      "y": 3587,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 71,
+    "position": {
+      "x": 3016,
+      "y": 3589,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 73,
+    "position": {
+      "x": 3019,
+      "y": 3591,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 72,
+    "position": {
+      "x": 3027,
+      "y": 3596,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 73,
+    "position": {
+      "x": 3080,
+      "y": 3533,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 77,
+    "position": {
+      "x": 3079,
+      "y": 3552,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 71,
+    "position": {
+      "x": 3092,
+      "y": 3558,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 78,
+    "position": {
+      "x": 3100,
+      "y": 3572,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 79,
+    "position": {
+      "x": 3107,
+      "y": 3565,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 80,
+    "position": {
+      "x": 3103,
+      "y": 3563,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 72,
+    "position": {
+      "x": 3112,
+      "y": 3554,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 2581,
+    "position": {
+      "x": 3105,
+      "y": 3558,
+      "z": 0
+    },
+    "description": "Mage of Zamorak"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 81,
+    "position": {
+      "x": 3099,
+      "y": 3564,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 77,
+    "position": {
+      "x": 3106,
+      "y": 3576,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 70,
+    "position": {
+      "x": 3113,
+      "y": 3539,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 71,
+    "position": {
+      "x": 3113,
+      "y": 3536,
+      "z": 0
+    },
+    "description": "Skeleton"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3082,
+      "y": 3606,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3076,
+      "y": 3607,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3082,
+      "y": 3600,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 85,
+    "position": {
+      "x": 3089,
+      "y": 3699,
+      "z": 0
+    },
+    "description": "Ghost"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 86,
+    "position": {
+      "x": 3090,
+      "y": 3687,
+      "z": 0
+    },
+    "description": "Ghost"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 87,
+    "position": {
+      "x": 3099,
+      "y": 3701,
+      "z": 0
+    },
+    "description": "Ghost"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3096,
+      "y": 3655,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3106,
+      "y": 3683,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3096,
+      "y": 3648,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3099,
+      "y": 3668,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3099,
+      "y": 3681,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 90,
+    "position": {
+      "x": 3110,
+      "y": 3691,
+      "z": 0
+    },
+    "description": "Ghost"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3110,
+      "y": 3658,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "NORTH_EAST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3101,
+      "y": 3666,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3113,
+      "y": 3653,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 92,
+    "position": {
+      "x": 3109,
+      "y": 3690,
+      "z": 0
+    },
+    "description": "Ghost"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 2838,
+    "position": {
+      "x": 3133,
+      "y": 3684,
+      "z": 0
+    },
+    "description": "Grizzly bear"
+  },
+  {
+    "facing": "NORTH_WEST",
+    "radius": 0,
+    "id": 45,
+    "position": {
+      "x": 3159,
+      "y": 3671,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 48,
+    "position": {
+      "x": 3159,
+      "y": 3681,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 46,
+    "position": {
+      "x": 3162,
+      "y": 3663,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 45,
+    "position": {
+      "x": 3166,
+      "y": 3682,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 63,
+    "position": {
+      "x": 3166,
+      "y": 3661,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 46,
+    "position": {
+      "x": 3168,
+      "y": 3684,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 61,
+    "position": {
+      "x": 3168,
+      "y": 3681,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH",
+    "radius": 0,
+    "id": 46,
+    "position": {
+      "x": 3170,
+      "y": 3680,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 46,
+    "position": {
+      "x": 3178,
+      "y": 3671,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 45,
+    "position": {
+      "x": 3167,
+      "y": 3677,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 48,
+    "position": {
+      "x": 3170,
+      "y": 3669,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH_WEST",
+    "radius": 0,
+    "id": 48,
+    "position": {
+      "x": 3182,
+      "y": 3671,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 264,
+    "position": {
+      "x": 3136,
+      "y": 3700,
+      "z": 0
+    },
+    "description": "Green dragon"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 263,
+    "position": {
+      "x": 3147,
+      "y": 3705,
+      "z": 0
+    },
+    "description": "Green dragon"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 262,
+    "position": {
+      "x": 3149,
+      "y": 3694,
+      "z": 0
+    },
+    "description": "Green dragon"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 45,
+    "position": {
+      "x": 3153,
+      "y": 3679,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 60,
+    "position": {
+      "x": 3153,
+      "y": 3680,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 47,
+    "position": {
+      "x": 3164,
+      "y": 3685,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 46,
+    "position": {
+      "x": 3159,
+      "y": 3680,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 261,
+    "position": {
+      "x": 3158,
+      "y": 3706,
+      "z": 0
+    },
+    "description": "Green dragon"
+  },
+  {
+    "facing": "EAST",
+    "radius": 0,
+    "id": 62,
+    "position": {
+      "x": 3169,
+      "y": 3683,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "NORTH",
+    "radius": 0,
+    "id": 61,
+    "position": {
+      "x": 3168,
+      "y": 3662,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "WEST",
+    "radius": 0,
+    "id": 59,
+    "position": {
+      "x": 3167,
+      "y": 3688,
+      "z": 0
+    },
+    "description": "Zombie"
+  },
+  {
+    "facing": "SOUTH_EAST",
+    "radius": 0,
+    "id": 47,
+    "position": {
+      "x": 3162,
+      "y": 3678,
+      "z": 0
+    },
+    "description": "Zombie"
   }
 ]

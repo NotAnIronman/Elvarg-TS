@@ -5,8 +5,7 @@ import { Location } from "../../../game/model/Location";
 
 function formatWildernessLevelText(tile: { x: number; y: number }): string {
   const level = Wilderness.levelForY(tile.y);
-  const combatTag = Wilderness.isMulti(tile.x, tile.y) ? "@red@M@whi@" : "@gre@S@whi@";
-  return `${combatTag} Lvl ${level}`;
+  return `Level ${level}`;
 }
 
 export class FinalizedMapRegionChangePacketListener implements PacketExecutor {
@@ -38,7 +37,6 @@ export class FinalizedMapRegionChangePacketListener implements PacketExecutor {
 
       const multiIcon = Wilderness.isMulti(tile.x, tile.y) ? 1 : 0;
       player?.setMultiIcon?.(multiIcon);
-      packetSender.sendMultiIcon?.(multiIcon);
       return;
     }
 
@@ -46,6 +44,5 @@ export class FinalizedMapRegionChangePacketListener implements PacketExecutor {
     player?.setMultiIcon?.(0);
     packetSender.sendWalkableInterface?.(-1);
     packetSender.sendInteractionOption?.("null", 2, true);
-    packetSender.sendMultiIcon?.(0);
   }
 }

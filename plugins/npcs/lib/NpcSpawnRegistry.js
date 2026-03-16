@@ -220,7 +220,10 @@ function getCombinedSpawns(state) {
       }
 
       const npcId = Math.trunc(spawn.id);
-      if (supportedNpcIds && !supportedNpcIds.has(npcId)) {
+      const shouldFilterUnsupportedId =
+        sourceName !== "elvarg" && supportedNpcIds && !supportedNpcIds.has(npcId);
+
+      if (shouldFilterUnsupportedId) {
         filteredUnsupportedNpcIds++;
         unsupportedIdCountById.set(
           npcId,

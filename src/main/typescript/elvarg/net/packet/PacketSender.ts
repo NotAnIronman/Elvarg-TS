@@ -780,8 +780,9 @@ export class PacketSender {
   }
 
   public sendMultiIcon(value: number): PacketSender {
-    // Temporarily disabled to avoid extra packets that the client isn't expecting
-    // during bring-up.
+    const out = new PacketBuilder(61);
+    out.put(value);
+    this.player.getSession().write(out);
     return this;
   }
 

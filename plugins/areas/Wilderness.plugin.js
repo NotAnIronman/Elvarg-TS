@@ -40,8 +40,7 @@ function shareClanChat(attacker, target) {
 
 function formatWildernessLevelText(tile) {
   const level = Wilderness.levelForY(tile.y);
-  const combatTag = Wilderness.isMulti(tile.x, tile.y) ? "@red@M@whi@" : "@gre@S@whi@";
-  return `${combatTag} Lvl ${level}`;
+  return `Level ${level}`;
 }
 
 function refreshWildernessUi(player, tile, inWilderness) {
@@ -65,7 +64,6 @@ function refreshWildernessUi(player, tile, inWilderness) {
     if (player.getMultiIcon() !== multiIcon) {
       player.setMultiIcon(multiIcon);
     }
-    player.getPacketSender().sendMultiIcon(multiIcon);
     return;
   }
 
@@ -79,7 +77,6 @@ function refreshWildernessUi(player, tile, inWilderness) {
   if (player.getMultiIcon() !== 0) {
     player.setMultiIcon(0);
   }
-  player.getPacketSender().sendMultiIcon(0);
 }
 
 function isInWildernessCached(cache, player) {
@@ -203,7 +200,6 @@ module.exports = {
           const multiIcon = Wilderness.isMulti(tile.x, tile.y) ? 1 : 0;
           if (player.getMultiIcon() !== multiIcon) {
             player.setMultiIcon(multiIcon);
-            player.getPacketSender().sendMultiIcon(multiIcon);
           }
         }
       } else {
@@ -216,7 +212,6 @@ module.exports = {
         }
         if (!isBot && player.getMultiIcon() !== 0) {
           player.setMultiIcon(0);
-          player.getPacketSender().sendMultiIcon(0);
         }
       }
 
