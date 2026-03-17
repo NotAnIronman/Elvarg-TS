@@ -11,7 +11,10 @@ const { Location } = require("../../../../src/main/typescript/elvarg/game/model/
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { GameConstants } = require("../../../../src/main/typescript/elvarg/game/GameConstants");
 const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
-const { randomInRange } = require("../navigation/BotNavigation");
+const {
+  queueRouteAndFlagAppearance,
+  randomInRange,
+} = require("../navigation/BotNavigation");
 const { PvpCombatExecutionNode } = require("../nodes/pvp/PvpCombatExecutionNode");
 const { PvpDefensiveActionNode } = require("../nodes/pvp/PvpDefensiveActionNode");
 const { PvpFreezeAndKiteNode } = require("../nodes/pvp/PvpFreezeAndKiteNode");
@@ -63,6 +66,11 @@ const SEEKING_RESET_STAGGER_MIN_MS = 250;
 const SEEKING_RESET_STAGGER_MAX_MS = 1800;
 const HIGH_WILDNESS_AGGRESSION_LEVEL = 48;
 const DEEP_WILD_FENCE_Y = 3904;
+const DITCH_NON_WILD_STRIP_MIN_X = 2940;
+const DITCH_NON_WILD_STRIP_MAX_X = 3392;
+const DITCH_NON_WILD_STRIP_MIN_Y = 3523;
+const DITCH_NON_WILD_STRIP_MAX_Y = 3524;
+const DITCH_WILDERNESS_RETURN_Y = 3525;
 
 const PVP_PHASE = Object.freeze({
   IDLE: "idle",
@@ -100,6 +108,85 @@ function resolveHotspotCycleJitterMs(username, nowMs, spreadMs) {
   const safeSpreadMs = Math.max(1, Math.floor(spreadMs));
   const cycleSeed = Math.floor(Math.max(0, Number(nowMs) || 0) / 7000);
   return hashUsername(`${username}:${cycleSeed}`) % safeSpreadMs;
+}
+
+function isInDitchNonWildStrip(player) {
+  const location = player?.getLocation?.();
+  const x = location?.getX?.();
+  const y = location?.getY?.();
+  const z = location?.getZ?.();
+  return (
+    Number.isFinite(x) &&
+    Number.isFinite(y) &&
+    z === 0 &&
+    x >= DITCH_NON_WILD_STRIP_MIN_X &&
+    x <= DITCH_NON_WILD_STRIP_MAX_X &&
+    y >= DITCH_NON_WILD_STRIP_MIN_Y &&
+    y <= DITCH_NON_WILD_STRIP_MAX_Y
+  );
+}
+
+function chooseWalkableWildernessReturnTile(player, state) {
+  const location = player?.getLocation?.();
+  if (!location) {
+    return null;
+  }
+  const z = location.getZ?.();
+  if (z !== 0) {
+    return null;
+  }
+  const privateArea = player.getPrivateArea?.() ?? null;
+  const roamBounds = state?.roaming?.roamBounds ?? null;
+  if (
+    roamBounds &&
+    Number.isFinite(roamBounds.minX) &&
+    Number.isFinite(roamBounds.maxX) &&
+    Number.isFinite(roamBounds.minY) &&
+    Number.isFinite(roamBounds.maxY)
+  ) {
+    const minX = Math.floor(roamBounds.minX);
+    const maxX = Math.floor(roamBounds.maxX);
+    const minY = Math.max(DITCH_WILDERNESS_RETURN_Y, Math.floor(roamBounds.minY));
+    const maxY = Math.floor(roamBounds.maxY);
+    if (maxX >= minX && maxY >= minY) {
+      for (let attempt = 0; attempt < 64; attempt += 1) {
+        const tile = new Location(
+          randomInRange(minX, maxX),
+          randomInRange(minY, maxY),
+          z
+        );
+        if (!Wilderness.isInLocation(tile)) {
+          continue;
+        }
+        if (RegionManager.blocked(tile, privateArea)) {
+          continue;
+        }
+        return { x: tile.getX(), y: tile.getY() };
+      }
+    }
+  }
+
+  const baseX = location.getX?.();
+  if (!Number.isFinite(baseX)) {
+    return null;
+  }
+  for (let dy = 0; dy <= 2; dy += 1) {
+    const y = DITCH_WILDERNESS_RETURN_Y + dy;
+    for (let dx = 0; dx <= 4; dx += 1) {
+      const candidates = dx === 0 ? [baseX] : [baseX - dx, baseX + dx];
+      for (const x of candidates) {
+        const tile = new Location(x, y, z);
+        if (!Wilderness.isInLocation(tile)) {
+          continue;
+        }
+        if (RegionManager.blocked(tile, privateArea)) {
+          continue;
+        }
+        return { x, y };
+      }
+    }
+  }
+  return null;
 }
 
 class PvpBehavior {
@@ -310,6 +397,22 @@ class PvpBehavior {
     return true;
   }
 
+  queueReturnToWildernessIfNeeded(player, state) {
+    if (!this.isPvpOnly(state) || !isInDitchNonWildStrip(player)) {
+      return false;
+    }
+    const returnTile = chooseWalkableWildernessReturnTile(player, state);
+    if (!returnTile) {
+      return false;
+    }
+    queueRouteAndFlagAppearance(player, returnTile.x, returnTile.y, {
+      state,
+      reason: "pvp_non_wild_strip_return",
+    });
+    this.setPhase(state, PVP_PHASE.SEEKING);
+    return true;
+  }
+
   behaviorRequirementsMet({ player, state, nowMs }) {
     if (!player || !state) {
       return false;
@@ -319,6 +422,9 @@ class PvpBehavior {
       state.mode !== this.behaviorMode.ROAMING &&
       !(pvpOnly && state.mode === this.behaviorMode.PVP)
     ) {
+      return false;
+    }
+    if (this.queueReturnToWildernessIfNeeded(player, state)) {
       return false;
     }
     if (!Wilderness.isIn(player)) {
@@ -778,7 +884,9 @@ class PvpBehavior {
     }
 
     if (this.isPvpOnly(state)) {
-      return this.resetSeekingState(player, state, nowMs, reason);
+      const reset = this.resetSeekingState(player, state, nowMs, reason);
+      this.queueReturnToWildernessIfNeeded(player, state);
+      return reset;
     }
 
     this.setPhase(state, PVP_PHASE.IDLE);

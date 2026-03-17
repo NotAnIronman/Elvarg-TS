@@ -1,5 +1,6 @@
 const { GameConstants } = require("../../../src/main/typescript/elvarg/game/GameConstants");
 const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { Wilderness } = require("../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
 const { PluginManager } = require("../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { TaskManager } = require("../../../src/main/typescript/elvarg/game/task/TaskManager");
@@ -81,7 +82,10 @@ function chooseWalkableTileInBounds(roamBounds, fallbackLocation) {
       randomInRange(minY, maxY),
       z
     );
-    if (!RegionManager.blocked(candidate, null)) {
+    if (
+      Wilderness.isInLocation(candidate) &&
+      !RegionManager.blocked(candidate, null)
+    ) {
       return candidate;
     }
   }

@@ -12,6 +12,7 @@ const UNREACHABLE_SEGMENT_COOLDOWN_MAX_MS = 12000;
 const UNREACHABLE_SEGMENT_TTL_MS = 30000;
 const UNREACHABLE_SEGMENT_MAX_TRACKED = 24;
 const FORBIDDEN_TARGET_Y = new Set([3521, 3522]);
+const PVP_ONLY_NON_WILD_STRIP_Y = new Set([3523, 3524]);
 const pendingMovementByPlayer = new WeakMap();
 const unreachableSegmentsByPlayer = new WeakMap();
 const pathBlockedLogStateByUsername = new Map();
@@ -57,18 +58,34 @@ function segmentKey(x, y, z) {
   return `${x},${y},${z}`;
 }
 
-function isForbiddenTargetY(y) {
-  return Number.isFinite(y) && FORBIDDEN_TARGET_Y.has(Math.floor(y));
+function isPvpOnlyState(state) {
+  const modes = state?.autonomy?.allowedAutonomousModes;
+  return (
+    Array.isArray(modes) &&
+    modes.length === 1 &&
+    modes[0] === "pvp"
+  );
 }
 
-function sanitizeTargetTile(player, targetX, targetY) {
+function isForbiddenTargetY(y, pvpOnly = false) {
+  if (!Number.isFinite(y)) {
+    return false;
+  }
+  const normalizedY = Math.floor(y);
+  if (FORBIDDEN_TARGET_Y.has(normalizedY)) {
+    return true;
+  }
+  return pvpOnly === true && PVP_ONLY_NON_WILD_STRIP_Y.has(normalizedY);
+}
+
+function sanitizeTargetTile(player, pvpOnly, targetX, targetY) {
   const safeX = Math.floor(targetX);
   const y = Math.floor(targetY);
-  if (!isForbiddenTargetY(y)) {
+  if (!isForbiddenTargetY(y, pvpOnly)) {
     return { x: safeX, y };
   }
   const currentY = player?.getLocation?.()?.getY?.();
-  const safeY = Number.isFinite(currentY) && currentY <= 3521 ? 3520 : 3523;
+  const safeY = Number.isFinite(currentY) && currentY <= 3522 ? 3520 : 3525;
   return { x: safeX, y: safeY };
 }
 
@@ -121,6 +138,7 @@ function chooseNextTarget(player, state, botWalkRadius, options = {}) {
   const previousTarget = state.roaming?.target;
   const acceptTarget =
     typeof options.acceptTarget === "function" ? options.acceptTarget : null;
+  const pvpOnly = isPvpOnlyState(state);
   const radiusSq = botWalkRadius * botWalkRadius;
   const maxAttempts = 24;
 
@@ -133,7 +151,7 @@ function chooseNextTarget(player, state, botWalkRadius, options = {}) {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const targetX = randomInRange(minX, maxX);
         const targetY = randomInRange(minY, maxY);
-        if (isForbiddenTargetY(targetY)) {
+        if (isForbiddenTargetY(targetY, pvpOnly)) {
           continue;
         }
         if (targetX === currentX && targetY === currentY) {
@@ -167,7 +185,7 @@ function chooseNextTarget(player, state, botWalkRadius, options = {}) {
 
     const targetX = homeX + dx;
     const targetY = homeY + dy;
-    if (isForbiddenTargetY(targetY)) {
+    if (isForbiddenTargetY(targetY, pvpOnly)) {
       continue;
     }
     if (targetX === currentX && targetY === currentY) {
@@ -197,7 +215,7 @@ function chooseNextTarget(player, state, botWalkRadius, options = {}) {
   ];
 
   for (const [targetX, targetY] of fallbackTargets) {
-    if (isForbiddenTargetY(targetY)) {
+    if (isForbiddenTargetY(targetY, pvpOnly)) {
       continue;
     }
     if (targetX === currentX && targetY === currentY) {
@@ -225,12 +243,13 @@ function calculateWalkRoute(player, targetX, targetY) {
 
 function resolveSegmentTarget(
   player,
+  pvpOnly,
   targetX,
   targetY,
   maxRouteSegmentTiles = MAX_ROUTE_SEGMENT_TILES
 ) {
   if (!player) {
-    return sanitizeTargetTile(player, targetX, targetY);
+    return sanitizeTargetTile(player, pvpOnly, targetX, targetY);
   }
   const maxSegmentTiles = Math.max(1, Math.floor(maxRouteSegmentTiles));
   const loc = player.getLocation();
@@ -240,7 +259,7 @@ function resolveSegmentTarget(
   const dy = targetY - currentY;
   const chebyshevDistance = Math.max(Math.abs(dx), Math.abs(dy));
   if (chebyshevDistance <= maxSegmentTiles) {
-    return sanitizeTargetTile(player, targetX, targetY);
+    return sanitizeTargetTile(player, pvpOnly, targetX, targetY);
   }
 
   const ratio = maxSegmentTiles / chebyshevDistance;
@@ -254,11 +273,11 @@ function resolveSegmentTarget(
     segmentY += Math.sign(dy);
   }
 
-  return sanitizeTargetTile(player, segmentX, segmentY);
+  return sanitizeTargetTile(player, pvpOnly, segmentX, segmentY);
 }
 
-function queueRouteAndFlagAppearance(player, targetX, targetY) {
-  return requestMovement(player, targetX, targetY);
+function queueRouteAndFlagAppearance(player, targetX, targetY, options = {}) {
+  return requestMovement(player, targetX, targetY, options);
 }
 
 function requestMovement(player, targetX, targetY, options = {}) {
@@ -270,7 +289,8 @@ function requestMovement(player, targetX, targetY, options = {}) {
   }
   const loc = player.getLocation?.();
   const z = Number.isFinite(options.z) ? Math.floor(options.z) : loc?.getZ?.();
-  const target = sanitizeTargetTile(player, targetX, targetY);
+  const pvpOnly = isPvpOnlyState(options.state ?? null);
+  const target = sanitizeTargetTile(player, pvpOnly, targetX, targetY);
   pendingMovementByPlayer.set(player, {
     x: target.x,
     y: target.y,
@@ -283,6 +303,7 @@ function requestMovement(player, targetX, targetY, options = {}) {
         ? Math.floor(options.maxRouteSegmentTiles)
         : MAX_ROUTE_SEGMENT_TILES,
     basicPather: options.basicPather === true,
+    pvpOnly,
     nextDispatchAtMs: Number.isFinite(options.nextDispatchAtMs)
       ? Math.max(0, Math.floor(options.nextDispatchAtMs))
       : 0,
@@ -318,6 +339,7 @@ function dispatchMovementRequest(player, request) {
   const nowMs = Date.now();
   const segmentTarget = resolveSegmentTarget(
     player,
+    request.pvpOnly === true,
     request.x,
     request.y,
     request.maxRouteSegmentTiles

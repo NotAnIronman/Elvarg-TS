@@ -44,7 +44,7 @@ const WILDERNESS_HOTSPOTS = Object.freeze({
     roamRadius: 6,
     lingerMs: 9000,
     maxSimultaneousFights: 5,
-    area: { minX: 3078, maxX: 3091, minY: 3523, maxY: 3535, z: 0 },
+    area: { minX: 3078, maxX: 3091, minY: 3525, maxY: 3535, z: 0 },
     anchor: { x: 3085, y: 3528, z: 0 },
     allowedProfiles: ["standard", "veteran", "elite"],
     allowedLoadouts: [
@@ -66,7 +66,7 @@ const WILDERNESS_HOTSPOTS = Object.freeze({
     roamRadius: 7,
     lingerMs: 11000,
     maxSimultaneousFights: 4,
-    area: { minX: 3092, maxX: 3106, minY: 3523, maxY: 3536, z: 0 },
+    area: { minX: 3092, maxX: 3106, minY: 3525, maxY: 3536, z: 0 },
     anchor: { x: 3099, y: 3529, z: 0 },
     allowedProfiles: ["novice", "standard", "veteran", "elite"],
     allowedLoadouts: [
@@ -89,8 +89,8 @@ const WILDERNESS_HOTSPOTS = Object.freeze({
     roamRadius: 3,
     lingerMs: 10000,
     maxSimultaneousFights: 8,
-    area: { minX: 3228, maxX: 3262, minY: 3523, maxY: 3542, z: 0 },
-    anchor: { x: 3243, y: 3524, z: 0 },
+    area: { minX: 3228, maxX: 3262, minY: 3525, maxY: 3542, z: 0 },
+    anchor: { x: 3243, y: 3526, z: 0 },
     allowedProfiles: ["novice", "standard", "veteran", "elite"],
     allowedLoadouts: [
       "f2p_strength_pure",

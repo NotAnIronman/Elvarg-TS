@@ -747,6 +747,9 @@ class BotBehaviorTask extends Task {
     if (this.isInCombat(player)) {
       return false;
     }
+    if (peekMovementRequest(player)) {
+      return false;
+    }
     if (pvp.replenishAfterKillPending === true) {
       return false;
     }
@@ -916,6 +919,16 @@ class BotBehaviorTask extends Task {
       return false;
     }
     if (!attacker.isRegistered?.() || (attacker.getHitpoints?.() ?? 0) <= 0) {
+      return false;
+    }
+    if (!Wilderness.isIn(player) || !Wilderness.isIn(attacker)) {
+      if (combat?.getTarget?.() === attacker || combat?.getAttacker?.() === attacker) {
+        combat.reset?.();
+        combat.setUnderAttack?.(null);
+      }
+      if (player.getCombatFollowing?.() === attacker) {
+        player.setCombatFollowing?.(null);
+      }
       return false;
     }
     const privateArea = player.getPrivateArea?.();

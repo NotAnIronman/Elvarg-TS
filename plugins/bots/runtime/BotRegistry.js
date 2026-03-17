@@ -1,5 +1,6 @@
 const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
 const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { Wilderness } = require("../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const {
   getEnabledWildernessHotspots,
   getWildernessHotspot,
@@ -548,11 +549,14 @@ function createBotRegistry(options) {
       const offsetX = tileIndex % width;
       const offsetY = Math.floor(tileIndex / width);
       const candidate = new Location(minX + offsetX, minY + offsetY, z);
-      if (!RegionManager.blocked(candidate, null)) {
+      if (
+        Wilderness.isInLocation(candidate) &&
+        !RegionManager.blocked(candidate, null)
+      ) {
         return candidate;
       }
     }
-    if (!RegionManager.blocked(anchor, null)) {
+    if (Wilderness.isInLocation(anchor) && !RegionManager.blocked(anchor, null)) {
       return anchor.clone().setZ(z);
     }
     return null;

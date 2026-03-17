@@ -184,11 +184,11 @@ class DitchTraversalService {
     return Math.abs(currentY - objectY) <= this.roamingDitchCrossMaxDistanceY;
   }
 
-  requestCross(player, state, traversalObject, nowMs = Date.now()) {
+  requestCross(player, state, traversalObject, nowMs = Date.now(), traversalTargetOverride = null) {
     if (!player || !state || !traversalObject) {
       return false;
     }
-    const traversalTarget = this.getTraversalTarget(state);
+    const traversalTarget = traversalTargetOverride ?? this.getTraversalTarget(state);
     if (!traversalTarget) {
       return false;
     }
@@ -322,7 +322,7 @@ class DitchTraversalService {
     if (!this.isObjectBetween(current.y, target.y, objectY)) {
       return false;
     }
-    return this.requestCross(player, state, traversalObject, nowMs) === true;
+    return this.requestCross(player, state, traversalObject, nowMs, target) === true;
   }
 
   processTransition(player, state, nowMs = Date.now()) {
@@ -433,7 +433,7 @@ class DitchTraversalService {
     state.roaming.pendingRetry = null;
     this.setTraversalTarget(state, { x: retry.x, y: retry.y, z: retry.z });
     this.clearMovementQueue(player);
-    queueRouteAndFlagAppearance(player, retry.x, retry.y);
+    queueRouteAndFlagAppearance(player, retry.x, retry.y, { state });
     this.api.log("ditch_post_delay_retry_walk", {
       username: player.getUsername(),
       retryX: retry.x,
