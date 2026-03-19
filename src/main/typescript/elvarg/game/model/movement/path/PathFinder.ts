@@ -2,19 +2,16 @@ import { Mobile } from "../../../entity/impl/Mobile";
 import { Server } from "../../../../Server";
 import { RegionManager } from "../../../collision/RegionManager";
 import { Location } from "../../Location";
-import { PrivateArea } from "../../areas/impl/PrivateArea";
 import { Graphic } from "../../Graphic";
 import { PlayerRights } from "../../rights/PlayerRights";
 import { GameConstants } from "../../../GameConstants";
 import { CombatConstants } from "../../../content/combat/CombatConstants";
 import { PluginManager } from "../../../../plugins/PluginManager";
+import { RsmodRouteFinding } from "./RsmodRouteFinding";
 import * as fs from "fs";
 import * as path from "path";
 
 export class PathFinder {
-    private static readonly GRID_SIZE = 104;
-    private static readonly ROUTE_STEP_CAPACITY = 4096;
-    private static readonly DISTANCE_SENTINEL = 0x5f5e0ff;
     private static readonly ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
     // Debounce path-blocked events aggressively: repeated retries against the
     // same destination within a short window do not provide extra recovery
@@ -31,27 +28,7 @@ export class PathFinder {
         signature: string;
         lastEmittedAtMs: number;
     }>();
-    private static readonly scratchDirections: number[][] = PathFinder.createGrid(0);
-    private static readonly scratchDistanceValues: number[][] =
-        PathFinder.createGrid(PathFinder.DISTANCE_SENTINEL);
-    private static readonly scratchRouteStepsX: number[] =
-        new Array<number>(PathFinder.ROUTE_STEP_CAPACITY).fill(0);
-    private static readonly scratchRouteStepsY: number[] =
-        new Array<number>(PathFinder.ROUTE_STEP_CAPACITY).fill(0);
-
-    private static createGrid(fillValue: number): number[][] {
-        const grid = new Array<number[]>(PathFinder.GRID_SIZE);
-        for (let x = 0; x < PathFinder.GRID_SIZE; x++) {
-            grid[x] = new Array<number>(PathFinder.GRID_SIZE).fill(fillValue);
-        }
-        return grid;
-    }
-
-    private static resetScratchGrid(grid: number[][], fillValue: number): void {
-        for (let x = 0; x < PathFinder.GRID_SIZE; x++) {
-            grid[x].fill(fillValue);
-        }
-    }
+    private static readonly rsmodRouteFinding = new RsmodRouteFinding();
 
     private static log(line: string) {
         if (!PathFinder.LOG_ENABLED) {
@@ -96,15 +73,6 @@ export class PathFinder {
         });
         return true;
     }
-    static WEST = 0x1280108;
-    static EAST = 0x1280180;
-    static SOUTH = 0x1280102;
-    static NORTH = 0x1280120;
-    static SOUTHEAST = 0x1280183;
-    static SOUTHWEST = 0x128010e;
-    static NORTHEAST = 0x12801e0;
-    static NORTHWEST = 0x1280138;
-
     private static TILE_DISTANCE_DELTAS: Map<number, number[][]> = new Map<number, number[][]>()
         .set(1, [[-1, 0], [0, -1], [0, 1], [1, 0]])
         .set(2, [[-2, 0], [-1, -1], [-1, 1], [0, -2], [0, 2], [1, -1], [1, 1], [2, 0]])
@@ -135,32 +103,206 @@ export class PathFinder {
             [9, -3], [9, -2], [9, -1], [9, 1], [9, 2], [9, 3], [9, 4], [10, 0]
         ]);
 
-    public isInDiagonalBlock(attacker: Location, attacked: Location): boolean {
-        return attacked.getX() - 1 == attacker.getX() && attacked.getY() + 1 == attacker.getY()
-            || attacker.getX() - 1 == attacked.getX() && attacker.getY() + 1 == attacked.getY()
-            || attacked.getX() + 1 == attacker.getX() && attacked.getY() - 1 == attacker.getY()
-            || attacker.getX() + 1 == attacked.getX() && attacker.getY() - 1 == attacked.getY()
-            || attacked.getX() + 1 == attacker.getX() && attacked.getY() + 1 == attacked.getY()
-            || attacker.getX() + 1 == attacked.getX() && attacker.getY() + 1 == attacker.getY();
+    public static isDiagonalTiles(attacker: Location, attacked: Location): boolean {
+        return (
+            Math.abs(attacker.getX() - attacked.getX()) === 1 &&
+            Math.abs(attacker.getY() - attacked.getY()) === 1
+        );
     }
 
     public static isDiagonalLocation(att: Mobile, def: Mobile): boolean {
-        let attacker = att.getLocation().clone();
-        let attacked = def.getLocation().clone();
-        let isDia = attacker.getX() - 1 == attacked.getX() && attacker.getY() + 1 == attacked.getY() //top left
-            || attacker.getX() + 1 == attacked.getX() && attacker.getY() - 1 == attacked.getY() //bottom right
-            || attacker.getX() + 1 == attacked.getX() && attacker.getY() + 1 == attacked.getY() //top right
-            || attacker.getX() - 1 == attacked.getX() && attacker.getY() - 1 == attacked.getY(); //bottom right
-        return isDia;
+        return PathFinder.isDiagonalTiles(att.getLocation(), def.getLocation());
+    }
+
+    private static emitNoPath(
+        entity: Mobile,
+        srcX: number,
+        srcY: number,
+        destX: number,
+        destY: number,
+        height: number,
+        basicPather: boolean,
+        size: number,
+        xLength: number,
+        yLength: number,
+        direction: number,
+        blockingMask: number
+    ): void {
+        Server.logDebug("error.. no path found... path probably not reachable.");
+        PathFinder.log(`no path found to ${destX},${destY}`);
+        const signature = [
+            `${destX},${destY},${height}`,
+            `b:${basicPather ? 1 : 0}`,
+            `s:${size}`,
+            `xl:${xLength}`,
+            `yl:${yLength}`,
+            `d:${direction}`,
+            `m:${blockingMask}`,
+        ].join("|");
+        if (PathFinder.shouldEmitPathBlockedEvent(entity, signature, Date.now())) {
+            PluginManager.emitPathBlocked({
+                entity,
+                isPlayer: entity.isPlayer(),
+                username: entity.isPlayer() ? (entity.getAsPlayer()?.getUsername() ?? null) : null,
+                from: {
+                    x: srcX,
+                    y: srcY,
+                    z: height,
+                },
+                to: {
+                    x: destX,
+                    y: destY,
+                    z: height,
+                },
+                basicPather,
+                requestedSize: size,
+                xLength,
+                yLength,
+                direction,
+                blockingMask,
+            });
+        }
+    }
+
+    private static applyRsmodRoute(
+        entity: Mobile,
+        destX: number,
+        destY: number,
+        options: {
+            destWidth?: number;
+            destLength?: number;
+            locAngle?: number;
+            locShape?: number;
+            moveNear?: boolean;
+            blockAccessFlags?: number;
+            maxWaypoints?: number;
+            requestedSize?: number;
+            xLength?: number;
+            yLength?: number;
+            direction?: number;
+            blockingMask?: number;
+        } = {}
+    ): number {
+        entity.getMovementQueue().lastDestX = destX;
+        entity.getMovementQueue().lastDestY = destY;
+        entity.getMovementQueue().setRoute(false);
+
+        const height = entity.getLocation().getZ();
+        const srcX = entity.getLocation().getX();
+        const srcY = entity.getLocation().getY();
+        const regionBaseX = entity.getLocation().getRegionX() << 3;
+        const regionBaseY = entity.getLocation().getRegionY() << 3;
+        const route = PathFinder.rsmodRouteFinding.findRoute({
+            level: height,
+            srcX,
+            srcY,
+            srcSize: Math.max(entity.getSize(), 1),
+            destX,
+            destY,
+            destWidth: options.destWidth ?? 1,
+            destLength: options.destLength ?? 1,
+            locAngle: options.locAngle ?? 0,
+            locShape: options.locShape ?? -1,
+            moveNear: options.moveNear ?? true,
+            blockAccessFlags: options.blockAccessFlags ?? 0,
+            maxWaypoints: options.maxWaypoints ?? 25,
+            privateArea: entity.getPrivateArea(),
+        });
+
+        if (!route.success) {
+            PathFinder.emitNoPath(
+                entity,
+                srcX,
+                srcY,
+                destX,
+                destY,
+                height,
+                options.moveNear === true,
+                options.requestedSize ?? 0,
+                options.xLength ?? 0,
+                options.yLength ?? 0,
+                options.direction ?? 0,
+                options.blockingMask ?? 0
+            );
+            return 0;
+        }
+
+        entity.getMovementQueue().setRoute(true);
+        entity
+            .getMovementQueue()
+            .setPathX(route.endX - regionBaseX)
+            .setPathY(route.endY - regionBaseY);
+
+        let steps = 0;
+        for (const waypoint of route.waypoints) {
+            entity.getMovementQueue().addSteps(new Location(waypoint.x, waypoint.y, waypoint.z));
+            steps++;
+        }
+
+        PathFinder.log(
+            `route built entity=${entity.isPlayer() ? "player:" + entity.getAsPlayer().getUsername() : "npc"} steps=${steps} dest=${destX},${destY} alt=${route.alternative ? 1 : 0}`
+        );
+        return steps;
+    }
+
+    public static reachedEntity(entity: Mobile, target: Mobile): boolean {
+        return PathFinder.rsmodRouteFinding.reachedAbsolute({
+            level: entity.getLocation().getZ(),
+            srcX: entity.getLocation().getX(),
+            srcY: entity.getLocation().getY(),
+            srcSize: Math.max(entity.getSize(), 1),
+            destX: target.getLocation().getX(),
+            destY: target.getLocation().getY(),
+            destWidth: Math.max(target.getSize(), 1),
+            destLength: Math.max(target.getSize(), 1),
+            locShape: -2,
+            privateArea: entity.getPrivateArea(),
+        });
+    }
+
+    public static reachedObject(
+        entity: Mobile,
+        destX: number,
+        destY: number,
+        destWidth: number,
+        destLength: number,
+        locAngle: number,
+        locShape: number,
+        blockAccessFlags: number
+    ): boolean {
+        return PathFinder.rsmodRouteFinding.reachedAbsolute({
+            level: entity.getLocation().getZ(),
+            srcX: entity.getLocation().getX(),
+            srcY: entity.getLocation().getY(),
+            srcSize: Math.max(entity.getSize(), 1),
+            destX,
+            destY,
+            destWidth,
+            destLength,
+            locAngle,
+            locShape,
+            blockAccessFlags,
+            privateArea: entity.getPrivateArea(),
+        });
     }
 
     static calculateCombatRoute(player: Mobile, target: Mobile) {
-        PathFinder.calculateRoute(player, 0, target.getLocation().getX(), target.getLocation().getY(), 1, 1, 0, 0, false);
+        PathFinder.applyRsmodRoute(player, target.getLocation().getX(), target.getLocation().getY(), {
+            destWidth: Math.max(target.getSize(), 1),
+            destLength: Math.max(target.getSize(), 1),
+            locShape: -2,
+            moveNear: true,
+        });
         player.setMobileInteraction(target);
     }
 
-    static calculateEntityRoute(player: Mobile, destX: number, destY: number) {
-        PathFinder.calculateRoute(player, 0, destX, destY, 1, 1, 0, 0, false);
+    static calculateEntityRoute(player: Mobile, target: Mobile) {
+        return PathFinder.applyRsmodRoute(player, target.getLocation().getX(), target.getLocation().getY(), {
+            destWidth: Math.max(target.getSize(), 1),
+            destLength: Math.max(target.getSize(), 1),
+            locShape: -2,
+            moveNear: true,
+        });
     }
 
     static calculateWalkRoute(player: Mobile, destX: number, destY: number) {
@@ -169,11 +311,43 @@ export class PathFinder {
                 `calculateWalkRoute entity=player:${player.getAsPlayer().getUsername()} from=${player.getLocation().getX()},${player.getLocation().getY()},${player.getLocation().getZ()} to=${destX},${destY}`
             );
         }
-        PathFinder.calculateRoute(player, 0, destX, destY, 0, 0, 0, 0, true);
+        return PathFinder.applyRsmodRoute(player, destX, destY, {
+            locShape: -1,
+            moveNear: true,
+        });
     }
 
     static calculateObjectRoute(entity: Mobile, size: number, destX: number, destY: number, xLength: number, yLength: number, direction: number, blockingMask: number) {
-        PathFinder.calculateRoute(entity, size, destX, destY, xLength, yLength, direction, blockingMask, false);
+        let destWidth = 1;
+        let destLength = 1;
+        let locShape = -1;
+        let locAngle = 0;
+        let blockAccessFlags = 0;
+
+        if (xLength > 0 && yLength > 0) {
+            destWidth = xLength;
+            destLength = yLength;
+            locShape = 10;
+            locAngle = direction;
+            blockAccessFlags = blockingMask;
+        } else if (size !== 0) {
+            locShape = size - 1;
+            locAngle = direction;
+        }
+
+        return PathFinder.applyRsmodRoute(entity, destX, destY, {
+            destWidth,
+            destLength,
+            locAngle,
+            locShape,
+            moveNear: true,
+            blockAccessFlags,
+            requestedSize: size,
+            xLength,
+            yLength,
+            direction,
+            blockingMask,
+        });
     }
 
     public static getClosestAttackableTile(attacker: Mobile, defender: Mobile, distance: number): Location | null {
@@ -275,582 +449,36 @@ export class PathFinder {
         PathFinder.log(
             `calculateRoute entity=${entity.isPlayer() ? "player:" + entity.getAsPlayer().getUsername() : "npc"} dest=${destX},${destY} size=${size} basic=${basicPather}`
         );
+        let destWidth = 1;
+        let destLength = 1;
+        let locShape = -1;
+        let locAngle = 0;
+        let blockAccessFlags = 0;
 
-        /** RS Protocol **/
-        const byte0 = 104;
-        const byte1 = 104;
-
-        const directions = PathFinder.scratchDirections;
-        const distanceValues = PathFinder.scratchDistanceValues;
-        const routeStepsX = PathFinder.scratchRouteStepsX;
-        const routeStepsY = PathFinder.scratchRouteStepsY;
-
-        let anInt1264 = 0;
-        let anInt1288 = 0;
-
-        entity.getMovementQueue().lastDestX = destX;
-        entity.getMovementQueue().lastDestY = destY;
-
-        PathFinder.resetScratchGrid(directions, 0);
-        PathFinder.resetScratchGrid(distanceValues, PathFinder.DISTANCE_SENTINEL);
-
-        // Calculate local coordinates relative to the player's current region.
-        let localX = entity.getLocation().getX() - (entity.getLocation().getRegionX() << 3);
-        let localY = entity.getLocation().getY() - (entity.getLocation().getRegionY() << 3);
-        let destinationX = destX - (entity.getLocation().getRegionX() << 3);
-        let destinationY = destY - (entity.getLocation().getRegionY() << 3);
-
-        let baseX = localX;
-        let baseY = localY;
-        /** RS Protocol **/
-        directions[localX][localY] = 99;
-        distanceValues[localX][localY] = 0;
-        /** Size of the 2nd queue **/
-        let tail = 0;
-        /** Size of the 1st queue **/
-        let queueIndex = 0;
-        /** Set in order to loop to find best path **/
-        routeStepsX[tail] = localX;
-        routeStepsY[tail++] = localY;
-        /** Required for custom object walk-to actions. **/
-        entity.getMovementQueue().setRoute(false);
-        /** Size of the main queue **/
-        let queueSizeX = routeStepsX.length;
-        /** Entities height **/
-        let height = entity.getLocation().getZ();
-        /** Private Area **/
-        let area: PrivateArea = entity.getPrivateArea();
-        /** Steps taken to get to best route **/
-        let steps = 0;
-        /** Loops and checks flags for best route to destination. **/
-        while (queueIndex != tail) {
-            baseX = routeStepsX[queueIndex];
-            baseY = routeStepsY[queueIndex];
-            queueIndex = (queueIndex + 1) % queueSizeX;
-            let absoluteX = (entity.getLocation().getRegionX() << 3) + baseX;
-            let absoluteY = (entity.getLocation().getRegionY() << 3) + baseY;
-
-            if (baseX == destinationX && baseY == destinationY) {
-                entity.getMovementQueue().setRoute(true);
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                break;
-            }
-
-            if (size != 0) {
-                /** Used for basic walking and other packet interactions also size 10 **/
-                if ((size < 5 || size == 10) && PathFinder.defaultRoutePath(entity, destinationX, baseX, baseY, direction, size - 1, destinationY)) {
-                    console.log("Using normal entity pathing..");
-                    entity.getMovementQueue().setRoute(true);
-                    break;
-                }
-                /** Used for larger entities e.g corp/kbd ect **/
-                if (size < 10 && PathFinder.largeRoutePath(entity, destinationX, destinationY, baseY, size - 1, direction, baseX)) {
-                    Server.logDebug("Using larger Size Pathing..");
-                    entity.getMovementQueue().setRoute(true);
-                    break;
-                }
-            }
-            if (size < 10 && PathFinder.largeRoutePath(entity, destinationX, destinationY, baseY, size - 1, direction, baseX)) {
-                Server.logDebug("Using larger Size Pathing..");
-                entity.getMovementQueue().setRoute(true);
-                break;
-            }
-            if (
-                xLength > 0 &&
-                yLength > 0 &&
-                PathFinder.sizeRoutePath(
-                    entity,
-                    destinationY,
-                    destinationX,
-                    baseX,
-                    xLength,
-                    blockingMask,
-                    yLength,
-                    baseY
-                )
-            ) {
-                entity.getMovementQueue().setRoute(true);
-                break;
-            }
-            let priceValue = distanceValues[baseX][baseY] + 1;
-
-            if (baseX > 0 && directions[baseX - 1][baseY] == 0 && (RegionManager.getClipping(absoluteX - 1, absoluteY, height, area) & PathFinder.WEST) == 0) {
-                routeStepsX[tail] = baseX - 1;
-                routeStepsY[tail] = baseY;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX - 1][baseY] = 2;
-                distanceValues[baseX - 1][baseY] = priceValue;
-            }
-
-            if (baseX < byte0 - 1 && directions[baseX + 1][baseY] == 0 && (RegionManager.getClipping(absoluteX + 1, absoluteY, height, area) & PathFinder.EAST) == 0) {
-                routeStepsX[tail] = baseX + 1;
-                routeStepsY[tail] = baseY;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX + 1][baseY] = 8;
-                distanceValues[baseX + 1][baseY] = priceValue;
-            }
-            if (baseY > 0 && directions[baseX][baseY - 1] == 0 && (RegionManager.getClipping(absoluteX, absoluteY - 1, height, area) & PathFinder.SOUTH) == 0) {
-                routeStepsX[tail] = baseX;
-                routeStepsY[tail] = baseY - 1;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX][baseY - 1] = 1;
-                distanceValues[baseX][baseY - 1] = priceValue;
-            }
-            if (baseY < byte1 - 1 && directions[baseX][baseY + 1] == 0 && (RegionManager.getClipping(absoluteX, absoluteY + 1, height, area) & PathFinder.NORTH) == 0) {
-                routeStepsX[tail] = baseX;
-                routeStepsY[tail] = baseY + 1;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX][baseY + 1] = 4;
-                distanceValues[baseX][baseY + 1] = priceValue;
-            }
-            if (baseX > 0 && baseY > 0 && directions[baseX - 1][baseY - 1] === 0 && (RegionManager.getClipping(absoluteX - 1, absoluteY - 1, height, area) & PathFinder.SOUTHWEST) === 0
-                && (RegionManager.getClipping(absoluteX - 1, absoluteY, height, area) & PathFinder.WEST) === 0 && (RegionManager.getClipping(absoluteX, absoluteY - 1, height, area) & PathFinder.SOUTH) === 0) {
-                routeStepsX[tail] = baseX - 1;
-                routeStepsY[tail] = baseY - 1;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX - 1][baseY - 1] = 3;
-                distanceValues[baseX - 1][baseY - 1] = priceValue;
-            }
-
-            if (baseX < byte0 - 1 && baseY > 0 && directions[baseX + 1][baseY - 1] === 0
-                && (RegionManager.getClipping(absoluteX + 1, absoluteY - 1, height, area) & PathFinder.SOUTHEAST) === 0 && (RegionManager.getClipping(absoluteX + 1, absoluteY, height, area) & PathFinder.EAST) === 0
-                && (RegionManager.getClipping(absoluteX, absoluteY - 1, height, area) & PathFinder.SOUTH) === 0) {
-                routeStepsX[tail] = baseX + 1;
-                routeStepsY[tail] = baseY - 1;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX + 1][baseY - 1] = 9;
-                distanceValues[baseX + 1][baseY - 1] = priceValue;
-            }
-
-            if (baseX > 0 && baseY < byte1 - 1 && directions[baseX - 1][baseY + 1] === 0
-                && (RegionManager.getClipping(absoluteX - 1, absoluteY + 1, height, area) & PathFinder.NORTHWEST) === 0 && (RegionManager.getClipping(absoluteX - 1, absoluteY, height, area) & PathFinder.WEST) === 0
-                && (RegionManager.getClipping(absoluteX, absoluteY + 1, height, area) & PathFinder.NORTH) === 0) {
-                routeStepsX[tail] = baseX - 1;
-                routeStepsY[tail] = baseY + 1;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX - 1][baseY + 1] = 6;
-                distanceValues[baseX - 1][baseY + 1] = priceValue;
-            }
-            if (baseX < byte0 - 1 && baseY < byte1 - 1 && directions[baseX + 1][baseY + 1] === 0
-                && (RegionManager.getClipping(absoluteX + 1, absoluteY + 1, height, area) & PathFinder.NORTHEAST) === 0 && (RegionManager.getClipping(absoluteX + 1, absoluteY, height, area) & PathFinder.EAST) === 0
-                && (RegionManager.getClipping(absoluteX, absoluteY + 1, height, area) & PathFinder.NORTH) === 0) {
-                routeStepsX[tail] = baseX + 1;
-                routeStepsY[tail] = baseY + 1;
-            }
-            if (baseX < byte0 - 1 && baseY < byte1 - 1 && directions[baseX + 1][baseY + 1] === 0 &&
-                (RegionManager.getClipping(absoluteX + 1, absoluteY + 1, height, area) & PathFinder.NORTHEAST) === 0 &&
-                (RegionManager.getClipping(absoluteX + 1, absoluteY, height, area) & PathFinder.EAST) === 0 &&
-                (RegionManager.getClipping(absoluteX, absoluteY + 1, height, area) & PathFinder.NORTH) === 0) {
-                routeStepsX[tail] = baseX + 1;
-                routeStepsY[tail] = baseY + 1;
-                tail = (tail + 1) % queueSizeX;
-                directions[baseX + 1][baseY + 1] = 12;
-                distanceValues[baseX + 1][baseY + 1] = priceValue;
-            }
-        }
-        anInt1264 = 0;
-
-        if (!entity.getMovementQueue().hasRoute()) {
-            if (basicPather) {
-                let cost = 100;
-                for (let range = 1; range < 5; range++) {
-                    for (let xOffset = destinationX - range; xOffset <= destinationX + range; xOffset++) {
-                        for (let yOffset = destinationY - range; yOffset <= destinationY + range; yOffset++) {
-                            if (xOffset >= 0 && yOffset >= 0 && xOffset < 104 && yOffset < 104 && distanceValues[xOffset][yOffset] < cost) {
-                                cost = distanceValues[xOffset][yOffset];
-                                baseX = xOffset;
-                                baseY = yOffset;
-                                anInt1264 = 1;
-                                entity.getMovementQueue().setRoute(true);
-                            }
-                        }
-                    }
-                    if (entity.getMovementQueue().hasRoute())
-                        break;
-                }
-            }
-            if (!entity.getMovementQueue().hasRoute()) {
-                Server.logDebug("error.. no path found... path probably not reachable.");
-                PathFinder.log(`no path found to ${destX},${destY}`);
-                const fromX = entity.getLocation().getX();
-                const fromY = entity.getLocation().getY();
-                // Use destination/request shape as the debounce signature.
-                // Excluding "from" avoids event spam while an entity repeatedly
-                // retries toward the same blocked destination.
-                const signature = [
-                    `${destX},${destY},${height}`,
-                    `b:${basicPather ? 1 : 0}`,
-                    `s:${size}`,
-                    `xl:${xLength}`,
-                    `yl:${yLength}`,
-                    `d:${direction}`,
-                    `m:${blockingMask}`,
-                ].join("|");
-                if (PathFinder.shouldEmitPathBlockedEvent(entity, signature, Date.now())) {
-                    PluginManager.emitPathBlocked({
-                        entity,
-                        isPlayer: entity.isPlayer(),
-                        username: entity.isPlayer() ? (entity.getAsPlayer()?.getUsername() ?? null) : null,
-                        from: {
-                            x: fromX,
-                            y: fromY,
-                            z: height,
-                        },
-                        to: {
-                            x: destX,
-                            y: destY,
-                            z: height,
-                        },
-                        basicPather,
-                        requestedSize: size,
-                        xLength,
-                        yLength,
-                        direction,
-                        blockingMask,
-                    });
-                }
-                return 0;
-            }
+        if (xLength > 0 && yLength > 0) {
+            destWidth = xLength;
+            destLength = yLength;
+            locShape = 10;
+            locAngle = direction;
+            blockAccessFlags = blockingMask;
+        } else if (size !== 0) {
+            locShape = size - 1;
+            locAngle = direction;
         }
 
-        queueIndex = 0;
-        routeStepsX[queueIndex] = baseX;
-        routeStepsY[queueIndex++] = baseY;
-
-        let l5;
-        for (let dirc = l5 = directions[baseX][baseY]; baseX !== localX || baseY !== localY; dirc = directions[baseX][baseY]) {
-            if (dirc !== l5) {
-                l5 = dirc;
-                routeStepsX[queueIndex] = baseX;
-                routeStepsY[queueIndex++] = baseY;
-            }
-            if ((dirc & 2) !== 0)
-                baseX++;
-            else if ((dirc & 8) !== 0)
-                baseX--;
-            if ((dirc & 1) !== 0)
-                baseY++;
-            else if ((dirc & 4) !== 0)
-                baseY--;
-        }
-
-        if (queueIndex > 0) {
-
-            if (queueIndex > 25)
-                queueIndex = 25;
-        }
-        while (queueIndex-- > 0) {
-            let absX = (entity.getLocation().getRegionX() << 3) + routeStepsX[queueIndex];
-            let absY = (entity.getLocation().getRegionY() << 3) + routeStepsY[queueIndex];
-            entity.getMovementQueue().addSteps(new Location(absX, absY, height));
-            steps++;
-        }
-        PathFinder.log(
-            `route built entity=${entity.isPlayer() ? "player:" + entity.getAsPlayer().getUsername() : "npc"} steps=${steps} dest=${destX},${destY}`
-        );
-        return steps;
-    }
-
-    public static defaultRoutePath(entity: Mobile, destX: number, baseX: number, baseY: number, direction: number, size: number, destY: number): boolean {
-        if (baseX === destX && baseY === destY) {
-            entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-            return true;
-        }
-
-        const absX = (entity.getLocation().getRegionX() << 3) + baseX;
-
-        const absY = (entity.getLocation().getRegionY() << 3) + baseY;
-
-        const height = entity.getLocation().getZ();
-
-        const area = entity.getPrivateArea();
-
-        baseX -= 0;
-        baseY -= 0;
-        destX -= 0;
-        destY -= 0;
-
-        if (size === 0) {
-            if (direction === 0) {
-                if (baseX === destX - 1 && baseY === destY) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX === destX && baseY === destY + 1 && (RegionManager.getClipping(absX, absY, height, area) & 0x1280120) === 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX === destX && baseY === destY - 1 && (RegionManager.getClipping(absX, absY, height, area) & 0x1280102) === 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction === 1) {
-                if (baseX === destX && baseY === destY + 1) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX === destX - 1 && baseY === destY && (RegionManager.getClipping(absX, absY, height, area) & 0x1280108) === 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX === destX + 1 && baseY === destY && (RegionManager.getClipping(absX, absY, height, area) & 0x1280180) === 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction === 2) {
-                if (baseX === destX + 1 && baseY === destY) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX === destX && baseY === destY + 1 && (RegionManager.getClipping(absX, absY, height, area) & 0x1280120) === 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX === destX && baseY === destY - 1 && (RegionManager.getClipping(absX, absY, height, area) & 0x1280102) === 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction == 3) {
-                if (baseX == destX && baseY == destY - 1) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX - 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280108) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX + 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280180) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            }
-        } if (size == 2) {
-            if (direction == 0) {
-                if (baseX == destX - 1 && baseY == destY) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY + 1) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX + 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280180) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY - 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280102) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction == 1) {
-                if (baseX == destX - 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280108) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY + 1) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX + 1 && baseY == destY) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY - 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280102) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction == 2) {
-                if (baseX == destX - 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280108) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY + 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280120) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX + 1 && baseY == destY) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY - 1) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction == 3) {
-                if (baseX == destX - 1 && baseY == destY) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY + 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280120) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX + 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x1280180) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY - 1) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            }
-        } if (size == 9) {
-            if (baseX == destX && baseY == destY + 1 && (RegionManager.getClipping(absX, absY, height, area) & 0x20) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-            if (baseX == destX && baseY == destY - 1 && (RegionManager.getClipping(absX, absY, height, area) & 2) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-            if (baseX == destX - 1 && baseY == destY && (RegionManager.getClipping(absX, absY, height, area) & 8) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-            if (baseX == destX + 1 && baseY == destY && (RegionManager.getClipping(absX, absY, height, area) & 0x80) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static largeRoutePath(entity: Mobile, destX: number, destY: number, baseY: number, size: number, direction: number, baseX: number): boolean {
-        if (baseX === destX && baseY === destY) {
-            entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-            return true;
-        }
-
-        const absX = (entity.getLocation().getRegionX() << 3) + baseX;
-
-        const absY = (entity.getLocation().getRegionY() << 3) + baseY;
-
-        const height = entity.getLocation().getZ();
-
-        const area = entity.getPrivateArea();
-
-        baseX -= 0;
-        baseY -= 0;
-        destX -= 0;
-        destY -= 0;
-
-        if (size == 6 || size == 7) {
-            if (size == 7)
-                direction = direction + 2 & 3;
-            if (direction == 0) {
-                if (baseX == destX + 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x80) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY - 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 2) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction == 1) {
-                if (baseX == destX - 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 8) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY - 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 2) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction == 2) {
-                if (baseX == destX - 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 8) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY + 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x20) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            } else if (direction == 3) {
-                if (baseX == destX + 1 && baseY == destY
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x80) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-                if (baseX == destX && baseY == destY + 1
-                    && (RegionManager.getClipping(absX, absY, height, area) & 0x20) == 0) {
-                    entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                    return true;
-                }
-            }
-        }
-        if (size == 8) {
-            if (baseX == destX && baseY == destY + 1
-                && (RegionManager.getClipping(absX, absY, height, area) & 0x20) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-            if (baseX == destX && baseY == destY - 1 && (RegionManager.getClipping(absX, absY, height, area) & 2) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-            if (baseX == destX - 1 && baseY == destY && (RegionManager.getClipping(absX, absY, height, area) & 8) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-            if (baseX == destX + 1 && baseY == destY
-                && (RegionManager.getClipping(absX, absY, height, area) & 0x80) == 0) {
-                entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static sizeRoutePath(entity: Mobile, destY: number, destX: number, baseX: number, sizeX: number, blockedMask: number, sizeY: number, baseY: number): boolean {
-        const absX = (entity.getLocation().getRegionX() << 3) + baseX;
-        const absY = (entity.getLocation().getRegionY() << 3) + baseY;
-        const height = entity.getLocation().getZ();
-        const area = entity.getPrivateArea();
-        let xOffset = 0;
-        let yOffset = 0;
-        const maxX = (destX + sizeY) - 1;
-        const maxY = (destY + sizeX) - 1;
-        // rest of the function logic
-        if (baseX >= destX && baseX <= maxX && baseY >= destY && baseY <= maxY) {
-            entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-            return true;
-        }
-        if (baseX == destX - 1 && baseY >= destY && baseY <= maxY
-            && (RegionManager.getClipping(absX - xOffset, absY - yOffset, height, area) & 8) == 0
-            && (blockedMask & 8) == 0) {
-            entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-            return true;
-        }
-        if (baseX == maxX + 1 && baseY >= destY && baseY <= maxY
-            && (RegionManager.getClipping(absX - xOffset, absY - yOffset, height, area) & 0x80) == 0
-            && (blockedMask & 2) == 0) {
-            entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-            return true;
-        }
-        if (baseY == destY - 1 && baseX >= destX && baseX <= maxX
-            && (RegionManager.getClipping(absX - xOffset, absY - yOffset, height, area) & 2) == 0
-            && (blockedMask & 4) == 0 || baseY == maxY + 1 && baseX >= destX && baseX <= maxX
-            && (RegionManager.getClipping(absX - xOffset, absY - yOffset, height, area) & 0x20) == 0
-            && (blockedMask & 1) == 0) {
-            entity.getMovementQueue().setPathX(baseX).setPathY(baseY);
-            return true;
-        }
-        return false;
+        return PathFinder.applyRsmodRoute(entity, destX, destY, {
+            destWidth,
+            destLength,
+            locAngle,
+            locShape,
+            moveNear: basicPather,
+            blockAccessFlags,
+            requestedSize: size,
+            xLength,
+            yLength,
+            direction,
+            blockingMask,
+        });
     }
 
     public static findWalkable(entity: Mobile, x: number, y: number, targetSize: number): boolean {

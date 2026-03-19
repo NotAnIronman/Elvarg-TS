@@ -11,7 +11,6 @@ import { Direction, Directions } from "../Direction";
 import { Location } from "../Location";
 import { Skill } from "../Skill";
 import { PathFinder } from "./path/PathFinder";
-import { RS317PathFinder } from './path/RS317PathFinder'
 import { PlayerRights } from "../rights/PlayerRights";
 import { Task } from "../../task/Task";
 import { TaskManager } from "../../task/TaskManager";
@@ -688,7 +687,7 @@ export class MovementQueue {
         }
 
         if (!dancing) {
-            if (!combatFollow && this.character.calculateDistance(following) == 1 && !RS317PathFinder.isInDiagonalBlock(current, destination)) {
+            if (!combatFollow && this.character.calculateDistance(following) == 1 && !PathFinder.isDiagonalTiles(current, destination)) {
                 return;
             }
 
@@ -1263,10 +1262,58 @@ export class MovementQueue {
         this.resetFollow();
     }
 
-    public walkToEntity(entity: Mobile, runnable?: () => void) {
-        let destX = entity.getLocation().getX();
-        let destY = entity.getLocation().getY();
+    private buildObjectRouteSpec(object: GameObject) {
+        const objectX = object.getLocation().getX();
+        const objectY = object.getLocation().getY();
+        const type = object.getType();
+        const id = object.getId();
+        const direction = object.getFace();
 
+        if (type === 10 || type === 11 || type === 22) {
+            const def = ObjectDefinition.forId(id);
+            const xLength = def.getSizeX();
+            const yLength = def.getSizeY();
+            const blockingMask = def.getBlockingMask();
+
+            return {
+                objectX,
+                objectY,
+                type,
+                id,
+                direction,
+                routeSize: 0,
+                routeXLength: xLength,
+                routeYLength: yLength,
+                routeDirection: direction,
+                routeBlockingMask: blockingMask,
+                reachWidth: xLength,
+                reachLength: yLength,
+                reachAngle: direction,
+                reachShape: 10,
+                reachBlockAccessFlags: blockingMask,
+            };
+        }
+
+        return {
+            objectX,
+            objectY,
+            type,
+            id,
+            direction,
+            routeSize: type + 1,
+            routeXLength: 0,
+            routeYLength: 0,
+            routeDirection: direction,
+            routeBlockingMask: 0,
+            reachWidth: 1,
+            reachLength: 1,
+            reachAngle: direction,
+            reachShape: type,
+            reachBlockAccessFlags: 0,
+        };
+    }
+
+    public walkToEntity(entity: Mobile, runnable?: () => void) {
         let mobility = this.getMobility();
         if (!mobility.canMove()) {
             mobility.sendMessage(this.player);
@@ -1283,10 +1330,7 @@ export class MovementQueue {
 
         this.walkToReset();
 
-        PathFinder.calculateEntityRoute(this.player, destX, destY);
-
-        let finalDestinationX = this.player.getMovementQueue().pathX;
-        let finalDestinationY = this.player.getMovementQueue().pathY;
+        PathFinder.calculateEntityRoute(this.player, entity);
 
         let currentX = entity.getLocation().getX();
         let currentY = entity.getLocation().getY();
@@ -1297,7 +1341,7 @@ export class MovementQueue {
                 this.reset();
                 currentX = entity.getLocation().getX();
                 currentY = entity.getLocation().getY();
-                PathFinder.calculateEntityRoute(this.player, currentX, currentY);
+                PathFinder.calculateEntityRoute(this.player, entity);
             }
 
             if (runnable && this.player.getMovementQueue().isWithinEntityInteractionDistance(entity.getLocation())) {
@@ -1319,20 +1363,16 @@ export class MovementQueue {
                 return;
             }
 
-            if (!this.player.getMovementQueue().points.length) {
-                return;
-            }
-
-            if (!this.player.getMovementQueue().hasRoute()) {
-                // Player hasn't got a route.
-                reachStage = -1;
-                return;
-            }
-
-            if (this.player.getLocation().getX() === finalDestinationX && this.player.getLocation().getY() === finalDestinationY) {
+            if (PathFinder.reachedEntity(this.player, entity)) {
                 reachStage = 1;
+                return;
             }
-            return;
+
+            if (this.player.getMovementQueue().points.length) {
+                return;
+            }
+
+            reachStage = -1;
         }));
     }
 
@@ -1353,34 +1393,27 @@ export class MovementQueue {
 
         this.walkToReset();
 
-        let objectX = object.getLocation().getX();
-        let objectY = object.getLocation().getY();
-        let type = object.getType();
-        let id = object.getId();
-        let direction = object.getFace();
+        const routeSpec = this.buildObjectRouteSpec(object);
+        const objectX = routeSpec.objectX;
+        const objectY = routeSpec.objectY;
+        const type = routeSpec.type;
+        const id = routeSpec.id;
+        const direction = routeSpec.direction;
 
-        if (type == 10 || type == 11 || type == 22) {
-            let xLength, yLength;
-            let def = ObjectDefinition.forId(id);
-            if (direction == 0 || direction == 2) {
-                yLength = def.getSizeX();
-                xLength = def.getSizeY();
-            } else {
-                yLength = def.getSizeY();
-                xLength = def.getSizeX();
-            }
-            let blockingMask = def.getBlockingMask();
+        const queueObjectRoute = () => PathFinder.calculateObjectRoute(
+            this.player,
+            routeSpec.routeSize,
+            objectX,
+            objectY,
+            routeSpec.routeXLength,
+            routeSpec.routeYLength,
+            routeSpec.routeDirection,
+            routeSpec.routeBlockingMask
+        );
 
-            if (direction != 0) {
-                blockingMask = (blockingMask << direction & 0xf) + (blockingMask >> 4 - direction);
-            }
-            PathFinder.calculateObjectRoute(this.player, 0, objectX, objectY, xLength, yLength, 0, blockingMask);
-        } else {
-            PathFinder.calculateObjectRoute(this.player, type + 1, objectX, objectY, 0, 0, direction, 0);
-        }
+        queueObjectRoute();
 
         const finalDestinationX = this.player.getMovementQueue().pathX;
-
         const finalDestinationY = this.player.getMovementQueue().pathY;
         MovementQueue.log(
             `[walkToObject] ${this.ownerLabel()} obj=${id}@${objectX},${objectY},${this.player.getLocation().getZ()} type=${type} face=${direction} route=${this.player.getMovementQueue().hasRoute()} path=${finalDestinationX},${finalDestinationY} queuedSteps=${this.points.length}`
@@ -1392,6 +1425,7 @@ export class MovementQueue {
 
         this.player.setPositionToFace(new Location(objectX, objectY));
         let walkStage = 0;
+        let repathAttempts = 0;
         TaskManager.submit(new MovementeTaskFunc(this.player.getIndex(), () => {
             if (walkStage != 0) {
 
@@ -1425,20 +1459,39 @@ export class MovementQueue {
                 TaskManager.cancelTasks(this.player.getIndex());
                 return;
             }
-            if (this.points.length) {
+            if (PathFinder.reachedObject(
+                this.player,
+                objectX,
+                objectY,
+                routeSpec.reachWidth,
+                routeSpec.reachLength,
+                routeSpec.reachAngle,
+                routeSpec.reachShape,
+                routeSpec.reachBlockAccessFlags
+            )) {
+                walkStage = 1;
+                return;
+            }
+            if (this.points.length || this.player.getMovementQueue().isMovings()) {
                 return;
             }
 
-            if (!this.player.getMovementQueue().hasRoute() || this.player.getLocation().getX() !== finalDestinationX || this.player.getLocation().getY() !== finalDestinationY) {
-                walkStage = -1;
-                /** When no destination is set = no possible route to requested tiles **/
-                MovementQueue.log(
-                    `[walkToObject] ${this.ownerLabel()} failed route=${this.player.getMovementQueue().hasRoute()} current=${this.player.getLocation().getX()},${this.player.getLocation().getY()} expected=${finalDestinationX},${finalDestinationY}`
-                );
-                this.player.getPacketSender().sendMessage("You can't reach that!");
-                return;
+            if (repathAttempts < 2) {
+                repathAttempts++;
+                queueObjectRoute();
+                if (this.points.length || this.player.getMovementQueue().hasRoute()) {
+                    MovementQueue.log(
+                        `[walkToObject] ${this.ownerLabel()} repath=${repathAttempts} obj=${id}@${objectX},${objectY} current=${this.player.getLocation().getX()},${this.player.getLocation().getY()}`
+                    );
+                    return;
+                }
             }
-            walkStage = 1;
+
+            walkStage = -1;
+            MovementQueue.log(
+                `[walkToObject] ${this.ownerLabel()} failed route=${this.player.getMovementQueue().hasRoute()} current=${this.player.getLocation().getX()},${this.player.getLocation().getY()} expected=${finalDestinationX},${finalDestinationY}`
+            );
+            this.player.getPacketSender().sendMessage("You can't reach that!");
         }));
     }
 

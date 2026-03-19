@@ -15,7 +15,6 @@ export class MapObjects {
 
         if (object == null && player.getRights() == PlayerRights.DEVELOPER) {
             player.getPacketSender().sendMessage("@red@Object with id " + id + " does not exist.");
-            object = new GameObject(id, location, 10, 0, player.getPrivateArea());
         }
 
         return object;
