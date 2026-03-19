@@ -17,7 +17,6 @@ export class Appearance {
 
     canChangeAppearance = false;
     headHint = -1;
-    bountyHunterSkull = -1;
     // Match Java int[13] semantics: all slots start at 0.
     look: number[] = new Array(13).fill(0);
     player: Player;
@@ -32,16 +31,6 @@ export class Appearance {
 
     setHeadHint(headHint: number): this {
         this.headHint = headHint;
-        this.player.getUpdateFlag().flag(Flag.APPEARANCE);
-        return this;
-    }
-
-    getBountyHunterSkull(): number {
-        return this.bountyHunterSkull;
-    }
-
-    setBountyHunterSkull(skullHint: number): this {
-        this.bountyHunterSkull = skullHint;
         this.player.getUpdateFlag().flag(Flag.APPEARANCE);
         return this;
     }

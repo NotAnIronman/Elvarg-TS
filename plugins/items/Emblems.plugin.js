@@ -1,24 +1,15 @@
-const { Emblem } = require("../../src/main/typescript/elvarg/game/content/combat/bountyhunter/Emblem");
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
 const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 
-const EMBLEM_IDS = new Set([
-  Emblem.MYSTERIOUS_EMBLEM_1.id,
-  Emblem.MYSTERIOUS_EMBLEM_2.id,
-  Emblem.MYSTERIOUS_EMBLEM_3.id,
-  Emblem.MYSTERIOUS_EMBLEM_4.id,
-  Emblem.MYSTERIOUS_EMBLEM_5.id,
-  Emblem.MYSTERIOUS_EMBLEM_6.id,
-  Emblem.MYSTERIOUS_EMBLEM_7.id,
-  Emblem.MYSTERIOUS_EMBLEM_8.id,
-  Emblem.MYSTERIOUS_EMBLEM_9.id,
-  Emblem.MYSTERIOUS_EMBLEM_10.id,
+const EMBLEM_ID_LIST = Object.freeze([
+  12746, 12748, 12749, 12750, 12751, 12752, 12753, 12754, 12755, 12756,
 ]);
+const EMBLEM_IDS = new Set(EMBLEM_ID_LIST);
 
-const EMBLEM_TIER_1_ID = Emblem.MYSTERIOUS_EMBLEM_1.id;
-const EMBLEM_TIER_2_ID = Emblem.MYSTERIOUS_EMBLEM_2.id;
+const EMBLEM_TIER_1_ID = EMBLEM_ID_LIST[0];
+const EMBLEM_TIER_2_ID = EMBLEM_ID_LIST[1];
 
 function isEmblemItemId(itemId) {
   return Number.isInteger(itemId) && EMBLEM_IDS.has(itemId);

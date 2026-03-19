@@ -8,7 +8,6 @@ import { World } from "../../World";
 import { PrayerData, PrayerHandler } from "../PrayerHandler";
 import { WeaponInterfaces } from "../combat/WeaponInterfaces";
 import { BonusManager } from "../../model/equipment/BonusManager";
-import { BountyHunter } from "../combat/bountyhunter/BountyHunter";
 import { GameObject } from "../../entity/impl/object/GameObject";
 import { EnteredAmountAction } from "../../model/EnteredAmountAction";
 import { Wilderness } from "../wilderness/Wilderness";
@@ -280,7 +279,6 @@ export class SkillManager {
         BonusManager.update(this.player);
         WeaponInterfaces.assign(this.player);
         PrayerHandler.deactivatePrayers(this.player);
-        BountyHunter.unassign(this.player);
         this.player.getUpdateFlag().flag(Flag.APPEARANCE);
     }
 

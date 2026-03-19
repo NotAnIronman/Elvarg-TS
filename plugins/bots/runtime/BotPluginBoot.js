@@ -273,8 +273,10 @@ function bootPlayerBotsRuntime(options = {}) {
         npcAggroPolicyHandler,
         modeValidationIntervalMs: config.modeValidationIntervalMs,
         idleEntryStride: config.idleEntryStride,
+        timingDesyncMs: config.timingDesyncMs,
         lodConfig: config.lodConfig,
         taskProfiler: config.taskProfiler,
+        executionBudget: config.executionBudget,
         handlePersistentPvpRespawn: (entry, nowMs) => {
           const player = entry?.player;
           const state = entry?.state;

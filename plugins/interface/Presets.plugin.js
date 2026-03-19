@@ -3,7 +3,6 @@ const { PrayerData, PrayerHandler } = require("../../src/main/typescript/elvarg/
 const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { CombatSpells } = require("../../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells");
-const { BountyHunter } = require("../../src/main/typescript/elvarg/game/content/combat/bountyhunter/BountyHunter");
 const { Autocasting } = require("../../src/main/typescript/elvarg/game/content/combat/magic/Autocasting");
 const { Presetable } = require("../../src/main/typescript/elvarg/game/content/presets/Presetable");
 const { PredefinedPresets } = require("../../src/main/typescript/elvarg/game/content/presets/PredefinedPresets");
@@ -474,10 +473,6 @@ function applyPreset(player, preset) {
   const newCombatLevel = player.getSkillManager().getCombatLevel();
   const combatLevelText = `Combat level: ${newCombatLevel}`;
   sender.sendString(combatLevelText, 19000).sendString(combatLevelText, 5858);
-
-  if (newCombatLevel !== oldCombatLevel) {
-    BountyHunter.unassign(player);
-  }
 
   sender.sendTabInterface(6, player.getSpellbook().getInterfaceId());
   sender.sendConfig(709, PrayerHandler.canUse(player, PrayerData.PRESERVE, false) ? 1 : 0);

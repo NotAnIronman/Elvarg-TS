@@ -78,8 +78,9 @@ const BOT_CONFIG = Object.freeze({
     "data",
     "object-index.json"
   ),
-  // Run bot behavior decisions every 2 game ticks to reduce BT pressure.
-  botDecisionTicks: 3,
+  // Run the scheduler every game tick; near-player throttling is handled by
+  // LOD/budget logic so PvP bots do not move in visible waves.
+  botDecisionTicks: 1,
   botBaseCooldownMs: 1200,
   botJitterMs: 300,
   ditchAttemptCooldownMs: 1200,
@@ -114,6 +115,13 @@ const BOT_CONFIG = Object.freeze({
     intervalMs: parseEnvInt("BOT_TASK_PROFILER_INTERVAL_MS", 10000, 1000),
     sampleStride: parseEnvInt("BOT_TASK_PROFILER_SAMPLE_STRIDE", 4, 1),
   }),
+  executionBudget: Object.freeze({
+    enabled: (process.env.BOT_EXECUTION_BUDGET_ENABLED ?? "1") === "1",
+    maxMs: parseEnvInt("BOT_EXECUTION_BUDGET_MS", 30, 5),
+    minEntriesPerCycle: parseEnvInt("BOT_EXECUTION_MIN_ENTRIES_PER_CYCLE", 24, 1),
+    logCooldownMs: parseEnvInt("BOT_EXECUTION_BUDGET_LOG_COOLDOWN_MS", 5000, 1000),
+  }),
+  timingDesyncMs: parseEnvInt("BOT_TIMING_DESYNC_MS", 900, 0),
   botSpawnRadius: 14,
   botSpawnMinDistance: 2,
   botSpawnMaxAttempts: 80,
@@ -126,7 +134,7 @@ const BOT_CONFIG = Object.freeze({
   // 1 = every bot every cycle, 2 = every second cycle, 3 = every third, etc.
   // Combat/traversal/transient bots still run every cycle.
   modeValidationIntervalMs: 2500,
-  idleEntryStride: 6,
+  idleEntryStride: 4,
   // Bot LOD simulation:
   // Near real players, bots tick every cycle for responsiveness.
   // Further away, bot behavior-tree work is downsampled.
@@ -136,9 +144,9 @@ const BOT_CONFIG = Object.freeze({
     nearDistanceTiles: 12,
     mediumDistanceTiles: 48,
     chunkSizeTiles: 32,
-    nearStride: 3,
-    mediumStride: 6,
-    farStride: 24,
+    nearStride: 1,
+    mediumStride: 3,
+    farStride: 12,
   }),
   wildernessDitchObjectId: ObjectIds.WILDERNESS_DITCH,
   manualControlPacketOpcodes: MANUAL_CONTROL_PACKET_OPCODES,

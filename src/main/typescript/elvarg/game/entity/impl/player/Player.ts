@@ -6,7 +6,6 @@ import { CombatSpecial } from "../../../content/combat/CombatSpecial";
 import { CombatType } from "../../../content/combat/CombatType";
 import { FightType } from "../../../content/combat/FightType";
 import { WeaponInterfaces } from "../../../content/combat/WeaponInterfaces";
-import { BountyHunter } from "../../../content/combat/bountyhunter/BountyHunter"
 import { PendingHit } from "../../../content/combat/hit/PendingHit";
 import { Autocasting } from "../../../content/combat/magic/Autocasting";
 import { Presetable } from "../../../content/presets/Presetable";
@@ -91,7 +90,6 @@ export class Player extends Mobile {
     * Fields
     */
     private vengeTimer: SecondsTimer = new SecondsTimer();
-    private targetSearchTimer = new SecondsTimer();
     public recentKills: string[] = []; // Contains ip addresses of recent kills
     private chatMessageQueue = new Array<ChatMessage>();
     public currentChatMessage: ChatMessage;
@@ -179,13 +177,10 @@ export class Player extends Mobile {
     private crystalBowShotsInStage = 0;
     private crystalBowTrackedStageItemId = -1;
     // Bounty hunter
-    public targetKills: number;
-    public normalKills: number;
     public totalKills: number;
     public killstreak: number;
     public highestKillstreak: number;
     public deaths: number;
-    private safeTimer = 180;
     public pcPoints: number;
     private preserveUnlocked: boolean;
     private rigourUnlocked: boolean;
@@ -354,8 +349,9 @@ export class Player extends Mobile {
         const baseSpeed =
             weapon && typeof weapon.getSpeed === "function" ? weapon.getSpeed() : 4;
         let speed = Math.max(baseSpeed, 1);
+        const fightType = FightType.resolve(this.getFightType());
 
-        if (this.getFightType().toString().toLowerCase().includes("rapid")) {
+        if (fightType?.isRapid()) {
             speed = Math.max(speed - 1, 1);
         }
 
@@ -424,11 +420,6 @@ export class Player extends Mobile {
             ((this.botAreaProcessTick = (this.botAreaProcessTick + 1) % 3) === 0);
         if (shouldProcessArea) {
             timed("area", () => AreaManager.process(this));
-        }
-
-        // Process Bounty Hunter
-        if (!isBot) {
-            timed("bounty_hunter", () => BountyHunter.process(this));
         }
 
         // Updates inventory if an update
@@ -644,7 +635,6 @@ export class Player extends Mobile {
             username: this.getUsername(),
         });
         this.getRelations().updateLists(false);
-        BountyHunter.unassign(this);
         TaskManager.cancelTasks(this);
         this.setHasVengeance(false);
         this.getVengeanceTimer().stop();
@@ -1234,30 +1224,6 @@ export class Player extends Mobile {
         this.amountDonated += amountDonated;
     }
 
-    public incrementTargetKills(): void {
-        this.targetKills++;
-    }
-
-    public getTargetKills(): number {
-        return this.targetKills;
-    }
-
-    public setTargetKills(targetKills: number): void {
-        this.targetKills = targetKills;
-    }
-
-    public incrementKills(): void {
-        this.normalKills++;
-    }
-
-    public getNormalKills(): number {
-        return this.normalKills;
-    }
-
-    public setNormalKills(normalKills: number): void {
-        this.normalKills = normalKills;
-    }
-
     public getTotalKills(): number {
         return this.totalKills;
     }
@@ -1280,10 +1246,6 @@ export class Player extends Mobile {
 
     public setDeaths(deaths: number): void {
         this.deaths = deaths;
-    }
-
-    public resetSafingTimer(): void {
-        this.setSafeTimer(180);
     }
 
     public getHighestKillstreak(): number {
@@ -1315,22 +1277,6 @@ export class Player extends Mobile {
 
     public getRecentKills(): string[] {
         return this.recentKills;
-    }
-
-    public getSafeTimer(): number {
-        return this.safeTimer;
-    }
-
-    public setSafeTimer(safeTimer: number) {
-        this.safeTimer = safeTimer;
-    }
-
-    public decrementAndGetSafeTimer(): number {
-        return this.safeTimer--;
-    }
-
-    public getTargetSearchTimer(): SecondsTimer {
-        return this.targetSearchTimer;
     }
 
     public getSpecialAttackRestore(): SecondsTimer {

@@ -38,9 +38,32 @@ function scorePvpCandidate(sourceEntry, candidateEntry) {
   return score;
 }
 
+function compareCandidateRank(a, b) {
+  if ((b?.score ?? Number.NEGATIVE_INFINITY) !== (a?.score ?? Number.NEGATIVE_INFINITY)) {
+    return (b?.score ?? Number.NEGATIVE_INFINITY) - (a?.score ?? Number.NEGATIVE_INFINITY);
+  }
+  return (a?.distance ?? Number.POSITIVE_INFINITY) - (b?.distance ?? Number.POSITIVE_INFINITY);
+}
+
+function insertTopCandidate(pool, candidate, maxSize) {
+  if (!Array.isArray(pool) || !candidate || maxSize <= 0) {
+    return;
+  }
+  let insertAt = pool.length;
+  while (insertAt > 0 && compareCandidateRank(candidate, pool[insertAt - 1]) < 0) {
+    insertAt -= 1;
+  }
+  pool.splice(insertAt, 0, candidate);
+  if (pool.length > maxSize) {
+    pool.length = maxSize;
+  }
+}
+
 function pickPvpOpponent({
   sourceEntry,
   entries,
+  candidateEntries,
+  pvpIndex,
   nowMs,
   pvpMaxDistanceTiles,
   isInCombat,
@@ -48,21 +71,23 @@ function pickPvpOpponent({
 }) {
   const sourcePlayer = sourceEntry?.player;
   const sourceState = sourceEntry?.state;
-  if (!sourcePlayer || !sourceState || !Array.isArray(entries)) {
+  const pool = Array.isArray(candidateEntries) ? candidateEntries : entries;
+  if (!sourcePlayer || !sourceState || !Array.isArray(pool)) {
     return null;
   }
 
   const sourceHotspotId = sourceState?.pvp?.hotspotId ?? null;
   const requireSameHotspot = false;
 
-  const candidates = [];
-  for (const other of entries) {
+  const topCandidates = [];
+  for (const other of pool) {
     if (
       typeof isPvpCandidate === "function" &&
       !isPvpCandidate({
         sourceEntry,
         candidateEntry: other,
         entries,
+        pvpIndex,
         nowMs,
         isInCombat,
       })
@@ -79,24 +104,21 @@ function pickPvpOpponent({
     if (distance > pvpMaxDistanceTiles) {
       continue;
     }
-    candidates.push({
-      entry: other,
-      distance,
-      score: scorePvpCandidate(sourceEntry, other),
-    });
+    insertTopCandidate(
+      topCandidates,
+      {
+        entry: other,
+        distance,
+        score: scorePvpCandidate(sourceEntry, other),
+      },
+      3
+    );
   }
 
-  if (candidates.length === 0) {
+  if (topCandidates.length === 0) {
     return null;
   }
-  candidates.sort((a, b) => {
-    if (b.score !== a.score) {
-      return b.score - a.score;
-    }
-    return a.distance - b.distance;
-  });
-  const topPool = candidates.slice(0, Math.min(3, candidates.length));
-  return topPool[randomInRange(0, topPool.length - 1)].entry;
+  return topCandidates[randomInRange(0, topCandidates.length - 1)].entry;
 }
 
 module.exports = {

@@ -11,6 +11,7 @@ const { Location } = require("../../../../src/main/typescript/elvarg/game/model/
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { GameConstants } = require("../../../../src/main/typescript/elvarg/game/GameConstants");
 const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
+const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const {
   queueRouteAndFlagAppearance,
   randomInRange,
@@ -71,6 +72,7 @@ const DITCH_NON_WILD_STRIP_MAX_X = 3392;
 const DITCH_NON_WILD_STRIP_MIN_Y = 3523;
 const DITCH_NON_WILD_STRIP_MAX_Y = 3524;
 const DITCH_WILDERNESS_RETURN_Y = 3525;
+const REAL_PLAYER_OPPONENT_VALIDATION_POOL_SIZE = 4;
 
 const PVP_PHASE = Object.freeze({
   IDLE: "idle",
@@ -94,6 +96,14 @@ const MANAGED_PVP_PRAYERS = Object.freeze([
   PrayerHandler.MYSTIC_LORE,
   PrayerHandler.MYSTIC_WILL,
 ]);
+
+function getSpatialBucketKey(x, y, z, chunkSize) {
+  return `${z}:${Math.floor(x / chunkSize)}:${Math.floor(y / chunkSize)}`;
+}
+
+function getTileOccupancyKey(location) {
+  return `${location.getZ?.()}:${location.getX?.()}:${location.getY?.()}`;
+}
 
 function hashUsername(value) {
   const text = typeof value === "string" ? value : "";
@@ -533,7 +543,10 @@ class PvpBehavior {
     return false;
   }
 
-  countActiveHotspotFights(entries, hotspotId) {
+  countActiveHotspotFights(entries, hotspotId, pvpIndex = null) {
+    if (pvpIndex?.activeHotspotCombatCounts instanceof Map) {
+      return Math.floor((pvpIndex.activeHotspotCombatCounts.get(hotspotId) ?? 0) / 2);
+    }
     if (!Array.isArray(entries) || !hotspotId) {
       return 0;
     }
@@ -585,14 +598,76 @@ class PvpBehavior {
     );
   }
 
-  canInitiatePlayerAttack(attacker, target) {
-    if (!attacker || !target) {
-      return false;
+  compareScoredCandidates(a, b) {
+    if ((a?.score ?? Number.NEGATIVE_INFINITY) !== (b?.score ?? Number.NEGATIVE_INFINITY)) {
+      return (b?.score ?? Number.NEGATIVE_INFINITY) - (a?.score ?? Number.NEGATIVE_INFINITY);
     }
-    const method = CombatFactory.getMethod(attacker);
-    return (
-      CombatFactory.canAttack(attacker, method, target) === CanAttackResponse.CAN_ATTACK
+    return (a?.distance ?? Number.POSITIVE_INFINITY) - (b?.distance ?? Number.POSITIVE_INFINITY);
+  }
+
+  insertTopScoredCandidate(pool, candidate, maxSize) {
+    if (!candidate || !Array.isArray(pool) || maxSize <= 0) {
+      return;
+    }
+    let insertAt = pool.length;
+    while (insertAt > 0 && this.compareScoredCandidates(candidate, pool[insertAt - 1]) < 0) {
+      insertAt -= 1;
+    }
+    pool.splice(insertAt, 0, candidate);
+    if (pool.length > maxSize) {
+      pool.length = maxSize;
+    }
+  }
+
+  trackActivePvpTarget(pvpIndex, player, targetUsername) {
+    if (
+      !(pvpIndex?.activePvpTargetCounts instanceof Map) ||
+      !(pvpIndex?.activePvpTargetByUsername instanceof Map) ||
+      !targetUsername
+    ) {
+      return;
+    }
+    const username = player?.getUsername?.() ?? null;
+    if (!username) {
+      return;
+    }
+    const previousTargetUsername = pvpIndex.activePvpTargetByUsername.get(username) ?? null;
+    if (previousTargetUsername === targetUsername) {
+      return;
+    }
+    if (previousTargetUsername) {
+      const previousCount = Number(
+        pvpIndex.activePvpTargetCounts.get(previousTargetUsername) ?? 0
+      );
+      if (previousCount <= 1) {
+        pvpIndex.activePvpTargetCounts.delete(previousTargetUsername);
+      } else {
+        pvpIndex.activePvpTargetCounts.set(previousTargetUsername, previousCount - 1);
+      }
+    }
+    pvpIndex.activePvpTargetByUsername.set(username, targetUsername);
+    pvpIndex.activePvpTargetCounts.set(
+      targetUsername,
+      Number(pvpIndex.activePvpTargetCounts.get(targetUsername) ?? 0) + 1
     );
+  }
+
+  trackHotspotCombatEntry(pvpIndex, hotspotId) {
+    if (!(pvpIndex?.activeHotspotCombatCounts instanceof Map) || !hotspotId) {
+      return;
+    }
+    pvpIndex.activeHotspotCombatCounts.set(
+      hotspotId,
+      Number(pvpIndex.activeHotspotCombatCounts.get(hotspotId) ?? 0) + 1
+    );
+  }
+
+  trackPvpIndexEngagement(pvpIndex, player, state, targetUsername) {
+    if (!pvpIndex || !player || !state || !targetUsername) {
+      return;
+    }
+    this.trackActivePvpTarget(pvpIndex, player, targetUsername);
+    this.trackHotspotCombatEntry(pvpIndex, state?.pvp?.hotspotId ?? null);
   }
 
   tryStartRealPlayerEngagement({
@@ -600,6 +675,7 @@ class PvpBehavior {
     sourceState,
     sourceAutonomy,
     targetPlayer,
+    pvpIndex,
     nowMs,
     durationMs,
     postPvpCooldownMinMs,
@@ -640,6 +716,12 @@ class PvpBehavior {
 
     sourcePlayer.getMovementQueue?.().reset?.();
     sourcePlayer.getCombat?.()?.attack?.(targetPlayer);
+    this.trackPvpIndexEngagement(
+      pvpIndex,
+      sourcePlayer,
+      sourceState,
+      targetPlayer.getUsername?.() ?? null
+    );
     this.api?.log?.("bot_pvp_started_real_player", {
       bot: sourcePlayer.getUsername?.(),
       target: targetPlayer.getUsername?.(),
@@ -653,6 +735,7 @@ class PvpBehavior {
   tryStartMode({
     entry,
     entries,
+    sharedCycleState,
     nowMs,
     pvpMinMs = PVP_DURATION_DEFAULT_MIN_MS,
     pvpMaxMs = PVP_DURATION_DEFAULT_MAX_MS,
@@ -691,11 +774,16 @@ class PvpBehavior {
         ? isInCombat
         : (candidate) => this.isInCombat(candidate);
 
-    const realPlayerOpponent = this.resolvePreferredRealPlayerOpponent({
-      sourceEntry: entry,
-      pvpMaxDistanceTiles,
-      isInCombat: isInCombatCheck,
-    });
+    const realPlayerOpponent = ServerPerf.measurePhase(
+      "bot.pvp.try_start.real_player_scan",
+      () =>
+        this.resolvePreferredRealPlayerOpponent({
+          sourceEntry: entry,
+          pvpMaxDistanceTiles,
+          isInCombat: isInCombatCheck,
+          pvpIndex: sharedCycleState?.pvpIndex ?? null,
+        })
+    );
     if (
       realPlayerOpponent &&
       this.shouldPrioritizeRealPlayerAggro(sourcePlayer, realPlayerOpponent)
@@ -706,6 +794,7 @@ class PvpBehavior {
         sourceState,
         sourceAutonomy,
         targetPlayer: realPlayerOpponent,
+        pvpIndex: sharedCycleState?.pvpIndex ?? null,
         nowMs,
         durationMs,
         postPvpCooldownMinMs,
@@ -715,7 +804,11 @@ class PvpBehavior {
       }
     }
 
-    if (!this.resolveHotspotEngagementDecision(sourcePlayer, sourceState, nowMs)) {
+    if (
+      !ServerPerf.measurePhase("bot.pvp.try_start.hotspot_decision", () =>
+        this.resolveHotspotEngagementDecision(sourcePlayer, sourceState, nowMs)
+      )
+    ) {
       return false;
     }
 
@@ -723,7 +816,11 @@ class PvpBehavior {
     const sourceHotspot = sourceHotspotId ? getWildernessHotspot(sourceHotspotId) : null;
     const maxSimultaneousFights = Number(sourceHotspot?.maxSimultaneousFights ?? 0);
     if (maxSimultaneousFights > 0) {
-      const activeFights = this.countActiveHotspotFights(entries, sourceHotspotId);
+      const activeFights = this.countActiveHotspotFights(
+        entries,
+        sourceHotspotId,
+        sharedCycleState?.pvpIndex ?? null
+      );
       if (activeFights >= maxSimultaneousFights) {
         const lingerBase = Math.max(5000, Number(sourceHotspot?.lingerMs ?? 9000));
         const nextDecisionAt =
@@ -753,6 +850,7 @@ class PvpBehavior {
         sourceState,
         sourceAutonomy,
         targetPlayer: realPlayerOpponent,
+        pvpIndex: sharedCycleState?.pvpIndex ?? null,
         nowMs,
         durationMs,
         postPvpCooldownMinMs,
@@ -762,14 +860,24 @@ class PvpBehavior {
       }
     }
 
-    const opponentEntry = pickPvpOpponent({
-      sourceEntry: entry,
-      entries,
-      nowMs,
-      pvpMaxDistanceTiles,
-      isInCombat: isInCombatCheck,
-      isPvpCandidate: (options) => this.isPvpCandidate(options),
-    });
+    const opponentEntry = ServerPerf.measurePhase(
+      "bot.pvp.try_start.bot_opponent_selection",
+      () =>
+        pickPvpOpponent({
+          sourceEntry: entry,
+          entries,
+          candidateEntries: this.getNearbyIndexedBotEntries(
+            sharedCycleState?.pvpIndex ?? null,
+            sourcePlayer,
+            pvpMaxDistanceTiles
+          ),
+          pvpIndex: sharedCycleState?.pvpIndex ?? null,
+          nowMs,
+          pvpMaxDistanceTiles,
+          isInCombat: isInCombatCheck,
+          isPvpCandidate: (options) => this.isPvpCandidate(options),
+        })
+    );
     if (!opponentEntry) {
       return false;
     }
@@ -821,6 +929,18 @@ class PvpBehavior {
       scheduleCombatAction(opponentState, nowMs);
       scheduleReviewTimers(opponentState, nowMs);
     }
+    this.trackPvpIndexEngagement(
+      sharedCycleState?.pvpIndex ?? null,
+      sourcePlayer,
+      sourceState,
+      opponentPlayer.getUsername?.() ?? null
+    );
+    this.trackPvpIndexEngagement(
+      sharedCycleState?.pvpIndex ?? null,
+      opponentPlayer,
+      opponentState,
+      sourcePlayer.getUsername?.() ?? null
+    );
 
     applyGeneratedPvpLoadout(sourcePlayer, sourceState, {
       api: this.api,
@@ -911,7 +1031,84 @@ class PvpBehavior {
     return true;
   }
 
-  isTargetedByActivePvp(targetUsername, entries, ignoreUsername = null) {
+  getNearbyIndexedValues(bucketMap, sourcePlayer, maxDistanceTiles, chunkSizeTiles) {
+    if (
+      !(bucketMap instanceof Map) ||
+      !sourcePlayer ||
+      !Number.isFinite(maxDistanceTiles) ||
+      maxDistanceTiles < 0 ||
+      !Number.isFinite(chunkSizeTiles) ||
+      chunkSizeTiles <= 0
+    ) {
+      return null;
+    }
+    const location = sourcePlayer.getLocation?.();
+    const x = location?.getX?.();
+    const y = location?.getY?.();
+    const z = location?.getZ?.();
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      return null;
+    }
+
+    const radius = Math.max(1, Math.ceil(maxDistanceTiles / chunkSizeTiles));
+    const originChunkX = Math.floor(x / chunkSizeTiles);
+    const originChunkY = Math.floor(y / chunkSizeTiles);
+    const values = [];
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        const key = getSpatialBucketKey(
+          (originChunkX + dx) * chunkSizeTiles,
+          (originChunkY + dy) * chunkSizeTiles,
+          z,
+          chunkSizeTiles
+        );
+        const bucket = bucketMap.get(key);
+        if (!bucket?.length) {
+          continue;
+        }
+        values.push(...bucket);
+      }
+    }
+    return values;
+  }
+
+  getNearbyIndexedBotEntries(pvpIndex, sourcePlayer, maxDistanceTiles) {
+    return this.getNearbyIndexedValues(
+      pvpIndex?.botBuckets ?? null,
+      sourcePlayer,
+      maxDistanceTiles,
+      Number(pvpIndex?.chunkSizeTiles ?? 0)
+    );
+  }
+
+  getNearbyIndexedRealPlayers(pvpIndex, sourcePlayer, maxDistanceTiles) {
+    return this.getNearbyIndexedValues(
+      pvpIndex?.realPlayerBuckets ?? null,
+      sourcePlayer,
+      maxDistanceTiles,
+      Number(pvpIndex?.chunkSizeTiles ?? 0)
+    );
+  }
+
+  getIndexedPlayerTileOccupancyCount(pvpIndex, privateArea, location) {
+    if (!(pvpIndex?.playerTileOccupancyByArea instanceof Map) || !location) {
+      return null;
+    }
+    const areaMap = pvpIndex.playerTileOccupancyByArea.get(privateArea ?? null);
+    if (!(areaMap instanceof Map)) {
+      return 0;
+    }
+    return Number(areaMap.get(getTileOccupancyKey(location)) ?? 0);
+  }
+
+  isTargetedByActivePvp(targetUsername, entries, ignoreUsername = null, pvpIndex = null) {
+    if (targetUsername && pvpIndex?.activePvpTargetCounts instanceof Map) {
+      const activeCount = Number(pvpIndex.activePvpTargetCounts.get(targetUsername) ?? 0);
+      const ignoredTargetUsername = ignoreUsername
+        ? pvpIndex?.activePvpTargetByUsername?.get(ignoreUsername) ?? null
+        : null;
+      return activeCount - (ignoredTargetUsername === targetUsername ? 1 : 0) > 0;
+    }
     if (!targetUsername || !Array.isArray(entries)) {
       return false;
     }
@@ -931,7 +1128,7 @@ class PvpBehavior {
     return false;
   }
 
-  isPvpCandidate({ sourceEntry, candidateEntry, entries, nowMs, isInCombat }) {
+  isPvpCandidate({ sourceEntry, candidateEntry, entries, pvpIndex, nowMs, isInCombat }) {
     if (!sourceEntry || !candidateEntry || sourceEntry === candidateEntry) {
       return false;
     }
@@ -988,14 +1185,19 @@ class PvpBehavior {
     const candidateUsername = candidatePlayer.getUsername?.();
     if (
       !isMultiEngagement &&
-      this.isTargetedByActivePvp(candidateUsername, entries, sourceUsername)
+      this.isTargetedByActivePvp(candidateUsername, entries, sourceUsername, pvpIndex)
     ) {
       return false;
     }
     return true;
   }
 
-  resolvePreferredRealPlayerOpponent({ sourceEntry, pvpMaxDistanceTiles, isInCombat }) {
+  resolvePreferredRealPlayerOpponent({
+    sourceEntry,
+    pvpMaxDistanceTiles,
+    isInCombat,
+    pvpIndex = null,
+  }) {
     const sourcePlayer = sourceEntry?.player;
     const sourceState = sourceEntry?.state;
     if (!sourcePlayer || !sourceState) {
@@ -1003,10 +1205,18 @@ class PvpBehavior {
     }
 
     const sourceProfile = this.getProfile(sourceState);
-    let bestPlayer = null;
-    let bestScore = Number.NEGATIVE_INFINITY;
+    const sourceMethod = CombatFactory.getMethod(sourcePlayer);
+    const topCandidates = [];
+    const indexedCandidates = this.getNearbyIndexedRealPlayers(
+      pvpIndex,
+      sourcePlayer,
+      pvpMaxDistanceTiles
+    );
+    const realPlayerCandidates = Array.isArray(indexedCandidates)
+      ? indexedCandidates
+      : World.getPlayers();
 
-    World.getPlayers().forEach((candidatePlayer) => {
+    realPlayerCandidates.forEach((candidatePlayer) => {
       if (!candidatePlayer || candidatePlayer === sourcePlayer) {
         return;
       }
@@ -1038,10 +1248,6 @@ class PvpBehavior {
       if (distance > pvpMaxDistanceTiles) {
         return;
       }
-      if (!this.canInitiatePlayerAttack(sourcePlayer, candidatePlayer)) {
-        return;
-      }
-
       const isMultiEngagement =
         AreaManager.inMulti(sourcePlayer) && AreaManager.inMulti(candidatePlayer);
       if (!isMultiEngagement && typeof isInCombat === "function" && isInCombat(candidatePlayer)) {
@@ -1062,13 +1268,27 @@ class PvpBehavior {
         score += 20;
       }
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestPlayer = candidatePlayer;
-      }
+      this.insertTopScoredCandidate(
+        topCandidates,
+        {
+          player: candidatePlayer,
+          score,
+          distance,
+        },
+        REAL_PLAYER_OPPONENT_VALIDATION_POOL_SIZE
+      );
     });
 
-    return bestPlayer;
+    for (const candidate of topCandidates) {
+      if (
+        CombatFactory.canAttack(sourcePlayer, sourceMethod, candidate.player) ===
+        CanAttackResponse.CAN_ATTACK
+      ) {
+        return candidate.player;
+      }
+    }
+
+    return null;
   }
 
   resolveTargetPlayer(state) {
@@ -1137,6 +1357,7 @@ class PvpBehavior {
     const pvp = state?.pvp;
     const playerLoc = player?.getLocation?.();
     const targetLoc = target?.getLocation?.();
+    const pvpIndex = pvp?.currentCyclePvpIndex ?? null;
     if (!pvp || !playerLoc || !targetLoc || !playerLoc.equals(targetLoc)) {
       return false;
     }
@@ -1168,7 +1389,10 @@ class PvpBehavior {
 
     let bestTile = null;
     let bestDistance = Number.POSITIVE_INFINITY;
-    const localPlayers = player.getLocalPlayers?.() ?? [];
+    const localPlayers =
+      pvpIndex?.playerTileOccupancyByArea instanceof Map
+        ? null
+        : player.getLocalPlayers?.() ?? [];
     for (const tile of candidates) {
       if (RegionManager.blocked(tile, privateArea)) {
         continue;
@@ -1177,28 +1401,31 @@ class PvpBehavior {
         continue;
       }
 
-      let occupied = false;
-      for (const candidate of localPlayers) {
-        if (!candidate || candidate === player || candidate === target) {
-          continue;
-        }
-        if (!candidate.isRegistered?.()) {
-          continue;
-        }
-        if (candidate.getPrivateArea?.() !== privateArea) {
-          continue;
-        }
-        const loc = candidate.getLocation?.();
-        if (!loc) {
-          continue;
-        }
-        if (
-          loc.getX() === tile.getX() &&
-          loc.getY() === tile.getY() &&
-          loc.getZ() === tile.getZ()
-        ) {
-          occupied = true;
-          break;
+      let occupied =
+        (this.getIndexedPlayerTileOccupancyCount(pvpIndex, privateArea, tile) ?? 0) > 0;
+      if (!occupied && Array.isArray(localPlayers)) {
+        for (const candidate of localPlayers) {
+          if (!candidate || candidate === player || candidate === target) {
+            continue;
+          }
+          if (!candidate.isRegistered?.()) {
+            continue;
+          }
+          if (candidate.getPrivateArea?.() !== privateArea) {
+            continue;
+          }
+          const loc = candidate.getLocation?.();
+          if (!loc) {
+            continue;
+          }
+          if (
+            loc.getX() === tile.getX() &&
+            loc.getY() === tile.getY() &&
+            loc.getZ() === tile.getZ()
+          ) {
+            occupied = true;
+            break;
+          }
         }
       }
       if (occupied) {
@@ -1229,73 +1456,87 @@ class PvpBehavior {
   }
 
   tick(context) {
-    const resolved = resolveBotNodeContext(context, this.botStatesByName, {
-      requiredMode: this.behaviorMode.PVP,
-      requireNotInCombat: false,
-      requireNotBusy: false,
-    });
+    const resolved = ServerPerf.measurePhase("bot.pvp.tick.resolve_context", () =>
+      resolveBotNodeContext(context, this.botStatesByName, {
+        requiredMode: this.behaviorMode.PVP,
+        requireNotInCombat: false,
+        requireNotBusy: false,
+      })
+    );
     if (!resolved) {
       return "failure";
     }
 
     const { player, state, nowMs } = resolved;
 
-    const replenish = this.replenishAfterKillNode.tick({
-      player,
-      state,
-      nowMs,
-    });
+    const replenish = ServerPerf.measurePhase("bot.pvp.tick.replenish", () =>
+      this.replenishAfterKillNode.tick({
+        player,
+        state,
+        nowMs,
+      })
+    );
     if (replenish?.handled) {
       return replenish.status ?? "failure";
     }
 
-    const jump = this.jumpKilledTargetNode.tick({
-      player,
-      state,
-      nowMs,
-      pvpMinMs: PVP_DURATION_DEFAULT_MIN_MS,
-      pvpMaxMs: PVP_DURATION_DEFAULT_MAX_MS,
-    });
+    const jump = ServerPerf.measurePhase("bot.pvp.tick.jump", () =>
+      this.jumpKilledTargetNode.tick({
+        player,
+        state,
+        nowMs,
+        pvpMinMs: PVP_DURATION_DEFAULT_MIN_MS,
+        pvpMaxMs: PVP_DURATION_DEFAULT_MAX_MS,
+      })
+    );
     if (jump?.handled) {
       return jump.status ?? "failure";
     }
 
-    const validation = this.validateEngagementNode.tick({
-      player,
-      state,
-      nowMs,
-    });
+    const validation = ServerPerf.measurePhase("bot.pvp.tick.validate", () =>
+      this.validateEngagementNode.tick({
+        player,
+        state,
+        nowMs,
+      })
+    );
     if (validation?.handled) {
       return validation.status ?? "failure";
     }
 
     const target = validation?.target ?? null;
-    const defensive = this.defensiveActionNode.tick({
-      player,
-      state,
-      nowMs,
-      target,
-    });
+    const defensive = ServerPerf.measurePhase("bot.pvp.tick.defensive", () =>
+      this.defensiveActionNode.tick({
+        player,
+        state,
+        nowMs,
+        target,
+      })
+    );
     if (defensive?.handled) {
       return defensive.status ?? "failure";
     }
 
-    const freeze = this.freezeAndKiteNode.tick({
-      player,
-      state,
-      nowMs,
-      target,
-    });
+    const freeze = ServerPerf.measurePhase("bot.pvp.tick.freeze", () =>
+      this.freezeAndKiteNode.tick({
+        player,
+        state,
+        nowMs,
+        target,
+      })
+    );
     if (freeze?.handled) {
       return freeze.status ?? "failure";
     }
 
-    return this.combatExecutionNode.tick({
-      player,
-      state,
-      nowMs,
-      target,
-    });
+    return ServerPerf.measurePhase("bot.pvp.tick.combat_execution", () =>
+      this.combatExecutionNode.tick({
+        player,
+        state,
+        nowMs,
+        target,
+      })
+    );
   }
 
   isValidTarget(player, target) {

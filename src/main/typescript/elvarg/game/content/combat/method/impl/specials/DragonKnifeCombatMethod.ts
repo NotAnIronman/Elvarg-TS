@@ -7,14 +7,13 @@ import { RangedData } from "../../../ranged/RangedData";
 import { Projectile } from "../../../../../model/Projectile";
 import { ItemIdentifiers } from "../../../../../../util/ItemIdentifiers";
 import { Equipment } from "../../../../../model/container/impl/Equipment";
-import { Item } from "../../../../../model/Item";
-import { WeaponInterfaces } from "../../../WeaponInterfaces";
-import { Flag } from "../../../../../model/Flag";
 import { Sound } from "../../../../../Sound";
 import { Sounds } from "../../../../../Sounds";
+import { CombatFactory } from "../../../CombatFactory";
 
 export class DragonKnifeCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(8292);
+    private static readonly SPECIAL_AMMO_COST = 2;
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
         const distance = character.getLocation().getDistance(target.getLocation());
@@ -29,11 +28,15 @@ export class DragonKnifeCombatMethod extends RangedCombatMethod {
         if (!character.isPlayer()) {
             return false;
         }
-        const weaponId = character.getAsPlayer().getEquipment().get(Equipment.WEAPON_SLOT).getId();
-        return weaponId === ItemIdentifiers.DRAGON_KNIFE
+        const player = character.getAsPlayer();
+        const weaponId = player.getEquipment().get(Equipment.WEAPON_SLOT).getId();
+        if (!(weaponId === ItemIdentifiers.DRAGON_KNIFE
             || weaponId === ItemIdentifiers.DRAGON_KNIFE_P_
             || weaponId === ItemIdentifiers.DRAGON_KNIFE_P_PLUS_
-            || weaponId === ItemIdentifiers.DRAGON_KNIFE_P_PLUS_PLUS_;
+            || weaponId === ItemIdentifiers.DRAGON_KNIFE_P_PLUS_PLUS_)) {
+            return false;
+        }
+        return CombatFactory.checkAmmo(player, DragonKnifeCombatMethod.SPECIAL_AMMO_COST);
     }
 
     start(character: Mobile, target: Mobile): void {
@@ -42,20 +45,7 @@ export class DragonKnifeCombatMethod extends RangedCombatMethod {
         player.performAnimation(DragonKnifeCombatMethod.ANIMATION);
         Sounds.sendSound(character, Sound.THROW_DART);
         Projectile.createProjectile(character, target, 1629, 30, 60, 40, 36).sendProjectile();
-        DragonKnifeCombatMethod.decrementThrownWeapon(player, 1);
-    }
-
-    private static decrementThrownWeapon(player: any, amount: number): void {
-        const item = player.getEquipment().get(Equipment.WEAPON_SLOT);
-        item.decrementAmountBy(amount);
-
-        if (item.getAmount() <= 0) {
-            player.getPacketSender().sendMessage("You have run out of ammunition!");
-            player.getEquipment().set(Equipment.WEAPON_SLOT, new Item(-1));
-            WeaponInterfaces.assign(player);
-            player.getUpdateFlag().flag(Flag.APPEARANCE);
-        }
-
-        player.getEquipment().refreshItems();
+        Projectile.createProjectile(character, target, 1629, 26, 64, 43, 36).sendProjectile();
+        CombatFactory.decrementAmmo(player, target.getLocation(), DragonKnifeCombatMethod.SPECIAL_AMMO_COST);
     }
 }

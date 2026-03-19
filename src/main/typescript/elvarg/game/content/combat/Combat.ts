@@ -38,6 +38,7 @@ export class Combat {
     private cachedCanReachCycle = -1;
     private cachedCanReachMethod: CombatMethod | null = null;
     private cachedCanReachTarget: Mobile | null = null;
+    private cachedCanReachSkipTargetValidation = false;
     private cachedCanReachAttackerX = -1;
     private cachedCanReachAttackerY = -1;
     private cachedCanReachAttackerZ = -1;
@@ -46,6 +47,20 @@ export class Combat {
     private cachedCanReachTargetZ = -1;
     private cachedCanReachAttackerMoving = false;
     private cachedCanReachTargetMoving = false;
+    private cachedValidTargetResult = false;
+    private cachedValidTargetCycle = -1;
+    private cachedValidTargetTarget: Mobile | null = null;
+    private cachedValidTargetAttackerX = -1;
+    private cachedValidTargetAttackerY = -1;
+    private cachedValidTargetAttackerZ = -1;
+    private cachedValidTargetTargetX = -1;
+    private cachedValidTargetTargetY = -1;
+    private cachedValidTargetTargetZ = -1;
+    private cachedValidTargetAttackerHp = -1;
+    private cachedValidTargetTargetHp = -1;
+    private cachedValidTargetAttackerRegistered = false;
+    private cachedValidTargetTargetRegistered = false;
+    private cachedValidTargetAttackerUntargetable = false;
     private castSpell: CombatSpell;
     private autoCastSpell: CombatSpell;
     private previousCast: CombatSpell;
@@ -63,6 +78,12 @@ export class Combat {
         this.cachedCanReachCycle = -1;
         this.cachedCanReachMethod = null;
         this.cachedCanReachTarget = null;
+        this.cachedCanReachSkipTargetValidation = false;
+    }
+
+    private invalidateValidTargetCache() {
+        this.cachedValidTargetCycle = -1;
+        this.cachedValidTargetTarget = null;
     }
 
     public resolveMethodForCurrentCycle(): CombatMethod {
@@ -76,7 +97,53 @@ export class Combat {
         return resolved;
     }
 
-    public resolveCanReachForCurrentCycle(method: CombatMethod, target: Mobile): boolean {
+    public resolveValidTargetForCurrentCycle(target: Mobile): boolean {
+        const cycle = World.getProcessCycle();
+        const attackerLocation = this.character.getLocation();
+        const targetLocation = target?.getLocation();
+        const attackerHitpoints = this.character.getHitpoints();
+        const targetHitpoints = target?.getHitpoints?.() ?? -1;
+        const attackerRegistered = this.character.isRegistered();
+        const targetRegistered = target?.isRegistered?.() ?? false;
+        const attackerUntargetable = this.character.isUntargetable();
+
+        if (
+            this.cachedValidTargetCycle === cycle &&
+            this.cachedValidTargetTarget === target &&
+            this.cachedValidTargetAttackerX === (attackerLocation?.getX() ?? -1) &&
+            this.cachedValidTargetAttackerY === (attackerLocation?.getY() ?? -1) &&
+            this.cachedValidTargetAttackerZ === (attackerLocation?.getZ() ?? -1) &&
+            this.cachedValidTargetTargetX === (targetLocation?.getX() ?? -1) &&
+            this.cachedValidTargetTargetY === (targetLocation?.getY() ?? -1) &&
+            this.cachedValidTargetTargetZ === (targetLocation?.getZ() ?? -1) &&
+            this.cachedValidTargetAttackerHp === attackerHitpoints &&
+            this.cachedValidTargetTargetHp === targetHitpoints &&
+            this.cachedValidTargetAttackerRegistered === attackerRegistered &&
+            this.cachedValidTargetTargetRegistered === targetRegistered &&
+            this.cachedValidTargetAttackerUntargetable === attackerUntargetable
+        ) {
+            return this.cachedValidTargetResult;
+        }
+
+        const result = CombatFactory.validTarget(this.character, target);
+        this.cachedValidTargetCycle = cycle;
+        this.cachedValidTargetTarget = target;
+        this.cachedValidTargetAttackerX = attackerLocation?.getX() ?? -1;
+        this.cachedValidTargetAttackerY = attackerLocation?.getY() ?? -1;
+        this.cachedValidTargetAttackerZ = attackerLocation?.getZ() ?? -1;
+        this.cachedValidTargetTargetX = targetLocation?.getX() ?? -1;
+        this.cachedValidTargetTargetY = targetLocation?.getY() ?? -1;
+        this.cachedValidTargetTargetZ = targetLocation?.getZ() ?? -1;
+        this.cachedValidTargetAttackerHp = attackerHitpoints;
+        this.cachedValidTargetTargetHp = targetHitpoints;
+        this.cachedValidTargetAttackerRegistered = attackerRegistered;
+        this.cachedValidTargetTargetRegistered = targetRegistered;
+        this.cachedValidTargetAttackerUntargetable = attackerUntargetable;
+        this.cachedValidTargetResult = result;
+        return result;
+    }
+
+    public resolveCanReachForCurrentCycle(method: CombatMethod, target: Mobile, skipTargetValidation: boolean = false): boolean {
         const cycle = World.getProcessCycle();
         const attackerLocation = this.character.getLocation();
         const targetLocation = target?.getLocation();
@@ -87,6 +154,7 @@ export class Combat {
             this.cachedCanReachCycle === cycle &&
             this.cachedCanReachMethod === method &&
             this.cachedCanReachTarget === target &&
+            this.cachedCanReachSkipTargetValidation === skipTargetValidation &&
             this.cachedCanReachAttackerX === (attackerLocation?.getX() ?? -1) &&
             this.cachedCanReachAttackerY === (attackerLocation?.getY() ?? -1) &&
             this.cachedCanReachAttackerZ === (attackerLocation?.getZ() ?? -1) &&
@@ -99,10 +167,11 @@ export class Combat {
             return this.cachedCanReachResult;
         }
 
-        const result = CombatFactory.canReach(this.character, method, target);
+        const result = CombatFactory.canReach(this.character, method, target, skipTargetValidation);
         this.cachedCanReachCycle = cycle;
         this.cachedCanReachMethod = method;
         this.cachedCanReachTarget = target;
+        this.cachedCanReachSkipTargetValidation = skipTargetValidation;
         this.cachedCanReachAttackerX = attackerLocation?.getX() ?? -1;
         this.cachedCanReachAttackerY = attackerLocation?.getY() ?? -1;
         this.cachedCanReachAttackerZ = attackerLocation?.getZ() ?? -1;
@@ -212,20 +281,20 @@ export class Combat {
 
         const target = this.target;
         if (!ServerPerf.measurePhase(
+            "combat.process.can_attack.valid_target",
+            () => this.resolveValidTargetForCurrentCycle(target)
+        )) {
+            return false;
+        }
+
+        if (!ServerPerf.measurePhase(
             "combat.process.can_reach",
-            () => this.resolveCanReachForCurrentCycle(this.method, target)
+            () => this.resolveCanReachForCurrentCycle(this.method, target, true)
         )) {
             // Make sure the character is within reach before processing combat
             return false;
         }
         if (this.target !== target || target == null) {
-            return false;
-        }
-
-        if (!ServerPerf.measurePhase(
-            "combat.process.can_attack.valid_target",
-            () => CombatFactory.validTarget(this.character, target)
-        )) {
             return false;
         }
 
@@ -360,6 +429,7 @@ export class Combat {
         this.setGraniteMaulSpecialQueued(false);
         this.invalidateResolvedMethodCache();
         this.invalidateCanReachCache();
+        this.invalidateValidTargetCache();
     }
 
     public isGraniteMaulSpecialQueued(): boolean {

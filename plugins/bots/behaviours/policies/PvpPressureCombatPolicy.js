@@ -1,65 +1,31 @@
 "use strict";
 
-const { CombatFactory } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatType } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const { CombatSpells } = require("../../../../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells");
 const { MagicSpellbook } = require("../../../../src/main/typescript/elvarg/game/model/MagicSpellbook");
 const { PrayerHandler } = require("../../../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
-const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { EquipPacketListener } = require("../../../../src/main/typescript/elvarg/net/packet/impl/EquipPacketListener");
 const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
-const { WeaponInterfaces } = require("../../../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
-const { ItemIdentifiers } = require("../../../../src/main/typescript/elvarg/util/ItemIdentifiers");
-
+const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const { Inventory } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Inventory");
+const {
+  BOW_INTERFACES,
+  CROSSBOW_INTERFACES,
+  getAmmoId,
+  getPvpCombatSnapshot,
+  getWeaponId,
+  invalidatePvpCombatSnapshot,
+  isRangedInterface,
+  resolveInventorySlotByItemId,
+  isStaffInterface,
+  resolveCurrentCombatType,
+} = require("./PvpCombatRuntimeCache");
 
 const PRESSURE_WINDOW_TICKS = 1;
 const MELEE_DISTANCE_TILES = 1;
-const SPEC_WEAPON_IDS = new Set([
-  ItemIdentifiers.ANCIENT_GODSWORD,
-  ItemIdentifiers.DARK_BOW,
-  ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
-  ItemIdentifiers.GRANITE_MAUL,
-  ItemIdentifiers.MAGIC_SHORTBOW,
-  ItemIdentifiers.MAGIC_SHORTBOW_I_,
-  ItemIdentifiers.MAGIC_SHORTBOW_3,
-]);
-const STAFF_INTERFACES = new Set([
-  WeaponInterfaces.STAFF,
-  WeaponInterfaces.ANCIENT_STAFF,
-]);
-const RANGED_INTERFACES = new Set([
-  WeaponInterfaces.SHORTBOW,
-  WeaponInterfaces.LONGBOW,
-  WeaponInterfaces.DARK_BOW,
-  WeaponInterfaces.CROSSBOW,
-  WeaponInterfaces.KARILS_CROSSBOW,
-  WeaponInterfaces.KNIFE,
-  WeaponInterfaces.OBBY_RINGS,
-  WeaponInterfaces.THROWNAXE,
-  WeaponInterfaces.DART,
-  WeaponInterfaces.JAVELIN,
-]);
-const BOW_INTERFACES = new Set([
-  WeaponInterfaces.SHORTBOW,
-  WeaponInterfaces.LONGBOW,
-  WeaponInterfaces.DARK_BOW,
-]);
-const CROSSBOW_INTERFACES = new Set([
-  WeaponInterfaces.CROSSBOW,
-  WeaponInterfaces.KARILS_CROSSBOW,
-]);
-const ARROW_IDS = new Set([
-  ItemIdentifiers.ADAMANT_ARROW,
-  ItemIdentifiers.BROAD_ARROW,
-  ItemIdentifiers.DRAGON_ARROW,
-  ItemIdentifiers.RUNE_ARROW,
-]);
-const BOLT_IDS = new Set([
-  ItemIdentifiers.DRAGON_BOLTS,
-  ItemIdentifiers.DRAGON_BOLTS_E_,
-]);
+const PRESSURE_RETRY_COOLDOWN_MS = 450;
+const PRESSURE_FAILURE_COOLDOWN_MS = 300;
 const FREEZE_SPELLS = Object.freeze({
   veteran: CombatSpells.SNARE,
   elite: CombatSpells.ENTANGLE,
@@ -67,14 +33,6 @@ const FREEZE_SPELLS = Object.freeze({
 
 function isVeteranOrEliteProfile(profile) {
   return profile?.id === "veteran" || profile?.id === "elite";
-}
-
-function getWeaponId(player) {
-  return player?.getEquipment?.()?.get?.(Equipment.WEAPON_SLOT)?.getId?.() ?? -1;
-}
-
-function getAmmoId(player) {
-  return player?.getEquipment?.()?.get?.(Equipment.AMMUNITION_SLOT)?.getId?.() ?? -1;
 }
 
 function getDistance(player, target) {
@@ -106,140 +64,12 @@ function isAttackWindowOpen(player) {
   );
 }
 
-function isStaffInterface(weaponInterface) {
-  return STAFF_INTERFACES.has(weaponInterface);
-}
-
-function isRangedInterface(weaponInterface) {
-  return RANGED_INTERFACES.has(weaponInterface);
-}
-
-function classifyWeaponInterface(weaponInterface) {
-  if (!weaponInterface) {
-    return null;
-  }
-  if (isStaffInterface(weaponInterface)) {
-    return CombatType.MAGIC;
-  }
-  if (isRangedInterface(weaponInterface)) {
-    return CombatType.RANGED;
-  }
-  if (weaponInterface === WeaponInterfaces.UNARMED) {
-    return null;
-  }
-  return CombatType.MELEE;
-}
-
-function findInventoryItem(player, predicate) {
-  const items = player?.getInventory?.()?.getItems?.() ?? [];
-  for (const item of items) {
-    const itemId = item?.getId?.() ?? -1;
-    if (itemId <= 0 || predicate(item, itemId) !== true) {
-      continue;
-    }
-    const slot = player?.getInventory?.()?.getSlotForItemId?.(itemId) ?? -1;
-    if (slot >= 0) {
-      return { item, itemId, slot };
-    }
-  }
-  return null;
-}
-
 function equipInventoryItem(player, slot, itemId) {
   if (!player || slot < 0 || itemId <= 0) {
     return false;
   }
   EquipPacketListener.equip(player, itemId, slot, Inventory.INTERFACE_ID);
   return true;
-}
-
-function resolveAmmoCandidate(player, weaponInterface) {
-  const equippedAmmoId = getAmmoId(player);
-  if (equippedAmmoId > 0) {
-    if (BOW_INTERFACES.has(weaponInterface) && ARROW_IDS.has(equippedAmmoId)) {
-      return { ammoId: equippedAmmoId, slot: -1 };
-    }
-    if (CROSSBOW_INTERFACES.has(weaponInterface) && BOLT_IDS.has(equippedAmmoId)) {
-      return { ammoId: equippedAmmoId, slot: -1 };
-    }
-  }
-  if (!BOW_INTERFACES.has(weaponInterface) && !CROSSBOW_INTERFACES.has(weaponInterface)) {
-    return null;
-  }
-  return findInventoryItem(player, (_item, itemId) =>
-    BOW_INTERFACES.has(weaponInterface) ? ARROW_IDS.has(itemId) : BOLT_IDS.has(itemId)
-  );
-}
-
-function resolveCurrentCandidate(player) {
-  const weapon = player?.getWeapon?.();
-  const weaponId = getWeaponId(player);
-  const combatType = classifyWeaponInterface(weapon);
-  if (!weapon || weaponId <= 0 || combatType == null) {
-    return null;
-  }
-  return {
-    combatType,
-    weaponId,
-    slot: -1,
-    weaponInterface: weapon,
-    ammo: resolveAmmoCandidate(player, weapon),
-    current: true,
-  };
-}
-
-function resolveInventoryCandidates(player, state) {
-  const candidates = [];
-  const items = player?.getInventory?.()?.getItems?.() ?? [];
-  const generatedPrimaryWeaponId = Number(state?.pvp?.generatedPrimaryWeaponId ?? -1);
-  const generatedSpecWeaponId = Number(state?.pvp?.generatedSpecWeaponId ?? -1);
-
-  for (const item of items) {
-    const itemId = item?.getId?.() ?? -1;
-    if (itemId <= 0) {
-      continue;
-    }
-    if (
-      itemId === generatedSpecWeaponId ||
-      (SPEC_WEAPON_IDS.has(itemId) && itemId !== generatedPrimaryWeaponId)
-    ) {
-      continue;
-    }
-    const weaponInterface = item?.getDefinition?.()?.getWeaponInterface?.();
-    const combatType = classifyWeaponInterface(weaponInterface);
-    if (combatType == null) {
-      continue;
-    }
-    const slot = player?.getInventory?.()?.getSlotForItemId?.(itemId) ?? -1;
-    if (slot < 0) {
-      continue;
-    }
-    candidates.push({
-      combatType,
-      weaponId: itemId,
-      slot,
-      weaponInterface,
-      ammo: resolveAmmoCandidate(player, weaponInterface),
-      current: itemId === generatedPrimaryWeaponId,
-    });
-  }
-
-  return candidates;
-}
-
-function resolveStyleCandidates(player, state) {
-  const byType = new Map();
-  const currentCandidate = resolveCurrentCandidate(player);
-  if (currentCandidate) {
-    byType.set(currentCandidate.combatType, currentCandidate);
-  }
-  for (const candidate of resolveInventoryCandidates(player, state)) {
-    const existing = byType.get(candidate.combatType);
-    if (!existing || (!existing.current && candidate.current)) {
-      byType.set(candidate.combatType, candidate);
-    }
-  }
-  return byType;
 }
 
 function isLikelyMeleeThreat(target) {
@@ -258,33 +88,46 @@ function canUseMagicPressure(player) {
   return combat?.getAutocastSpell?.() != null;
 }
 
-function shouldUseFreeze(player, target, profile, magicCandidate) {
+function shouldUseFreeze(player, profile, magicCandidate, pressureContext) {
   if (!magicCandidate || !isVeteranOrEliteProfile(profile)) {
     return false;
   }
   if (player?.getSpellbook?.() !== MagicSpellbook.NORMAL) {
     return false;
   }
-  if (!isLikelyMeleeThreat(target)) {
+  if (!pressureContext?.targetLikelyMeleeThreat) {
     return false;
   }
-  if (target?.getTimers?.().has?.(TimerKey.FREEZE) || target?.getTimers?.().has?.(TimerKey.FREEZE_IMMUNITY)) {
+  if (pressureContext?.targetFrozen || pressureContext?.targetFreezeImmune) {
     return false;
   }
   return Math.random() <= Number(profile?.nextHitFreezeChance ?? profile?.freezeUseChance ?? 0);
 }
 
-function scoreCandidate(candidate, player, target, state, profile) {
+function buildPressureContext(player, target, state) {
+  return {
+    targetPrayers: target?.getPrayerActive?.() ?? [],
+    targetHpRatio: getTargetHpRatio(target),
+    distance: getDistance(player, target),
+    preferredStyle: state?.pvp?.preferredCombatStyle,
+    targetFrozen: target?.getTimers?.().has?.(TimerKey.FREEZE) === true,
+    targetFreezeImmune: target?.getTimers?.().has?.(TimerKey.FREEZE_IMMUNITY) === true,
+    targetLikelyMeleeThreat: isLikelyMeleeThreat(target),
+    magicPressureAvailable: canUseMagicPressure(player),
+  };
+}
+
+function scoreCandidate(candidate, state, profile, pressureContext) {
   if (!candidate) {
     return Number.NEGATIVE_INFINITY;
   }
-  const targetPrayers = target?.getPrayerActive?.() ?? [];
-  const targetHpRatio = getTargetHpRatio(target);
-  const distance = getDistance(player, target);
-  const preferredStyle = state?.pvp?.preferredCombatStyle;
+  const targetPrayers = pressureContext?.targetPrayers ?? [];
+  const targetHpRatio = Number(pressureContext?.targetHpRatio ?? 1);
+  const distance = Number(pressureContext?.distance ?? 99);
+  const preferredStyle = pressureContext?.preferredStyle ?? state?.pvp?.preferredCombatStyle;
   let score = candidate.current ? 0.45 : 0.2;
 
-  if (candidate.combatType === CombatType.MAGIC && !canUseMagicPressure(player)) {
+  if (candidate.combatType === CombatType.MAGIC && pressureContext?.magicPressureAvailable !== true) {
     return Number.NEGATIVE_INFINITY;
   }
 
@@ -316,24 +159,24 @@ function scoreCandidate(candidate, player, target, state, profile) {
     if (targetHpRatio <= Number(profile?.nextHitMeleeFinisherHpRatio ?? 0.45)) {
       score += 0.95;
     }
-    if (target?.getTimers?.().has?.(TimerKey.FREEZE)) {
+    if (pressureContext?.targetFrozen) {
       score += 0.2;
     }
   } else if (candidate.combatType === CombatType.RANGED) {
     if (distance > MELEE_DISTANCE_TILES) {
       score += 0.65;
     }
-    if (target?.getTimers?.().has?.(TimerKey.FREEZE)) {
+    if (pressureContext?.targetFrozen) {
       score += 0.55;
     }
     if (!candidate.ammo && (BOW_INTERFACES.has(candidate.weaponInterface) || CROSSBOW_INTERFACES.has(candidate.weaponInterface))) {
       score -= 2;
     }
   } else if (candidate.combatType === CombatType.MAGIC) {
-    if (isLikelyMeleeThreat(target)) {
+    if (pressureContext?.targetLikelyMeleeThreat) {
       score += 0.45;
     }
-    if (!target?.getTimers?.().has?.(TimerKey.FREEZE) && !target?.getTimers?.().has?.(TimerKey.FREEZE_IMMUNITY)) {
+    if (!pressureContext?.targetFrozen && !pressureContext?.targetFreezeImmune) {
       score += 0.25;
     }
   }
@@ -341,11 +184,11 @@ function scoreCandidate(candidate, player, target, state, profile) {
   return score;
 }
 
-function chooseBestCandidate(candidates, player, target, state, profile) {
+function chooseBestCandidate(candidates, state, profile, pressureContext) {
   let bestCandidate = null;
   let bestScore = Number.NEGATIVE_INFINITY;
   for (const candidate of candidates.values()) {
-    const score = scoreCandidate(candidate, player, target, state, profile);
+    const score = scoreCandidate(candidate, state, profile, pressureContext);
     if (score > bestScore) {
       bestScore = score;
       bestCandidate = candidate;
@@ -354,15 +197,34 @@ function chooseBestCandidate(candidates, player, target, state, profile) {
   return bestCandidate;
 }
 
-function maybeEquipCandidate(player, candidate) {
+function maybeEquipCandidate(player, candidate, state) {
   if (!candidate) {
     return false;
   }
-  if (candidate.slot >= 0) {
-    equipInventoryItem(player, candidate.slot, candidate.weaponId);
+  const weaponSlot = resolveInventorySlotByItemId(
+    player,
+    candidate.weaponId,
+    state?.pvp?.runtimeCombatSnapshot?.snapshot ?? null,
+    candidate.slot
+  );
+  if (weaponSlot >= 0 && getWeaponId(player) !== candidate.weaponId) {
+    equipInventoryItem(player, weaponSlot, candidate.weaponId);
+    invalidatePvpCombatSnapshot(state);
   }
-  if (candidate.ammo && candidate.ammo.slot >= 0) {
-    equipInventoryItem(player, candidate.ammo.slot, candidate.ammo.ammoId ?? candidate.ammo.itemId);
+  const ammoId = candidate.ammo?.ammoId ?? candidate.ammo?.itemId ?? -1;
+  const ammoSlot = resolveInventorySlotByItemId(
+    player,
+    ammoId,
+    state?.pvp?.runtimeCombatSnapshot?.snapshot ?? null,
+    candidate.ammo?.slot ?? -1
+  );
+  if (
+    candidate.ammo &&
+    ammoSlot >= 0 &&
+    getAmmoId(player) !== (candidate.ammo.ammoId ?? candidate.ammo.itemId)
+  ) {
+    equipInventoryItem(player, ammoSlot, candidate.ammo.ammoId ?? candidate.ammo.itemId);
+    invalidatePvpCombatSnapshot(state);
   }
   return getWeaponId(player) === candidate.weaponId;
 }
@@ -380,18 +242,26 @@ function tryQueuedSpecialAttack(player, target) {
   return true;
 }
 
-function executePressureStyle(player, target, candidate) {
+function executePressureStyle(player, target, candidate, state) {
   const combat = player?.getCombat?.();
   if (!combat || !candidate) {
     return false;
   }
-  if (!maybeEquipCandidate(player, candidate)) {
+  if (!maybeEquipCandidate(player, candidate, state)) {
     return false;
   }
   if (candidate.combatType !== CombatType.MAGIC) {
     combat.setCastSpell?.(null);
   }
   combat.attack(target);
+  return true;
+}
+
+function schedulePressureCheck(state, nowMs, delayMs) {
+  if (!state?.pvp) {
+    return false;
+  }
+  state.pvp.nextPressureCheckAt = nowMs + Math.max(100, Math.floor(delayMs));
   return true;
 }
 
@@ -412,11 +282,25 @@ function maybeRunPressureCombatScript(context) {
   if (!isAttackWindowOpen(player)) {
     return { handled: false, forcedCombatType: null };
   }
+  if (nowMs < Number(pvp.nextPressureCheckAt ?? 0)) {
+    return { handled: false, forcedCombatType: null };
+  }
 
-  if (tryQueuedSpecialAttack(player, target)) {
+  const queuedSpecialHandled = ServerPerf.measurePhase(
+    "bot.pvp.pressure_script.queued_special",
+    () => tryQueuedSpecialAttack(player, target)
+  );
+  if (queuedSpecialHandled) {
     pvp.lastPressureScriptAt = nowMs;
+    schedulePressureCheck(state, nowMs, PRESSURE_RETRY_COOLDOWN_MS);
     scheduleCombatAction?.(state, nowMs);
-    return { handled: true, forcedCombatType: CombatFactory.getMethod(player)?.type?.() ?? null };
+    const combatSnapshot = getPvpCombatSnapshot(player, state, nowMs);
+    return {
+      handled: true,
+      forcedCombatType:
+        combatSnapshot?.currentCombatType ??
+        resolveCurrentCombatType(player, player?.getWeapon?.(), getWeaponId(player)),
+    };
   }
 
   const cooldownMs = Math.max(200, Number(profile?.nextHitScriptCooldownMs ?? 450));
@@ -424,37 +308,62 @@ function maybeRunPressureCombatScript(context) {
     return { handled: false, forcedCombatType: null };
   }
   if (Math.random() > Number(profile?.nextHitScriptChance ?? 0.6)) {
+    schedulePressureCheck(state, nowMs, PRESSURE_FAILURE_COOLDOWN_MS);
     return { handled: false, forcedCombatType: null };
   }
 
-  const candidates = resolveStyleCandidates(player, state);
+  const combatSnapshot = ServerPerf.measurePhase("bot.pvp.pressure_script.snapshot", () =>
+    getPvpCombatSnapshot(player, state, nowMs)
+  );
+  const candidates = combatSnapshot?.styleCandidatesByType ?? new Map();
+  const pressureContext = ServerPerf.measurePhase("bot.pvp.pressure_script.context", () =>
+    buildPressureContext(player, target, state)
+  );
   const magicCandidate = candidates.get(CombatType.MAGIC) ?? null;
-  if (shouldUseFreeze(player, target, profile, magicCandidate)) {
-    if (maybeEquipCandidate(player, magicCandidate)) {
+  const shouldFreeze = ServerPerf.measurePhase("bot.pvp.pressure_script.freeze_check", () =>
+    shouldUseFreeze(player, profile, magicCandidate, pressureContext)
+  );
+  if (shouldFreeze) {
+    if (
+      ServerPerf.measurePhase("bot.pvp.pressure_script.freeze_cast", () =>
+        maybeEquipCandidate(player, magicCandidate, state)
+      )
+    ) {
       player.getCombat?.().castSpellOn?.(target, FREEZE_SPELLS[profile.id]);
       pvp.lastFreezeAt = nowMs;
       pvp.lastPressureScriptAt = nowMs;
+      schedulePressureCheck(state, nowMs, PRESSURE_RETRY_COOLDOWN_MS);
       scheduleCombatAction?.(state, nowMs);
       scheduleFreezeReview?.(state, nowMs);
       return { handled: true, forcedCombatType: CombatType.MAGIC };
     }
   }
 
-  const bestCandidate = chooseBestCandidate(candidates, player, target, state, profile);
+  const bestCandidate = ServerPerf.measurePhase("bot.pvp.pressure_script.choose_candidate", () =>
+    chooseBestCandidate(candidates, state, profile, pressureContext)
+  );
   if (!bestCandidate) {
+    schedulePressureCheck(state, nowMs, PRESSURE_FAILURE_COOLDOWN_MS);
     return { handled: false, forcedCombatType: null };
   }
   if (bestCandidate.slot >= 0) {
     const switchChance = Number(profile?.nextHitStyleSwitchChance ?? profile?.switchChance ?? 0.5);
     if (Math.random() > switchChance) {
+      schedulePressureCheck(state, nowMs, PRESSURE_FAILURE_COOLDOWN_MS);
       return { handled: false, forcedCombatType: null };
     }
   }
-  if (!executePressureStyle(player, target, bestCandidate)) {
+  if (
+    !ServerPerf.measurePhase("bot.pvp.pressure_script.execute_style", () =>
+      executePressureStyle(player, target, bestCandidate, state)
+    )
+  ) {
+    schedulePressureCheck(state, nowMs, PRESSURE_FAILURE_COOLDOWN_MS);
     return { handled: false, forcedCombatType: null };
   }
 
   pvp.lastPressureScriptAt = nowMs;
+  schedulePressureCheck(state, nowMs, PRESSURE_RETRY_COOLDOWN_MS);
   scheduleCombatAction?.(state, nowMs);
   return { handled: true, forcedCombatType: bestCandidate.combatType };
 }

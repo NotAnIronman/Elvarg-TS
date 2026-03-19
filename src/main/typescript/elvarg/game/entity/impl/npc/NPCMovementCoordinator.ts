@@ -6,15 +6,18 @@ import { Misc } from "../../../../util/Misc";
 import { NPC } from "./NPC";
 
 export class NPCMovementCoordinator {
+    private static readonly RETREAT_REPATH_COOLDOWN_MS = 600;
     private npc: NPC;
     private coordinateState: CoordinateState;
     private radius: number;
+    private nextRetreatRepathAt: number;
 
 
     constructor(npc: NPC) {
         this.npc = npc;
         this.coordinateState = CoordinateState.HOME;
         this.radius = 0;
+        this.nextRetreatRepathAt = 0;
     }
 
     public process() {
@@ -49,9 +52,35 @@ export class NPCMovementCoordinator {
                 break;
             case CoordinateState.RETREATING:
             case CoordinateState.AWAY:
-                PathFinder.calculateWalkRoute(this.npc, this.npc.getSpawnPosition().getX(), this.npc.getSpawnPosition().getY());
+                this.processRetreatingMovement();
                 break;
         }
+    }
+
+    private processRetreatingMovement(): void {
+        const spawn = this.npc.getSpawnPosition();
+        const current = this.npc.getLocation();
+        if (current.equals(spawn)) {
+            this.coordinateState = CoordinateState.HOME;
+            this.nextRetreatRepathAt = 0;
+            return;
+        }
+
+        const movementQueue = this.npc.getMovementQueue();
+        const retreatRouteActive =
+            movementQueue.lastDestX === spawn.getX()
+            && movementQueue.lastDestY === spawn.getY()
+            && (movementQueue.size() > 0 || movementQueue.isMovings());
+        if (retreatRouteActive) {
+            return;
+        }
+
+        const nowMs = Date.now();
+        if (nowMs < this.nextRetreatRepathAt) {
+            return;
+        }
+        this.nextRetreatRepathAt = nowMs + NPCMovementCoordinator.RETREAT_REPATH_COOLDOWN_MS;
+        PathFinder.calculateWalkRoute(this.npc, spawn.getX(), spawn.getY());
     }
 
     public updateCoordinator() {
@@ -87,6 +116,7 @@ export class NPCMovementCoordinator {
             this.coordinateState = CoordinateState.AWAY;
         } else {
             this.coordinateState = CoordinateState.HOME;
+            this.nextRetreatRepathAt = 0;
         }
     }
 

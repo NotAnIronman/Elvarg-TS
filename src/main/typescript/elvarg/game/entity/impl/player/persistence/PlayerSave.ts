@@ -73,15 +73,12 @@ export class PlayerSave {
     private poisonImmunityTimer: number;
     private fireImmunityTimer: number;
     private teleblockTimer: number;
-    private targetSearchTimer: number;
     private specialAttackRestoreTimer: number;
     private skullTimer: number;
     private skullType;
     private running: boolean;
     private runEnergy: number;
     private totalKills: number;
-    private targetKills: number;
-    private normalKills: number;
     private killstreak: number;
     private highestKillstreak: number;
     private recentKills: string[];
@@ -294,14 +291,6 @@ export class PlayerSave {
         this.teleblockTimer = teleblockTimer;
     }
 
-    public getTargetSearchTimer(): number {
-        return this.targetSearchTimer;
-    }
-
-    public setTargetSearchTimer(targetSearchTimer: number): void {
-        this.targetSearchTimer = targetSearchTimer;
-    }
-
     public getSpecialAttackRestoreTimer(): number {
         return this.specialAttackRestoreTimer;
     }
@@ -348,22 +337,6 @@ export class PlayerSave {
 
     public setTotalKills(totalKills: number): void {
         this.totalKills = totalKills;
-    }
-
-    public getTargetKills(): number {
-        return this.targetKills;
-    }
-
-    public setTargetKills(targetKills: number): void {
-        this.targetKills = targetKills;
-    }
-
-    public getNormalKills(): number {
-        return this.normalKills;
-    }
-
-    public setNormalKills(normalKills: number): void {
-        this.normalKills = normalKills;
     }
 
     public getKillstreak(): number {
@@ -681,15 +654,12 @@ export class PlayerSave {
         player.getCombat().getPoisonImmunityTimer().start(this.poisonImmunityTimer);
         player.getCombat().getFireImmunityTimer().start(this.fireImmunityTimer);
         player.getCombat().getTeleblockTimer().start(this.teleblockTimer);
-        player.getTargetSearchTimer().start(this.targetSearchTimer);
         player.getSpecialAttackRestore().start(this.specialAttackRestoreTimer);
 
         player.setSkullTimer(this.skullTimer);
         player.setSkullType(this.skullType);
 
         player.setTotalKills(this.totalKills);
-        player.setTargetKills(this.targetKills);
-        player.setNormalKills(this.normalKills);
         player.setKillstreak(this.killstreak);
         player.setHighestKillstreak(this.highestKillstreak);
         player.setDeaths(this.deaths);
@@ -780,15 +750,12 @@ export class PlayerSave {
         playerSave.fireImmunityTimer = player.getCombat().getFireImmunityTimer().secondsRemaining();
 
         playerSave.teleblockTimer = player.getCombat().getTeleblockTimer().secondsRemaining();
-        playerSave.targetSearchTimer = player.getTargetSearchTimer().secondsRemaining();
         playerSave.specialAttackRestoreTimer = player.getSpecialAttackRestore().secondsRemaining();
 
         playerSave.skullTimer = player.getSkullTimer();
         playerSave.skullType = player.getSkullType();
 
         playerSave.totalKills = player.getTotalKills();
-        playerSave.targetKills = player.getTargetKills();
-        playerSave.normalKills = player.getNormalKills();
         playerSave.killstreak = player.getKillstreak();
         playerSave.highestKillstreak = player.getHighestKillstreak();
         playerSave.recentKills = [...(player.getRecentKills() ?? [])];

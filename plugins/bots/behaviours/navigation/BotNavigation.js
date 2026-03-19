@@ -11,6 +11,7 @@ const UNREACHABLE_SEGMENT_COOLDOWN_BASE_MS = 1200;
 const UNREACHABLE_SEGMENT_COOLDOWN_MAX_MS = 12000;
 const UNREACHABLE_SEGMENT_TTL_MS = 30000;
 const UNREACHABLE_SEGMENT_MAX_TRACKED = 24;
+const MOVEMENT_REQUEST_REFRESH_GRACE_MS = 250;
 const FORBIDDEN_TARGET_Y = new Set([3521, 3522]);
 const PVP_ONLY_NON_WILD_STRIP_Y = new Set([3523, 3524]);
 const pendingMovementByPlayer = new WeakMap();
@@ -291,22 +292,58 @@ function requestMovement(player, targetX, targetY, options = {}) {
   const z = Number.isFinite(options.z) ? Math.floor(options.z) : loc?.getZ?.();
   const pvpOnly = isPvpOnlyState(options.state ?? null);
   const target = sanitizeTargetTile(player, pvpOnly, targetX, targetY);
+  const requestedAtMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
+  const maxRouteSegmentTiles =
+    Number.isFinite(options.maxRouteSegmentTiles) &&
+    options.maxRouteSegmentTiles > 0
+      ? Math.floor(options.maxRouteSegmentTiles)
+      : MAX_ROUTE_SEGMENT_TILES;
+  const basicPather = options.basicPather === true;
+  const nextDispatchAtMs = Number.isFinite(options.nextDispatchAtMs)
+    ? Math.max(0, Math.floor(options.nextDispatchAtMs))
+    : 0;
+  const existing = pendingMovementByPlayer.get(player);
+
+  if (
+    existing &&
+    existing.x === target.x &&
+    existing.y === target.y &&
+    existing.z === (Number.isFinite(z) ? z : null) &&
+    existing.pvpOnly === pvpOnly &&
+    existing.basicPather === basicPather &&
+    existing.maxRouteSegmentTiles === maxRouteSegmentTiles
+  ) {
+    existing.reason =
+      typeof options.reason === "string" ? options.reason : existing.reason ?? null;
+    existing.requestedAtMs = requestedAtMs;
+    if (nextDispatchAtMs > 0) {
+      existing.nextDispatchAtMs = Math.max(
+        Number(existing.nextDispatchAtMs ?? 0),
+        nextDispatchAtMs
+      );
+    } else if (
+      Number.isFinite(existing.lastDispatchedAtMs) &&
+      existing.lastDispatchedAtMs > 0 &&
+      requestedAtMs - existing.lastDispatchedAtMs <= MOVEMENT_REQUEST_REFRESH_GRACE_MS
+    ) {
+      existing.nextDispatchAtMs = Math.max(
+        Number(existing.nextDispatchAtMs ?? 0),
+        existing.lastDispatchedAtMs + MOVEMENT_REQUEST_REFRESH_GRACE_MS
+      );
+    }
+    return true;
+  }
+
   pendingMovementByPlayer.set(player, {
     x: target.x,
     y: target.y,
     z: Number.isFinite(z) ? z : null,
     reason: typeof options.reason === "string" ? options.reason : null,
-    requestedAtMs: Number.isFinite(options.nowMs) ? options.nowMs : Date.now(),
-    maxRouteSegmentTiles:
-      Number.isFinite(options.maxRouteSegmentTiles) &&
-      options.maxRouteSegmentTiles > 0
-        ? Math.floor(options.maxRouteSegmentTiles)
-        : MAX_ROUTE_SEGMENT_TILES,
-    basicPather: options.basicPather === true,
+    requestedAtMs,
+    maxRouteSegmentTiles,
+    basicPather,
     pvpOnly,
-    nextDispatchAtMs: Number.isFinite(options.nextDispatchAtMs)
-      ? Math.max(0, Math.floor(options.nextDispatchAtMs))
-      : 0,
+    nextDispatchAtMs,
     noPathAttempts: 0,
     sameSegmentNoPathAttempts: 0,
     lastFailedSegmentKey: null,

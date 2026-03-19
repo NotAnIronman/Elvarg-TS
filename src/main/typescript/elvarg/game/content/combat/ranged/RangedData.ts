@@ -405,13 +405,13 @@ export class RangedWeapon {
     public static readonly DRAGON_DART = new RangedWeapon([11230], [(Ammunition.DRAGON_DART)], RangedWeaponType.DART)
 
 
-    public static readonly BRONZE_KNIFE = new RangedWeapon([864, 870, 5654], [Ammunition.BRONZE_KNIFE], RangedWeaponType.KNIFE)
-    public static readonly IRON_KNIFE = new RangedWeapon([863, 871, 5655], [Ammunition.IRON_KNIFE], RangedWeaponType.KNIFE)
-    public static readonly STEEL_KNIFE = new RangedWeapon([865, 872, 5656], [Ammunition.STEEL_KNIFE], RangedWeaponType.KNIFE)
-    public static readonly BLACK_KNIFE = new RangedWeapon([869, 874, 5658], [Ammunition.BLACK_KNIFE], RangedWeaponType.KNIFE)
-    public static readonly MITHRIL_KNIFE = new RangedWeapon([866, 873, 5657], [Ammunition.MITHRIL_KNIFE], RangedWeaponType.KNIFE)
-    public static readonly ADAMANT_KNIFE = new RangedWeapon([867, 875, 5659], [Ammunition.ADAMANT_KNIFE], RangedWeaponType.KNIFE)
-    public static readonly RUNE_KNIFE = new RangedWeapon([868, 876, 5660, 5667], [Ammunition.RUNE_KNIFE], RangedWeaponType.KNIFE)
+    public static readonly BRONZE_KNIFE = new RangedWeapon([864, ItemIdentifiers.BRONZE_KNIFE_P_, ItemIdentifiers.BRONZE_KNIFE_P_PLUS_, ItemIdentifiers.BRONZE_KNIFE_P_PLUS_PLUS_], [Ammunition.BRONZE_KNIFE], RangedWeaponType.KNIFE)
+    public static readonly IRON_KNIFE = new RangedWeapon([863, ItemIdentifiers.IRON_KNIFE_P_, ItemIdentifiers.IRON_KNIFE_P_PLUS_, ItemIdentifiers.IRON_KNIFE_P_PLUS_PLUS_], [Ammunition.IRON_KNIFE], RangedWeaponType.KNIFE)
+    public static readonly STEEL_KNIFE = new RangedWeapon([865, ItemIdentifiers.STEEL_KNIFE_P_, ItemIdentifiers.STEEL_KNIFE_P_PLUS_, ItemIdentifiers.STEEL_KNIFE_P_PLUS_PLUS_], [Ammunition.STEEL_KNIFE], RangedWeaponType.KNIFE)
+    public static readonly BLACK_KNIFE = new RangedWeapon([869, ItemIdentifiers.BLACK_KNIFE_P_, ItemIdentifiers.BLACK_KNIFE_P_PLUS_, ItemIdentifiers.BLACK_KNIFE_P_PLUS_PLUS_], [Ammunition.BLACK_KNIFE], RangedWeaponType.KNIFE)
+    public static readonly MITHRIL_KNIFE = new RangedWeapon([866, ItemIdentifiers.MITHRIL_KNIFE_P_, ItemIdentifiers.MITHRIL_KNIFE_P_PLUS_, ItemIdentifiers.MITHRIL_KNIFE_P_PLUS_PLUS_], [Ammunition.MITHRIL_KNIFE], RangedWeaponType.KNIFE)
+    public static readonly ADAMANT_KNIFE = new RangedWeapon([867, ItemIdentifiers.ADAMANT_KNIFE_P_, ItemIdentifiers.ADAMANT_KNIFE_P_PLUS_, ItemIdentifiers.ADAMANT_KNIFE_P_PLUS_PLUS_], [Ammunition.ADAMANT_KNIFE], RangedWeaponType.KNIFE)
+    public static readonly RUNE_KNIFE = new RangedWeapon([868, ItemIdentifiers.RUNE_KNIFE_P_, ItemIdentifiers.RUNE_KNIFE_P_PLUS_, ItemIdentifiers.RUNE_KNIFE_P_PLUS_PLUS_], [Ammunition.RUNE_KNIFE], RangedWeaponType.KNIFE)
     public static readonly DRAGON_KNIFE = new RangedWeapon([ItemIdentifiers.DRAGON_KNIFE, ItemIdentifiers.DRAGON_KNIFE_P_, ItemIdentifiers.DRAGON_KNIFE_P_PLUS_, ItemIdentifiers.DRAGON_KNIFE_P_PLUS_PLUS_], [Ammunition.DRAGON_KNIFE], RangedWeaponType.KNIFE)
 
     public static readonly TOKTZ_XIL_UL = new RangedWeapon([6522], [Ammunition.TOKTZ_XIL_UL], RangedWeaponType.TOKTZ_XIL_UL)

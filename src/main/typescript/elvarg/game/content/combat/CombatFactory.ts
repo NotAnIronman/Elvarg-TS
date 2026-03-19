@@ -291,8 +291,8 @@ export class CombatFactory {
         return true;
     }
 
-    static canReach(attacker: Mobile, method: CombatMethod, target: Mobile) {
-        if (!CombatFactory.validTarget(attacker, target)) {
+    static canReach(attacker: Mobile, method: CombatMethod, target: Mobile, skipTargetValidation: boolean = false) {
+        if (!skipTargetValidation && !CombatFactory.validTarget(attacker, target)) {
             attacker.getCombat().reset();
             return true;
         }

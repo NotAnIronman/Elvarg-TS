@@ -50,6 +50,7 @@ export class World {
     private static items: ItemOnGround[] = [];
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];
+    private static npcTileOccupants: Map<string, NPC[]> = new Map();
     private static realPlayerObserverBuckets: Map<string, Array<{ x: number; y: number; z: number }>> = new Map();
     private static realPlayerObserverCount = 0;
     private static playerUpdateBuckets: Map<string, Player[]> = new Map();
@@ -217,8 +218,88 @@ export class World {
         return `${z}:${x >> 3}:${y >> 3}`;
     }
 
+    private static getNpcTileKey(x: number, y: number, z: number): string {
+        return `${z}:${x}:${y}`;
+    }
+
     private static getBotProcessObserverBucketKey(x: number, y: number, z: number): string {
         return `${z}:${Math.floor(x / World.BOT_PROCESS_LOD_CHUNK_SIZE_TILES)}:${Math.floor(y / World.BOT_PROCESS_LOD_CHUNK_SIZE_TILES)}`;
+    }
+
+    private static addNpcToTileOccupants(npc: NPC, location: Location | null | undefined): void {
+        if (!npc || !location) {
+            return;
+        }
+        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
+        const bucket = World.npcTileOccupants.get(key);
+        if (bucket) {
+            if (!bucket.includes(npc)) {
+                bucket.push(npc);
+            }
+            return;
+        }
+        World.npcTileOccupants.set(key, [npc]);
+    }
+
+    private static removeNpcFromTileOccupants(npc: NPC, location: Location | null | undefined): void {
+        if (!npc || !location) {
+            return;
+        }
+        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
+        const bucket = World.npcTileOccupants.get(key);
+        if (!bucket || bucket.length === 0) {
+            return;
+        }
+        const nextBucket = bucket.filter((candidate) => candidate !== npc);
+        if (nextBucket.length === 0) {
+            World.npcTileOccupants.delete(key);
+            return;
+        }
+        World.npcTileOccupants.set(key, nextBucket);
+    }
+
+    public static registerNpcPosition(npc: NPC, location: Location | null | undefined = npc?.getLocation?.()): void {
+        World.addNpcToTileOccupants(npc, location);
+    }
+
+    public static unregisterNpcPosition(npc: NPC, location: Location | null | undefined = npc?.getLocation?.()): void {
+        World.removeNpcFromTileOccupants(npc, location);
+    }
+
+    public static onNpcMoved(
+        npc: NPC,
+        previousLocation: Location | null | undefined,
+        nextLocation: Location | null | undefined
+    ): void {
+        if (!npc || !previousLocation || !nextLocation) {
+            return;
+        }
+        if (previousLocation.equals(nextLocation)) {
+            return;
+        }
+        World.removeNpcFromTileOccupants(npc, previousLocation);
+        World.addNpcToTileOccupants(npc, nextLocation);
+    }
+
+    public static isNpcOccupyingTile(
+        location: Location | null | undefined,
+        ignoredNpc: NPC | null = null
+    ): boolean {
+        if (!location) {
+            return false;
+        }
+        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
+        const bucket = World.npcTileOccupants.get(key);
+        if (!bucket || bucket.length === 0) {
+            return false;
+        }
+        for (const npc of bucket) {
+            if (!npc || npc === ignoredNpc) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     private static addToUpdateBucket<T extends { getLocation(): Location }>(
@@ -669,6 +750,7 @@ export class World {
                     });
                     continue;
                 }
+                World.registerNpcPosition(npc);
                 if (typeof npc.isPet === "function" && npc.isPet()) {
                     const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
                     const ownerName = owner && typeof owner.getUsername === "function"
@@ -693,6 +775,7 @@ export class World {
                 const wasRegistered =
                     typeof npc.isRegistered === "function" ? npc.isRegistered() : null;
                 const indexBefore = typeof npc.getIndex === "function" ? npc.getIndex() : null;
+                World.unregisterNpcPosition(npc);
                 World.npcs.remove(npc);
                 if (typeof npc.isPet === "function" && npc.isPet()) {
                     const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;

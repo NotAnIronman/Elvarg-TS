@@ -1,10 +1,18 @@
 const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
+const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
+const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
 
 const GLOW_PRESET_ATTRIBUTE = "visual:glowPreset";
 const GLOW_INTENSITY_ATTRIBUTE = "visual:glowIntensity";
 const LAST_GLOW_PRESET_ATTRIBUTE = "killstreaks:lastGlowPreset";
+
+const BASE_BLOOD_MONEY_REWARD = 150;
+const STREAK_STEP = 5;
+const STREAK_STEP_REWARD = 50;
+const STREAK_MILESTONE_REWARD = 500;
 
 const GLOW_PRESETS = Object.freeze({
   off: 0,
@@ -180,31 +188,122 @@ function shouldIncrementForBotKill(killer, victim) {
   );
 }
 
-function incrementBotKillstreak(killer) {
-  if (!isEligibleKillstreakPlayer(killer)) {
+function updatePvpInterface(player) {
+  if (!isEligibleKillstreakPlayer(player)) {
     return;
   }
-  killer.incrementKillstreak?.();
-  const current = normalizeKillstreak(killer);
-  if (current > parseAttributeInt(killer.getHighestKillstreak?.(), 0)) {
-    killer.setHighestKillstreak?.(current);
-    killer
-      .getPacketSender?.()
-      .sendMessage?.(
-        `Congratulations! Your highest killstreak is now ${killer.getHighestKillstreak?.()}.`
-      );
+  player
+    .getPacketSender?.()
+    .sendString?.(`@or1@Killstreak: ${normalizeKillstreak(player)}`, 52029)
+    ?.sendString?.(`@or1@Kills: ${parseAttributeInt(player.getTotalKills?.(), 0)}`, 52030)
+    ?.sendString?.(`@or1@Deaths: ${parseAttributeInt(player.getDeaths?.(), 0)}`, 52031)
+    ?.sendString?.(`@or1@K/D Ratio: ${player.getKillDeathRatio?.() ?? "0"}`, 52033);
+}
+
+function trackRecentKill(killer, victim) {
+  const recentKills = killer?.getRecentKills?.();
+  const victimHost = victim?.getHostAddress?.();
+  if (!Array.isArray(recentKills) || !victimHost) {
+    return;
+  }
+  if (recentKills.length >= 1) {
+    recentKills.shift();
+  }
+  recentKills.push(victimHost);
+}
+
+function shouldRewardPlayerKill(killer, victim) {
+  if (!isEligibleKillstreakPlayer(killer) || !isEligibleKillstreakPlayer(victim)) {
+    return false;
+  }
+
+  const killerHost = killer.getHostAddress?.();
+  const victimHost = victim.getHostAddress?.();
+  if (killerHost && victimHost && killerHost === victimHost) {
+    return false;
+  }
+
+  const recentKills = killer.getRecentKills?.();
+  if (Array.isArray(recentKills) && victimHost && recentKills.includes(victimHost)) {
+    return false;
+  }
+
+  return true;
+}
+
+function resolveStepReward(streak) {
+  return Math.floor(Math.max(0, streak) / STREAK_STEP) * STREAK_STEP_REWARD;
+}
+
+function resolveMilestoneReward(streak) {
+  if (streak <= 0 || streak % STREAK_STEP !== 0) {
+    return 0;
+  }
+  return Math.floor(streak / STREAK_STEP) * STREAK_MILESTONE_REWARD;
+}
+
+function resolveBloodMoneyReward(streak) {
+  return (
+    BASE_BLOOD_MONEY_REWARD +
+    resolveStepReward(streak) +
+    resolveMilestoneReward(streak)
+  );
+}
+
+function awardBloodMoney(player, victim, amount) {
+  if (!isEligibleKillstreakPlayer(player) || amount <= 0) {
+    return;
+  }
+
+  if (
+    player.getInventory?.().contains?.(ItemIdentifiers.BLOOD_MONEY) ||
+    (player.getInventory?.().getFreeSlots?.() ?? 0) > 0
+  ) {
+    player.getInventory().adds(ItemIdentifiers.BLOOD_MONEY, amount);
   } else {
-    killer
-      .getPacketSender?.()
-      .sendMessage?.(`Your killstreak is now ${current}.`);
+    ItemOnGroundManager.registerNonGlobals(
+      player,
+      new Item(ItemIdentifiers.BLOOD_MONEY, amount),
+      victim?.getLocation?.()?.clone?.() ?? victim?.getLocation?.()
+    );
   }
 }
 
-function handleVictimDefeat(victim) {
+function applyKillstreakProgress(player) {
+  if (!isEligibleKillstreakPlayer(player)) {
+    return {
+      streak: 0,
+      newHighest: false,
+      glowOutcome: syncKillstreakGlow(player),
+    };
+  }
+
+  player.incrementKillstreak?.();
+  const streak = normalizeKillstreak(player);
+  const highest = parseAttributeInt(player.getHighestKillstreak?.(), 0);
+  const newHighest = streak > highest;
+  if (newHighest) {
+    player.setHighestKillstreak?.(streak);
+  }
+
+  const glowOutcome = syncKillstreakGlow(player);
+  updatePvpInterface(player);
+
+  return {
+    streak,
+    newHighest,
+    glowOutcome,
+  };
+}
+
+function handleVictimDefeat(victim, options = {}) {
   if (!isEligibleKillstreakPlayer(victim)) {
     return;
   }
 
+  if (options.countDeath === true) {
+    victim.incrementDeaths?.();
+  }
   const previousStreak = normalizeKillstreak(victim);
   if (previousStreak > 0) {
     victim.setKillstreak?.(0);
@@ -213,19 +312,79 @@ function handleVictimDefeat(victim) {
       .sendMessage?.(`Your ${previousStreak} killstreak has ended.`);
   }
   syncKillstreakGlow(victim);
+  updatePvpInterface(victim);
 }
 
-function handleKillerProgress(killer, victim) {
-  if (!isEligibleKillstreakPlayer(killer) || killer === victim) {
-    return;
-  }
-
-  const outcome = syncKillstreakGlow(killer);
-  if (!outcome.tier || outcome.nextPreset === outcome.previousPreset) {
+function handleThresholdAnnouncement(killer, outcome) {
+  if (!outcome?.tier || outcome.nextPreset === outcome.previousPreset) {
     return;
   }
 
   World.sendMessage(formatThresholdAnnouncement(killer, outcome.tier, outcome.streak));
+}
+
+function sendKillstreakMessage(killer, streak, newHighest) {
+  const sender = killer?.getPacketSender?.();
+  if (!sender) {
+    return;
+  }
+
+  if (newHighest) {
+    sender.sendMessage?.(`Congratulations! Your highest killstreak is now ${streak}.`);
+    return;
+  }
+
+  sender.sendMessage?.(`Your killstreak is now ${streak}.`);
+}
+
+function isEligiblePlayerKill(killer, victim) {
+  return (
+    isEligibleKillstreakPlayer(killer) &&
+    isEligibleKillstreakPlayer(victim) &&
+    killer !== victim &&
+    Wilderness.isIn?.(killer) === true &&
+    Wilderness.isIn?.(victim) === true
+  );
+}
+
+function handlePlayerKill(killer, victim) {
+  if (!isEligiblePlayerKill(killer, victim)) {
+    return;
+  }
+
+  if (!shouldRewardPlayerKill(killer, victim)) {
+    killer
+      .getPacketSender?.()
+      .sendMessage?.(
+        "Repeated kills on the same target do not give blood money or killstreak progress."
+      );
+    updatePvpInterface(killer);
+    return;
+  }
+
+  trackRecentKill(killer, victim);
+  killer.incrementTotalKills?.();
+
+  const progress = applyKillstreakProgress(killer);
+  sendKillstreakMessage(killer, progress.streak, progress.newHighest);
+  handleThresholdAnnouncement(killer, progress.glowOutcome);
+
+  const rewardAmount = resolveBloodMoneyReward(progress.streak);
+  awardBloodMoney(killer, victim, rewardAmount);
+
+  const milestoneReward = resolveMilestoneReward(progress.streak);
+  if (milestoneReward > 0) {
+    killer
+      .getPacketSender?.()
+      .sendMessage?.(
+        `You've received ${rewardAmount} blood money for that kill, including a ${milestoneReward} killstreak bonus.`
+      );
+    return;
+  }
+
+  killer
+    .getPacketSender?.()
+    .sendMessage?.(`You've received ${rewardAmount} blood money for that kill!`);
 }
 
 module.exports = {
@@ -234,14 +393,22 @@ module.exports = {
   register(api) {
     api.onPlayerLogin(({ player }) => {
       syncKillstreakGlow(player);
+      updatePvpInterface(player);
     });
 
     api.onPlayerDefeated(({ killer, victim }) => {
-      if (shouldIncrementForBotKill(killer, victim)) {
-        incrementBotKillstreak(killer);
+      const botKill = shouldIncrementForBotKill(killer, victim);
+      const playerKill = isEligiblePlayerKill(killer, victim);
+
+      if (botKill) {
+        const progress = applyKillstreakProgress(killer);
+        sendKillstreakMessage(killer, progress.streak, progress.newHighest);
+        handleThresholdAnnouncement(killer, progress.glowOutcome);
       }
-      handleVictimDefeat(victim);
-      handleKillerProgress(killer, victim);
+      handleVictimDefeat(victim, { countDeath: playerKill });
+      if (playerKill) {
+        handlePlayerKill(killer, victim);
+      }
     });
   },
 };

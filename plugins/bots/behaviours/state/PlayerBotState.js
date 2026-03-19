@@ -158,6 +158,16 @@ function createPvpBehaviorState() {
     appliedBoostProfileId: null,
     cachedEatAtHpRatioProfileId: null,
     cachedEatAtHpRatio: null,
+    runtimeCombatSnapshot: null,
+    cachedProtectionPrayerId: null,
+    cachedOffensivePrayerId: null,
+    cachedPrayerTargetCombatType: null,
+    cachedPrayerPlayerCombatType: null,
+    cachedPrayerTargetUsername: null,
+    currentCyclePvpIndex: null,
+    nextOneTickCheckAt: 0,
+    nextSwitchbackCheckAt: 0,
+    nextPressureCheckAt: 0,
   };
 }
 
@@ -204,6 +214,16 @@ function clearPvpBehaviorState(state) {
   state.pvp.appliedBoostProfileId = null;
   state.pvp.cachedEatAtHpRatioProfileId = null;
   state.pvp.cachedEatAtHpRatio = null;
+  state.pvp.runtimeCombatSnapshot = null;
+  state.pvp.cachedProtectionPrayerId = null;
+  state.pvp.cachedOffensivePrayerId = null;
+  state.pvp.cachedPrayerTargetCombatType = null;
+  state.pvp.cachedPrayerPlayerCombatType = null;
+  state.pvp.cachedPrayerTargetUsername = null;
+  state.pvp.currentCyclePvpIndex = null;
+  state.pvp.nextOneTickCheckAt = 0;
+  state.pvp.nextSwitchbackCheckAt = 0;
+  state.pvp.nextPressureCheckAt = 0;
 }
 
 function createAutonomyState() {

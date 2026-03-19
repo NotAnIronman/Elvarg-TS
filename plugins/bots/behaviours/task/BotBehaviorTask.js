@@ -4,6 +4,7 @@ const { Location } = require("../../../../src/main/typescript/elvarg/game/model/
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
+const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const {
   chooseNextTarget,
   peekMovementRequest,
@@ -24,6 +25,7 @@ const {
 const NS_PER_MS = 1_000_000n;
 const MOVING_MODE_DECISION_DELAY_MS = 1500;
 const BLOCKED_TILE_CHECK_INTERVAL_MS = 5000;
+const PVP_INDEX_CHUNK_SIZE_TILES = 16;
 
 class BotBehaviorTask extends Task {
   constructor(entries, traversalService, decisionTicks, options = {}) {
@@ -53,6 +55,9 @@ class BotBehaviorTask extends Task {
     this.idleEntryStride = Number.isFinite(options.idleEntryStride)
       ? Math.max(1, Math.floor(options.idleEntryStride))
       : 2;
+    this.timingDesyncMs = Number.isFinite(options.timingDesyncMs)
+      ? Math.max(0, Math.floor(options.timingDesyncMs))
+      : 450;
     this.lodConfig = this.resolveLodConfig(options.lodConfig ?? {});
     this._nextLodRefreshAt = 0;
     this._humanObserverBuckets = new Map();
@@ -60,6 +65,9 @@ class BotBehaviorTask extends Task {
     this._humanObserverRevision = 0;
     this._cycleCounter = 0;
     this.taskProfiler = this.resolveTaskProfiler(options.taskProfiler ?? {});
+    this.executionBudget = this.resolveExecutionBudget(options.executionBudget ?? {});
+    this._entryCursor = 0;
+    this._nextBudgetLogAt = 0;
     this._profileWindow = this.createProfileWindow(Date.now());
   }
 
@@ -90,6 +98,25 @@ class BotBehaviorTask extends Task {
       controllerMs: 0,
       totalEntryMs: 0,
       modeSamples: Object.create(null),
+    };
+  }
+
+  resolveExecutionBudget(rawConfig) {
+    const enabled = rawConfig?.enabled !== false;
+    const maxMs = Number.isFinite(rawConfig?.maxMs)
+      ? Math.max(5, Math.floor(rawConfig.maxMs))
+      : 45;
+    const minEntriesPerCycle = Number.isFinite(rawConfig?.minEntriesPerCycle)
+      ? Math.max(1, Math.floor(rawConfig.minEntriesPerCycle))
+      : 48;
+    const logCooldownMs = Number.isFinite(rawConfig?.logCooldownMs)
+      ? Math.max(1000, Math.floor(rawConfig.logCooldownMs))
+      : 5000;
+    return {
+      enabled,
+      maxMs,
+      minEntriesPerCycle,
+      logCooldownMs,
     };
   }
 
@@ -202,6 +229,184 @@ class BotBehaviorTask extends Task {
   getHumanObserverBucketKey(x, y, z) {
     const chunkSize = this.lodConfig.chunkSizeTiles;
     return `${z}:${Math.floor(x / chunkSize)}:${Math.floor(y / chunkSize)}`;
+  }
+
+  getSpatialBucketKey(x, y, z, chunkSize) {
+    return `${z}:${Math.floor(x / chunkSize)}:${Math.floor(y / chunkSize)}`;
+  }
+
+  addToSpatialBucket(buckets, location, value, chunkSize) {
+    if (!buckets || !location || !value) {
+      return;
+    }
+    const x = location.getX?.();
+    const y = location.getY?.();
+    const z = location.getZ?.();
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      return;
+    }
+    const key = this.getSpatialBucketKey(x, y, z, chunkSize);
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.push(value);
+    } else {
+      buckets.set(key, [value]);
+    }
+  }
+
+  getTileOccupancyAreaMap(occupancyByArea, privateArea) {
+    if (!(occupancyByArea instanceof Map)) {
+      return null;
+    }
+    const areaKey = privateArea ?? null;
+    let areaMap = occupancyByArea.get(areaKey);
+    if (!(areaMap instanceof Map)) {
+      areaMap = new Map();
+      occupancyByArea.set(areaKey, areaMap);
+    }
+    return areaMap;
+  }
+
+  addToTileOccupancy(occupancyByArea, privateArea, location) {
+    if (!(occupancyByArea instanceof Map) || !location) {
+      return;
+    }
+    const x = location.getX?.();
+    const y = location.getY?.();
+    const z = location.getZ?.();
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      return;
+    }
+    const areaMap = this.getTileOccupancyAreaMap(occupancyByArea, privateArea);
+    if (!(areaMap instanceof Map)) {
+      return;
+    }
+    const key = `${z}:${x}:${y}`;
+    areaMap.set(key, Number(areaMap.get(key) ?? 0) + 1);
+  }
+
+  buildPvpCycleState(nowMs = Date.now()) {
+    const chunkSizeTiles = PVP_INDEX_CHUNK_SIZE_TILES;
+    const botBuckets = new Map();
+    const realPlayerBuckets = new Map();
+    const playerTileOccupancyByArea = new Map();
+    const activeHotspotCombatCounts = new Map();
+    const activePvpTargetCounts = new Map();
+    const activePvpTargetByUsername = new Map();
+    const shouldRefreshHumanObservers =
+      this.lodConfig.enabled && nowMs >= this._nextLodRefreshAt;
+    const observerBuckets = shouldRefreshHumanObservers ? new Map() : null;
+    let observerCount = 0;
+
+    for (const entry of this.entries) {
+      const player = entry?.player;
+      const state = entry?.state;
+      if (!player || !state) {
+        continue;
+      }
+
+      const location = player.getLocation?.();
+      if (location) {
+        this.addToSpatialBucket(botBuckets, location, entry, chunkSizeTiles);
+        if (player.isRegistered?.() === true && (player.getHitpoints?.() ?? 0) > 0) {
+          this.addToTileOccupancy(
+            playerTileOccupancyByArea,
+            player.getPrivateArea?.() ?? null,
+            location
+          );
+        }
+      }
+
+      if (state.mode !== this.behaviorMode?.PVP) {
+        continue;
+      }
+
+      const targetUsername = state?.pvp?.targetUsername ?? null;
+      const username = player.getUsername?.() ?? null;
+      if (targetUsername) {
+        activePvpTargetCounts.set(
+          targetUsername,
+          (activePvpTargetCounts.get(targetUsername) ?? 0) + 1
+        );
+        if (username) {
+          activePvpTargetByUsername.set(username, targetUsername);
+        }
+      }
+
+      if (state?.pvp?.phase !== "combat" || !this.isInCombat(player)) {
+        continue;
+      }
+      const hotspotId = state?.pvp?.hotspotId ?? null;
+      if (!hotspotId) {
+        continue;
+      }
+      activeHotspotCombatCounts.set(
+        hotspotId,
+        (activeHotspotCombatCounts.get(hotspotId) ?? 0) + 1
+      );
+    }
+
+    World.getPlayers().forEach((candidatePlayer) => {
+      if (!candidatePlayer || candidatePlayer.isPlayerBot?.() === true) {
+        return;
+      }
+      if (!World.isPlayerSessionConnected(candidatePlayer)) {
+        return;
+      }
+      if (!candidatePlayer.isRegistered?.()) {
+        return;
+      }
+      if ((candidatePlayer.getHitpoints?.() ?? 0) <= 0) {
+        return;
+      }
+      if (!Wilderness.isIn(candidatePlayer)) {
+        return;
+      }
+      const location = candidatePlayer.getLocation?.();
+      if (!location) {
+        return;
+      }
+      this.addToSpatialBucket(realPlayerBuckets, location, candidatePlayer, chunkSizeTiles);
+      this.addToTileOccupancy(
+        playerTileOccupancyByArea,
+        candidatePlayer.getPrivateArea?.() ?? null,
+        location
+      );
+      if (observerBuckets) {
+        const observer = {
+          x: location.getX?.(),
+          y: location.getY?.(),
+          z: location.getZ?.(),
+        };
+        const key = this.getHumanObserverBucketKey(observer.x, observer.y, observer.z);
+        const bucket = observerBuckets.get(key);
+        if (bucket) {
+          bucket.push(observer);
+        } else {
+          observerBuckets.set(key, [observer]);
+        }
+        observerCount += 1;
+      }
+    });
+
+    if (observerBuckets) {
+      this._humanObserverBuckets = observerBuckets;
+      this._humanObserverCount = observerCount;
+      this._humanObserverRevision += 1;
+      this._nextLodRefreshAt = nowMs + this.lodConfig.refreshIntervalMs;
+    }
+
+    return {
+      pvpIndex: {
+        chunkSizeTiles,
+        botBuckets,
+        realPlayerBuckets,
+        playerTileOccupancyByArea,
+        activeHotspotCombatCounts,
+        activePvpTargetCounts,
+        activePvpTargetByUsername,
+      },
+    };
   }
 
   resolveModeActiveDuration(definition) {
@@ -417,6 +622,100 @@ class BotBehaviorTask extends Task {
         distanceTiles
       ) <= distanceTiles
     );
+  }
+
+  isUrgentEntry(entry, nowMs = Date.now()) {
+    const player = entry?.player;
+    const state = entry?.state;
+    if (!player || !state) {
+      return false;
+    }
+    if (player.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME)) {
+      return true;
+    }
+    if (state.awaitingDitchTransition != null || state.roaming?.pendingRetry != null) {
+      return true;
+    }
+    if (player.getForceMovement?.() != null) {
+      return true;
+    }
+    const followTarget = player.getFollowing?.();
+    const interactTarget = player.getInteractingMobile?.();
+    const isLivePlayerBot = (entity) =>
+      entity?.isPlayer?.() === true &&
+      entity?.isRegistered?.() === true &&
+      entity?.getAsPlayer?.()?.isPlayerBot?.() === true;
+    if (isLivePlayerBot(followTarget) || isLivePlayerBot(interactTarget)) {
+      return true;
+    }
+    if (
+      state.mode === this.behaviorMode?.PVP &&
+      (
+        (state.pvp?.phase === "combat" &&
+          state.pvp?.targetPlayer?.getAsPlayer?.()?.isPlayerBot?.() === true) ||
+        state.pvp?.targetPlayer?.getAsPlayer?.()?.isPlayerBot?.() === true
+      )
+    ) {
+      return true;
+    }
+    const pvpNextActionAt = Number(state.pvp?.nextActionAt ?? 0);
+    const urgentPvpObserverDistance = Math.max(
+      4,
+      Math.floor(this.lodConfig.nearDistanceTiles / 2)
+    );
+    if (
+      state.mode === this.behaviorMode?.PVP &&
+      nowMs >= pvpNextActionAt &&
+      this.hasNearbyHumanObserver(player, nowMs, urgentPvpObserverDistance)
+    ) {
+      return true;
+    }
+    if (this.hasCombatLinks(player) || this.isInCombat(player)) {
+      return true;
+    }
+    return this.isInteractingWithRealPlayer(player);
+  }
+
+  shouldYieldForBudget(startedAtMs, processedRegularEntries) {
+    if (!this.executionBudget.enabled) {
+      return false;
+    }
+    if (processedRegularEntries < this.executionBudget.minEntriesPerCycle) {
+      return false;
+    }
+    return Date.now() - startedAtMs >= this.executionBudget.maxMs;
+  }
+
+  logBudgetYield(nowMs, details) {
+    if (!this.api?.log || nowMs < this._nextBudgetLogAt) {
+      return;
+    }
+    this._nextBudgetLogAt = nowMs + this.executionBudget.logCooldownMs;
+    this.api.log("bot_task_budget_yield", details);
+  }
+
+  resolveEntryNowMs(entry, nowMs) {
+    if (this.timingDesyncMs <= 0) {
+      return nowMs;
+    }
+    const state = entry?.state;
+    if (!state) {
+      return nowMs;
+    }
+    let offsetMs = Number(state.timingOffsetMs ?? Number.NaN);
+    if (!Number.isFinite(offsetMs)) {
+      const seedText =
+        entry?.entryUsername ??
+        entry?.player?.getUsername?.() ??
+        String(entry?.entryIndex ?? "");
+      let hash = 0;
+      for (let index = 0; index < seedText.length; index += 1) {
+        hash = (hash * 31 + seedText.charCodeAt(index)) | 0;
+      }
+      offsetMs = Math.abs(hash) % (this.timingDesyncMs + 1);
+      state.timingOffsetMs = offsetMs;
+    }
+    return nowMs - offsetMs;
   }
 
   ensureAutonomyState(state) {
@@ -673,7 +972,7 @@ class BotBehaviorTask extends Task {
     );
   }
 
-  tryStartModeWithHandler(entry, mode, nowMs, params = {}) {
+  tryStartModeWithHandler(entry, mode, nowMs, params = {}, sharedCycleState = null) {
     return (
       callModeHook({
         modeHandlers: this.modeHandlers,
@@ -682,6 +981,7 @@ class BotBehaviorTask extends Task {
         payload: {
           entry,
           entries: this.entries,
+          sharedCycleState,
           nowMs,
           ...params,
         },
@@ -1025,7 +1325,7 @@ class BotBehaviorTask extends Task {
     return definitions[definitions.length - 1] ?? null;
   }
 
-  startAutonomousMode(entry, definition, nowMs) {
+  startAutonomousMode(entry, definition, nowMs, sharedCycleState = null) {
     const mode = definition?.mode;
     if (!mode) {
       return false;
@@ -1036,7 +1336,8 @@ class BotBehaviorTask extends Task {
         entry,
         mode,
         nowMs,
-        definition?.params ?? {}
+        definition?.params ?? {},
+        sharedCycleState
       );
     }
     if (entry?.state?.mode === mode) {
@@ -1058,7 +1359,7 @@ class BotBehaviorTask extends Task {
     );
   }
 
-  startRoamingFallback(entry, nowMs, reason = "fallback_roaming") {
+  startRoamingFallback(entry, nowMs, reason = "fallback_roaming", sharedCycleState = null) {
     if (this.isPvpOnlyBot(entry?.state)) {
       const pvpDefinition = this.getAutonomousModeDefinition(this.behaviorMode.PVP);
       if (pvpDefinition) {
@@ -1068,7 +1369,8 @@ class BotBehaviorTask extends Task {
             ...pvpDefinition,
             reason: reason === "fallback_roaming" ? "fallback_pvp" : reason,
           },
-          nowMs
+          nowMs,
+          sharedCycleState
         );
       }
       return false;
@@ -1083,11 +1385,12 @@ class BotBehaviorTask extends Task {
         ...roamingDefinition,
         reason,
       },
-      nowMs
+      nowMs,
+      sharedCycleState
     );
   }
 
-  processAutonomousMode(entry, nowMs) {
+  processAutonomousMode(entry, nowMs, sharedCycleState = null) {
     if (!this.behaviorMode || !entry?.state || !entry?.player) {
       return;
     }
@@ -1240,7 +1543,7 @@ class BotBehaviorTask extends Task {
             stopParams
           )
         ) {
-          this.startRoamingFallback(entry, nowMs, "mode_state_invalid");
+          this.startRoamingFallback(entry, nowMs, "mode_state_invalid", sharedCycleState);
         }
         return;
       }
@@ -1306,7 +1609,10 @@ class BotBehaviorTask extends Task {
       const pvpCandidate = candidates.find(
         (definition) => definition?.mode === this.behaviorMode.PVP
       );
-      if (pvpCandidate && this.startAutonomousMode(entry, pvpCandidate, nowMs)) {
+      if (
+        pvpCandidate &&
+        this.startAutonomousMode(entry, pvpCandidate, nowMs, sharedCycleState)
+      ) {
         return;
       }
     }
@@ -1316,7 +1622,7 @@ class BotBehaviorTask extends Task {
       this.scheduleNextDecision(state, nowMs);
       return;
     }
-    if (this.startAutonomousMode(entry, selectedMode, nowMs)) {
+    if (this.startAutonomousMode(entry, selectedMode, nowMs, sharedCycleState)) {
       return;
     }
 
@@ -1324,148 +1630,238 @@ class BotBehaviorTask extends Task {
       if (fallbackMode === selectedMode) {
         continue;
       }
-      if (this.startAutonomousMode(entry, fallbackMode, nowMs)) {
+      if (this.startAutonomousMode(entry, fallbackMode, nowMs, sharedCycleState)) {
         return;
       }
     }
 
-    this.startRoamingFallback(entry, nowMs, "auto_switch_fallback");
+    this.startRoamingFallback(entry, nowMs, "auto_switch_fallback", sharedCycleState);
+  }
+
+  processEntry(entry, index, now, sharedCycleState = null, options = {}) {
+    const entryNow = this.resolveEntryNowMs(entry, now);
+    const urgentPhasePrefix = options?.urgentPhasePrefix ?? null;
+    const sampleEntry = this.shouldSampleEntry(index);
+    const modeProfile =
+      sampleEntry && this._profileWindow
+        ? this.getModeProfile(this._profileWindow, entry?.state?.mode)
+        : null;
+    let entryStartNs = 0n;
+    if (sampleEntry && this._profileWindow) {
+      entryStartNs = process.hrtime.bigint();
+    }
+    try {
+      const state = entry?.state;
+      const player = entry?.player;
+      if (!player || !state) {
+        return;
+      }
+      if (this.recoverBlockedWildernessBot(entry, entryNow)) {
+        return;
+      }
+      if (this.hasCombatLinks(player)) {
+        this.clearDeadCombatLinks(entry);
+      }
+      if (sampleEntry && this._profileWindow) {
+        this._profileWindow.sampledEntries += 1;
+        if (modeProfile) {
+          modeProfile.sampledEntries += 1;
+        }
+      }
+
+      const combat = player.getCombat?.();
+      const attacker = combat?.getAttacker?.();
+      const target = combat?.getTarget?.();
+      const hasPendingTraversal =
+        state.awaitingDitchTransition != null ||
+        state.roaming?.pendingRetry != null;
+      const needsNpcAggro =
+        !!this.npcAggroPolicyHandler &&
+        (attacker?.isNpc?.() === true || target?.isNpc?.() === true);
+
+      let shouldProcessHeavy = true;
+      let traversalStartNs = 0n;
+      let npcAggroStartNs = 0n;
+      if (sampleEntry && this._profileWindow) {
+        traversalStartNs = process.hrtime.bigint();
+        npcAggroStartNs = process.hrtime.bigint();
+      }
+
+      if (!hasPendingTraversal && !needsNpcAggro) {
+        let heavyGateStartNs = 0n;
+        if (sampleEntry && this._profileWindow) {
+          heavyGateStartNs = process.hrtime.bigint();
+        }
+        shouldProcessHeavy = this.shouldProcessEntryHeavy(entry, entryNow);
+        if (sampleEntry && this._profileWindow) {
+          this._profileWindow.heavyGateMs += this.elapsedMs(heavyGateStartNs);
+        }
+        if (!shouldProcessHeavy) {
+          return;
+        }
+      }
+
+      if (hasPendingTraversal && state.awaitingDitchTransition != null) {
+        this.traversalService.processTransition(player, state, entryNow);
+      }
+      if (hasPendingTraversal && state.roaming?.pendingRetry != null) {
+        this.traversalService.processPendingRetry(player, state, entryNow);
+      }
+      if (sampleEntry && this._profileWindow) {
+        this._profileWindow.traversalMs += this.elapsedMs(traversalStartNs);
+      }
+
+      if (needsNpcAggro) {
+        this.npcAggroPolicyHandler.handlePlayerProcess({
+          player,
+          nowMs: entryNow,
+        });
+      }
+      if (sampleEntry && this._profileWindow) {
+        this._profileWindow.npcAggroMs += this.elapsedMs(npcAggroStartNs);
+      }
+
+      if (sampleEntry && this._profileWindow) {
+        this._profileWindow.heavyEntries += 1;
+        if (modeProfile) {
+          modeProfile.heavyEntries += 1;
+        }
+      }
+      let autonomyStartNs = 0n;
+      if (sampleEntry && this._profileWindow) {
+        autonomyStartNs = process.hrtime.bigint();
+      }
+      if (urgentPhasePrefix) {
+        ServerPerf.measurePhase(`${urgentPhasePrefix}.autonomy`, () =>
+          this.processAutonomousMode(entry, entryNow, sharedCycleState)
+        );
+      } else {
+        this.processAutonomousMode(entry, entryNow, sharedCycleState);
+      }
+      if (sampleEntry && this._profileWindow) {
+        const autonomyMs = this.elapsedMs(autonomyStartNs);
+        this._profileWindow.autonomyMs += autonomyMs;
+        if (modeProfile) {
+          modeProfile.autonomyMs += autonomyMs;
+        }
+      }
+      if (this.shouldSkipIdlePvpControllerTick(entry, entryNow)) {
+        return;
+      }
+      let controllerStartNs = 0n;
+      if (sampleEntry && this._profileWindow) {
+        controllerStartNs = process.hrtime.bigint();
+      }
+      const pvpState = state?.pvp ?? null;
+      if (urgentPhasePrefix) {
+        if (pvpState) {
+          pvpState.currentCyclePvpIndex = sharedCycleState?.pvpIndex ?? null;
+        }
+        try {
+          ServerPerf.measurePhase(`${urgentPhasePrefix}.controller`, () =>
+            entry.controller.tick(entryNow)
+          );
+        } finally {
+          if (pvpState) {
+            pvpState.currentCyclePvpIndex = null;
+          }
+        }
+      } else {
+        if (pvpState) {
+          pvpState.currentCyclePvpIndex = sharedCycleState?.pvpIndex ?? null;
+        }
+        try {
+          entry.controller.tick(entryNow);
+        } finally {
+          if (pvpState) {
+            pvpState.currentCyclePvpIndex = null;
+          }
+        }
+      }
+      if (sampleEntry && this._profileWindow) {
+        const controllerMs = this.elapsedMs(controllerStartNs);
+        this._profileWindow.controllerMs += controllerMs;
+        if (modeProfile) {
+          modeProfile.controllerMs += controllerMs;
+        }
+      }
+    } catch (err) {
+      console.error("[bots] behavior tick failed", err);
+    } finally {
+      if (sampleEntry && this._profileWindow) {
+        const totalEntryMs = this.elapsedMs(entryStartNs);
+        this._profileWindow.totalEntryMs += totalEntryMs;
+        if (modeProfile) {
+          modeProfile.totalEntryMs += totalEntryMs;
+        }
+      }
+    }
   }
 
   execute() {
     const now = Date.now();
     this._cycleCounter = (this._cycleCounter + 1) & 0x7fffffff;
-    this.refreshHumanObservers(now);
-    for (let index = 0; index < this.entries.length; index++) {
-      const entry = this.entries[index];
-      const sampleEntry = this.shouldSampleEntry(index);
-      const modeProfile =
-        sampleEntry && this._profileWindow
-          ? this.getModeProfile(this._profileWindow, entry?.state?.mode)
-          : null;
-      let entryStartNs = 0n;
-      if (sampleEntry && this._profileWindow) {
-        entryStartNs = process.hrtime.bigint();
+
+    const totalEntries = this.entries.length;
+    if (totalEntries <= 0) {
+      this.flushTaskProfileIfDue(now);
+      return;
+    }
+
+    const startedAtMs = Date.now();
+    const sharedCycleState = ServerPerf.measurePhase(
+      "task.bot_behavior.build_cycle_state",
+      () => this.buildPvpCycleState(now)
+    );
+    const urgentEntries = new Set();
+    ServerPerf.measurePhase("task.bot_behavior.urgent_entries", () => {
+      for (let index = 0; index < totalEntries; index++) {
+        const entry = this.entries[index];
+        if (!this.isUrgentEntry(entry, now)) {
+          continue;
+        }
+        urgentEntries.add(entry);
+        this.processEntry(entry, index, now, sharedCycleState, {
+          urgentPhasePrefix: "task.bot_behavior.urgent",
+        });
       }
-      try {
-        const state = entry?.state;
-        const player = entry?.player;
-        if (!player || !state) {
-          continue;
-        }
-        if (this.recoverBlockedWildernessBot(entry, now)) {
-          continue;
-        }
-        if (this.hasCombatLinks(player)) {
-          this.clearDeadCombatLinks(entry);
-        }
-        if (sampleEntry && this._profileWindow) {
-          this._profileWindow.sampledEntries += 1;
-          if (modeProfile) {
-            modeProfile.sampledEntries += 1;
-          }
-        }
+    });
 
-        const combat = player.getCombat?.();
-        const attacker = combat?.getAttacker?.();
-        const target = combat?.getTarget?.();
-        const hasPendingTraversal =
-          state.awaitingDitchTransition != null ||
-          state.roaming?.pendingRetry != null;
-        const needsNpcAggro =
-          !!this.npcAggroPolicyHandler &&
-          (attacker?.isNpc?.() === true || target?.isNpc?.() === true);
-
-        let shouldProcessHeavy = true;
-        let traversalStartNs = 0n;
-        let npcAggroStartNs = 0n;
-        if (sampleEntry && this._profileWindow) {
-          traversalStartNs = process.hrtime.bigint();
-          npcAggroStartNs = process.hrtime.bigint();
-        }
-
-        if (!hasPendingTraversal && !needsNpcAggro) {
-          let heavyGateStartNs = 0n;
-          if (sampleEntry && this._profileWindow) {
-            heavyGateStartNs = process.hrtime.bigint();
-          }
-          shouldProcessHeavy = this.shouldProcessEntryHeavy(entry, now);
-          if (sampleEntry && this._profileWindow) {
-            this._profileWindow.heavyGateMs += this.elapsedMs(heavyGateStartNs);
-          }
-          if (!shouldProcessHeavy) {
+    const startIndex = this._entryCursor % totalEntries;
+    let processedRegularEntries = 0;
+    const budgetYielded = ServerPerf.measurePhase(
+      "task.bot_behavior.regular_entries",
+      () => {
+        for (let offset = 0; offset < totalEntries; offset++) {
+          const index = (startIndex + offset) % totalEntries;
+          const entry = this.entries[index];
+          if (urgentEntries.has(entry)) {
             continue;
           }
-        }
-
-        // Traversal processing is only needed while an actual transition/retry
-        // is queued; avoid the call overhead on every idle bot tick.
-        if (hasPendingTraversal && state.awaitingDitchTransition != null) {
-          this.traversalService.processTransition(player, state, now);
-        }
-        if (hasPendingTraversal && state.roaming?.pendingRetry != null) {
-          this.traversalService.processPendingRetry(player, state, now);
-        }
-        if (sampleEntry && this._profileWindow) {
-          this._profileWindow.traversalMs += this.elapsedMs(traversalStartNs);
-        }
-
-        // Only run NPC aggro policy when NPC combat context exists.
-        if (needsNpcAggro) {
-          this.npcAggroPolicyHandler.handlePlayerProcess({
-            player,
-            nowMs: now,
-          });
-        }
-        if (sampleEntry && this._profileWindow) {
-          this._profileWindow.npcAggroMs += this.elapsedMs(npcAggroStartNs);
-        }
-
-        if (sampleEntry && this._profileWindow) {
-          this._profileWindow.heavyEntries += 1;
-          if (modeProfile) {
-            modeProfile.heavyEntries += 1;
+          if (this.shouldYieldForBudget(startedAtMs, processedRegularEntries)) {
+            this._entryCursor = index;
+            this.logBudgetYield(now, {
+              elapsedMs: Date.now() - startedAtMs,
+              totalEntries,
+              urgentEntries: urgentEntries.size,
+              processedRegularEntries,
+              nextCursor: this._entryCursor,
+              budgetMs: this.executionBudget.maxMs,
+            });
+            return true;
           }
+          processedRegularEntries += 1;
+          this.processEntry(entry, index, now, sharedCycleState);
         }
-        let autonomyStartNs = 0n;
-        if (sampleEntry && this._profileWindow) {
-          autonomyStartNs = process.hrtime.bigint();
-        }
-        this.processAutonomousMode(entry, now);
-        if (sampleEntry && this._profileWindow) {
-          const autonomyMs = this.elapsedMs(autonomyStartNs);
-          this._profileWindow.autonomyMs += autonomyMs;
-          if (modeProfile) {
-            modeProfile.autonomyMs += autonomyMs;
-          }
-        }
-        if (this.shouldSkipIdlePvpControllerTick(entry, now)) {
-          continue;
-        }
-        let controllerStartNs = 0n;
-        if (sampleEntry && this._profileWindow) {
-          controllerStartNs = process.hrtime.bigint();
-        }
-        entry.controller.tick(now);
-        if (sampleEntry && this._profileWindow) {
-          const controllerMs = this.elapsedMs(controllerStartNs);
-          this._profileWindow.controllerMs += controllerMs;
-          if (modeProfile) {
-            modeProfile.controllerMs += controllerMs;
-          }
-        }
-      } catch (err) {
-        console.error("[bots] behavior tick failed", err);
-      } finally {
-        if (sampleEntry && this._profileWindow) {
-          const totalEntryMs = this.elapsedMs(entryStartNs);
-          this._profileWindow.totalEntryMs += totalEntryMs;
-          if (modeProfile) {
-            modeProfile.totalEntryMs += totalEntryMs;
-          }
-        }
+        return false;
       }
+    );
+    if (budgetYielded === true) {
+      this.flushTaskProfileIfDue(now);
+      return;
     }
+
+    this._entryCursor = (startIndex + processedRegularEntries) % totalEntries;
     this.flushTaskProfileIfDue(now);
   }
 }

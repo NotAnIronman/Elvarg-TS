@@ -1,24 +1,7 @@
 const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
-const { BountyHunter } = require("../../src/main/typescript/elvarg/game/content/combat/bountyhunter/BountyHunter");
 const { Obelisks } = require("../../src/main/typescript/elvarg/game/content/Obelisks");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
-
-function addToWildList(player) {
-  if (player?.isPlayerBot?.()) {
-    return;
-  }
-  if (!BountyHunter.PLAYERS_IN_WILD.includes(player)) {
-    BountyHunter.PLAYERS_IN_WILD.push(player);
-  }
-}
-
-function removeFromWildList(player) {
-  const index = BountyHunter.PLAYERS_IN_WILD.indexOf(player);
-  if (index >= 0) {
-    BountyHunter.PLAYERS_IN_WILD.splice(index, 1);
-  }
-}
 
 function readPlayerTile(player) {
   const location = player?.getLocation?.();
@@ -51,8 +34,6 @@ function refreshWildernessUi(player, tile, inWilderness) {
   if (inWilderness) {
     player.getPacketSender().sendInteractionOption("Attack", 2, true);
     player.getPacketSender().sendWalkableInterface(197);
-    addToWildList(player);
-    BountyHunter.updateInterface(player);
 
     const level = Wilderness.levelForY(tile.y);
     if (player.getWildernessLevel() !== level) {
@@ -69,7 +50,6 @@ function refreshWildernessUi(player, tile, inWilderness) {
 
   player.getPacketSender().sendWalkableInterface(-1);
   player.getPacketSender().sendInteractionOption("null", 2, true);
-  removeFromWildList(player);
 
   if (player.getWildernessLevel() !== 0) {
     player.setWildernessLevel(0);
@@ -235,7 +215,6 @@ module.exports = {
 
     api.onPlayerDisconnect(({ player }) => {
       inWildState.delete(player);
-      removeFromWildList(player);
     });
 
     api.onCanTeleport((event) => {
@@ -336,22 +315,6 @@ module.exports = {
       if (Obelisks.activate(event.objectId)) {
         event.handled = true;
       }
-    });
-
-    api.onPlayerDefeated(({ killer, victim }) => {
-      if (!killer || !victim) {
-        return;
-      }
-      if (killer?.isPlayerBot?.() || victim?.isPlayerBot?.()) {
-        return;
-      }
-      if (
-        !getCachedInWilderness(inWildState, killer) ||
-        !getCachedInWilderness(inWildState, victim)
-      ) {
-        return;
-      }
-      BountyHunter.onDeath(killer, victim, true, 50);
     });
 
     api.log("registered");

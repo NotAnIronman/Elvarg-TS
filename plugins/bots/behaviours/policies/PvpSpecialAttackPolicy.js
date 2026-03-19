@@ -7,16 +7,14 @@ const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers
 const { ItemIdentifiers } = require("../../../../src/main/typescript/elvarg/util/ItemIdentifiers");
 const { EquipPacketListener } = require("../../../../src/main/typescript/elvarg/net/packet/impl/EquipPacketListener");
 const { getPvpProfile } = require("../pvp/PvpAssignment");
-
-const SUPPORTED_SPEC_WEAPONS = Object.freeze([
-  ItemIdentifiers.ANCIENT_GODSWORD,
-  ItemIdentifiers.DARK_BOW,
-  ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
-  ItemIdentifiers.GRANITE_MAUL,
-  ItemIdentifiers.MAGIC_SHORTBOW,
-  ItemIdentifiers.MAGIC_SHORTBOW_I_,
-  ItemIdentifiers.MAGIC_SHORTBOW_3,
-]);
+const {
+  getAmmoId,
+  getPvpCombatSnapshot,
+  getWeaponId,
+  invalidatePvpCombatSnapshot,
+  resolveInventorySlotByItemId,
+  SUPPORTED_SPEC_WEAPONS,
+} = require("./PvpCombatRuntimeCache");
 
 const SWITCHABLE_SPEC_WEAPONS = new Set([
   ItemIdentifiers.ANCIENT_GODSWORD,
@@ -30,6 +28,8 @@ const SWITCHABLE_SPEC_WEAPONS = new Set([
 
 const POST_SPEC_SWITCHBACK_DELAY_MS = 900;
 const ONE_TICK_ATTACK_WINDOW_TICKS = 2;
+const ONE_TICK_FAST_CHECK_COOLDOWN_MS = 450;
+const SWITCHBACK_RETRY_COOLDOWN_MS = 450;
 
 function getSpecialForWeaponId(weaponId) {
   if (!Number.isInteger(weaponId) || weaponId <= 0) {
@@ -44,10 +44,6 @@ function getSpecialForWeaponId(weaponId) {
     }
   }
   return null;
-}
-
-function getWeaponId(player) {
-  return player?.getEquipment?.()?.get?.(Equipment.WEAPON_SLOT)?.getId?.() ?? -1;
 }
 
 function getOwnHpRatio(player) {
@@ -98,11 +94,11 @@ function isWithinMeleeRange(player, target) {
   return Number(playerLoc.getDistance?.(targetLoc) ?? 99) <= 1;
 }
 
-function resolveInventoryWeapon(player, weaponId) {
+function resolveInventoryWeapon(player, weaponId, snapshot = null) {
   if (!player || !Number.isInteger(weaponId) || weaponId <= 0) {
     return null;
   }
-  const slot = player?.getInventory?.()?.getSlotForItemId?.(weaponId) ?? -1;
+  const slot = resolveInventorySlotByItemId(player, weaponId, snapshot);
   if (slot < 0) {
     return null;
   }
@@ -128,17 +124,38 @@ function shouldUseOneTickNow(player, target, state, profile) {
   return Number(state?.pvp?.lastDamageTakenAt ?? 0) > 0;
 }
 
-function resolveInventorySpecWeapon(player, state) {
+function resolveInventorySpecWeapon(player, state, snapshot = null) {
+  const cachedPreferred = snapshot?.preferredSpecCandidate ?? null;
+  const preferredSlot = resolveInventorySlotByItemId(
+    player,
+    cachedPreferred?.weaponId ?? -1,
+    snapshot,
+    cachedPreferred?.slot ?? -1
+  );
+  if (preferredSlot >= 0) {
+    return {
+      weaponId: cachedPreferred.weaponId,
+      slot: preferredSlot,
+      special: getSpecialForWeaponId(cachedPreferred.weaponId),
+    };
+  }
+  const cachedFallback = snapshot?.fallbackSpecCandidate ?? null;
+  const fallbackSlot = resolveInventorySlotByItemId(
+    player,
+    cachedFallback?.weaponId ?? -1,
+    snapshot,
+    cachedFallback?.slot ?? -1
+  );
+  if (fallbackSlot >= 0) {
+    return {
+      weaponId: cachedFallback.weaponId,
+      slot: fallbackSlot,
+      special: getSpecialForWeaponId(cachedFallback.weaponId),
+    };
+  }
   const inventory = player?.getInventory?.();
   if (!inventory) {
     return null;
-  }
-  const preferredId = Number(state?.pvp?.generatedSpecWeaponId ?? -1);
-  if (preferredId > 0) {
-    const preferredSlot = inventory.getSlotForItemId?.(preferredId) ?? -1;
-    if (preferredSlot >= 0) {
-      return { weaponId: preferredId, slot: preferredSlot, special: getSpecialForWeaponId(preferredId) };
-    }
   }
   for (const weaponId of SUPPORTED_SPEC_WEAPONS) {
     const slot = inventory.getSlotForItemId?.(weaponId) ?? -1;
@@ -211,7 +228,7 @@ function shouldUseSpecNow(player, target, state, profile, special, weaponId) {
   return Math.random() <= chance;
 }
 
-function equipWeaponFromInventory(player, slot, weaponId) {
+function equipWeaponFromInventory(player, state, slot, weaponId) {
   if (slot < 0 || weaponId <= 0) {
     return false;
   }
@@ -221,15 +238,21 @@ function equipWeaponFromInventory(player, slot, weaponId) {
     slot,
     require("../../../../src/main/typescript/elvarg/game/model/container/impl/Inventory").Inventory.INTERFACE_ID
   );
-  return getWeaponId(player) === weaponId;
+  const switched = getWeaponId(player) === weaponId;
+  if (switched) {
+    invalidatePvpCombatSnapshot(state);
+  }
+  return switched;
 }
 
-function equipAmmoFromInventory(player, ammoId) {
+function equipAmmoFromInventory(player, state, ammoId, snapshot = null) {
   if (!player || !Number.isInteger(ammoId) || ammoId <= 0) {
     return false;
   }
-  const inventory = player.getInventory?.();
-  const slot = inventory?.getSlotForItemId?.(ammoId) ?? -1;
+  if (getAmmoId(player) === ammoId) {
+    return true;
+  }
+  const slot = resolveInventorySlotByItemId(player, ammoId, snapshot);
   if (slot < 0) {
     return false;
   }
@@ -239,28 +262,30 @@ function equipAmmoFromInventory(player, ammoId) {
     slot,
     require("../../../../src/main/typescript/elvarg/game/model/container/impl/Inventory").Inventory.INTERFACE_ID
   );
-  return (
+  const equipped =
     player?.getEquipment?.()?.get?.(Equipment.AMMUNITION_SLOT)?.getId?.() === ammoId
-  );
+  if (equipped) {
+    invalidatePvpCombatSnapshot(state);
+  }
+  return equipped;
 }
 
-function switchBackToPrimaryWeapon(player, state) {
+function switchBackToPrimaryWeapon(player, state, snapshot = null) {
   const primaryWeaponId = Number(state?.pvp?.generatedPrimaryWeaponId ?? -1);
   if (primaryWeaponId <= 0 || getWeaponId(player) === primaryWeaponId) {
     return false;
   }
-  const inventory = player?.getInventory?.();
-  const slot = inventory?.getSlotForItemId?.(primaryWeaponId) ?? -1;
+  const slot = resolveInventorySlotByItemId(player, primaryWeaponId, snapshot);
   if (slot < 0) {
     return false;
   }
-  const switched = equipWeaponFromInventory(player, slot, primaryWeaponId);
+  const switched = equipWeaponFromInventory(player, state, slot, primaryWeaponId);
   if (!switched) {
     return false;
   }
   const primaryAmmoId = Number(state?.pvp?.generatedPrimaryAmmoId ?? -1);
   if (primaryAmmoId > 0) {
-    equipAmmoFromInventory(player, primaryAmmoId);
+    equipAmmoFromInventory(player, state, primaryAmmoId, snapshot);
   }
   return true;
 }
@@ -271,6 +296,9 @@ function maybeSwitchBackToPrimaryWeapon(context) {
   if (!player || !pvp) {
     return false;
   }
+  if (nowMs < Number(pvp.nextSwitchbackCheckAt ?? 0)) {
+    return false;
+  }
   const currentWeaponId = getWeaponId(player);
   const primaryWeaponId = Number(pvp.generatedPrimaryWeaponId ?? -1);
   if (
@@ -279,15 +307,30 @@ function maybeSwitchBackToPrimaryWeapon(context) {
     currentWeaponId === primaryWeaponId ||
     !SWITCHABLE_SPEC_WEAPONS.has(currentWeaponId)
   ) {
+    pvp.nextSwitchbackCheckAt = 0;
     return false;
   }
   if (player?.isSpecialActivated?.() === true) {
+    pvp.nextSwitchbackCheckAt = nowMs + SWITCHBACK_RETRY_COOLDOWN_MS;
     return false;
   }
-  if (nowMs < Number(pvp.lastSpecAt ?? 0) + POST_SPEC_SWITCHBACK_DELAY_MS) {
+  const earliestSwitchbackAt = Number(pvp.lastSpecAt ?? 0) + POST_SPEC_SWITCHBACK_DELAY_MS;
+  if (nowMs < earliestSwitchbackAt) {
+    pvp.nextSwitchbackCheckAt = earliestSwitchbackAt;
     return false;
   }
-  return switchBackToPrimaryWeapon(player, state);
+  const timers = player.getTimers?.();
+  const attackWindowOpen =
+    timers?.willEndIn?.(TimerKey.COMBAT_ATTACK, 1) === true ||
+    timers?.has?.(TimerKey.COMBAT_ATTACK) !== true;
+  if (!attackWindowOpen) {
+    pvp.nextSwitchbackCheckAt = nowMs + SWITCHBACK_RETRY_COOLDOWN_MS;
+    return false;
+  }
+  const combatSnapshot = getPvpCombatSnapshot(player, state, nowMs);
+  const switched = switchBackToPrimaryWeapon(player, state, combatSnapshot);
+  pvp.nextSwitchbackCheckAt = switched ? 0 : nowMs + SWITCHBACK_RETRY_COOLDOWN_MS;
+  return switched;
 }
 
 function tryActivateSpecial(player) {
@@ -326,19 +369,27 @@ function maybeUseOneTickAttack(context, profile) {
   if (nowMs < Number(pvp.lastOneTickAt ?? 0) + cooldownMs) {
     return false;
   }
-  if (!shouldUseOneTickNow(player, target, state, profile)) {
-    return false;
-  }
-
   const timers = player.getTimers?.();
   const attackWindowOpen =
     timers?.willEndIn?.(TimerKey.COMBAT_ATTACK, ONE_TICK_ATTACK_WINDOW_TICKS) === true ||
     timers?.has?.(TimerKey.COMBAT_ATTACK) !== true;
   if (!attackWindowOpen) {
+    if (nowMs >= Number(pvp.nextOneTickCheckAt ?? 0)) {
+      pvp.nextOneTickCheckAt = nowMs + ONE_TICK_FAST_CHECK_COOLDOWN_MS;
+    }
+    return false;
+  }
+  if (nowMs < Number(pvp.nextOneTickCheckAt ?? 0)) {
+    return false;
+  }
+  pvp.nextOneTickCheckAt = nowMs + ONE_TICK_FAST_CHECK_COOLDOWN_MS;
+
+  if (!shouldUseOneTickNow(player, target, state, profile)) {
     return false;
   }
 
   const pendingTargetHpRatio = getEffectiveTargetHpRatio(target);
+  const combatSnapshot = getPvpCombatSnapshot(player, state, nowMs);
   const oneTickBaseChance = Number(profile?.oneTickUseChance ?? 0);
   const gmaulChance = Math.min(
     0.98,
@@ -351,7 +402,7 @@ function maybeUseOneTickAttack(context, profile) {
           slot: -1,
           special: getSpecialForWeaponId(ItemIdentifiers.GRANITE_MAUL),
         }
-      : resolveInventoryWeapon(player, ItemIdentifiers.GRANITE_MAUL);
+      : resolveInventoryWeapon(player, ItemIdentifiers.GRANITE_MAUL, combatSnapshot);
 
   if (
     gmaulCandidate &&
@@ -360,7 +411,7 @@ function maybeUseOneTickAttack(context, profile) {
   ) {
     if (
       gmaulCandidate.slot >= 0 &&
-      !equipWeaponFromInventory(player, gmaulCandidate.slot, gmaulCandidate.weaponId)
+      !equipWeaponFromInventory(player, state, gmaulCandidate.slot, gmaulCandidate.weaponId)
     ) {
       return false;
     }
@@ -372,7 +423,7 @@ function maybeUseOneTickAttack(context, profile) {
     }
   }
 
-  const inventorySpec = resolveInventorySpecWeapon(player, state);
+  const inventorySpec = resolveInventorySpecWeapon(player, state, combatSnapshot);
   if (!inventorySpec || inventorySpec.weaponId === ItemIdentifiers.GRANITE_MAUL) {
     return false;
   }
@@ -388,12 +439,12 @@ function maybeUseOneTickAttack(context, profile) {
     return false;
   }
 
-  if (!equipWeaponFromInventory(player, inventorySpec.slot, inventorySpec.weaponId)) {
+  if (!equipWeaponFromInventory(player, state, inventorySpec.slot, inventorySpec.weaponId)) {
     return false;
   }
   const specAmmoId = Number(pvp.generatedSpecAmmoId ?? -1);
   if (specAmmoId > 0) {
-    equipAmmoFromInventory(player, specAmmoId);
+    equipAmmoFromInventory(player, state, specAmmoId, combatSnapshot);
   }
   if (tryActivateSpecial(player)) {
     pvp.lastOneTickAt = nowMs;
@@ -411,8 +462,12 @@ function maybeUseSpecialAttack(context) {
     return false;
   }
 
-  const profile = getPvpProfile(pvp.profileId);
-  if (maybeUseOneTickAttack(context, profile)) {
+  const profile = context?.profile ?? getPvpProfile(pvp.profileId);
+  const canCheckOneTick =
+    isVeteranOrEliteProfile(profile) &&
+    nowMs >= Number(pvp.lastOneTickAt ?? 0) + Math.max(600, Number(profile?.oneTickCooldownMs ?? 3000)) &&
+    nowMs >= Number(pvp.nextOneTickCheckAt ?? 0);
+  if (canCheckOneTick && maybeUseOneTickAttack(context, profile)) {
     return true;
   }
   if (nowMs < Number(pvp.nextSpecReviewAt ?? 0)) {
@@ -431,7 +486,8 @@ function maybeUseSpecialAttack(context) {
     }
   }
 
-  const inventorySpec = resolveInventorySpecWeapon(player, state);
+  const combatSnapshot = getPvpCombatSnapshot(player, state, nowMs);
+  const inventorySpec = resolveInventorySpecWeapon(player, state, combatSnapshot);
   const switchChance = Number(profile?.specSwitchChance ?? 0.4);
   if (
     inventorySpec &&
@@ -439,10 +495,10 @@ function maybeUseSpecialAttack(context) {
     Math.random() <= switchChance &&
     shouldUseSpecNow(player, target, state, profile, inventorySpec.special, inventorySpec.weaponId)
   ) {
-    if (equipWeaponFromInventory(player, inventorySpec.slot, inventorySpec.weaponId)) {
+    if (equipWeaponFromInventory(player, state, inventorySpec.slot, inventorySpec.weaponId)) {
       const specAmmoId = Number(pvp.generatedSpecAmmoId ?? -1);
       if (specAmmoId > 0) {
-        equipAmmoFromInventory(player, specAmmoId);
+        equipAmmoFromInventory(player, state, specAmmoId, combatSnapshot);
       }
       const activated = tryActivateSpecial(player);
       if (activated) {
@@ -459,7 +515,7 @@ function maybeUseSpecialAttack(context) {
     currentSpecial &&
     !player?.isSpecialActivated?.()
   ) {
-    switchBackToPrimaryWeapon(player, state);
+    switchBackToPrimaryWeapon(player, state, combatSnapshot);
   }
 
   scheduleSpecReview?.(state, nowMs);

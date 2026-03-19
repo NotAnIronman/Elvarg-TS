@@ -30,6 +30,8 @@ const getMovementQueueCtor = () =>
   require("../../model/movement/MovementQueue").MovementQueue as typeof import("../../model/movement/MovementQueue").MovementQueue;
 const getRegionManager = () =>
   require("../../collision/RegionManager").RegionManager as typeof import("../../collision/RegionManager").RegionManager;
+const getWorld = () =>
+  require("../../World").World as typeof import("../../World").World;
 
 class MobileTask extends Task {
     constructor(ticks: number, private readonly execFunc: Function) {
@@ -109,8 +111,12 @@ export abstract class Mobile extends Entity {
      * @return
      */
     public moveTo(teleportTarget: Location): Mobile {
+        const previousLocation = this.getLocation();
         this.getMovementQueue().reset();
         this.setLocation(teleportTarget.clone());
+        if (this.isNpc()) {
+            getWorld().onNpcMoved(this.getAsNpc(), previousLocation, this.getLocation());
+        }
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
@@ -137,8 +143,12 @@ export abstract class Mobile extends Entity {
             }
         }
 
+        const previousLocation = this.getLocation();
         this.getMovementQueue().reset();
         this.setLocation(chosen.clone());
+        if (this.isNpc()) {
+            getWorld().onNpcMoved(this.getAsNpc(), previousLocation, this.getLocation());
+        }
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
@@ -161,8 +171,12 @@ export abstract class Mobile extends Entity {
                 break;
             }
         }
+        const previousLocation = this.getLocation();
         this.getMovementQueue().reset();
         this.setLocation(chosen.clone());
+        if (this.isNpc()) {
+            getWorld().onNpcMoved(this.getAsNpc(), previousLocation, this.getLocation());
+        }
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);

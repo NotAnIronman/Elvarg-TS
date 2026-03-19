@@ -1,3 +1,6 @@
+import * as fs from "fs";
+import * as path from "path";
+
 type TickPhaseMap = Map<string, number>;
 
 type TickSample = {
@@ -20,8 +23,24 @@ type PhaseSummary = {
 
 export class ServerPerf {
   private static readonly SAMPLE_CAP = 300;
+  private static readonly AUTO_SNAPSHOT_FILE = path.join(
+    process.cwd(),
+    "logs",
+    "server-performance.auto.log"
+  );
+  private static readonly AUTO_SNAPSHOT_LATEST_FILE = path.join(
+    process.cwd(),
+    "logs",
+    "server-performance.auto.latest.log"
+  );
+  private static readonly AUTO_SNAPSHOT_COOLDOWN_MS = 15000;
+  private static readonly AUTO_SUMMARY_TICKS = 30;
+  private static readonly AUTO_TICK_AVG_THRESHOLD_MS = 140;
+  private static readonly AUTO_TICK_MAX_THRESHOLD_MS = 220;
+  private static readonly AUTO_PHASE_AVG_THRESHOLD_MS = 90;
   private static samples: TickSample[] = [];
   private static currentTick: TickSample | null = null;
+  private static lastAutoSnapshotAt = 0;
 
   public static beginTick(
     tickNumber: number,
@@ -79,6 +98,7 @@ export class ServerPerf {
       ServerPerf.samples.shift();
     }
     ServerPerf.currentTick = null;
+    ServerPerf.maybeWriteAutoSnapshot(current);
   }
 
   public static getSummary(limitTicks = 60): {
@@ -111,7 +131,7 @@ export class ServerPerf {
         lastPlayers: 0,
         lastNpcs: 0,
         lastTasks: 0,
-        topPhases: [],
+      topPhases: [],
       };
     }
 
@@ -166,5 +186,55 @@ export class ServerPerf {
       lastTasks: last.tasks,
       topPhases,
     };
+  }
+
+  private static maybeWriteAutoSnapshot(sample: TickSample): void {
+    const nowMs = Date.now();
+    if (nowMs - ServerPerf.lastAutoSnapshotAt < ServerPerf.AUTO_SNAPSHOT_COOLDOWN_MS) {
+      return;
+    }
+
+    const summary = ServerPerf.getSummary(ServerPerf.AUTO_SUMMARY_TICKS);
+    const hottestPhase = summary.topPhases[0] ?? null;
+    const reasonParts: string[] = [];
+    if (summary.avgTickMs >= ServerPerf.AUTO_TICK_AVG_THRESHOLD_MS) {
+      reasonParts.push(`avgTick=${summary.avgTickMs.toFixed(1)}ms`);
+    }
+    if (summary.maxTickMs >= ServerPerf.AUTO_TICK_MAX_THRESHOLD_MS) {
+      reasonParts.push(`maxTick=${summary.maxTickMs.toFixed(1)}ms`);
+    }
+    if (hottestPhase && hottestPhase.avgMs >= ServerPerf.AUTO_PHASE_AVG_THRESHOLD_MS) {
+      reasonParts.push(`${hottestPhase.name}=${hottestPhase.avgMs.toFixed(1)}ms`);
+    }
+    if (reasonParts.length === 0) {
+      return;
+    }
+
+    const timestamp = new Date(nowMs).toISOString();
+    const lines: string[] = [
+      `${timestamp} [serverperf-auto] reason=${reasonParts.join(" ")}`,
+      `${timestamp} [serverperf-auto] ticks=${summary.ticks} avgTick=${summary.avgTickMs.toFixed(
+        1
+      )}ms maxTick=${summary.maxTickMs.toFixed(1)}ms avgDrift=${summary.avgDriftMs.toFixed(
+        1
+      )}ms maxDrift=${summary.maxDriftMs.toFixed(1)}ms`,
+      `${timestamp} [serverperf-auto] lastTick=${sample.tickNumber} players=${sample.players} npcs=${sample.npcs} tasks=${sample.tasks} duration=${sample.durationMs.toFixed(
+        1
+      )}ms drift=${sample.driftMs.toFixed(1)}ms`,
+    ];
+
+    for (const phase of summary.topPhases.slice(0, 12)) {
+      lines.push(
+        `${timestamp} [serverperf-auto] ${phase.name}: total=${phase.totalMs.toFixed(
+          1
+        )}ms avg=${phase.avgMs.toFixed(1)}ms max=${phase.maxMs.toFixed(1)}ms`
+      );
+    }
+
+    const payload = `${lines.join("\n")}\n`;
+    fs.mkdirSync(path.dirname(ServerPerf.AUTO_SNAPSHOT_FILE), { recursive: true });
+    fs.appendFileSync(ServerPerf.AUTO_SNAPSHOT_FILE, payload, "utf8");
+    fs.writeFileSync(ServerPerf.AUTO_SNAPSHOT_LATEST_FILE, payload, "utf8");
+    ServerPerf.lastAutoSnapshotAt = nowMs;
   }
 }

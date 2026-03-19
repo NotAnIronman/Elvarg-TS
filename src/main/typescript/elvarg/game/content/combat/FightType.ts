@@ -261,4 +261,18 @@ export class FightType {
         return this.attackSound;
     }
 
+    public isRapid(): boolean {
+        return this === FightType.CROSSBOW_RAPID
+            || this === FightType.KARILS_CROSSBOW_RAPID
+            || this === FightType.BALLISTA_RAPID
+            || this === FightType.BLOWPIPE_RAPID
+            || this === FightType.SHORTBOW_RAPID
+            || this === FightType.LONGBOW_RAPID
+            || this === FightType.KNIFE_RAPID
+            || this === FightType.OBBY_RING_RAPID
+            || this === FightType.THROWNAXE_RAPID
+            || this === FightType.DART_RAPID
+            || this === FightType.JAVELIN_RAPID;
+    }
+
 }    
