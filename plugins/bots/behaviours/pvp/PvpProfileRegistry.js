@@ -5,6 +5,9 @@ function freezeProfile(profile) {
     ...profile,
     targetReviewMs: Object.freeze({ ...profile.targetReviewMs }),
     prayerReviewMs: Object.freeze({ ...profile.prayerReviewMs }),
+    targetStyleReactionTicks: profile.targetStyleReactionTicks
+      ? Object.freeze({ ...profile.targetStyleReactionTicks })
+      : null,
     specReviewMs: Object.freeze({ ...profile.specReviewMs }),
     freezeReviewMs: Object.freeze({ ...profile.freezeReviewMs }),
     combatActionMs: Object.freeze({ ...profile.combatActionMs }),
@@ -63,6 +66,7 @@ const PVP_PROFILES = Object.freeze({
     label: "Veteran",
     targetReviewMs: { min: 900, max: 1800 },
     prayerReviewMs: { min: 750, max: 1500 },
+    targetStyleReactionTicks: { min: 5, max: 10 },
     specReviewMs: { min: 1800, max: 3200 },
     freezeReviewMs: { min: 5500, max: 9500 },
     combatActionMs: { min: 500, max: 1200 },
@@ -97,6 +101,7 @@ const PVP_PROFILES = Object.freeze({
     label: "Elite",
     targetReviewMs: { min: 420, max: 900 },
     prayerReviewMs: { min: 320, max: 700 },
+    targetStyleReactionTicks: { min: 4, max: 6 },
     specReviewMs: { min: 900, max: 1800 },
     freezeReviewMs: { min: 2400, max: 4800 },
     combatActionMs: { min: 260, max: 620 },

@@ -551,6 +551,89 @@ function chooseF2pMageWearSet() {
   };
 }
 
+function chooseInitiateCape(options = {}) {
+  if (options.preferRange === true) {
+    return choose([ItemIdentifiers.AVAS_ACCUMULATOR, ItemIdentifiers.OBSIDIAN_CAPE]);
+  }
+  return choose([
+    ItemIdentifiers.OBSIDIAN_CAPE,
+    ItemIdentifiers.STRENGTH_CAPE_T_,
+    ItemIdentifiers.ZAMORAK_CAPE,
+  ]);
+}
+
+function chooseInitiateAmulet(options = {}) {
+  if (options.preferStrength === true) {
+    return choose([ItemIdentifiers.AMULET_OF_STRENGTH, ItemIdentifiers.AMULET_OF_GLORY]);
+  }
+  return choose([ItemIdentifiers.AMULET_OF_GLORY, ItemIdentifiers.AMULET_OF_STRENGTH]);
+}
+
+function chooseInitiateGloves(profile) {
+  const options = [
+    ItemIdentifiers.MITHRIL_GLOVES,
+    ItemIdentifiers.ADAMANT_GLOVES,
+    ItemIdentifiers.COMBAT_BRACELET,
+  ];
+  if (isVeteranOrEliteProfile(profile)) {
+    options.push(ItemIdentifiers.BARROWS_GLOVES);
+  }
+  return choose(options);
+}
+
+function chooseInitiateRing(profile) {
+  const options = [ItemIdentifiers.RING_OF_RECOIL, ItemIdentifiers.BERSERKER_RING];
+  if (isEliteProfile(profile)) {
+    options.push(ItemIdentifiers.BERSERKER_RING_I_);
+  }
+  return choose(options);
+}
+
+function chooseInitiateOffhand(profile) {
+  const options = [
+    ItemIdentifiers.MITHRIL_DEFENDER,
+    ItemIdentifiers.UNHOLY_BOOK,
+    ItemIdentifiers.BOOK_OF_LAW,
+  ];
+  if (isVeteranOrEliteProfile(profile)) {
+    options.push(ItemIdentifiers.RUNE_DEFENDER);
+  }
+  return choose(options);
+}
+
+function buildInitiateMeleeInventory(specWeaponId, options = {}) {
+  const inventory = [
+    item(specWeaponId),
+    item(ItemIdentifiers.SUPER_ATTACK_4_),
+    item(ItemIdentifiers.SUPER_STRENGTH_4_),
+    item(ItemIdentifiers.SUPER_RESTORE_4_),
+    item(ItemIdentifiers.SUPER_RESTORE_4_),
+    item(ItemIdentifiers.SARADOMIN_BREW_4_),
+    item(ItemIdentifiers.RING_OF_RECOIL),
+  ];
+  const karams = Number(options.comboEatCount ?? 5);
+  inventory.push(...repeat(ItemIdentifiers.COOKED_KARAMBWAN, 1, karams));
+  fillFood(inventory, ItemIdentifiers.SHARK, 28 - inventory.length);
+  return inventory.slice(0, 28);
+}
+
+function buildInitiateRangeInventory(specWeaponId, ammoAmount = 180, options = {}) {
+  const inventory = compact([
+    item(specWeaponId),
+    item(ItemIdentifiers.RUNE_ARROW, ammoAmount),
+    item(ItemIdentifiers.RANGING_POTION_4_),
+    item(ItemIdentifiers.SUPER_ATTACK_4_),
+    item(ItemIdentifiers.SUPER_STRENGTH_4_),
+    item(ItemIdentifiers.SUPER_RESTORE_4_),
+    item(ItemIdentifiers.SUPER_RESTORE_4_),
+    item(ItemIdentifiers.SARADOMIN_BREW_4_),
+  ]);
+  const karams = Number(options.comboEatCount ?? 5);
+  inventory.push(...repeat(ItemIdentifiers.COOKED_KARAMBWAN, 1, karams));
+  fillFood(inventory, ItemIdentifiers.SHARK, 28 - inventory.length);
+  return inventory.slice(0, 28);
+}
+
 const F2P_MAGIC_PACKAGES = Object.freeze([
   Object.freeze({
     weight: 2,
@@ -889,6 +972,73 @@ function buildF2pBindKoInventory(options = {}) {
 }
 
 const ARCHETYPES = Object.freeze({
+  initiate_dscim_dds: Object.freeze({
+    id: "initiate_dscim_dds",
+    weight: 18,
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [60, 20, 99, 90, 82, 52, 94],
+    autocastSpellId: -1,
+    equipment: (magicPackage, profile) =>
+      compact([
+        item(ItemIdentifiers.INITIATE_SALLET),
+        item(chooseInitiateCape()),
+        item(ItemIdentifiers.DRAGON_SCIMITAR),
+        item(chooseInitiateAmulet({ preferStrength: true })),
+        item(ItemIdentifiers.INITIATE_HAUBERK),
+        item(chooseInitiateOffhand(profile)),
+        item(ItemIdentifiers.INITIATE_CUISSE),
+        item(chooseInitiateGloves(profile)),
+        item(choose([ItemIdentifiers.CLIMBING_BOOTS, ItemIdentifiers.ROCK_CLIMBING_BOOTS])),
+        item(chooseInitiateRing(profile)),
+      ]),
+    inventory: () =>
+      buildInitiateMeleeInventory(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_),
+  }),
+  initiate_dscim_gmaul: Object.freeze({
+    id: "initiate_dscim_gmaul",
+    weight: 16,
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [60, 20, 99, 90, 88, 52, 82],
+    autocastSpellId: -1,
+    equipment: (magicPackage, profile) =>
+      compact([
+        item(ItemIdentifiers.INITIATE_SALLET),
+        item(chooseInitiateCape()),
+        item(ItemIdentifiers.DRAGON_SCIMITAR),
+        item(chooseInitiateAmulet({ preferStrength: true })),
+        item(ItemIdentifiers.INITIATE_HAUBERK),
+        item(chooseInitiateOffhand(profile)),
+        item(choose([ItemIdentifiers.INITIATE_CUISSE, ItemIdentifiers.BLACK_DHIDE_CHAPS])),
+        item(chooseInitiateGloves(profile)),
+        item(choose([ItemIdentifiers.CLIMBING_BOOTS, ItemIdentifiers.ROCK_CLIMBING_BOOTS])),
+        item(chooseInitiateRing(profile)),
+      ]),
+    inventory: () =>
+      buildInitiateMeleeInventory(ItemIdentifiers.GRANITE_MAUL, { comboEatCount: 6 }),
+  }),
+  initiate_msb_gmaul: Object.freeze({
+    id: "initiate_msb_gmaul",
+    weight: 12,
+    spellbook: MagicSpellbook.NORMAL,
+    stats: [50, 20, 99, 88, 96, 52, 82],
+    autocastSpellId: -1,
+    equipment: (magicPackage, profile) =>
+      compact([
+        item(ItemIdentifiers.INITIATE_SALLET),
+        item(chooseInitiateCape({ preferRange: true })),
+        item(ItemIdentifiers.MAGIC_SHORTBOW),
+        item(chooseInitiateAmulet()),
+        item(ItemIdentifiers.INITIATE_HAUBERK),
+        null,
+        item(choose([ItemIdentifiers.BLACK_DHIDE_CHAPS, ItemIdentifiers.INITIATE_CUISSE])),
+        item(chooseInitiateGloves(profile)),
+        item(choose([ItemIdentifiers.CLIMBING_BOOTS, ItemIdentifiers.ROCK_CLIMBING_BOOTS])),
+        item(chooseInitiateRing(profile)),
+        item(ItemIdentifiers.RUNE_ARROW, 140),
+      ]),
+    inventory: () =>
+      buildInitiateRangeInventory(ItemIdentifiers.GRANITE_MAUL, 180),
+  }),
   f2p_rwh_pure: Object.freeze({
     id: "f2p_rwh_pure",
     weight: 18,

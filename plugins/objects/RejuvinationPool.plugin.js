@@ -1,10 +1,13 @@
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 
-const POOL_ID = ObjectIds.ORNATE_REJUVENATION_POOL;
+const POOL_IDS = [
+  ObjectIds.FANCY_REJUVENATION_POOL,
+  ObjectIds.ORNATE_REJUVENATION_POOL,
+];
 const ATTR_BLEED_TASK_KEY = "combat:bleed:taskKey";
 
 function isRecentPvpCombat(player) {
@@ -12,17 +15,22 @@ function isRecentPvpCombat(player) {
     return false;
   }
   const combat = player.getCombat?.();
-  const participants = [
-    combat?.getTarget?.(),
-    combat?.getAttacker?.(),
-    player.getCombatFollowing?.(),
-  ];
-  return participants.some(
-    (other) =>
-      other?.isPlayer?.() === true &&
-      other?.isRegistered?.() === true &&
-      (other.getHitpoints?.() ?? 0) > 0
-  );
+  const playerTimers = player.getTimers?.();
+  const participants = [combat?.getTarget?.(), combat?.getAttacker?.()];
+  return participants.some((other) => {
+    if (
+      other?.isPlayer?.() !== true ||
+      other?.isRegistered?.() !== true ||
+      (other.getHitpoints?.() ?? 0) <= 0
+    ) {
+      return false;
+    }
+    const otherTimers = other.getTimers?.();
+    return (
+      playerTimers?.has?.(TimerKey.COMBAT_ATTACK) === true ||
+      otherTimers?.has?.(TimerKey.COMBAT_ATTACK) === true
+    );
+  });
 }
 
 function restoreLoweredStats(player) {
@@ -97,7 +105,7 @@ function restoreFromPool(player) {
 module.exports = {
   name: "RejuvinationPool",
   register(api) {
-    api.onObjectFirstClick([POOL_ID], (event) => {
+    api.onObjectFirstClick(POOL_IDS, (event) => {
       if (isRecentPvpCombat(event.player)) {
         event.player
           .getPacketSender()

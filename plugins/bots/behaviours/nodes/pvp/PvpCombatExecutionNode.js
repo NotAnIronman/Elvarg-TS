@@ -4,6 +4,7 @@ const { PrayerHandler } = require("../../../../../src/main/typescript/elvarg/gam
 const {
   CombatType,
 } = require("../../../../../src/main/typescript/elvarg/game/content/combat/CombatType");
+const { GameConstants } = require("../../../../../src/main/typescript/elvarg/game/GameConstants");
 const { ServerPerf } = require("../../../../../src/main/typescript/elvarg/util/ServerPerf");
 const { randomInRange } = require("../../navigation/BotNavigation");
 const {
@@ -38,6 +39,7 @@ const MANAGED_OFFENSIVE_PRAYERS = Object.freeze([
   ...RANGED_OFFENSIVE_PRAYERS,
   ...MAGIC_OFFENSIVE_PRAYERS,
 ]);
+const GAME_TICK_MS = Number(GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE ?? 600);
 
 function deactivatePrayerSet(player, prayerIds, exceptPrayerId = null) {
   if (!player || !Array.isArray(prayerIds)) {
@@ -89,6 +91,10 @@ function hasOtherActivePrayer(player, prayerIds, exceptPrayerId = null) {
   return false;
 }
 
+function normalizeCombatType(combatType) {
+  return Number.isInteger(combatType) ? combatType : null;
+}
+
 class PvpCombatExecutionNode {
   constructor(options = {}) {
     this.setPhase = options.setPhase;
@@ -102,6 +108,93 @@ class PvpCombatExecutionNode {
     this.scheduleReviewTimers = options.scheduleReviewTimers;
     this.getProfile = options.getProfile;
     this.pvpPhase = options.pvpPhase;
+  }
+
+  resolveObservedTargetCombatType(state, target, nowMs, profile = null) {
+    const pvp = state?.pvp;
+    const targetUsername = target?.getUsername?.() ?? null;
+    if (!pvp || !target || !targetUsername) {
+      return null;
+    }
+
+    const actualTargetCombatType = normalizeCombatType(
+      resolveCurrentCombatType(target, target?.getWeapon?.(), getWeaponId(target))
+    );
+    const reactionTicks = profile?.targetStyleReactionTicks ?? null;
+    const reactionMinMs = Math.max(
+      0,
+      Number(reactionTicks?.min ?? 0) * GAME_TICK_MS
+    );
+    const reactionMaxMs = Math.max(
+      reactionMinMs,
+      Number(reactionTicks?.max ?? 0) * GAME_TICK_MS
+    );
+
+    if (pvp.cachedPrayerTargetUsername !== targetUsername) {
+      pvp.observedPrayerTargetCombatType = actualTargetCombatType;
+      pvp.pendingPrayerTargetCombatType = null;
+      pvp.pendingPrayerTargetCombatTypeAt = 0;
+      return actualTargetCombatType;
+    }
+
+    const observedCombatType = normalizeCombatType(pvp.observedPrayerTargetCombatType);
+    if (actualTargetCombatType == null) {
+      pvp.pendingPrayerTargetCombatType = null;
+      pvp.pendingPrayerTargetCombatTypeAt = 0;
+      return observedCombatType;
+    }
+    if (observedCombatType == null) {
+      pvp.observedPrayerTargetCombatType = actualTargetCombatType;
+      pvp.pendingPrayerTargetCombatType = null;
+      pvp.pendingPrayerTargetCombatTypeAt = 0;
+      return actualTargetCombatType;
+    }
+    if (reactionMaxMs <= 0) {
+      pvp.observedPrayerTargetCombatType = actualTargetCombatType;
+      pvp.pendingPrayerTargetCombatType = null;
+      pvp.pendingPrayerTargetCombatTypeAt = 0;
+      return actualTargetCombatType;
+    }
+
+    if (actualTargetCombatType === observedCombatType) {
+      pvp.pendingPrayerTargetCombatType = null;
+      pvp.pendingPrayerTargetCombatTypeAt = 0;
+      return observedCombatType;
+    }
+
+    const pendingCombatType = normalizeCombatType(pvp.pendingPrayerTargetCombatType);
+    if (
+      pendingCombatType !== actualTargetCombatType ||
+      Number(pvp.pendingPrayerTargetCombatTypeAt ?? 0) <= 0
+    ) {
+      pvp.pendingPrayerTargetCombatType = actualTargetCombatType;
+      pvp.pendingPrayerTargetCombatTypeAt =
+        nowMs + randomInRange(reactionMinMs, reactionMaxMs);
+      return observedCombatType;
+    }
+
+    if (nowMs >= Number(pvp.pendingPrayerTargetCombatTypeAt ?? 0)) {
+      pvp.observedPrayerTargetCombatType = pendingCombatType;
+      pvp.pendingPrayerTargetCombatType = null;
+      pvp.pendingPrayerTargetCombatTypeAt = 0;
+      return pendingCombatType;
+    }
+
+    return observedCombatType;
+  }
+
+  resolveNextPrayerReviewAt(nowMs, baseMinMs, baseMaxMs, isStable, pendingTargetCombatTypeAt = 0) {
+    const nextReviewAt =
+      nowMs +
+      randomInRange(
+        isStable ? Math.max(baseMinMs + 200, Math.floor(baseMinMs * 2)) : baseMinMs,
+        isStable ? Math.max(baseMaxMs + 400, Math.floor(baseMaxMs * 2)) : baseMaxMs
+      );
+    const pendingReviewAt = Number(pendingTargetCombatTypeAt ?? 0);
+    if (pendingReviewAt > nowMs) {
+      return Math.min(nextReviewAt, pendingReviewAt);
+    }
+    return nextReviewAt;
   }
 
   reviewPrayers(player, state, target, nowMs, profile = null) {
@@ -125,12 +218,13 @@ class PvpCombatExecutionNode {
     const playerCombatType =
       combatSnapshot?.currentCombatType ??
       resolveCurrentCombatType(player, player?.getWeapon?.(), getWeaponId(player));
-    const targetCombatType = resolveCurrentCombatType(
-      target,
-      target?.getWeapon?.(),
-      getWeaponId(target)
-    );
     const targetUsername = target.getUsername?.() ?? null;
+    const targetCombatType = this.resolveObservedTargetCombatType(
+      state,
+      target,
+      nowMs,
+      resolvedProfile
+    );
     const desiredProtectionPrayer = this.resolveProtectionPrayer(
       player,
       target,
@@ -184,16 +278,13 @@ class PvpCombatExecutionNode {
     pvp.cachedPrayerTargetCombatType = targetCombatType;
     pvp.cachedPrayerPlayerCombatType = playerCombatType;
     pvp.cachedPrayerTargetUsername = targetUsername;
-    pvp.nextPrayerReviewAt =
-      nowMs +
-      randomInRange(
-        protectionStable && offensiveStable
-          ? Math.max(basePrayerReviewMinMs + 200, Math.floor(basePrayerReviewMinMs * 2))
-          : basePrayerReviewMinMs,
-        protectionStable && offensiveStable
-          ? Math.max(basePrayerReviewMaxMs + 400, Math.floor(basePrayerReviewMaxMs * 2))
-          : basePrayerReviewMaxMs
-      );
+    pvp.nextPrayerReviewAt = this.resolveNextPrayerReviewAt(
+      nowMs,
+      basePrayerReviewMinMs,
+      basePrayerReviewMaxMs,
+      protectionStable && offensiveStable,
+      pvp.pendingPrayerTargetCombatTypeAt
+    );
     return true;
   }
 
@@ -255,10 +346,11 @@ class PvpCombatExecutionNode {
     ) {
       return true;
     }
-    const targetCombatType = resolveCurrentCombatType(
+    const targetCombatType = this.resolveObservedTargetCombatType(
+      state,
       target,
-      target?.getWeapon?.(),
-      getWeaponId(target)
+      nowMs,
+      this.getProfile?.(state) ?? null
     );
     return pvp.cachedPrayerTargetCombatType !== targetCombatType;
   }

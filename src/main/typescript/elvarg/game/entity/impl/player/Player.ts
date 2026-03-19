@@ -677,6 +677,7 @@ export class Player extends Mobile {
             this.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
         }
         this.getPacketSender().sendTabInterface(6, this.getSpellbook().getInterfaceId());
+        CombatSpecial.ensureRestoreTask(this);
 
         // Keep baseline right-click player interactions available outside wilderness/duel areas.
         this.getPacketSender().sendInteractionOption("Follow", 3, false);

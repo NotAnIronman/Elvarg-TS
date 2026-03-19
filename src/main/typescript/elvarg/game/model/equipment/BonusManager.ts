@@ -59,9 +59,6 @@ export class BonusManager {
             const definition = ItemDefinition.forId(item.getId());
             if (definition.getBonuses() != null) {
                 for (let i = 0; i < definition.getBonuses().length; i++) {
-                    if (i == 11 && bonuses[i] != 0) {
-                        continue;
-                    }
                     bonuses[i] += definition.getBonuses()[i];
                 }
             }

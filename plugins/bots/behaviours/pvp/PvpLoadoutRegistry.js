@@ -67,6 +67,16 @@ const PVP_LOADOUTS = Object.freeze({
     inventoryBias: { food: 0.58, potions: 0.14, comboEat: 0.03 },
     hotspots: ["edge_ditch", "edge_south", "chaos_temple"],
   }),
+  initiate_pure: freezeLoadout({
+    id: "initiate_pure",
+    label: "Initiate Pure",
+    tags: ["edge", "pure", "initiate", "melee"],
+    weaponFamilies: ["dscim", "dds", "gmaul", "msb"],
+    armorFamilies: ["initiate", "mixed", "dhide"],
+    archetypes: ["initiate_dscim_dds", "initiate_dscim_gmaul", "initiate_msb_gmaul"],
+    inventoryBias: { food: 0.56, potions: 0.18, comboEat: 0.08 },
+    hotspots: ["edge_ditch", "edge_south", "chaos_temple"],
+  }),
   f2p_strength_pure: freezeLoadout({
     id: "f2p_strength_pure",
     label: "F2P Strength Pure",

@@ -202,6 +202,7 @@ const BOT_CONFIG = Object.freeze({
       Object.freeze({ value: "deep_wild_hybrid", weight: 15 }),
       Object.freeze({ value: "anti_pk_hybrid", weight: 12 }),
       Object.freeze({ value: "budget_pk", weight: 17 }),
+      Object.freeze({ value: "initiate_pure", weight: 10 }),
       Object.freeze({ value: "f2p_strength_pure", weight: 8 }),
       Object.freeze({ value: "f2p_rune_pure", weight: 10 }),
       Object.freeze({ value: "f2p_range_ko", weight: 7 }),

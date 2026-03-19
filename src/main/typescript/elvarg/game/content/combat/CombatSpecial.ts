@@ -332,14 +332,30 @@ export class CombatSpecial {
     public static drain(character: Mobile, amount: number) {
         character.decrementSpecialPercentage(amount);
 
-        if (!character.isRecoveringSpecialAttack()) {
-            TaskManager.submit(new RestoreSpecialAttackTask(character));
-        }
+        CombatSpecial.ensureRestoreTask(character);
 
         if (character.isPlayer()) {
             let p = character.getAsPlayer();
             CombatSpecial.updateBar(p);
         }
+    }
+
+    public static ensureRestoreTask(character: Mobile): boolean {
+        if (!character || character.getSpecialPercentage() >= 100 || character.isRecoveringSpecialAttack()) {
+            return false;
+        }
+
+        let initialDelayTicks: number | undefined;
+        if (character.isPlayer()) {
+            const secondsRemaining = character.getAsPlayer().getSpecialAttackRestore().secondsRemaining();
+            initialDelayTicks = RestoreSpecialAttackTask.initialDelayTicksFromSeconds(
+                secondsRemaining,
+                character
+            );
+        }
+
+        TaskManager.submit(new RestoreSpecialAttackTask(character, initialDelayTicks));
+        return true;
     }
 
     public static updateBar(player: Player) {

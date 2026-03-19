@@ -32,6 +32,8 @@ const getRegionManager = () =>
   require("../../collision/RegionManager").RegionManager as typeof import("../../collision/RegionManager").RegionManager;
 const getWorld = () =>
   require("../../World").World as typeof import("../../World").World;
+const getPlayerRights = () =>
+  require("../../model/rights/PlayerRights").PlayerRights as typeof import("../../model/rights/PlayerRights").PlayerRights;
 
 class MobileTask extends Task {
     constructor(ticks: number, private readonly execFunc: Function) {
@@ -469,10 +471,17 @@ export abstract class Mobile extends Entity {
             hit.setDamage(0);
             return hit;
         }
+        const PlayerRights = getPlayerRights();
+        const protectedDeveloper =
+          this.isPlayer() &&
+          this.getAsPlayer()?.getRights?.() === PlayerRights.DEVELOPER;
         if (hit.getDamage() > this.getHitpoints())
             hit.setDamage(this.getHitpoints());
         if (hit.getDamage() < 0)
             hit.setDamage(0);
+        if (protectedDeveloper) {
+            return hit;
+        }
         let outcome = this.getHitpoints() - hit.getDamage();
         if (outcome < 0)
             outcome = 0;
