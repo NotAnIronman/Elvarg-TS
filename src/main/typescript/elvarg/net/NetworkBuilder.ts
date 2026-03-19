@@ -94,8 +94,6 @@ class LoginSession {
   }> = [];
   private recentKeepAliveCount = 0;
   private recentKeepAliveAt: string | null = null;
-  private loginInitialRegionId: number | null = null;
-  private loginReplacementsSent = false;
   private pendingInboundPacket: {
     opcode: number;
     encOpcode: number;
@@ -361,16 +359,13 @@ class LoginSession {
       ])
     );
     // Encrypted initial packets
-    const initialRegionId = this.sendInitialPackets(player);
+    this.sendInitialPackets(player);
     this.sendInitialNpcs(player);
     PluginManager.emitPlayerLogin({
       player: gamePlayer,
       username: gamePlayer.getUsername(),
     });
     this.stage = "ESTABLISHED";
-
-    this.loginInitialRegionId = initialRegionId;
-    this.loginReplacementsSent = false;
   }
 
   private loadPersistedPlayer(gamePlayer: Player, loginPassword: string): boolean {
@@ -618,7 +613,7 @@ class LoginSession {
     }
   }
 
-  private sendInitialPackets(player: PlayerState): number {
+  private sendInitialPackets(player: PlayerState): void {
     const { location, appearance, username, index } = player;
     const gamePlayerIndex = this.gamePlayer?.getIndex?.();
     const detailsIndex =
@@ -767,7 +762,6 @@ class LoginSession {
     this.sendPacket(104, follow, PacketType.VARIABLE, "follow_option");
     this.sendPacket(104, trade, PacketType.VARIABLE, "trade_option");
 
-    return currentRegionId;
   }
 
   private buildPlayerUpdate(
@@ -1269,10 +1263,9 @@ class LoginSession {
         loc.getX(),
         loc.getY(),
         6,
-        !this.loginReplacementsSent && this.loginInitialRegionId != null ? [this.loginInitialRegionId] : [],
+        [],
         true
       );
-      this.loginReplacementsSent = true;
     } catch (err) {
       this.log("visible_region_replacements_failed", {
         err: (err as Error)?.message ?? String(err),
