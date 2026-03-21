@@ -418,15 +418,6 @@ export class ItemActionPacketListener implements PacketExecutor {
     // }
 
     switch (itemId) {
-      case 12926:
-        player
-          .getPacketSender()
-          .sendMessage(
-            "Your Toxic blowpipe has " +
-              player.getBlowpipeScales() +
-              " Zulrah scales left."
-          );
-        break;
     }
   }
 }

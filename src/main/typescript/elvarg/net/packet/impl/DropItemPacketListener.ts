@@ -81,7 +81,7 @@ export class DropItemPacketListener implements PacketExecutor {
 
     if (item.getDefinition().isDropable()) {
       if (dropEvent.dropToGround !== false) {
-        const toFloor = new Item(item.getId(), item.getAmount());
+        const toFloor = item.clone();
         if (Wilderness.isIn(player)) {
           ItemOnGroundManager.registerGlobal(player, toFloor);
         } else {

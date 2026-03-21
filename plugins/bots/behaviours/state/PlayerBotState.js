@@ -164,6 +164,12 @@ function createPvpBehaviorState() {
     cachedPrayerTargetCombatType: null,
     cachedPrayerPlayerCombatType: null,
     cachedPrayerTargetUsername: null,
+    cachedActualPrayerTargetCombatType: null,
+    cachedActualPrayerTargetWeaponId: null,
+    cachedActualPrayerTargetWeaponInterface: null,
+    cachedActualPrayerTargetCastSpellId: null,
+    cachedActualPrayerTargetAutocastSpellId: null,
+    cachedActualPrayerTargetSpecialActive: null,
     observedPrayerTargetCombatType: null,
     pendingPrayerTargetCombatType: null,
     pendingPrayerTargetCombatTypeAt: 0,
@@ -223,6 +229,12 @@ function clearPvpBehaviorState(state) {
   state.pvp.cachedPrayerTargetCombatType = null;
   state.pvp.cachedPrayerPlayerCombatType = null;
   state.pvp.cachedPrayerTargetUsername = null;
+  state.pvp.cachedActualPrayerTargetCombatType = null;
+  state.pvp.cachedActualPrayerTargetWeaponId = null;
+  state.pvp.cachedActualPrayerTargetWeaponInterface = null;
+  state.pvp.cachedActualPrayerTargetCastSpellId = null;
+  state.pvp.cachedActualPrayerTargetAutocastSpellId = null;
+  state.pvp.cachedActualPrayerTargetSpecialActive = null;
   state.pvp.observedPrayerTargetCombatType = null;
   state.pvp.pendingPrayerTargetCombatType = null;
   state.pvp.pendingPrayerTargetCombatTypeAt = 0;

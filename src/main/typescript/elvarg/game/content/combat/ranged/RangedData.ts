@@ -10,6 +10,7 @@ import { Equipment } from '../../../model/container/impl/Equipment';
 import { ItemIdentifiers } from '../../../../util/ItemIdentifiers';
 import { Misc } from '../../../../util/Misc';
 import { CRYSTAL_BOW_ALL_WEAPON_IDS, CRYSTAL_BOW_PROJECTILE_ID, isCrystalBow } from './CrystalBow';
+import { PluginManager } from '../../../../plugins/PluginManager';
 
 const getFightType = () => require("../FightType").FightType as typeof import("../FightType").FightType;
 
@@ -196,6 +197,8 @@ export class Ammunition {
     public static readonly MITHRIL_DART = new Ammunition(809, new Graphic(235, 0, GraphicHeight.HIGH), 229, 8)
     public static readonly ADAMANT_DART = new Ammunition(810, new Graphic(236, 0, GraphicHeight.HIGH), 230, 13)
     public static readonly RUNE_DART = new Ammunition(811, new Graphic(237, 0, GraphicHeight.HIGH), 231, 17)
+    public static readonly BLACK_DART = new Ammunition(ItemIdentifiers.BLACK_DART, new Graphic(237, 0, GraphicHeight.HIGH), 231, 6)
+    public static readonly AMETHYST_DART = new Ammunition(ItemIdentifiers.AMETHYST_DART, new Graphic(1123, 0, GraphicHeight.HIGH), 226, 28)
     public static readonly DRAGON_DART = new Ammunition(11230, new Graphic(1123, 0, GraphicHeight.HIGH), 226, 24)
 
     public static readonly BRONZE_KNIFE = new Ammunition(864, new Graphic(219, 0, GraphicHeight.HIGH), 212, 3)
@@ -280,12 +283,11 @@ export class Ammunition {
         if (isCrystalBow(weapon)) {
             return Ammunition.CRYSTAL_BOW;
         }
-        const throwWeapon = Ammunition.rangedAmmunition.get(weapon);
-
-        // Toxic blowpipe should always fire dragon darts.
-        if (weapon === 12926) {
-            return Ammunition.DRAGON_DART;
+        const pluginResolvedAmmo = PluginManager.resolveRangedAmmunition(p);
+        if (pluginResolvedAmmo != null) {
+            return pluginResolvedAmmo;
         }
+        const throwWeapon = Ammunition.rangedAmmunition.get(weapon);
 
         // Didn't find one. Try arrows
         if (throwWeapon == null) {
@@ -420,7 +422,7 @@ export class RangedWeapon {
 
     public static readonly BALLISTA = new RangedWeapon([19478, 19481], [Ammunition.BRONZE_JAVELIN, Ammunition.IRON_JAVELIN, Ammunition.STEEL_JAVELIN, Ammunition.MITHRIL_JAVELIN, Ammunition.ADAMANT_JAVELIN, Ammunition.RUNE_JAVELIN, Ammunition.DRAGON_JAVELIN], RangedWeaponType.BALLISTA)
 
-    public static readonly TOXIC_BLOWPIPE = new RangedWeapon([12926], [Ammunition.DRAGON_DART], RangedWeaponType.BLOWPIPE)
+    public static readonly TOXIC_BLOWPIPE = new RangedWeapon([12926], [Ammunition.BRONZE_DART, Ammunition.IRON_DART, Ammunition.STEEL_DART, Ammunition.BLACK_DART, Ammunition.MITHRIL_DART, Ammunition.ADAMANT_DART, Ammunition.RUNE_DART, Ammunition.AMETHYST_DART, Ammunition.DRAGON_DART], RangedWeaponType.BLOWPIPE)
     public static readonly MORRIGANS_JAVELIN = new RangedWeapon([ItemIdentifiers.MORRIGANS_JAVELIN], [Ammunition.MORRIGANS_JAVELIN], RangedWeaponType.MORRIGANS_JAVELIN)
 
 

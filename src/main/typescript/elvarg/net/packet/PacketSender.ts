@@ -129,6 +129,14 @@ export class PacketSender {
     this.player.getSession().write(out);
     return this;
   }
+
+  sendJingle(id: number, delayTicks: number): this {
+    const out = new PacketBuilder(121);
+    out.putShort(id < 0 ? 65535 : id).putShort(delayTicks < 0 ? 65535 : delayTicks);
+    this.player.getSession().write(out);
+    return this;
+  }
+
   sendAutocastId(id: number): this {
     const out = new PacketBuilder(38);
     out.putShort(id);

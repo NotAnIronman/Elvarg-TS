@@ -130,7 +130,7 @@ export abstract class ItemContainer {
     let items = this.getValidItems();
     let array: Item[] = new Array(items.length);
     for (let i = 0; i < items.length; i++) {
-      array[i] = new Item(items[i].getId(), items[i].getAmount());
+      array[i] = items[i].clone();
     }
     return array;
   }
@@ -483,7 +483,19 @@ export abstract class ItemContainer {
       getItemDefinition().forId(item.getId()).isStackable() ||
       this.stackType() == StackType.STACKS
     ) {
-      let slot = this.getSlotForItemId(item.getId());
+      let slot = -1;
+      for (let i = 0; i < this.capacity(); i++) {
+        if (this.items[i].getId() !== item.getId()) {
+          continue;
+        }
+        if (
+          JSON.stringify(this.items[i].getMeta() ?? null) ===
+          JSON.stringify(item.getMeta() ?? null)
+        ) {
+          slot = i;
+          break;
+        }
+      }
       if (slot == -1) {
         slot = this.getEmptySlot();
       }
@@ -500,6 +512,7 @@ export abstract class ItemContainer {
       }
       let totalAmount = this.items[slot].getAmount() + item.getAmount();
       this.items[slot].setId(item.getId());
+      this.items[slot].setMeta(item.getMeta());
       if (totalAmount > Number.MAX_SAFE_INTEGER) {
         this.items[slot].setAmount(Number.MAX_SAFE_INTEGER);
       } else {
@@ -520,8 +533,7 @@ export abstract class ItemContainer {
           }
           return this;
         } else {
-          this.items[slot].setId(item.getId());
-          this.items[slot].setAmount(1);
+          this.items[slot] = item.clone().setAmount(1);
         }
         amount--;
       }
@@ -617,6 +629,7 @@ export abstract class ItemContainer {
         this.items[slot].setAmount(0);
         if (!leavePlaceHolder) {
           this.items[slot].setId(-1);
+          this.items[slot].setMeta(null);
         }
       }
     } else {
@@ -627,6 +640,7 @@ export abstract class ItemContainer {
         }
         if (!leavePlaceHolder) {
           this.items[slot].setId(-1);
+          this.items[slot].setMeta(null);
         }
         this.items[slot].setAmount(0);
         slot = this.getSlotForItemId(item.getId());

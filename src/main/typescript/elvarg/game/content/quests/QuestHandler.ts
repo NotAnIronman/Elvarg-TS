@@ -1,6 +1,8 @@
 
 import { Player } from "../../entity/impl/player/Player"
 import { NPC } from "../../entity/impl/npc/NPC"
+import { Music } from "../../Music";
+import { Misc } from "../../../util/Misc";
 import { Quest } from "./Quest";
 import { CooksAssistant } from "./impl/CooksAssistant";
 
@@ -122,6 +124,10 @@ export class Quests {
     public showRewardInterface(player: Player, lines: string[], itemID: number): void {
         const questName: string = this.getName();
 
+        const questCompleteJingles = Music.QUEST_COMPLETE_JINGLES;
+        player
+            .getPacketSender()
+            .sendJingle(questCompleteJingles[Misc.getRandom(questCompleteJingles.length - 1)], 0);
         player.getPacketSender().sendString(`You have completed + ${ questName } !`, 12144);
         player.getPacketSender().sendString(`${ this.get().questPointsReward() } `, 12147);
 
@@ -159,6 +165,4 @@ export class Quests {
         }
     }
 }
-
-
 

@@ -24,13 +24,10 @@ export class ExamineItemPacketListener implements PacketExecutor {
         );
       return;
     }
-    if (itemId == 12926) {
+    if (itemId == 12926 || itemId == 12924) {
       player
         .getPacketSender()
-        .sendMessage(
-          "Fires Dragon darts while coating them with venom. Charges left: " +
-            player.getBlowpipeScales()
-        );
+        .sendMessage("Fires darts while coating them with venom.");
       return;
     }
     // let itemDef = ItemDefinition.forId(itemId);

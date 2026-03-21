@@ -48,6 +48,10 @@ import {
   PluginItemDropEvent,
   PluginButtonClickEvent,
   PluginInterfaceActionClickEvent,
+  PluginBonusEvent,
+  PluginBonusProvider,
+  PluginRangedAmmoHandler,
+  PluginRangedAmmoResolver,
   PluginNpcCombatMethodProvider,
   PluginNpcCombatMethodProviderEntry,
   PluginPlayerLogoutEvent,
@@ -147,6 +151,9 @@ export class PluginManager {
   private static combatEngineOwner: string | null = null;
   private static combatDamageProvider: PluginCombatDamageProvider | null = null;
   private static combatDamageProviderOwner: string | null = null;
+  private static bonusProviders: Array<{ pluginName: string; provider: PluginBonusProvider }> = [];
+  private static rangedAmmoResolvers: Array<{ pluginName: string; resolver: PluginRangedAmmoResolver }> = [];
+  private static rangedAmmoHandlers: Array<{ pluginName: string; handler: PluginRangedAmmoHandler }> = [];
   private static combatMethodResolvers: PluginCombatMethodResolver[] = [];
   private static npcCombatMethodProviders: PluginNpcCombatMethodProviderEntry[] = [];
   private static pluginPerfEnabled = false;
@@ -2365,6 +2372,37 @@ export class PluginManager {
         }
         PluginManager.setCombatDamageProviderInternal(pluginName, provider);
       },
+      registerBonusProvider: (provider) => {
+        if (!provider || typeof provider.apply !== "function") {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid bonus provider registration`
+          );
+          return;
+        }
+        PluginManager.registerBonusProviderInternal(pluginName, provider);
+      },
+      registerRangedAmmoResolver: (resolver) => {
+        if (!resolver || typeof resolver.resolve !== "function") {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid ranged ammo resolver registration`
+          );
+          return;
+        }
+        PluginManager.registerRangedAmmoResolverInternal(pluginName, resolver);
+      },
+      registerRangedAmmoHandler: (handler) => {
+        if (
+          !handler ||
+          typeof handler.checkAmmo !== "function" ||
+          typeof handler.decrementAmmo !== "function"
+        ) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid ranged ammo handler registration`
+          );
+          return;
+        }
+        PluginManager.registerRangedAmmoHandlerInternal(pluginName, handler);
+      },
       registerCombatMethodResolver: (resolver) => {
         if (!resolver || typeof resolver.resolve !== "function") {
           console.warn(
@@ -2435,6 +2473,73 @@ export class PluginManager {
     return PluginManager.combatDamageProvider;
   }
 
+  public static applyBonusProviders(player: any, bonuses: number[]): void {
+    if (!player || !Array.isArray(bonuses)) {
+      return;
+    }
+    const event: PluginBonusEvent = { player, bonuses };
+    for (const entry of PluginManager.bonusProviders) {
+      try {
+        entry.provider.apply(event);
+      } catch (err) {
+        console.error(
+          `[plugins] bonus provider failed (${entry.pluginName})`,
+          err
+        );
+      }
+    }
+  }
+
+  public static resolveRangedAmmunition(player: any): any | null {
+    for (const entry of PluginManager.rangedAmmoResolvers) {
+      try {
+        const resolved = entry.resolver.resolve(player);
+        if (resolved != null) {
+          return resolved;
+        }
+      } catch (err) {
+        console.error(
+          `[plugins] ranged ammo resolver failed (${entry.pluginName})`,
+          err
+        );
+      }
+    }
+    return null;
+  }
+
+  public static checkRangedAmmo(player: any, amountRequired: number): boolean | null {
+    for (const entry of PluginManager.rangedAmmoHandlers) {
+      try {
+        const result = entry.handler.checkAmmo(player, amountRequired);
+        if (result != null) {
+          return result === true;
+        }
+      } catch (err) {
+        console.error(
+          `[plugins] ranged ammo check failed (${entry.pluginName})`,
+          err
+        );
+      }
+    }
+    return null;
+  }
+
+  public static decrementRangedAmmo(player: any, pos: any, amount: number): boolean {
+    for (const entry of PluginManager.rangedAmmoHandlers) {
+      try {
+        if (entry.handler.decrementAmmo(player, pos, amount) === true) {
+          return true;
+        }
+      } catch (err) {
+        console.error(
+          `[plugins] ranged ammo decrement failed (${entry.pluginName})`,
+          err
+        );
+      }
+    }
+    return false;
+  }
+
   public static getCombatMethodResolvers(): PluginCombatMethodResolver[] {
     return PluginManager.combatMethodResolvers.slice();
   }
@@ -2473,6 +2578,27 @@ export class PluginManager {
     }
     PluginManager.combatDamageProvider = provider;
     PluginManager.combatDamageProviderOwner = pluginName;
+  }
+
+  private static registerBonusProviderInternal(
+    pluginName: string,
+    provider: PluginBonusProvider
+  ): void {
+    PluginManager.bonusProviders.push({ pluginName, provider });
+  }
+
+  private static registerRangedAmmoResolverInternal(
+    pluginName: string,
+    resolver: PluginRangedAmmoResolver
+  ): void {
+    PluginManager.rangedAmmoResolvers.push({ pluginName, resolver });
+  }
+
+  private static registerRangedAmmoHandlerInternal(
+    pluginName: string,
+    handler: PluginRangedAmmoHandler
+  ): void {
+    PluginManager.rangedAmmoHandlers.push({ pluginName, handler });
   }
 
   private static registerCombatMethodResolverInternal(

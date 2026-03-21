@@ -32,6 +32,7 @@ import { DragonWarhammerCombatMethod } from "./method/impl/specials/DragonWarham
 import { GraniteMaulCombatMethod } from "./method/impl/specials/GraniteMaulCombatMethod";
 import { MagicShortbowCombatMethod } from "./method/impl/specials/MagicShortbowCombatMethod";
 import { MorrigansJavelinCombatMethod } from "./method/impl/specials/MorrigansJavelinCombatMethod";
+import { RangedCombatMethod } from "./method/impl/RangedCombatMethod";
 import { SaradominGodswordCombatMethod } from "./method/impl/specials/SaradominGodswordCombatMethod";
 import { SaradominSwordCombatMethod } from "./method/impl/specials/SaradominSwordCombatMethod";
 import { ShoveCombatMethod } from "./method/impl/specials/ShoveCombatMethod";
@@ -290,6 +291,14 @@ export class CombatSpecial {
         1,
         1,
         new DragonKnifeCombatMethod(),
+        null
+    )
+    public static readonly TOXIC_BLOWPIPE = new CombatSpecial(
+        [ItemIdentifiers.TOXIC_BLOWPIPE],
+        50,
+        1.5,
+        2.0,
+        new RangedCombatMethod(),
         null
     )
     public static readonly VOLATILE_NIGHTMARE_STAFF = new CombatSpecial(

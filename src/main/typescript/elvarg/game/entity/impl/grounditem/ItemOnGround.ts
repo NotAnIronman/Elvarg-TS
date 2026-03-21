@@ -143,7 +143,7 @@ export class ItemOnGround {
         this.pendingRemoval = pendingRemoval;
     }
     public clone(): ItemOnGround {
-        return new ItemOnGround(this.state, this.owner, this.getPosition(), this.item, this.goesGlobal, this.respawnTimer, this.privateArea);
+        return new ItemOnGround(this.state, this.owner, this.getPosition(), this.item.clone(), this.goesGlobal, this.respawnTimer, this.privateArea);
     }
 
     public equals(o: object): boolean {

@@ -95,6 +95,17 @@ function normalizeCombatType(combatType) {
   return Number.isInteger(combatType) ? combatType : null;
 }
 
+function readTargetCombatSignature(target) {
+  const combat = target?.getCombat?.();
+  return {
+    weaponId: getWeaponId(target),
+    weaponInterface: target?.getWeapon?.() ?? null,
+    castSpellId: combat?.getCastSpell?.()?.spellId ?? null,
+    autocastSpellId: combat?.getAutocastSpell?.()?.spellId ?? null,
+    specialActive: target?.isSpecialActivated?.() === true,
+  };
+}
+
 class PvpCombatExecutionNode {
   constructor(options = {}) {
     this.setPhase = options.setPhase;
@@ -117,9 +128,34 @@ class PvpCombatExecutionNode {
       return null;
     }
 
-    const actualTargetCombatType = normalizeCombatType(
-      resolveCurrentCombatType(target, target?.getWeapon?.(), getWeaponId(target))
-    );
+    const targetSignature = readTargetCombatSignature(target);
+    let actualTargetCombatType = null;
+    if (
+      pvp.cachedPrayerTargetUsername === targetUsername &&
+      pvp.cachedActualPrayerTargetWeaponId === targetSignature.weaponId &&
+      pvp.cachedActualPrayerTargetWeaponInterface === targetSignature.weaponInterface &&
+      pvp.cachedActualPrayerTargetCastSpellId === targetSignature.castSpellId &&
+      pvp.cachedActualPrayerTargetAutocastSpellId === targetSignature.autocastSpellId &&
+      pvp.cachedActualPrayerTargetSpecialActive === targetSignature.specialActive
+    ) {
+      actualTargetCombatType = normalizeCombatType(
+        pvp.cachedActualPrayerTargetCombatType
+      );
+    } else {
+      actualTargetCombatType = normalizeCombatType(
+        resolveCurrentCombatType(
+          target,
+          targetSignature.weaponInterface,
+          targetSignature.weaponId
+        )
+      );
+      pvp.cachedActualPrayerTargetCombatType = actualTargetCombatType;
+      pvp.cachedActualPrayerTargetWeaponId = targetSignature.weaponId;
+      pvp.cachedActualPrayerTargetWeaponInterface = targetSignature.weaponInterface;
+      pvp.cachedActualPrayerTargetCastSpellId = targetSignature.castSpellId;
+      pvp.cachedActualPrayerTargetAutocastSpellId = targetSignature.autocastSpellId;
+      pvp.cachedActualPrayerTargetSpecialActive = targetSignature.specialActive;
+    }
     const reactionTicks = profile?.targetStyleReactionTicks ?? null;
     const reactionMinMs = Math.max(
       0,
@@ -131,6 +167,12 @@ class PvpCombatExecutionNode {
     );
 
     if (pvp.cachedPrayerTargetUsername !== targetUsername) {
+      pvp.cachedActualPrayerTargetCombatType = actualTargetCombatType;
+      pvp.cachedActualPrayerTargetWeaponId = targetSignature.weaponId;
+      pvp.cachedActualPrayerTargetWeaponInterface = targetSignature.weaponInterface;
+      pvp.cachedActualPrayerTargetCastSpellId = targetSignature.castSpellId;
+      pvp.cachedActualPrayerTargetAutocastSpellId = targetSignature.autocastSpellId;
+      pvp.cachedActualPrayerTargetSpecialActive = targetSignature.specialActive;
       pvp.observedPrayerTargetCombatType = actualTargetCombatType;
       pvp.pendingPrayerTargetCombatType = null;
       pvp.pendingPrayerTargetCombatTypeAt = 0;

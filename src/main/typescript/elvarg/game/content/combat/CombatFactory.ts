@@ -131,6 +131,13 @@ export class CombatFactory {
                 return CombatFactory.MAGIC_COMBAT;
             }
 
+            for (const resolver of PluginManager.getCombatMethodResolvers()) {
+                const resolved = resolver.resolve(attacker);
+                if (resolved) {
+                    return resolved;
+                }
+            }
+
             const special = getPlayerCombatSpecial(player);
             if (player.isSpecialActivated() && special != null) {
                 return special.getCombatMethod();
@@ -1107,13 +1114,9 @@ export class CombatFactory {
             return false;
         }
 
-        if (rangedWeapon === RangedWeapon.TOXIC_BLOWPIPE) {
-            if (player.getBlowpipeScales() <= 0) {
-                player.getPacketSender().sendMessage("You must recharge your Toxic blowpipe using some Zulrah scales.");
-                player.getCombat().reset();
-                return false;
-            }
-            return true;
+        const pluginAmmoCheck = PluginManager.checkRangedAmmo(player, amountRequired);
+        if (pluginAmmoCheck != null) {
+            return pluginAmmoCheck;
         }
 
         if (rangedWeapon === RangedWeapon.CRYSTAL_BOW) {
@@ -1193,11 +1196,7 @@ export class CombatFactory {
             }
         }
 
-        if (rangedWeapon == RangedWeapon.TOXIC_BLOWPIPE) {
-            if (player.decrementAndGetBlowpipeScales() <= 0) {
-                player.getPacketSender().sendMessage("Your Toxic blowpipe has run out of scales!");
-                player.getCombat().reset();
-            }
+        if (PluginManager.decrementRangedAmmo(player, pos, amount)) {
             return;
         }
 

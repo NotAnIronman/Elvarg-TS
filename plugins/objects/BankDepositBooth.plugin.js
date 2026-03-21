@@ -2,6 +2,8 @@ const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/
 const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
 const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { ItemContainerActionPacketListener } = require("../../src/main/typescript/elvarg/net/packet/impl/ItemContainerActionPacketListener");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { handleBankContainerAction } = require("./BankBooths.plugin");
@@ -47,6 +49,7 @@ function open(player) {
   if (!sender) return;
   sender.sendInterface(IFACE);
   refresh(player);
+  Sounds.sendSound(player, Sound.CONTAINER_OPEN);
 }
 
 function deposit(player, slot, itemId, amount) {
@@ -110,6 +113,7 @@ function handleDepositButton(player, button) {
     return true;
   }
   if (BTN_CLOSE.has(button)) {
+    Sounds.sendSound(player, Sound.CONTAINER_CLOSE);
     player.getPacketSender().sendInterfaceRemoval();
     return true;
   }

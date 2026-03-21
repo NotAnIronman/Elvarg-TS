@@ -172,8 +172,6 @@ export class Player extends Mobile {
     public skullTimer: number;
     public points: number;
     private amountDonated: number;
-    // Blowpipe
-    public blowpipeScales: number;
     private crystalBowShotsInStage = 0;
     private crystalBowTrackedStageItemId = -1;
     // Bounty hunter
@@ -1294,22 +1292,6 @@ export class Player extends Mobile {
 
     public getDueling(): Dueling {
         return this.dueling;
-    }
-
-    public getBlowpipeScales(): number {
-        return this.blowpipeScales;
-    }
-
-    public setBlowpipeScales(blowpipeScales: number) {
-        this.blowpipeScales = blowpipeScales;
-    }
-
-    public incrementBlowpipeScales(blowpipeScales: number) {
-        this.blowpipeScales += blowpipeScales;
-    }
-
-    public decrementAndGetBlowpipeScales(): number {
-        return this.blowpipeScales--;
     }
 
     public getCrystalBowShotsInStage(): number {

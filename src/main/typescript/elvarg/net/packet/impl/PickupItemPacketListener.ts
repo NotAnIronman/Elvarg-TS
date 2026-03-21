@@ -3,7 +3,6 @@ import { PacketExecutor } from "../PacketExecutor";
 import { ItemDefinition } from "../../../game/definition/ItemDefinition";
 import { ItemOnGroundManager, OperationType } from "../../../game/entity/impl/grounditem/ItemOnGroundManager";
 import { Location } from "../../../game/model/Location";
-import { Item } from "../../../game/model/Item";
 import { Sounds } from "../../../game/Sounds";
 import { Sound } from "../../../game/Sound";
 
@@ -83,7 +82,7 @@ export class PickupItemPacketListener implements PacketExecutor {
       groundItem.setOldAmount(currentAmount);
       groundItem.getItem().decrementAmountBy(playerCanHold);
       ItemOnGroundManager.perform(groundItem, OperationType.ALTER);
-      pickedUpItem = new Item(groundItem.getItem().getId(), playerCanHold);
+      pickedUpItem = groundItem.getItem().clone().setAmount(playerCanHold);
       deregister = false;
     }
 

@@ -5,6 +5,7 @@ import { RangedWeapon } from "../../content/combat/ranged/RangedData";
 import { Ammunition } from "../../content/combat/ranged/RangedData";
 import { Equipment } from "../container/impl/Equipment";
 import { getCrystalBowAttackBonus, getCrystalBowRangedStrength, isCrystalBow } from "../../content/combat/ranged/CrystalBow";
+import { PluginManager } from "../../../plugins/PluginManager";
 
 export class BonusManager {
     public static readonly ATTACK_STAB = 0;
@@ -78,6 +79,7 @@ export class BonusManager {
                 bonuses[11] += rangedStrengthBonus - Number(definitionBonuses[11] ?? 0);
             }
         }
+        PluginManager.applyBonusProviders(player, bonuses);
 
         for (let i = 0; i < totalBonuses; i++) {
             if (i <= 4) {

@@ -7,7 +7,7 @@ export class Sound {
     // cooking sounds
 
     public static COOKING_COOK = new Sound(1039, 1, 10, 0)
-    public static COOKING_FOOD = new Sound(357, 1, 0, 0)
+    public static COOKING_FOOD = new Sound(1039, 1, 10, 0)
 
     public static COOKING_BURN = new Sound(240, 1, 0, 0)
 
@@ -47,9 +47,9 @@ export class Sound {
     public static IMP_ATTACKING = new Sound(10, 1, 25, 0)
 
     public static SHOOT_ARROW = new Sound(370, 1, 0, 0)
-    public static SHOOT_CROSSBOW = new Sound(361, 1, 0, 0)
-    public static SHOOT_BOW_QUIET = new Sound(362, 1, 0, 0)
-    public static THROW_DART = new Sound(364, 1, 0, 0)
+    public static SHOOT_CROSSBOW = new Sound(370, 1, 25, 0)
+    public static SHOOT_BOW_QUIET = new Sound(370, 1, 25, 0)
+    public static THROW_DART = new Sound(370, 1, 0, 0)
 
     public static WEAPON = new Sound(398, 1, 25, 0) // default/other
 
@@ -66,42 +66,48 @@ export class Sound {
     public static WEAPON_SCIMITAR = new Sound(396, 1, 25, 0)
 
     public static WEAPON_WHIP = new Sound(1080, 1, 25, 0)
-    public static WEAPON_DRAGON_DAGGER_STAB = new Sound(793, 1, 25, 0)
-    public static WEAPON_DHAROK_GREATAXE = new Sound(1057, 1, 25, 0)
-    public static WEAPON_VERAC_FLAIL = new Sound(1059, 1, 25, 0)
-    public static WEAPON_GUTHAN_WARSPEAR = new Sound(1061, 1, 25, 0)
-    public static WEAPON_TORAG_HAMMER = new Sound(1062, 1, 25, 0)
-    public static WEAPON_GRANITE_MAUL = new Sound(1079, 1, 25, 0)
+    public static WEAPON_DRAGON_DAGGER_STAB = new Sound(385, 1, 25, 0)
+    public static WEAPON_DHAROK_GREATAXE = new Sound(1057, 1, 0, 0)
+    public static WEAPON_VERAC_FLAIL = new Sound(1059, 1, 0, 0)
+    public static WEAPON_GUTHAN_WARSPEAR = new Sound(1061, 1, 0, 0)
+    public static WEAPON_TORAG_HAMMER = new Sound(1062, 1, 0, 0)
+    public static WEAPON_GRANITE_MAUL = new Sound(271, 1, 25, 0)
 
     // Special attack
 
     public static readonly DRAGON_DAGGER_SPECIAL = new Sound(385, 1, 25, 0)
-    public static readonly MAGIC_SHORTBOW_SPECIAL = new Sound(386, 1, 25, 0)
-    public static readonly DRAGON_MACE_SPECIAL = new Sound(387, 1, 25, 0)
-    public static readonly DRAGON_SPEAR_SPECIAL = new Sound(388, 1, 25, 0)
-    public static readonly DRAGON_BATTLEAXE_SPECIAL = new Sound(389, 1, 25, 0)
-    public static readonly DRAGON_LONGSWORD_SPECIAL = new Sound(390, 1, 25, 0)
-    public static readonly MAGIC_LONGBOW_SPECIAL = new Sound(391, 1, 25, 0)
-    public static readonly WHIP_SPECIAL = new Sound(1081, 1, 25, 0)
+    public static readonly MAGIC_SHORTBOW_SPECIAL = new Sound(386, 1, 0, 0)
+    public static readonly DRAGON_MACE_SPECIAL = new Sound(387, 1, 0, 0)
+    public static readonly DRAGON_SPEAR_SPECIAL = new Sound(2544, 1, 0, 0)
+    public static readonly DRAGON_BATTLEAXE_SPECIAL = new Sound(398, 1, 0, 0)
+    public static readonly DRAGON_LONGSWORD_SPECIAL = new Sound(390, 1, 0, 0)
+    public static readonly MAGIC_LONGBOW_SPECIAL = new Sound(370, 1, 0, 0)
+    public static readonly WHIP_SPECIAL = new Sound(1081, 1, 0, 0)
 
     // Spell sounds
 
     public static SPELL_FAIL_SPLASH = new Sound(193, 1, 0, 0)
-    public static TELEKINETIC_GRAB = new Sound(200, 1, 0, 0)
+    public static TELEKINETIC_GRAB = new Sound(193, 1, 0, 0)
     public static HIGH_ALCHEMY = new Sound(223, 1, 0, 0)
     public static LOW_ALCHEMY = new Sound(224, 1, 0, 0)
-    public static SUPERHEAT_ITEM = new Sound(227, 1, 0, 0)
+    public static SUPERHEAT_ITEM = new Sound(217, 1, 0, 0)
     public static TELEPORT = new Sound(202, 1, 0, 0)
 
     public static ICE_BARRAGE_IMPACT = new Sound(1125, 1, 0, 0)
     public static ICA_BARRAGE_IMPACT = Sound.ICE_BARRAGE_IMPACT // legacy alias
-    public static BLOOD_BLITZ_CAST = new Sound(986, 1, 0, 0)
+    public static BLOOD_BLITZ_CAST = new Sound(985, 1, 0, 0)
     public static ICE_BLITZ_CAST = new Sound(1110, 1, 0, 0)
 
-    public static DROP_ITEM = new Sound(376, 1, 25, 0)
-    public static PICK_UP_ITEM = new Sound(358, 1, 25, 0)
+    public static DROP_ITEM = new Sound(376, 1, 0, 0)
+    public static PICK_UP_ITEM = new Sound(358, 1, 0, 0)
+    public static CONTAINER_OPEN = new Sound(326, 1, 0, 0)
+    public static CONTAINER_CLOSE = new Sound(326, 1, 0, 0)
+    public static DOOR_OPEN = new Sound(326, 1, 0, 0)
+    public static DOOR_CLOSE = new Sound(326, 1, 0, 0)
+    public static EQUIPMENT_ON = new Sound(358, 1, 0, 0)
+    public static EQUIPMENT_OFF = new Sound(376, 1, 0, 0)
 
-    public static FIRE_LIGHT = new Sound(375, 1, 50, 0)
+    public static FIRE_LIGHT = new Sound(375, 1, 0, 0)
     public static FIRE_SUCCESSFUL = new Sound(608, 1, 0, 0)
     public static FIRE_FIRST_ATTEMPT = new Sound(2584, 1, 0, 0)
     public static POTION_MIX = new Sound(373, 1, 0, 0)
@@ -109,11 +115,11 @@ export class Sound {
     public static FAIL_SLASH_WEB = new Sound(2548, 1, 0, 0)
     public static FOOD_EAT = new Sound(317, 1, 0, 0)
     public static DRINK = new Sound(334, 1, 0, 0)
-    public static PICK_LOCK = new Sound(324, 1, 0, 0)
+    public static PICK_LOCK = new Sound(356, 1, 0, 0)
     public static GENIE_LAMP = new Sound(430, 1, 0, 0)
     public static WOODCUTTING_START = new Sound(471, 1, 0, 0)
     public static BURY_BONES = new Sound(380, 1, 0, 0)
-    public static WILDERNESS_DITCH_JUMP = new Sound(455, 1, 0, 0)
+    public static WILDERNESS_DITCH_JUMP = new Sound(2462, 1, 0, 0)
     public static THIEVING_STUNNED = new Sound(458, 1, 0, 0)
     public static GEM_CUTTING = new Sound(464, 1, 0, 0)
     public static SMITHING = new Sound(468, 1, 0, 0)
@@ -190,6 +196,10 @@ export class Sound {
 
     public getVolume(): number {
         return this.volume;
+    }
+
+    public getClientVolume(): number {
+        return Math.max(0, Math.min(10, this.volume));
     }
 
     public getDelay(): number {

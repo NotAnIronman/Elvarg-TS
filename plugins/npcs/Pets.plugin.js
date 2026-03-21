@@ -4,6 +4,8 @@ const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/e
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
@@ -588,6 +590,7 @@ function drop(player, itemId, reward) {
       player.getPacketSender().sendMessage("You have a funny feeling like you're being followed.");
     } else {
       player.getInventory().deleteNumber(pet.itemId, 1);
+      Sounds.sendSound(player, Sound.DROP_ITEM);
       player.getPacketSender().sendMessage("You drop your pet..");
       player.performAnimation(INTERACTION_ANIM);
       player.setPositionToFace(npc.getLocation());
@@ -648,6 +651,7 @@ function pickup(player, npc) {
   }
 
   player.getPacketSender().sendMessage("You pick up your pet..");
+  Sounds.sendSound(player, Sound.PICK_UP_ITEM);
   player.setCurrentPet(null);
   return true;
 }

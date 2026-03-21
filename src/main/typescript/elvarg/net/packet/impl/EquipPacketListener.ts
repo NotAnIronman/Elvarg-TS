@@ -3,6 +3,8 @@ import { Packet } from "../Packet";
 import { Misc } from "../../../util/Misc";
 import { Server } from "../../../Server";
 import { PluginManager } from "../../../plugins/PluginManager";
+import { Sound } from "../../../game/Sound";
+import { Sounds } from "../../../game/Sounds";
 
 const getWeaponInterfaces = () =>
   require("../../../game/content/combat/WeaponInterfaces")
@@ -210,5 +212,6 @@ export class EquipPacketListener implements PacketExecutor {
     equipment.refreshItems();
     inventory.refreshItems();
     player.getUpdateFlag().flag(Flag.APPEARANCE);
+    Sounds.sendSound(player, Sound.EQUIPMENT_ON);
   }
 }

@@ -256,7 +256,6 @@ class JsonPlayerPersistence extends PlayerPersistence {
         specPercentage: 100,
         recoilDamage: 0,
         poisonDamage: 0,
-        blowpipeScales: 0,
         crystalBowShotsInStage: 0,
         crystalBowTrackedStageItemId: -1,
         barrowsCrypt: 0,
@@ -437,7 +436,11 @@ class JsonPlayerPersistence extends PlayerPersistence {
     const value = raw && typeof raw === "object" ? raw : {};
     const id = this.toNumber(value.id, -1);
     const amount = this.toNumber(value.amount, id > 0 ? 1 : 0);
-    return new Item(id, amount);
+    const meta =
+      value.meta && typeof value.meta === "object" && !Array.isArray(value.meta)
+        ? Item.cloneMeta(value.meta)
+        : null;
+    return new Item(id, amount, meta);
   }
 
   hydrateBanks(raw) {

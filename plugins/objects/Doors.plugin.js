@@ -4,6 +4,8 @@ const { Location } = require("../../src/main/typescript/elvarg/game/model/Locati
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 
 const CLOSED_DOOR_IDS = new Set([1535, 11727, 14749, 14751]);
 const OPEN_OBJECT_STATES = new Map();
@@ -255,6 +257,8 @@ function handleMappedDoor(player, object, objectId, location) {
     );
     rememberOpenObjects(anchorKey, [closedObject], [nextObject]);
   }
+
+  Sounds.sendSound(player, open ? Sound.DOOR_CLOSE : Sound.DOOR_OPEN);
 
   return true;
 }
@@ -661,6 +665,11 @@ function handleDoubleDoor(player, object, objectId, location) {
   } else {
     clearOpenDoor(anchorKey);
   }
+
+  Sounds.sendSound(
+    player,
+    pair.some(isDoubleDoorOpen) ? Sound.DOOR_CLOSE : Sound.DOOR_OPEN
+  );
 
   return true;
 }

@@ -5,6 +5,8 @@ const { ItemContainer } = require("../../src/main/typescript/elvarg/game/model/c
 const { StackType } = require("../../src/main/typescript/elvarg/game/model/container/StackType");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { PlayerStatus } = require("../../src/main/typescript/elvarg/game/model/PlayerStatus");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 
 const OPEN_PRICE_CHECKER_BUTTON = 27651;
@@ -38,9 +40,15 @@ class PriceCheckerContainer extends ItemContainer {
   }
 
   open() {
+    const opening =
+      this.player.getStatus?.() !== PlayerStatus.PRICE_CHECKING ||
+      this.player.getInterfaceId?.() !== PRICE_CHECKER_INTERFACE_ID;
     this.player.setStatus(PlayerStatus.PRICE_CHECKING);
     this.player.getMovementQueue().reset();
     this.refreshItems();
+    if (opening) {
+      Sounds.sendSound(this.player, Sound.CONTAINER_OPEN);
+    }
     return this;
   }
 
@@ -124,11 +132,16 @@ class PriceCheckerContainer extends ItemContainer {
       this.player.getStatus() == PlayerStatus.PRICE_CHECKING &&
       this.player.getInterfaceId() == PRICE_CHECKER_INTERFACE_ID
     ) {
+      let movedAny = false;
       for (const item of this.getValidItems()) {
         this.switchItems(this.player.getInventory(), item.clone(), false, false);
+        movedAny = true;
       }
       this.refreshItems();
       this.player.getInventory().refreshItems();
+      if (movedAny) {
+        Sounds.sendSound(this.player, Sound.PICK_UP_ITEM);
+      }
     }
   }
 
@@ -137,6 +150,7 @@ class PriceCheckerContainer extends ItemContainer {
       this.player.getStatus() == PlayerStatus.PRICE_CHECKING &&
       this.player.getInterfaceId() == PRICE_CHECKER_INTERFACE_ID
     ) {
+      let movedAny = false;
       for (const item of this.player.getInventory().getValidItems()) {
         const definition = item.getDefinition();
         if (!definition.isSellable() || definition.getValue() <= 0) {
@@ -145,9 +159,13 @@ class PriceCheckerContainer extends ItemContainer {
         this.player
           .getInventory()
           .switchItems(this, item.clone(), false, false);
+        movedAny = true;
       }
       this.refreshItems();
       this.player.getInventory().refreshItems();
+      if (movedAny) {
+        Sounds.sendSound(this.player, Sound.DROP_ITEM);
+      }
     }
   }
 
@@ -178,6 +196,7 @@ class PriceCheckerContainer extends ItemContainer {
         } else {
           this.switchItems(this, item, false, true);
         }
+        Sounds.sendSound(this.player, Sound.DROP_ITEM);
       }
       return true;
     }
@@ -196,6 +215,7 @@ class PriceCheckerContainer extends ItemContainer {
         } else {
           this.switchItems(this.player.getInventory(), item, false, true);
         }
+        Sounds.sendSound(this.player, Sound.PICK_UP_ITEM);
       }
       return true;
     }

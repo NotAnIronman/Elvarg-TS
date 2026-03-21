@@ -1,5 +1,8 @@
 // import { Player } from "../../../game/entity/impl/player/Player";
 import { Packet } from "../Packet";
+import { Sound } from "../../../game/Sound";
+import { Sounds } from "../../../game/Sounds";
+import { PluginManager } from "../../../plugins/PluginManager";
 // import { Bank } from "../../../game/model/container/impl/Bank";
 // import { DepositBox } from "../../../game/content/DepositBox";
 // import { Dueling } from "../../../game/content/Duelling";
@@ -136,6 +139,7 @@ export class ItemContainerActionPacketListener {
       equipment.refreshItems();
       inventory.refreshItems();
       player.getUpdateFlag().flag(getFlagEnum().APPEARANCE);
+      Sounds.sendSound(player, Sound.EQUIPMENT_OFF);
       return;
     }
 
@@ -372,6 +376,29 @@ export class ItemContainerActionPacketListener {
     let slot = packet.readShortA();
     let interfaceId = packet.readInt();
     let id = packet.readShortA();
+
+    const Equipment = getEquipmentCtor();
+    if (interfaceId === Equipment.INVENTORY_INTERFACE_ID) {
+      const equipment = player.getEquipment();
+      if (slot < 0 || slot >= equipment.capacity()) {
+        return;
+      }
+      const item = equipment.getItems()[slot];
+      if (!item || item.getId() !== id) {
+        return;
+      }
+
+      PluginManager.emitItemAction({
+        player,
+        interfaceId,
+        item,
+        itemId: id,
+        slot,
+        clickType: 4,
+        handled: false,
+      });
+      return;
+    }
 
     // Bank withdrawal..
     // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {

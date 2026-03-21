@@ -6,6 +6,8 @@ const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet
 const { PlayerStatus } = require("../../src/main/typescript/elvarg/game/model/PlayerStatus");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { NpcIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { ShopIdentifiers } = require("../../src/main/typescript/elvarg/util/ShopIdentifiers");
@@ -217,6 +219,7 @@ function ensureLoaded() {
 
     const originalAmounts = new Map();
     const itemRestockTicks = new Map();
+    const itemPrices = new Map();
     const stock = new Map();
     const order = [];
     const seen = new Set();
@@ -244,6 +247,11 @@ function ensureLoaded() {
         itemRestockTicks.set(id, restockTicks);
       }
 
+      const price = Number(stockEntry?.price);
+      if (Number.isFinite(price) && price > 0) {
+        itemPrices.set(id, Math.floor(price));
+      }
+
       originalAmounts.set(id, (originalAmounts.get(id) ?? 0) + amount);
       stock.set(id, (stock.get(id) ?? 0) + amount);
 
@@ -259,6 +267,7 @@ function ensureLoaded() {
       currency: normalizeCurrency(def.currency),
       originalAmounts,
       itemRestockTicks,
+      itemPrices,
       defaultRestockTicks,
       defaultDestockTicks,
       soldItemDestockTicks:
@@ -313,6 +322,10 @@ function buysItem(shop, itemId) {
 }
 
 function itemPrice(shop, itemDef) {
+  const override = shop.itemPrices?.get?.(itemDef.getId?.());
+  if (Number.isFinite(override) && override > 0) {
+    return override;
+  }
   if (shop.currency === "BLOOD_MONEY") {
     return Number(itemDef.getBloodMoneyValue?.() ?? 0);
   }
@@ -439,6 +452,9 @@ function currentShop(player) {
 function openShop(player, shop, resetScroll) {
   const sender = player.getPacketSender();
   const items = displayEntries(shop).map((entry) => new Item(entry.itemId, entry.amount));
+  const opening =
+    player.getStatus?.() !== PlayerStatus.SHOPPING ||
+    player.getInterfaceId?.() !== IFACE_SHOP;
 
   sender.sendItemContainer(player.getInventory(), IFACE_INV);
   sender.sendInterfaceItems(IFACE_ITEMS, items);
@@ -459,6 +475,9 @@ function openShop(player, shop, resetScroll) {
   }
 
   player.setStatus(PlayerStatus.SHOPPING);
+  if (opening) {
+    Sounds.sendSound(player, Sound.CONTAINER_OPEN);
+  }
   return true;
 }
 
@@ -704,6 +723,7 @@ function buyItem(player, shop, itemId, amount) {
 
   removeCurrency(player, shop.currency, removed * price);
   inv.adds(itemId, removed);
+  Sounds.sendSound(player, Sound.PICK_UP_ITEM);
 
   refreshShop(shop.id);
   ensureRestockTask();
@@ -745,6 +765,7 @@ function sellItem(player, shop, itemId, amount) {
   player.getInventory().deleteNumber(itemId, qty);
   addCurrency(player, shop.currency, qty * price);
   addStock(shop, itemId, qty);
+  Sounds.sendSound(player, Sound.DROP_ITEM);
 
   refreshShop(shop.id);
   ensureRestockTask();

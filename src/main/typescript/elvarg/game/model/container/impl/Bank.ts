@@ -16,6 +16,8 @@ import { GameObject } from "../../../entity/impl/object/GameObject";
 import { DialogueOption } from "../../dialogues/DialogueOption";
 import { EnteredSyntaxAction } from "../../EnteredSyntaxAction";
 import { DialogueOptionAction } from "../../dialogues/DialogueOptionAction";
+import { Sound } from "../../../Sound";
+import { Sounds } from "../../../Sounds";
 import { exec } from "child_process";
 const getPluginManager = () =>
     require("../../../../plugins/PluginManager").PluginManager as typeof import("../../../../plugins/PluginManager").PluginManager;
@@ -120,6 +122,8 @@ export class Bank extends ItemContainer {
 
             }
 
+            Sounds.sendSound(player, Sound.PICK_UP_ITEM);
+
             // Refresh inventory.
             player.getInventory().refreshItems();
         }
@@ -217,6 +221,8 @@ export class Bank extends ItemContainer {
             if (player.isSearchingBank()) {
                 player.getBank(this.BANK_SEARCH_TAB_INDEX).refreshItems();
             }
+
+            Sounds.sendSound(player, Sound.DROP_ITEM);
 
             // Refresh inventory
             player.getInventory().refreshItems();
@@ -347,6 +353,7 @@ export class Bank extends ItemContainer {
             // Handle bank settings
             switch (button) {
             case 32503:
+                Sounds.sendSound(player, Sound.CONTAINER_CLOSE);
                 player.getPacketSender().sendInterfaceRemoval();
                 break;
             case 32512:
@@ -436,6 +443,7 @@ export class Bank extends ItemContainer {
                         break;
                     case 5384:
                     case 50001:
+                        Sounds.sendSound(player, Sound.CONTAINER_CLOSE);
                         player.getPacketSender().sendInterfaceRemoval();
                         break;
                     case 50010:
@@ -458,14 +466,19 @@ export class Bank extends ItemContainer {
                 return;
             }
         }
+        let movedAny = false;
         for (let item of from.getValidItems()) {
             from.switchItems(player.getBank(Bank.getTabForItem(player, item.getId())), item.clone(),false, false);
+            movedAny = true;
         }
         from.refreshItems();
         if (player.isSearchingBank()) {
             player.getBank(this.BANK_SEARCH_TAB_INDEX).refreshItems();
         } else {
             player.getBank(player.getCurrentBankTab()).refreshItems();
+        }
+        if (movedAny) {
+            Sounds.sendSound(player, from instanceof Equipment ? Sound.EQUIPMENT_OFF : Sound.DROP_ITEM);
         }
         if (from instanceof Equipment) {
             WeaponInterfaces.assign(player);
@@ -579,6 +592,9 @@ export class Bank extends ItemContainer {
         if (pluginCanBank === false) {
             return this;
         }
+        const opening =
+            this.getPlayer().getStatus() !== PlayerStatus.BANKING ||
+            this.getPlayer().getInterfaceId() !== 5292;
 
         // Update player status
         this.getPlayer().setStatus(PlayerStatus.BANKING);
@@ -595,6 +611,9 @@ export class Bank extends ItemContainer {
 
         // Resets the scroll bar in the interface
         this.getPlayer().getPacketSender().sendInterfaceScrollReset(Bank.BANK_SCROLL_BAR_INTERFACE_ID);
+        if (opening) {
+            Sounds.sendSound(this.getPlayer(), Sound.CONTAINER_OPEN);
+        }
 
         return this;
     }

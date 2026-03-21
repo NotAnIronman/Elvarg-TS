@@ -5,6 +5,7 @@ export class Item {
 
     public id: number;
     public amount: number;
+    public meta: Record<string, unknown> | null;
 
     /**
  * An Item object constructor.
@@ -14,9 +15,31 @@ export class Item {
  * 
  */
 
-    constructor(id: number, amount?: number) {
+    constructor(id: number, amount?: number, meta?: Record<string, unknown> | null) {
         this.id = id;
         this.amount = amount != null ? amount : 1;
+        this.meta = Item.cloneMeta(meta);
+    }
+
+    private static cloneMetaValue(value: unknown): unknown {
+        if (Array.isArray(value)) {
+            return value.map((entry) => Item.cloneMetaValue(entry));
+        }
+        if (value && typeof value === "object") {
+            const clone: Record<string, unknown> = {};
+            for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+                clone[key] = Item.cloneMetaValue(entry);
+            }
+            return clone;
+        }
+        return value;
+    }
+
+    public static cloneMeta(meta?: Record<string, unknown> | null): Record<string, unknown> | null {
+        if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
+            return null;
+        }
+        return Item.cloneMetaValue(meta) as Record<string, unknown>;
     }
 
     /**
@@ -38,6 +61,42 @@ export class Item {
 
     public getAmount(): number {
         return this.amount;
+    }
+
+    public getMeta(): Record<string, unknown> | null {
+        return this.meta;
+    }
+
+    public setMeta(meta?: Record<string, unknown> | null): Item {
+        this.meta = Item.cloneMeta(meta);
+        return this;
+    }
+
+    public getMetaValue<T = unknown>(key: string): T | undefined {
+        if (!this.meta || typeof key !== "string" || key.length === 0) {
+            return undefined;
+        }
+        return this.meta[key] as T | undefined;
+    }
+
+    public setMetaValue(key: string, value: unknown): Item {
+        if (typeof key !== "string" || key.length === 0) {
+            return this;
+        }
+        if (value === undefined) {
+            if (this.meta) {
+                delete this.meta[key];
+                if (Object.keys(this.meta).length === 0) {
+                    this.meta = null;
+                }
+            }
+            return this;
+        }
+        if (!this.meta) {
+            this.meta = {};
+        }
+        this.meta[key] = Item.cloneMetaValue(value);
+        return this;
     }
     /**
 * Sets the amount of the item.
@@ -100,14 +159,16 @@ export class Item {
     }
 
     public clone(): Item {
-        return new Item(this.id, this.amount);
+        return new Item(this.id, this.amount, this.meta);
     }
 
     public equals(o: any): boolean {
         if (!(o instanceof Item))
             return false;
         let item = o as Item;
-        return item.getId() == this.getId() && item.getAmount() == this.getAmount();
+        return item.getId() == this.getId() &&
+            item.getAmount() == this.getAmount() &&
+            JSON.stringify(item.getMeta() ?? null) === JSON.stringify(this.getMeta() ?? null);
     }
 
 

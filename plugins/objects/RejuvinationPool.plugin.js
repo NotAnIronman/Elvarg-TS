@@ -1,4 +1,6 @@
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
@@ -114,6 +116,7 @@ module.exports = {
         return;
       }
       restoreFromPool(event.player);
+      Sounds.sendSound(event.player, Sound.PRAYER_RECHARGE);
       event.player
         .getPacketSender()
         .sendMessage("You feel fully rejuvenated.");

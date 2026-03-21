@@ -105,8 +105,20 @@ function shouldUseFreeze(player, profile, magicCandidate, pressureContext) {
 }
 
 function buildPressureContext(player, target, state) {
+  const targetPrayers = target?.getPrayerActive?.() ?? [];
+  let currentCombatType = null;
+  const runtimeSnapshot = state?.pvp?.runtimeCombatSnapshot?.snapshot ?? null;
+  if (runtimeSnapshot?.currentCombatType != null) {
+    currentCombatType = runtimeSnapshot.currentCombatType;
+  } else {
+    currentCombatType = resolveCurrentCombatType(
+      player,
+      player?.getWeapon?.(),
+      getWeaponId(player)
+    );
+  }
   return {
-    targetPrayers: target?.getPrayerActive?.() ?? [],
+    targetPrayers,
     targetHpRatio: getTargetHpRatio(target),
     distance: getDistance(player, target),
     preferredStyle: state?.pvp?.preferredCombatStyle,
@@ -114,7 +126,46 @@ function buildPressureContext(player, target, state) {
     targetFreezeImmune: target?.getTimers?.().has?.(TimerKey.FREEZE_IMMUNITY) === true,
     targetLikelyMeleeThreat: isLikelyMeleeThreat(target),
     magicPressureAvailable: canUseMagicPressure(player),
+    currentCombatType,
   };
+}
+
+function isCurrentStyleAlreadyGoodEnough(pressureContext) {
+  if (!pressureContext) {
+    return false;
+  }
+  const currentCombatType = pressureContext.currentCombatType;
+  if (!Number.isInteger(currentCombatType)) {
+    return false;
+  }
+  const targetPrayers = pressureContext.targetPrayers ?? [];
+  try {
+    const protectingPrayer = PrayerHandler.getProtectingPrayer(currentCombatType);
+    if (targetPrayers[protectingPrayer] === true) {
+      return false;
+    }
+  } catch (_error) {
+    // No direct protection prayer mapping; fall through to positional checks.
+  }
+
+  const distance = Number(pressureContext.distance ?? 99);
+  if (currentCombatType === CombatType.MELEE) {
+    return distance <= MELEE_DISTANCE_TILES;
+  }
+  if (currentCombatType === CombatType.RANGED) {
+    return distance > MELEE_DISTANCE_TILES;
+  }
+  if (currentCombatType === CombatType.MAGIC) {
+    if (
+      pressureContext.targetLikelyMeleeThreat &&
+      !pressureContext.targetFrozen &&
+      !pressureContext.targetFreezeImmune
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 function scoreCandidate(candidate, state, profile, pressureContext) {
@@ -319,6 +370,17 @@ function maybeRunPressureCombatScript(context) {
   const pressureContext = ServerPerf.measurePhase("bot.pvp.pressure_script.context", () =>
     buildPressureContext(player, target, state)
   );
+  if (
+    ServerPerf.measurePhase("bot.pvp.pressure_script.fast_keep_style", () =>
+      isCurrentStyleAlreadyGoodEnough(pressureContext)
+    )
+  ) {
+    schedulePressureCheck(state, nowMs, PRESSURE_RETRY_COOLDOWN_MS);
+    return {
+      handled: false,
+      forcedCombatType: pressureContext?.currentCombatType ?? null,
+    };
+  }
   const magicCandidate = candidates.get(CombatType.MAGIC) ?? null;
   const shouldFreeze = ServerPerf.measurePhase("bot.pvp.pressure_script.freeze_check", () =>
     shouldUseFreeze(player, profile, magicCandidate, pressureContext)

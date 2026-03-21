@@ -320,6 +320,24 @@ export interface PluginCombatDamageProvider {
   ): void;
 }
 
+export interface PluginBonusEvent {
+  player: any;
+  bonuses: number[];
+}
+
+export interface PluginBonusProvider {
+  apply(event: PluginBonusEvent): void;
+}
+
+export interface PluginRangedAmmoResolver {
+  resolve(player: any): any | null;
+}
+
+export interface PluginRangedAmmoHandler {
+  checkAmmo(player: any, amountRequired: number): boolean | null;
+  decrementAmmo(player: any, pos: any, amount: number): boolean;
+}
+
 export interface PluginApi {
   onPacketReceived(handler: (event: PluginPacketEvent) => void): void;
   onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
@@ -450,6 +468,9 @@ export interface PluginApi {
   log(message: string, extra?: Record<string, unknown>): void;
   setCombatEngine(engine: PluginCombatEngine): void;
   setCombatDamageProvider(provider: PluginCombatDamageProvider): void;
+  registerBonusProvider(provider: PluginBonusProvider): void;
+  registerRangedAmmoResolver(resolver: PluginRangedAmmoResolver): void;
+  registerRangedAmmoHandler(handler: PluginRangedAmmoHandler): void;
   registerCombatMethodResolver(resolver: PluginCombatMethodResolver): void;
   /**
    * Registers a combat method provider for one or more NPC IDs.
