@@ -348,6 +348,7 @@ export class RangedWeaponType {
     static get TOKTZ_XIL_UL() { const FT: any = getFightType(); return new RangedWeaponType(5, 6, FT?.OBBY_RING_LONGRANGE ?? null); }
     static get MORRIGANS_JAVELIN() { const FT: any = getFightType(); return new RangedWeaponType(5, 6, FT?.JAVELIN_LONGRANGE ?? null); }
     static get LONGBOW() { const FT: any = getFightType(); return new RangedWeaponType(9, 10, FT?.LONGBOW_LONGRANGE ?? null); }
+    static get TWISTED_BOW() { const FT: any = getFightType(); return new RangedWeaponType(10, 10, FT?.LONGBOW_LONGRANGE ?? null); }
     static get BLOWPIPE() { const FT: any = getFightType(); return new RangedWeaponType(5, 7, FT?.BLOWPIPE_LONGRANGE ?? null); }
     static get SHORTBOW() { const FT: any = getFightType(); return new RangedWeaponType(7, 9, FT?.SHORTBOW_LONGRANGE ?? null); }
     static get CRYSTAL_BOW() { const FT: any = getFightType(); return new RangedWeaponType(10, 10, FT?.SHORTBOW_LONGRANGE ?? null); }
@@ -386,6 +387,7 @@ export class RangedWeapon {
     public static readonly CRYSTAL_BOW = new RangedWeapon(CRYSTAL_BOW_ALL_WEAPON_IDS, [Ammunition.CRYSTAL_BOW], RangedWeaponType.CRYSTAL_BOW)
     public static readonly GODBOW = new RangedWeapon([19143, 19149, 19146], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.BROAD_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.SHORTBOW)
     public static readonly ZARYTE_BOW = new RangedWeapon([20171], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.BROAD_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.SHORTBOW)
+    public static readonly TWISTED_BOW = new RangedWeapon([ItemIdentifiers.TWISTED_BOW], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.ICE_ARROW, Ammunition.BROAD_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.TWISTED_BOW)
 
     public static readonly DARK_BOW = new RangedWeapon([11235, 13405, 15701, 15702, 15703, 15704], [Ammunition.BRONZE_ARROW, Ammunition.IRON_ARROW, Ammunition.STEEL_ARROW, Ammunition.MITHRIL_ARROW, Ammunition.ADAMANT_ARROW, Ammunition.RUNE_ARROW, Ammunition.DRAGON_ARROW], RangedWeaponType.LONGBOW)
 

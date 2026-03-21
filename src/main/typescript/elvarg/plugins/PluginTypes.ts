@@ -338,6 +338,11 @@ export interface PluginRangedAmmoHandler {
   decrementAmmo(player: any, pos: any, amount: number): boolean;
 }
 
+export interface PluginRangedCombatModifier {
+  modifyMaxHit(attacker: any, target: any, maxHit: number): number | null;
+  modifyAttackRoll(attacker: any, target: any, attackRoll: number): number | null;
+}
+
 export interface PluginApi {
   onPacketReceived(handler: (event: PluginPacketEvent) => void): void;
   onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
@@ -471,6 +476,7 @@ export interface PluginApi {
   registerBonusProvider(provider: PluginBonusProvider): void;
   registerRangedAmmoResolver(resolver: PluginRangedAmmoResolver): void;
   registerRangedAmmoHandler(handler: PluginRangedAmmoHandler): void;
+  registerRangedCombatModifier(modifier: PluginRangedCombatModifier): void;
   registerCombatMethodResolver(resolver: PluginCombatMethodResolver): void;
   /**
    * Registers a combat method provider for one or more NPC IDs.

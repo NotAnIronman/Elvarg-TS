@@ -10,6 +10,7 @@ import { applyMeleeAttackAccuracyModifiers, applyRangedAttackAccuracyModifiers, 
 import type { Player } from '../../../entity/impl/player/Player';
 import { World } from "../../../World";
 import { CombatEquipment } from "../CombatEquipment";
+import { PluginManager } from "../../../../plugins/PluginManager";
 
 type RollCacheEntry = {
     cycle: number;
@@ -130,6 +131,7 @@ export class AccuracyFormulasDpsCalc {
 
         } else if (style === CombatType.RANGED) {
             let attRoll = AccuracyFormulasDpsCalc.attackRangedRoll(entity);
+            attRoll = PluginManager.modifyRangedAttackRoll(entity, enemy, attRoll);
             let defRoll = AccuracyFormulasDpsCalc.defenseRangedRoll(enemy);
             return this.randomInclusive(attRoll) > this.randomInclusive(defRoll);
         } else if (style === CombatType.MAGIC) {

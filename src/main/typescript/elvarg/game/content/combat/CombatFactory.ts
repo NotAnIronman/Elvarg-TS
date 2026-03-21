@@ -176,7 +176,9 @@ export class CombatFactory {
             }
 
         } else if (type == CombatType.RANGED) {
-            damage = Misc.randomInclusive(0, DamageFormulas.calculateMaxRangedHit(entity));
+            let maxHit = DamageFormulas.calculateMaxRangedHit(entity);
+            maxHit = PluginManager.modifyRangedMaxHit(entity, victim, maxHit);
+            damage = Misc.randomInclusive(0, maxHit);
 
             if (victim.getPrayerActive()[PrayerHandler.PROTECT_FROM_MISSILES]) {
                 damage *= 0.6;

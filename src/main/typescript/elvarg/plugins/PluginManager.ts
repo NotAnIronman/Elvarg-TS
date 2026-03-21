@@ -52,6 +52,7 @@ import {
   PluginBonusProvider,
   PluginRangedAmmoHandler,
   PluginRangedAmmoResolver,
+  PluginRangedCombatModifier,
   PluginNpcCombatMethodProvider,
   PluginNpcCombatMethodProviderEntry,
   PluginPlayerLogoutEvent,
@@ -154,6 +155,7 @@ export class PluginManager {
   private static bonusProviders: Array<{ pluginName: string; provider: PluginBonusProvider }> = [];
   private static rangedAmmoResolvers: Array<{ pluginName: string; resolver: PluginRangedAmmoResolver }> = [];
   private static rangedAmmoHandlers: Array<{ pluginName: string; handler: PluginRangedAmmoHandler }> = [];
+  private static rangedCombatModifiers: Array<{ pluginName: string; modifier: PluginRangedCombatModifier }> = [];
   private static combatMethodResolvers: PluginCombatMethodResolver[] = [];
   private static npcCombatMethodProviders: PluginNpcCombatMethodProviderEntry[] = [];
   private static pluginPerfEnabled = false;
@@ -2403,6 +2405,19 @@ export class PluginManager {
         }
         PluginManager.registerRangedAmmoHandlerInternal(pluginName, handler);
       },
+      registerRangedCombatModifier: (modifier) => {
+        if (
+          !modifier ||
+          typeof modifier.modifyMaxHit !== "function" ||
+          typeof modifier.modifyAttackRoll !== "function"
+        ) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid ranged combat modifier registration`
+          );
+          return;
+        }
+        PluginManager.registerRangedCombatModifierInternal(pluginName, modifier);
+      },
       registerCombatMethodResolver: (resolver) => {
         if (!resolver || typeof resolver.resolve !== "function") {
           console.warn(
@@ -2540,6 +2555,42 @@ export class PluginManager {
     return false;
   }
 
+  public static modifyRangedMaxHit(attacker: any, target: any, maxHit: number): number {
+    let current = Number.isFinite(maxHit) ? Math.max(0, Math.floor(maxHit)) : 0;
+    for (const entry of PluginManager.rangedCombatModifiers) {
+      try {
+        const modified = entry.modifier.modifyMaxHit(attacker, target, current);
+        if (modified != null && Number.isFinite(modified)) {
+          current = Math.max(0, Math.floor(modified));
+        }
+      } catch (err) {
+        console.error(
+          `[plugins] ranged max hit modifier failed (${entry.pluginName})`,
+          err
+        );
+      }
+    }
+    return current;
+  }
+
+  public static modifyRangedAttackRoll(attacker: any, target: any, attackRoll: number): number {
+    let current = Number.isFinite(attackRoll) ? Math.max(0, Math.floor(attackRoll)) : 0;
+    for (const entry of PluginManager.rangedCombatModifiers) {
+      try {
+        const modified = entry.modifier.modifyAttackRoll(attacker, target, current);
+        if (modified != null && Number.isFinite(modified)) {
+          current = Math.max(0, Math.floor(modified));
+        }
+      } catch (err) {
+        console.error(
+          `[plugins] ranged attack roll modifier failed (${entry.pluginName})`,
+          err
+        );
+      }
+    }
+    return current;
+  }
+
   public static getCombatMethodResolvers(): PluginCombatMethodResolver[] {
     return PluginManager.combatMethodResolvers.slice();
   }
@@ -2599,6 +2650,13 @@ export class PluginManager {
     handler: PluginRangedAmmoHandler
   ): void {
     PluginManager.rangedAmmoHandlers.push({ pluginName, handler });
+  }
+
+  private static registerRangedCombatModifierInternal(
+    pluginName: string,
+    modifier: PluginRangedCombatModifier
+  ): void {
+    PluginManager.rangedCombatModifiers.push({ pluginName, modifier });
   }
 
   private static registerCombatMethodResolverInternal(
