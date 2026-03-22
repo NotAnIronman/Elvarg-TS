@@ -70,6 +70,7 @@ const BOT_CONFIG = Object.freeze({
   behaviorMode: BOT_BEHAVIOR_MODE,
   botCount: 0,
   wildernessRoamerBotCount: 845,
+  wildernessActiveRegionBotsPerRegion: 24,
   botWalkRadius: 10,
   objectIndexCachePath: path.join(
     process.cwd(),
@@ -292,7 +293,9 @@ module.exports = {
 
     botApi.log("registered", {
       spawned: boot.runtime.getSpawnedCount(),
-      totalConfigured: BOT_CONFIG.botCount + BOT_CONFIG.wildernessRoamerBotCount,
+      totalConfigured: BOT_CONFIG.botCount,
+      wildernessRegionalPool: BOT_CONFIG.wildernessRoamerBotCount,
+      wildernessActiveRegionBotsPerRegion: BOT_CONFIG.wildernessActiveRegionBotsPerRegion,
       wildernessRoamerBotCount: BOT_CONFIG.wildernessRoamerBotCount,
       walkRadius: BOT_CONFIG.botWalkRadius,
       decisionTicks: BOT_CONFIG.botDecisionTicks,

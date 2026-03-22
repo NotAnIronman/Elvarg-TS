@@ -29,6 +29,7 @@ import {
   PluginPlayerPathBlockedEvent,
   PluginPacketEvent,
   PluginCommandEvent,
+  PluginActiveRegionsEvent,
   PluginPlayerDisconnectEvent,
   PluginPlayerLoginEvent,
   PluginServerLifecycleEvent,
@@ -107,6 +108,7 @@ export class PluginManager {
   private static playerProcessHooks: PluginHook<PluginPlayerProcessEvent>[] = [];
   private static playerLevelUpHooks: PluginHook<PluginPlayerLevelUpEvent>[] = [];
   private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
+  private static activeRegionsHooks: PluginHook<PluginActiveRegionsEvent>[] = [];
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
   private static npcInteractionHooks: PluginHook<PluginNpcInteractionEvent>[] = [];
@@ -523,6 +525,20 @@ export class PluginManager {
     }
     for (const hook of PluginManager.regionLoadedHooks) {
       PluginManager.executeHook(hook, event, "region_loaded", "region_loaded");
+    }
+  }
+
+  public static emitActiveRegionsUpdated(event: PluginActiveRegionsEvent): void {
+    if (PluginManager.activeRegionsHooks.length === 0) {
+      return;
+    }
+    for (const hook of PluginManager.activeRegionsHooks) {
+      PluginManager.executeHook(
+        hook,
+        event,
+        "active_regions_updated",
+        "active_regions_updated"
+      );
     }
   }
 
@@ -1568,6 +1584,20 @@ export class PluginManager {
           },
         });
       },
+      onActiveRegionsUpdated: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.activeRegionsHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !Array.isArray(event.regions) || !Array.isArray(event.regionKeys)) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onPathBlocked: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -2348,6 +2378,31 @@ export class PluginManager {
         console.info(
           `[plugins] player persistence set by ${pluginName}: ${previousName} -> ${nextName}`
         );
+      },
+      getActiveRegionSnapshot: () => {
+        try {
+          const worldModule = require("../game/World");
+          const World = worldModule?.World;
+          return World?.getActiveRegionSnapshot?.() ?? {
+            processCycle: 0,
+            updatedAtMs: 0,
+            radius: 0,
+            regions: [],
+            regionKeys: [],
+          };
+        } catch (err) {
+          console.error(
+            `[plugins] ${pluginName} failed to read active region snapshot`,
+            err
+          );
+          return {
+            processCycle: 0,
+            updatedAtMs: 0,
+            radius: 0,
+            regions: [],
+            regionKeys: [],
+          };
+        }
       },
       setCombatEngine: (engine) => {
         if (!engine || typeof engine.getMethod !== "function") {

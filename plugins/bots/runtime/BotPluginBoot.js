@@ -336,6 +336,7 @@ function bootPlayerBotsRuntime(options = {}) {
     botApi,
     botCount: config.botCount,
     wildernessRoamerBotCount: config.wildernessRoamerBotCount,
+    wildernessActiveRegionBotsPerRegion: config.wildernessActiveRegionBotsPerRegion,
     botBaseCooldownMs: config.botBaseCooldownMs,
     spawn,
     spawnOffsets,
@@ -373,6 +374,8 @@ function bootPlayerBotsRuntime(options = {}) {
     startupLogger: (summary) => {
       api?.log?.("bot_startup_spawned", summary);
     },
+    onActiveRegionsUpdated: (handler) => api?.onActiveRegionsUpdated?.(handler),
+    getActiveRegionSnapshot: () => api?.getActiveRegionSnapshot?.(),
     botStatesByName,
     botmeUsernames,
     playerBotUsernames,

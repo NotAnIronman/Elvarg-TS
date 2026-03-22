@@ -73,6 +73,7 @@ const DITCH_NON_WILD_STRIP_MIN_Y = 3523;
 const DITCH_NON_WILD_STRIP_MAX_Y = 3524;
 const DITCH_WILDERNESS_RETURN_Y = 3525;
 const REAL_PLAYER_OPPONENT_VALIDATION_POOL_SIZE = 4;
+const MULTI_REAL_PLAYER_ATTACKER_CAP = 2;
 
 const PVP_PHASE = Object.freeze({
   IDLE: "idle",
@@ -1128,6 +1129,17 @@ class PvpBehavior {
     return false;
   }
 
+  getActivePvpTargetCount(targetUsername, ignoreUsername = null, pvpIndex = null) {
+    if (!targetUsername || !(pvpIndex?.activePvpTargetCounts instanceof Map)) {
+      return 0;
+    }
+    const activeCount = Number(pvpIndex.activePvpTargetCounts.get(targetUsername) ?? 0);
+    const ignoredTargetUsername = ignoreUsername
+      ? pvpIndex?.activePvpTargetByUsername?.get(ignoreUsername) ?? null
+      : null;
+    return Math.max(0, activeCount - (ignoredTargetUsername === targetUsername ? 1 : 0));
+  }
+
   isPvpCandidate({ sourceEntry, candidateEntry, entries, pvpIndex, nowMs, isInCombat }) {
     if (!sourceEntry || !candidateEntry || sourceEntry === candidateEntry) {
       return false;
@@ -1206,6 +1218,7 @@ class PvpBehavior {
 
     const sourceProfile = this.getProfile(sourceState);
     const sourceMethod = CombatFactory.getMethod(sourcePlayer);
+    const sourceUsername = sourcePlayer.getUsername?.() ?? null;
     const topCandidates = [];
     const indexedCandidates = this.getNearbyIndexedRealPlayers(
       pvpIndex,
@@ -1250,7 +1263,16 @@ class PvpBehavior {
       }
       const isMultiEngagement =
         AreaManager.inMulti(sourcePlayer) && AreaManager.inMulti(candidatePlayer);
+      const candidateUsername = candidatePlayer.getUsername?.() ?? null;
+      const activeTargeters = this.getActivePvpTargetCount(
+        candidateUsername,
+        sourceUsername,
+        pvpIndex
+      );
       if (!isMultiEngagement && typeof isInCombat === "function" && isInCombat(candidatePlayer)) {
+        return;
+      }
+      if (isMultiEngagement && activeTargeters >= MULTI_REAL_PLAYER_ATTACKER_CAP) {
         return;
       }
 
@@ -1265,7 +1287,7 @@ class PvpBehavior {
         score += 40;
       }
       if (isMultiEngagement) {
-        score += 20;
+        score += Math.max(0, 20 - activeTargeters * 12);
       }
 
       this.insertTopScoredCandidate(

@@ -21,6 +21,7 @@ import { Task } from './task/Task';
 import { GameSyncTask } from './entity/updating/sync/GameSyncTask';
 import { PluginManager } from '../plugins/PluginManager';
 import { ServerPerf } from '../util/ServerPerf';
+import { ActiveRegionIndex, ActiveRegionSnapshot } from './ActiveRegionIndex';
 
 const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
 
@@ -32,7 +33,6 @@ interface GameSyncTaskInterface {
 
 export class World {
     private static readonly MAX_PLAYERS = 1024;
-    private static readonly NPC_ACTIVE_REGION_RADIUS = 1;
     private static readonly IDLE_BOT_PROCESS_STRIDE = 2;
     private static readonly BOT_PROCESS_LOD_CHUNK_SIZE_TILES = 32;
     private static readonly BOT_PROCESS_LOD_NEAR_DISTANCE_TILES = 15;
@@ -51,6 +51,7 @@ export class World {
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];
     private static npcTileOccupants: Map<string, NPC[]> = new Map();
+    private static activeRegionIndex: ActiveRegionIndex = new ActiveRegionIndex(1);
     private static realPlayerObserverBuckets: Map<string, Array<{ x: number; y: number; z: number }>> = new Map();
     private static realPlayerObserverCount = 0;
     private static playerUpdateBuckets: Map<string, Player[]> = new Map();
@@ -208,6 +209,14 @@ export class World {
 
     public static getActiveNpcsForUpdate(): NPC[] {
         return this.activeNpcsForUpdate;
+    }
+
+    public static getActiveRegionSnapshot(): ActiveRegionSnapshot {
+        return World.activeRegionIndex.getSnapshot();
+    }
+
+    public static markActiveRegionsDirty(): void {
+        World.refreshActiveRegions();
     }
 
     private static getRegionKey(x: number, y: number, z: number): string {
@@ -418,31 +427,17 @@ export class World {
         return World.PLAYER_UPDATE_BUCKET_COMPARE_ENABLED;
     }
 
-    private static buildActiveNpcRegionKeys(): Set<string> {
-        const keys = new Set<string>();
-        World.players.forEach((player) => {
-            if (!player) {
-                return;
-            }
-            // Prioritize active regions around real connected players.
-            // Bot-only regions can fan out NPC processing across most of the map.
-            if (!World.shouldRunNetworkUpdates(player)) {
-                return;
-            }
-            const loc = player.getLocation();
-            const baseRegionX = loc.getX() >> 6;
-            const baseRegionY = loc.getY() >> 6;
-            const z = loc.getZ();
-            for (let dx = -World.NPC_ACTIVE_REGION_RADIUS; dx <= World.NPC_ACTIVE_REGION_RADIUS; dx++) {
-                for (let dy = -World.NPC_ACTIVE_REGION_RADIUS; dy <= World.NPC_ACTIVE_REGION_RADIUS; dy++) {
-                    keys.add(`${z}:${baseRegionX + dx}:${baseRegionY + dy}`);
-                }
-            }
-        });
-        return keys;
+    public static refreshActiveRegions(): void {
+        const snapshot = World.activeRegionIndex.update(
+            World.players,
+            (player) => World.shouldRunNetworkUpdates(player),
+            World.processCycle,
+            Date.now()
+        );
+        PluginManager.emitActiveRegionsUpdated(snapshot);
     }
 
-    private static shouldProcessNpc(npc: NPC, activeRegionKeys: Set<string> | null): boolean {
+    private static shouldProcessNpc(npc: NPC): boolean {
         if (!npc) {
             return false;
         }
@@ -456,7 +451,8 @@ export class World {
             return true;
         }
 
-        if (!activeRegionKeys || activeRegionKeys.size === 0) {
+        const activeRegionKeys = World.activeRegionIndex.getActiveRegionKeys();
+        if (activeRegionKeys.size === 0) {
             return false;
         }
 
@@ -692,6 +688,7 @@ export class World {
 
         // Add pending players..
         timed("queue_add_players", () => {
+            let activeRegionsChanged = false;
             for (let i = 0; i < GameConstants.QUEUED_LOOP_THRESHOLD; i++) {
                 let player = World.addPlayerQueue.shift();
                 if (!player)
@@ -707,7 +704,11 @@ export class World {
                     World.isPlayerSessionConnected(player)
                 ) {
                     player.getPacketSender?.().sendDetails?.();
+                    activeRegionsChanged = true;
                 }
+            }
+            if (activeRegionsChanged) {
+                World.refreshActiveRegions();
             }
         });
 
@@ -715,6 +716,7 @@ export class World {
         // If a player's transport is already closed, force removal immediately.
         timed("queue_remove_players", () => {
             let amount = 0;
+            let activeRegionsChanged = false;
             for (let index = World.removePlayerQueue.length - 1; index >= 0; index--) {
                 if (amount >= GameConstants.QUEUED_LOOP_THRESHOLD) {
                     break;
@@ -726,10 +728,16 @@ export class World {
                 }
                 const disconnected = !World.isPlayerSessionConnected(player);
                 if (disconnected || player.canLogout() || player.forcedLogoutTimer.finished() || Server.isUpdating()) {
+                    if (player.isPlayerBot?.() !== true) {
+                        activeRegionsChanged = true;
+                    }
                     World.players.remove(player);
                     World.removePlayerQueue.splice(index, 1);
                 }
                 amount++;
+            }
+            if (activeRegionsChanged) {
+                World.refreshActiveRegions();
             }
         });
         // Add pending Npcs..
@@ -822,15 +830,12 @@ export class World {
         });
 
         timed("process_npcs", () => {
-            const activeNpcRegions = GameConstants.PROCESS_NPCS_BY_ACTIVE_REGIONS
-                ? World.buildActiveNpcRegionKeys()
-                : null;
             World.npcs.forEach((npc) => {
                 try {
-                    if (!World.shouldProcessNpc(npc, activeNpcRegions)) {
+                    World.activeNpcsForUpdate.push(npc);
+                    if (!World.shouldProcessNpc(npc)) {
                         return;
                     }
-                    World.activeNpcsForUpdate.push(npc);
                     npc.process();
                 } catch (e) {
                     console.error(e);

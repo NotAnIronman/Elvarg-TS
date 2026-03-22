@@ -1,6 +1,7 @@
 import type { Packet } from "../net/packet/Packet";
 import type { PacketExecutor } from "../net/packet/PacketExecutor";
 import type { PlayerPersistence } from "../game/entity/impl/player/persistence/PlayerPersistence";
+import type { ActiveRegionSnapshot } from "../game/ActiveRegionIndex";
 
 export interface PluginPacketEvent {
   opcode: number;
@@ -50,6 +51,8 @@ export interface PluginRegionLoadedEvent {
   absX: number;
   absY: number;
 }
+
+export interface PluginActiveRegionsEvent extends ActiveRegionSnapshot {}
 
 export interface PluginPathBlockedEvent {
   entity: any;
@@ -356,6 +359,7 @@ export interface PluginApi {
   onPlayerProcess(handler: (event: PluginPlayerProcessEvent) => void): void;
   onPlayerLevelUp(handler: (event: PluginPlayerLevelUpEvent) => void): void;
   onRegionLoaded(handler: (event: PluginRegionLoadedEvent) => void): void;
+  onActiveRegionsUpdated(handler: (event: PluginActiveRegionsEvent) => void): void;
   onPathBlocked(handler: (event: PluginPathBlockedEvent) => void): void;
   onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
@@ -470,6 +474,7 @@ export interface PluginApi {
   registerPacketListener(opcode: number, listener: PacketExecutor): void;
   registerAlivePacketListener(opcode: number, listener: PacketExecutor): void;
   setPlayerPersistence(persistence: PlayerPersistence): void;
+  getActiveRegionSnapshot(): PluginActiveRegionsEvent;
   log(message: string, extra?: Record<string, unknown>): void;
   setCombatEngine(engine: PluginCombatEngine): void;
   setCombatDamageProvider(provider: PluginCombatDamageProvider): void;

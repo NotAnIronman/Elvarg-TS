@@ -287,7 +287,7 @@ function registerBotEvents(options) {
     pvpJumpOnKillPolicy,
   } = options;
 
-  api.onPlayerDisconnect(({ player, username }) => {
+  const handleRuntimeRemoval = ({ player, username, source }) => {
     if (
       player &&
       player.isPlayerBot?.() &&
@@ -304,8 +304,24 @@ function registerBotEvents(options) {
     }
     const removed = runtime.handleDisconnect(player, username);
     if (removed) {
-      botApi.log("botme_auto_disabled_disconnect", { username });
+      botApi.log("botme_auto_disabled_disconnect", { username, source });
     }
+  };
+
+  api.onPlayerDisconnect(({ player, username }) => {
+    handleRuntimeRemoval({
+      player,
+      username,
+      source: "disconnect",
+    });
+  });
+
+  api.onPlayerLogout(({ player, username }) => {
+    handleRuntimeRemoval({
+      player,
+      username,
+      source: "logout",
+    });
   });
 
   api.onPlayerDeathItemDrop((event) => {

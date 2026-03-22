@@ -17,6 +17,7 @@ import { PlayerStatus } from "../../game/model/PlayerStatus";
 import { Location } from "../../game/model/Location";
 import { DonatorRights } from "../../game/model/rights/DonatorRights";
 import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
+import { World } from "../../game/World";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
 // import { Mobile } from "../../game/entity/impl/Mobile";
@@ -45,6 +46,9 @@ export class PacketSender {
     this.player.setAllowRegionChangePacket(true);
     // Track the last known region using the player's actual position, matching the Java server.
     this.player.setLastKnownRegion(this.player.getLocation().clone());
+    if (this.player?.isPlayerBot?.() !== true) {
+      World.markActiveRegionsDirty();
+    }
     try {
       const location = this.player.getLocation();
       const currentRegionId = ((location.getX() >> 6) << 8) | (location.getY() >> 6);

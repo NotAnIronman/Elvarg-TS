@@ -3,6 +3,16 @@ import { Mobile } from "../../entity/impl/Mobile";
 import { Boundary } from "../../model/Boundary";
 
 export class Wilderness {
+    private static readonly AREAS: Boundary[] = [
+        new Boundary(2940, 3392, 3525, 3968, 0),
+        new Boundary(2986, 3012, 10338, 10366, 0),
+        new Boundary(3653, 3720, 3441, 3538, 0),
+        new Boundary(3650, 3653, 3457, 3472, 0),
+        new Boundary(3150, 3199, 3796, 3869, 0),
+        new Boundary(2994, 3041, 3733, 3790, 0),
+        new Boundary(3061, 3074, 10253, 10262, 0),
+    ];
+
     private static readonly MULTI: Boundary[] = [
         new Boundary(3136, 3327, 3519, 3607, 0),
         new Boundary(2360, 2445, 5045, 5125, 0),
@@ -28,17 +38,7 @@ export class Wilderness {
         }
         const x = location.getX();
         const y = location.getY();
-        const z = location.getZ();
-
-        return (
-            (x >= 2940 && x <= 3392 && y >= 3525 && y <= 3968 && z === 0) ||
-            (x >= 2986 && x <= 3012 && y >= 10338 && y <= 10366 && z === 0) ||
-            (x >= 3653 && x <= 3720 && y >= 3441 && y <= 3538 && z === 0) ||
-            (x >= 3650 && x <= 3653 && y >= 3457 && y <= 3472 && z === 0) ||
-            (x >= 3150 && x <= 3199 && y >= 3796 && y <= 3869 && z === 0) ||
-            (x >= 2994 && x <= 3041 && y >= 3733 && y <= 3790 && z === 0) ||
-            (x >= 3061 && x <= 3074 && y >= 10253 && y <= 10262 && z === 0)
-        );
+        return Wilderness.AREAS.some((boundary) => boundary.inside(location));
     }
 
     public static isIn(character: Mobile | null | undefined): boolean {
@@ -52,5 +52,28 @@ export class Wilderness {
     public static isMulti(x: number, y: number): boolean {
         const location = new Location(x, y, 0);
         return Wilderness.MULTI.some((boundary) => boundary.inside(location));
+    }
+
+    public static intersectsArea(minX: number, maxX: number, minY: number, maxY: number, z: number): boolean {
+        if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+            return false;
+        }
+        if (!Number.isFinite(z)) {
+            return false;
+        }
+        return Wilderness.AREAS.some((boundary) => {
+            const boundaryZ = boundary.height ?? 0;
+            const boundaryMinX = boundary.getX();
+            const boundaryMaxX = boundary.getX2();
+            const boundaryMinY = boundary.getY();
+            const boundaryMaxY = boundary.getY2();
+            return (
+                boundaryZ === z &&
+                boundaryMinX <= maxX &&
+                boundaryMaxX >= minX &&
+                boundaryMinY <= maxY &&
+                boundaryMaxY >= minY
+            );
+        });
     }
 }

@@ -653,6 +653,9 @@ class LoginSession {
       }
     }
 
+    if (this.gamePlayer?.isPlayerBot?.() !== true) {
+      World.markActiveRegionsDirty();
+    }
     this.sendPacket(73, mapPayload, PacketType.FIXED, "map_region");
 
     // Force a clean regional sync on login.
