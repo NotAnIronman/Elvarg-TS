@@ -18,6 +18,7 @@ const { PvpCombatExecutionNode } = require("../nodes/pvp/PvpCombatExecutionNode"
 const { PvpDefensiveActionNode } = require("../nodes/pvp/PvpDefensiveActionNode");
 const { PvpFreezeAndKiteNode } = require("../nodes/pvp/PvpFreezeAndKiteNode");
 const { PvpJumpKilledTargetNode } = require("../nodes/pvp/PvpJumpKilledTargetNode");
+const { PvpVengeanceNode } = require("../nodes/pvp/PvpVengeanceNode");
 const { ReplenishAfterKillNode } = require("../nodes/pvp/ReplenishAfterKillNode");
 const { PvpValidateEngagementNode } = require("../nodes/pvp/PvpValidateEngagementNode");
 const {
@@ -230,6 +231,12 @@ class PvpBehavior {
       getProfile: (state) => this.getProfile(state),
       scheduleCombatAction,
       scheduleFreezeReview,
+      pvpPhase: PVP_PHASE,
+    });
+    this.vengeanceNode = new PvpVengeanceNode({
+      setPhase: (state, phase) => this.setPhase(state, phase),
+      scheduleCombatAction,
+      getProfile: (state) => this.getProfile(state),
       pvpPhase: PVP_PHASE,
     });
     this.jumpKilledTargetNode = new PvpJumpKilledTargetNode({
@@ -1496,6 +1503,18 @@ class PvpBehavior {
     );
     if (freeze?.handled) {
       return freeze.status ?? "failure";
+    }
+
+    const vengeance = ServerPerf.measurePhase("bot.pvp.tick.vengeance", () =>
+      this.vengeanceNode.tick({
+        player,
+        state,
+        nowMs,
+        target,
+      })
+    );
+    if (vengeance?.handled) {
+      return vengeance.status ?? "failure";
     }
 
     return ServerPerf.measurePhase("bot.pvp.tick.combat_execution", () =>

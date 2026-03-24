@@ -138,6 +138,7 @@ function createPvpBehaviorState() {
     lastFoodAt: 0,
     lastBrewAt: 0,
     lastComboEatAt: 0,
+    lastVengeanceAt: 0,
     lastSpecAt: 0,
     lastOneTickAt: 0,
     lastPressureScriptAt: 0,
@@ -175,6 +176,7 @@ function createPvpBehaviorState() {
     nextOneTickCheckAt: 0,
     nextSwitchbackCheckAt: 0,
     nextPressureCheckAt: 0,
+    nextVengeanceAttemptAt: 0,
   };
 }
 
@@ -204,6 +206,7 @@ function clearPvpBehaviorState(state) {
   state.pvp.lastFoodAt = 0;
   state.pvp.lastBrewAt = 0;
   state.pvp.lastComboEatAt = 0;
+  state.pvp.lastVengeanceAt = 0;
   state.pvp.lastSpecAt = 0;
   state.pvp.lastOneTickAt = 0;
   state.pvp.lastPressureScriptAt = 0;
@@ -238,6 +241,7 @@ function clearPvpBehaviorState(state) {
   state.pvp.nextOneTickCheckAt = 0;
   state.pvp.nextSwitchbackCheckAt = 0;
   state.pvp.nextPressureCheckAt = 0;
+  state.pvp.nextVengeanceAttemptAt = 0;
 }
 
 function createAutonomyState() {

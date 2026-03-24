@@ -20,6 +20,7 @@ const RANGED_INTERFACES = new Set([
   WeaponInterfaces.THROWNAXE,
   WeaponInterfaces.DART,
   WeaponInterfaces.JAVELIN,
+  WeaponInterfaces.BLOWPIPE,
 ]);
 const BOW_INTERFACES = new Set([
   WeaponInterfaces.SHORTBOW,
@@ -39,24 +40,37 @@ const ARROW_IDS = new Set([
 const BOLT_IDS = new Set([
   ItemIdentifiers.DRAGON_BOLTS,
   ItemIdentifiers.DRAGON_BOLTS_E_,
+  ItemIdentifiers.BOLT_RACK,
 ]);
 const SPEC_WEAPON_IDS = new Set([
+  ItemIdentifiers.ARMADYL_GODSWORD,
   ItemIdentifiers.ANCIENT_GODSWORD,
+  ItemIdentifiers.BANDOS_GODSWORD,
   ItemIdentifiers.DARK_BOW,
+  ItemIdentifiers.DRAGON_CLAWS,
   ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+  ItemIdentifiers.HEAVY_BALLISTA,
   ItemIdentifiers.GRANITE_MAUL,
   ItemIdentifiers.MAGIC_SHORTBOW,
   ItemIdentifiers.MAGIC_SHORTBOW_I_,
   ItemIdentifiers.MAGIC_SHORTBOW_3,
+  ItemIdentifiers.SARADOMIN_GODSWORD,
+  ItemIdentifiers.ZAMORAK_GODSWORD,
 ]);
 const SUPPORTED_SPEC_WEAPONS = Object.freeze([
+  ItemIdentifiers.ARMADYL_GODSWORD,
   ItemIdentifiers.ANCIENT_GODSWORD,
+  ItemIdentifiers.BANDOS_GODSWORD,
   ItemIdentifiers.DARK_BOW,
+  ItemIdentifiers.DRAGON_CLAWS,
   ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+  ItemIdentifiers.HEAVY_BALLISTA,
   ItemIdentifiers.GRANITE_MAUL,
   ItemIdentifiers.MAGIC_SHORTBOW,
   ItemIdentifiers.MAGIC_SHORTBOW_I_,
   ItemIdentifiers.MAGIC_SHORTBOW_3,
+  ItemIdentifiers.SARADOMIN_GODSWORD,
+  ItemIdentifiers.ZAMORAK_GODSWORD,
 ]);
 
 function getWeaponId(player) {

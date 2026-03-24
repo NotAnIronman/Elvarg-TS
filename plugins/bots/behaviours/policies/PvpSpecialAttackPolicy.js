@@ -17,13 +17,19 @@ const {
 } = require("./PvpCombatRuntimeCache");
 
 const SWITCHABLE_SPEC_WEAPONS = new Set([
+  ItemIdentifiers.ARMADYL_GODSWORD,
   ItemIdentifiers.ANCIENT_GODSWORD,
+  ItemIdentifiers.BANDOS_GODSWORD,
   ItemIdentifiers.DARK_BOW,
+  ItemIdentifiers.DRAGON_CLAWS,
   ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
+  ItemIdentifiers.HEAVY_BALLISTA,
   ItemIdentifiers.GRANITE_MAUL,
   ItemIdentifiers.MAGIC_SHORTBOW,
   ItemIdentifiers.MAGIC_SHORTBOW_I_,
   ItemIdentifiers.MAGIC_SHORTBOW_3,
+  ItemIdentifiers.SARADOMIN_GODSWORD,
+  ItemIdentifiers.ZAMORAK_GODSWORD,
 ]);
 
 const POST_SPEC_SWITCHBACK_DELAY_MS = 900;
@@ -206,6 +212,25 @@ function shouldUseSpecNow(player, target, state, profile, special, weaponId) {
     if (targetHpRatio > finisherHpRatio + 0.18 && !pressure) {
       return false;
     }
+  }
+
+  if (
+    weaponId === ItemIdentifiers.ARMADYL_GODSWORD ||
+    weaponId === ItemIdentifiers.DRAGON_CLAWS
+  ) {
+    if (targetHpRatio > finisherHpRatio + 0.16 && !pressure) {
+      return false;
+    }
+    if (targetHpRatio <= finisherHpRatio + 0.06) {
+      chance += 0.1;
+    }
+  }
+
+  if (weaponId === ItemIdentifiers.HEAVY_BALLISTA) {
+    if (targetHpRatio > finisherHpRatio + 0.12 && !pressure) {
+      return false;
+    }
+    chance += 0.06;
   }
 
   if (
