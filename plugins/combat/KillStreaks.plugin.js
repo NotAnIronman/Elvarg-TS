@@ -242,12 +242,8 @@ function resolveMilestoneReward(streak) {
   return Math.floor(streak / STREAK_STEP) * STREAK_MILESTONE_REWARD;
 }
 
-function resolveBloodMoneyReward(streak) {
-  return (
-    BASE_BLOOD_MONEY_REWARD +
-    resolveStepReward(streak) +
-    resolveMilestoneReward(streak)
-  );
+function resolveKillstreakBonusReward(streak) {
+  return resolveStepReward(streak) + resolveMilestoneReward(streak);
 }
 
 function awardBloodMoney(player, victim, amount) {
@@ -337,6 +333,50 @@ function sendKillstreakMessage(killer, streak, newHighest) {
   sender.sendMessage?.(`Your killstreak is now ${streak}.`);
 }
 
+function applyKillstreakProgressAndAnnouncements(killer) {
+  const progress = applyKillstreakProgress(killer);
+  sendKillstreakMessage(killer, progress.streak, progress.newHighest);
+  handleThresholdAnnouncement(killer, progress.glowOutcome);
+  return progress;
+}
+
+function awardKillstreakScaledReward(killer, victim, streak, options = {}) {
+  if (!isEligibleKillstreakPlayer(killer)) {
+    return;
+  }
+  const baseReward = Math.max(0, Math.floor(Number(options?.baseReward ?? 0)));
+  const bonusReward = resolveKillstreakBonusReward(streak);
+  const totalReward = baseReward + bonusReward;
+  if (totalReward <= 0) {
+    return;
+  }
+
+  awardBloodMoney(killer, victim, totalReward);
+  const sender = killer.getPacketSender?.();
+  if (!sender) {
+    return;
+  }
+  const milestoneReward = resolveMilestoneReward(streak);
+  if (baseReward > 0) {
+    if (milestoneReward > 0) {
+      sender.sendMessage?.(
+        `You've received ${totalReward} blood money for that kill, including a ${milestoneReward} killstreak bonus.`
+      );
+      return;
+    }
+    sender.sendMessage?.(`You've received ${totalReward} blood money for that kill!`);
+    return;
+  }
+
+  if (milestoneReward > 0) {
+    sender.sendMessage?.(
+      `You've received ${totalReward} bonus blood money from your killstreak, including a ${milestoneReward} milestone bonus.`
+    );
+    return;
+  }
+  sender.sendMessage?.(`You've received ${totalReward} bonus blood money from your killstreak.`);
+}
+
 function isEligiblePlayerKill(killer, victim) {
   return (
     isEligibleKillstreakPlayer(killer) &&
@@ -365,26 +405,10 @@ function handlePlayerKill(killer, victim) {
   trackRecentKill(killer, victim);
   killer.incrementTotalKills?.();
 
-  const progress = applyKillstreakProgress(killer);
-  sendKillstreakMessage(killer, progress.streak, progress.newHighest);
-  handleThresholdAnnouncement(killer, progress.glowOutcome);
-
-  const rewardAmount = resolveBloodMoneyReward(progress.streak);
-  awardBloodMoney(killer, victim, rewardAmount);
-
-  const milestoneReward = resolveMilestoneReward(progress.streak);
-  if (milestoneReward > 0) {
-    killer
-      .getPacketSender?.()
-      .sendMessage?.(
-        `You've received ${rewardAmount} blood money for that kill, including a ${milestoneReward} killstreak bonus.`
-      );
-    return;
-  }
-
-  killer
-    .getPacketSender?.()
-    .sendMessage?.(`You've received ${rewardAmount} blood money for that kill!`);
+  const progress = applyKillstreakProgressAndAnnouncements(killer);
+  awardKillstreakScaledReward(killer, victim, progress.streak, {
+    baseReward: BASE_BLOOD_MONEY_REWARD,
+  });
 }
 
 module.exports = {
@@ -401,9 +425,10 @@ module.exports = {
       const playerKill = isEligiblePlayerKill(killer, victim);
 
       if (botKill) {
-        const progress = applyKillstreakProgress(killer);
-        sendKillstreakMessage(killer, progress.streak, progress.newHighest);
-        handleThresholdAnnouncement(killer, progress.glowOutcome);
+        const progress = applyKillstreakProgressAndAnnouncements(killer);
+        awardKillstreakScaledReward(killer, victim, progress.streak, {
+          baseReward: 0,
+        });
       }
       handleVictimDefeat(victim, { countDeath: playerKill });
       if (playerKill) {
