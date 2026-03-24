@@ -153,8 +153,6 @@ function createPvpBehaviorState() {
     replenishAfterKillPending: false,
     replenishPrayerId: null,
     replenishPrayerUntil: 0,
-    nextUnstackCheckAt: 0,
-    nextUnstackAt: 0,
     appliedBoostProfileId: null,
     cachedEatAtHpRatioProfileId: null,
     cachedEatAtHpRatio: null,
@@ -218,8 +216,6 @@ function clearPvpBehaviorState(state) {
   state.pvp.replenishAfterKillPending = false;
   state.pvp.replenishPrayerId = null;
   state.pvp.replenishPrayerUntil = 0;
-  state.pvp.nextUnstackCheckAt = 0;
-  state.pvp.nextUnstackAt = 0;
   state.pvp.appliedBoostProfileId = null;
   state.pvp.cachedEatAtHpRatioProfileId = null;
   state.pvp.cachedEatAtHpRatio = null;
@@ -713,9 +709,6 @@ function setModePvp(
     player.setRunning?.(true);
     player.getPacketSender?.()?.sendRunStatus?.();
   }
-  player.setFollowing(targetPlayer);
-  player.setMobileInteraction(targetPlayer);
-  player.setPositionToFace(targetPlayer.getLocation());
   return true;
 }
 

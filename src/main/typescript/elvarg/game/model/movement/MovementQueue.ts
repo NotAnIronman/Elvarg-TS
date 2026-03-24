@@ -820,7 +820,9 @@ export class MovementQueue {
         )) {
             return;
         }
-        if (!isBot) {
+        const destinationChanged =
+            this.lastDestX !== destination.getX() || this.lastDestY !== destination.getY();
+        if (!isBot || destinationChanged) {
             this.reset();
         }
         this.markBotRepathScheduled(destination, nowMs, true);

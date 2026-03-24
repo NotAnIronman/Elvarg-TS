@@ -66,8 +66,23 @@ class PvpValidateEngagementNode {
 
     const targetCombat = target.getCombat?.();
     const targetTarget = targetCombat?.getTarget?.();
+    const targetAttacker = targetCombat?.getAttacker?.();
+    const targetFollowing = target.getCombatFollowing?.();
     const isMultiEngagement = AreaManager.inMulti(player) && AreaManager.inMulti(target);
-    if (!isMultiEngagement && targetTarget && targetTarget !== player) {
+    const hasOtherOccupant =
+      (!targetTarget || targetTarget === player
+        ? false
+        : targetTarget.isRegistered?.() === true &&
+          (targetTarget.getHitpoints?.() ?? 0) > 0) ||
+      (!targetAttacker || targetAttacker === player
+        ? false
+        : targetAttacker.isRegistered?.() === true &&
+          (targetAttacker.getHitpoints?.() ?? 0) > 0) ||
+      (!targetFollowing || targetFollowing === player
+        ? false
+        : targetFollowing.isRegistered?.() === true &&
+          (targetFollowing.getHitpoints?.() ?? 0) > 0);
+    if (!isMultiEngagement && hasOtherOccupant) {
       this.setPhase?.(state, this.pvpPhase?.SEEKING ?? "seeking");
       if (pvpOnly) {
         this.resetSeekingState?.(player, state, nowMs, "target_in_other_combat");

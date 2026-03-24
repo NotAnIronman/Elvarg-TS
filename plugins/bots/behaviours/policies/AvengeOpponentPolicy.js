@@ -1,6 +1,11 @@
 "use strict";
 
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
+const {
+  CombatFactory,
+  CanAttackResponse,
+} = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { applyGeneratedPvpLoadout } = require("./PvpLoadoutPolicy");
 const { scheduleCombatAction, scheduleReviewTimers } = require("./PvpTimingPolicy");
 const { isPvpOnlyBotState } = require("../state/PlayerBotState");
@@ -113,6 +118,33 @@ class AvengeOpponentPolicy {
 
   engageImmediately(bot, state, target, nowMs) {
     if (!bot || !state || !state.pvp || !target) {
+      return false;
+    }
+    const isMultiEngagement = AreaManager.inMulti(bot) && AreaManager.inMulti(target);
+    if (!isMultiEngagement) {
+      const targetCombat = target.getCombat?.();
+      const targetTarget = targetCombat?.getTarget?.();
+      const targetAttacker = targetCombat?.getAttacker?.();
+      const targetFollowing = target.getCombatFollowing?.();
+      const occupiedByOther =
+        (targetTarget &&
+          targetTarget !== bot &&
+          targetTarget.isRegistered?.() === true &&
+          (targetTarget.getHitpoints?.() ?? 0) > 0) ||
+        (targetAttacker &&
+          targetAttacker !== bot &&
+          targetAttacker.isRegistered?.() === true &&
+          (targetAttacker.getHitpoints?.() ?? 0) > 0) ||
+        (targetFollowing &&
+          targetFollowing !== bot &&
+          targetFollowing.isRegistered?.() === true &&
+          (targetFollowing.getHitpoints?.() ?? 0) > 0);
+      if (occupiedByOther) {
+        return false;
+      }
+    }
+    const method = CombatFactory.getMethod(bot);
+    if (CombatFactory.canAttack(bot, method, target) !== CanAttackResponse.CAN_ATTACK) {
       return false;
     }
     const durationMs = Math.max(

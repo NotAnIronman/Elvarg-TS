@@ -71,6 +71,9 @@ const BOT_CONFIG = Object.freeze({
   botCount: 0,
   wildernessRoamerBotCount: 845,
   wildernessActiveRegionBotsPerRegion: 24,
+  // Active-region snapshots are currently radius=1 (3x3 around each player region).
+  // Inset by 1 to target only the true active core for regional wilderness bots.
+  wildernessActiveRegionInset: 1,
   botWalkRadius: 10,
   objectIndexCachePath: path.join(
     process.cwd(),

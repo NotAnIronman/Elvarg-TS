@@ -1,8 +1,13 @@
 const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task");
 const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
+const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const {
+  CombatFactory,
+  CanAttackResponse,
+} = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const {
@@ -624,6 +629,77 @@ class BotBehaviorTask extends Task {
     );
   }
 
+  hasNearbyHumanObserverCached(
+    entry,
+    nowMs,
+    distanceTiles = this.lodConfig.nearDistanceTiles
+  ) {
+    const player = entry?.player;
+    const state = entry?.state;
+    if (!player || !state) {
+      return false;
+    }
+    const normalizedDistance = Math.max(1, Math.floor(distanceTiles));
+    const cache = state?.nearHumanObserverUrgencyCache ?? null;
+    if (
+      cache &&
+      cache.revision === this._humanObserverRevision &&
+      cache.distanceTiles >= normalizedDistance &&
+      cache.expiresAt > nowMs
+    ) {
+      return cache.near === true;
+    }
+    const near = this.hasNearbyHumanObserver(player, nowMs, normalizedDistance);
+    state.nearHumanObserverUrgencyCache = {
+      near: near === true,
+      revision: this._humanObserverRevision,
+      distanceTiles: normalizedDistance,
+      expiresAt: nowMs + Math.max(250, Math.floor(this.lodConfig.refreshIntervalMs / 2)),
+    };
+    return near;
+  }
+
+  isPvpCombatNearHumanInterest(entry, nowMs) {
+    const player = entry?.player;
+    const state = entry?.state;
+    if (!player || !state || state.mode !== this.behaviorMode?.PVP) {
+      return true;
+    }
+    if (this.isInteractingWithRealPlayer(player)) {
+      return true;
+    }
+    const combat = player.getCombat?.();
+    const related = [
+      combat?.getTarget?.(),
+      combat?.getAttacker?.(),
+      player.getFollowing?.(),
+      player.getInteractingMobile?.(),
+      player.getCombatFollowing?.(),
+    ];
+    for (const entity of related) {
+      if (!entity || entity.isPlayer?.() !== true) {
+        continue;
+      }
+      const other = entity.getAsPlayer?.();
+      if (other && other.isPlayerBot?.() !== true) {
+        return true;
+      }
+    }
+    const observerDistance = Math.max(6, Math.floor(this.lodConfig.nearDistanceTiles));
+    return this.hasNearbyHumanObserverCached(entry, nowMs, observerDistance);
+  }
+
+  resolveProcessingShard(state, stride) {
+    let shard = Number.isFinite(state?.processingShard)
+      ? state.processingShard
+      : Number.NaN;
+    if (!Number.isFinite(shard) || shard < 0 || shard >= stride) {
+      shard = Math.floor(Math.random() * stride);
+      state.processingShard = shard;
+    }
+    return shard;
+  }
+
   isUrgentEntry(entry, nowMs = Date.now()) {
     const player = entry?.player;
     const state = entry?.state;
@@ -646,7 +722,10 @@ class BotBehaviorTask extends Task {
       entity?.isRegistered?.() === true &&
       entity?.getAsPlayer?.()?.isPlayerBot?.() === true;
     if (isLivePlayerBot(followTarget) || isLivePlayerBot(interactTarget)) {
-      return true;
+      if (state.mode !== this.behaviorMode?.PVP) {
+        return true;
+      }
+      return this.isPvpCombatNearHumanInterest(entry, nowMs);
     }
     if (
       state.mode === this.behaviorMode?.PVP &&
@@ -656,7 +735,7 @@ class BotBehaviorTask extends Task {
         state.pvp?.targetPlayer?.getAsPlayer?.()?.isPlayerBot?.() === true
       )
     ) {
-      return true;
+      return this.isPvpCombatNearHumanInterest(entry, nowMs);
     }
     const pvpNextActionAt = Number(state.pvp?.nextActionAt ?? 0);
     const urgentPvpObserverDistance = Math.max(
@@ -666,12 +745,15 @@ class BotBehaviorTask extends Task {
     if (
       state.mode === this.behaviorMode?.PVP &&
       nowMs >= pvpNextActionAt &&
-      this.hasNearbyHumanObserver(player, nowMs, urgentPvpObserverDistance)
+      this.hasNearbyHumanObserverCached(entry, nowMs, urgentPvpObserverDistance)
     ) {
       return true;
     }
     if (this.hasCombatLinks(player) || this.isInCombat(player)) {
-      return true;
+      if (state.mode !== this.behaviorMode?.PVP) {
+        return true;
+      }
+      return this.isPvpCombatNearHumanInterest(entry, nowMs);
     }
     return this.isInteractingWithRealPlayer(player);
   }
@@ -806,11 +888,22 @@ class BotBehaviorTask extends Task {
     if (!player || !state) {
       return true;
     }
+    const shard = this.resolveProcessingShard(state, stride);
     if (player.getAttribute?.(ATTR_RECRUIT_OWNER_USERNAME)) {
       return true;
     }
     if (this.isInCombat(player)) {
-      return true;
+      if (state.mode !== this.behaviorMode?.PVP) {
+        return true;
+      }
+      if (this.isPvpCombatNearHumanInterest(entry, nowMs)) {
+        return true;
+      }
+      const offscreenPvpCombatStride = Math.max(
+        2,
+        Math.max(stride, this.lodConfig.farStride) * 5
+      );
+      return (this._cycleCounter + shard) % offscreenPvpCombatStride === 0;
     }
     if (state.awaitingDitchTransition != null || state.roaming?.pendingRetry != null) {
       return true;
@@ -819,13 +912,6 @@ class BotBehaviorTask extends Task {
       return true;
     }
     const blockedBackoffUntil = Number(state.pathBlockedTracker?.backoffUntil ?? 0);
-    let shard = Number.isFinite(state.processingShard)
-      ? state.processingShard
-      : Number.NaN;
-    if (!Number.isFinite(shard) || shard < 0 || shard >= stride) {
-      shard = Math.floor(Math.random() * stride);
-      state.processingShard = shard;
-    }
     if (
       blockedBackoffUntil > nowMs &&
       !this.transientModes.has(state.mode) &&
@@ -867,7 +953,13 @@ class BotBehaviorTask extends Task {
       if (nowMs >= pvpNextActionAt && nearHumanInterest) {
         return true;
       }
-      const pvpStride = Math.max(2, stride);
+      const noHumanObservers = this.lodConfig.enabled && this._humanObserverCount <= 0;
+      const pvpStride = Math.max(
+        2,
+        noHumanObservers
+          ? Math.max(stride, this.lodConfig.farStride) * 5
+          : stride
+      );
       return (this._cycleCounter + shard) % pvpStride === 0;
     }
     return (this._cycleCounter + shard) % stride === 0;
@@ -1234,6 +1326,36 @@ class BotBehaviorTask extends Task {
     const privateArea = player.getPrivateArea?.();
     if (attacker.getPrivateArea?.() !== privateArea) {
       return false;
+    }
+    const isMultiEngagement = AreaManager.inMulti(player) && AreaManager.inMulti(attacker);
+    if (!isMultiEngagement) {
+      const attackerCombat = attacker.getCombat?.();
+      const attackerTarget = attackerCombat?.getTarget?.();
+      const attackerAttacker = attackerCombat?.getAttacker?.();
+      const attackerFollowing = attacker.getCombatFollowing?.();
+      const occupiedByOther =
+        (attackerTarget &&
+          attackerTarget !== player &&
+          attackerTarget.isRegistered?.() === true &&
+          (attackerTarget.getHitpoints?.() ?? 0) > 0) ||
+        (attackerAttacker &&
+          attackerAttacker !== player &&
+          attackerAttacker.isRegistered?.() === true &&
+          (attackerAttacker.getHitpoints?.() ?? 0) > 0) ||
+        (attackerFollowing &&
+          attackerFollowing !== player &&
+          attackerFollowing.isRegistered?.() === true &&
+          (attackerFollowing.getHitpoints?.() ?? 0) > 0);
+      if (occupiedByOther) {
+        return false;
+      }
+      const combatMethod = CombatFactory.getMethod(player);
+      if (
+        CombatFactory.canAttack(player, combatMethod, attacker) !==
+        CanAttackResponse.CAN_ATTACK
+      ) {
+        return false;
+      }
     }
 
     const currentTarget = combat?.getTarget?.();

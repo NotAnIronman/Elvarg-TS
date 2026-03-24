@@ -337,6 +337,7 @@ function bootPlayerBotsRuntime(options = {}) {
     botCount: config.botCount,
     wildernessRoamerBotCount: config.wildernessRoamerBotCount,
     wildernessActiveRegionBotsPerRegion: config.wildernessActiveRegionBotsPerRegion,
+    wildernessActiveRegionInset: config.wildernessActiveRegionInset,
     botBaseCooldownMs: config.botBaseCooldownMs,
     spawn,
     spawnOffsets,

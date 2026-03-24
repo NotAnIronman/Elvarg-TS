@@ -25,6 +25,7 @@ function createBotRegistry(options) {
     botCount,
     wildernessRoamerBotCount = 0,
     wildernessActiveRegionBotsPerRegion = 0,
+    wildernessActiveRegionInset = 0,
     botBaseCooldownMs,
     spawn,
     spawnOffsets,
@@ -83,6 +84,78 @@ function createBotRegistry(options) {
   const wildernessRegionalAssignments = new Map();
   const wildernessRegionalDespawnTimers = new Map();
   const wildernessRegionalPendingDespawn = new Set();
+
+  function regionKeyFromParts(z, regionX, regionY) {
+    return `${Math.floor(z)}:${Math.floor(regionX)}:${Math.floor(regionY)}`;
+  }
+
+  function sortRegions(left, right) {
+    return (
+      Number(left?.z ?? 0) - Number(right?.z ?? 0) ||
+      Number(left?.regionX ?? 0) - Number(right?.regionX ?? 0) ||
+      Number(left?.regionY ?? 0) - Number(right?.regionY ?? 0)
+    );
+  }
+
+  function contractRegionSet(regions, steps) {
+    let current = new Map();
+    for (const region of regions ?? []) {
+      if (!region?.key) {
+        continue;
+      }
+      current.set(region.key, region);
+    }
+
+    const safeSteps = Math.max(0, Math.floor(steps));
+    for (let step = 0; step < safeSteps; step += 1) {
+      if (current.size <= 0) {
+        break;
+      }
+      const next = new Map();
+      for (const region of current.values()) {
+        const regionX = Number(region?.regionX);
+        const regionY = Number(region?.regionY);
+        const z = Number(region?.z);
+        if (!Number.isInteger(regionX) || !Number.isInteger(regionY) || !Number.isInteger(z)) {
+          continue;
+        }
+        let hasAllNeighbors = true;
+        for (let dx = -1; dx <= 1 && hasAllNeighbors; dx += 1) {
+          for (let dy = -1; dy <= 1; dy += 1) {
+            const neighborKey = regionKeyFromParts(z, regionX + dx, regionY + dy);
+            if (!current.has(neighborKey)) {
+              hasAllNeighbors = false;
+              break;
+            }
+          }
+        }
+        if (hasAllNeighbors) {
+          next.set(region.key, region);
+        }
+      }
+      current = next;
+    }
+
+    return Array.from(current.values()).sort(sortRegions);
+  }
+
+  function resolveRegionalTargetRegions(snapshot) {
+    const regions = Array.isArray(snapshot?.regions) ? snapshot.regions : [];
+    if (regions.length <= 0) {
+      return [];
+    }
+
+    const snapshotRadius = Math.max(0, Math.floor(Number(snapshot?.radius ?? 0)));
+    const requestedInset = Math.max(0, Math.floor(Number(wildernessActiveRegionInset ?? 0)));
+    const effectiveInset = Math.min(snapshotRadius, requestedInset);
+    if (effectiveInset <= 0) {
+      return regions;
+    }
+
+    const contracted = contractRegionSet(regions, effectiveInset);
+    // Safety fallback: never collapse to zero target regions from contraction alone.
+    return contracted.length > 0 ? contracted : regions;
+  }
 
   function addEntry(username, entry) {
     entry.entryIndex = entries.length;
@@ -300,9 +373,10 @@ function createBotRegistry(options) {
       return [];
     }
 
-    const activeRegions = snapshot.regions
+    const targetRegions = resolveRegionalTargetRegions(snapshot);
+    const activeRegions = targetRegions
       .filter((region) => regionIntersectsWilderness(region))
-      .sort((a, b) => a.z - b.z || a.regionX - b.regionX || a.regionY - b.regionY);
+      .sort(sortRegions);
 
     if (activeRegions.length === 0) {
       return [];
@@ -480,15 +554,14 @@ function createBotRegistry(options) {
       },
       behaviorMode
     );
-    const spawnTimingJitterMs = resolveSpawnTimingJitterMs(username);
     if (!state.autonomy) {
       state.autonomy = {};
     }
-    primePvpOnlyStartupState(state, nowMs + spawnTimingJitterMs);
+    primePvpOnlyStartupState(state, nowMs);
     if (!state.roaming) {
       state.roaming = {};
     }
-    state.roaming.nextWalkAt = nowMs + spawnTimingJitterMs;
+    state.roaming.nextWalkAt = nowMs;
     if (assignedBounds) {
       state.roaming.roamBounds = {
         id: assignedHotspotId ?? assignedBounds.id ?? null,
@@ -526,7 +599,7 @@ function createBotRegistry(options) {
       controller: createController(
         bot,
         botSpawn,
-        randomInRange(0, botBaseCooldownMs)
+        0
       ),
     });
     emitPlayerLogin({
@@ -828,13 +901,12 @@ function createBotRegistry(options) {
           },
           behaviorMode
         );
-        const spawnTimingJitterMs = resolveSpawnTimingJitterMs(username);
         if (state?.autonomy) {
-          state.autonomy.nextDecisionAt = spawnStartedAt + spawnTimingJitterMs;
-          state.autonomy.nextModeValidationAt = spawnStartedAt + spawnTimingJitterMs;
+          state.autonomy.nextDecisionAt = spawnStartedAt;
+          state.autonomy.nextModeValidationAt = spawnStartedAt;
         }
         if (state?.roaming) {
-          state.roaming.nextWalkAt = spawnStartedAt + spawnTimingJitterMs;
+          state.roaming.nextWalkAt = spawnStartedAt;
         }
         assignPvpMetadata(state, { metadata: pvpMetadata });
         syncBotProfileAttribute(bot, state);
@@ -848,7 +920,7 @@ function createBotRegistry(options) {
           controller: createController(
             bot,
             botSpawn,
-            randomInRange(0, botBaseCooldownMs)
+            0
           ),
         });
         emitPlayerLogin({
@@ -898,15 +970,6 @@ function createBotRegistry(options) {
       });
     }
     setTimeout(() => spawnConfiguredBots(), 0);
-  }
-
-  function resolveSpawnTimingJitterMs(username) {
-    const text = typeof username === "string" ? username : "";
-    let hash = 0;
-    for (let index = 0; index < text.length; index += 1) {
-      hash = (hash * 31 + text.charCodeAt(index)) | 0;
-    }
-    return Math.abs(hash) % 15000;
   }
 
   function createWildernessRoamerSpawn(baseSpawn, bounds, index) {

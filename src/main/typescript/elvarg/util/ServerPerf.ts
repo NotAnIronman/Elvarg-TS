@@ -21,8 +21,37 @@ type PhaseSummary = {
   maxMs: number;
 };
 
+function parseEnvFlag(value: string | undefined, defaultValue: boolean): boolean {
+  if (value == null) {
+    return defaultValue;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") {
+    return false;
+  }
+  return defaultValue;
+}
+
 export class ServerPerf {
   private static readonly SAMPLE_CAP = 300;
+  private static readonly SNAPSHOT_FILE = path.join(
+    process.cwd(),
+    "logs",
+    "server-performance.snapshot.log"
+  );
+  private static readonly PERIODIC_SNAPSHOT_FILE = path.join(
+    process.cwd(),
+    "logs",
+    "server-performance.periodic.log"
+  );
+  private static readonly PERIODIC_SNAPSHOT_LATEST_FILE = path.join(
+    process.cwd(),
+    "logs",
+    "server-performance.periodic.latest.log"
+  );
   private static readonly AUTO_SNAPSHOT_FILE = path.join(
     process.cwd(),
     "logs",
@@ -38,9 +67,32 @@ export class ServerPerf {
   private static readonly AUTO_TICK_AVG_THRESHOLD_MS = 140;
   private static readonly AUTO_TICK_MAX_THRESHOLD_MS = 220;
   private static readonly AUTO_PHASE_AVG_THRESHOLD_MS = 90;
+  private static readonly AUTO_SNAPSHOT_ENABLED = parseEnvFlag(
+    process.env.SERVER_PERF_AUTO_ENABLED,
+    false
+  );
+  private static readonly PERIODIC_SNAPSHOT_ENABLED = parseEnvFlag(
+    process.env.SERVER_PERF_PERIODIC_ENABLED,
+    false
+  );
+  private static readonly PERIODIC_SUMMARY_TICKS = (() => {
+    const parsed = Number.parseInt(process.env.SERVER_PERF_PERIODIC_SUMMARY_TICKS ?? "60", 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 60;
+    }
+    return Math.min(300, Math.max(10, parsed));
+  })();
+  private static readonly PERIODIC_SNAPSHOT_INTERVAL_MS = (() => {
+    const parsed = Number.parseInt(process.env.SERVER_PERF_PERIODIC_INTERVAL_MS ?? "10000", 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return 10000;
+    }
+    return parsed;
+  })();
   private static samples: TickSample[] = [];
   private static currentTick: TickSample | null = null;
   private static lastAutoSnapshotAt = 0;
+  private static lastPeriodicSnapshotAt = 0;
 
   public static beginTick(
     tickNumber: number,
@@ -99,6 +151,7 @@ export class ServerPerf {
     }
     ServerPerf.currentTick = null;
     ServerPerf.maybeWriteAutoSnapshot(current);
+    ServerPerf.maybeWritePeriodicSnapshot(current);
   }
 
   public static getSummary(limitTicks = 60): {
@@ -189,6 +242,9 @@ export class ServerPerf {
   }
 
   private static maybeWriteAutoSnapshot(sample: TickSample): void {
+    if (!ServerPerf.AUTO_SNAPSHOT_ENABLED) {
+      return;
+    }
     const nowMs = Date.now();
     if (nowMs - ServerPerf.lastAutoSnapshotAt < ServerPerf.AUTO_SNAPSHOT_COOLDOWN_MS) {
       return;
@@ -236,5 +292,44 @@ export class ServerPerf {
     fs.appendFileSync(ServerPerf.AUTO_SNAPSHOT_FILE, payload, "utf8");
     fs.writeFileSync(ServerPerf.AUTO_SNAPSHOT_LATEST_FILE, payload, "utf8");
     ServerPerf.lastAutoSnapshotAt = nowMs;
+  }
+
+  private static maybeWritePeriodicSnapshot(sample: TickSample): void {
+    if (!ServerPerf.PERIODIC_SNAPSHOT_ENABLED) {
+      return;
+    }
+    if (ServerPerf.PERIODIC_SNAPSHOT_INTERVAL_MS <= 0) {
+      return;
+    }
+    const nowMs = Date.now();
+    if (nowMs - ServerPerf.lastPeriodicSnapshotAt < ServerPerf.PERIODIC_SNAPSHOT_INTERVAL_MS) {
+      return;
+    }
+    const summary = ServerPerf.getSummary(ServerPerf.PERIODIC_SUMMARY_TICKS);
+    if (!summary || summary.ticks <= 0) {
+      return;
+    }
+    const timestamp = new Date(nowMs).toISOString();
+    const lines: string[] = [
+      `${timestamp} [serverperf] ticks=${summary.ticks} avgTick=${summary.avgTickMs.toFixed(
+        1
+      )}ms maxTick=${summary.maxTickMs.toFixed(1)}ms avgDrift=${summary.avgDriftMs.toFixed(
+        1
+      )}ms maxDrift=${summary.maxDriftMs.toFixed(1)}ms`,
+      `${timestamp} [serverperf] lastTick=${sample.tickNumber} players=${sample.players} npcs=${sample.npcs} tasks=${sample.tasks}`,
+    ];
+    for (const phase of summary.topPhases) {
+      lines.push(
+        `${timestamp} [serverperf] ${phase.name}: total=${phase.totalMs.toFixed(
+          1
+        )}ms avg=${phase.avgMs.toFixed(1)}ms max=${phase.maxMs.toFixed(1)}ms`
+      );
+    }
+    const payload = `${lines.join("\n")}\n`;
+    fs.mkdirSync(path.dirname(ServerPerf.SNAPSHOT_FILE), { recursive: true });
+    fs.appendFileSync(ServerPerf.SNAPSHOT_FILE, payload, "utf8");
+    fs.appendFileSync(ServerPerf.PERIODIC_SNAPSHOT_FILE, payload, "utf8");
+    fs.writeFileSync(ServerPerf.PERIODIC_SNAPSHOT_LATEST_FILE, payload, "utf8");
+    ServerPerf.lastPeriodicSnapshotAt = nowMs;
   }
 }

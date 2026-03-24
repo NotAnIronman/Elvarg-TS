@@ -4,6 +4,10 @@ const { PrayerHandler } = require("../../../../../src/main/typescript/elvarg/gam
 const {
   CombatType,
 } = require("../../../../../src/main/typescript/elvarg/game/content/combat/CombatType");
+const {
+  CombatFactory,
+  CanAttackResponse,
+} = require("../../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { GameConstants } = require("../../../../../src/main/typescript/elvarg/game/GameConstants");
 const { ServerPerf } = require("../../../../../src/main/typescript/elvarg/util/ServerPerf");
 const { randomInRange } = require("../../navigation/BotNavigation");
@@ -106,10 +110,22 @@ function readTargetCombatSignature(target) {
   };
 }
 
+function clearApproachForTarget(player, target) {
+  if (!player || !target) {
+    return;
+  }
+  if (player.getFollowing?.() === target) {
+    player.setFollowing?.(null);
+  }
+  if (player.getInteractingMobile?.() === target) {
+    player.setMobileInteraction?.(null);
+  }
+  player.setPositionToFace?.(null);
+}
+
 class PvpCombatExecutionNode {
   constructor(options = {}) {
     this.setPhase = options.setPhase;
-    this.tryStepOutOfStack = options.tryStepOutOfStack;
     this.maybeSwitchBackToPrimaryWeapon = options.maybeSwitchBackToPrimaryWeapon;
     this.maybeUseSpecialAttack = options.maybeUseSpecialAttack;
     this.maybeRunPressureCombatScript = options.maybeRunPressureCombatScript;
@@ -410,22 +426,23 @@ class PvpCombatExecutionNode {
     if (!player || !state || !pvp || !target) {
       return "failure";
     }
+    const combat = player.getCombat?.();
+    if (!combat) {
+      return "failure";
+    }
 
-    const steppedOutOfStack = ServerPerf.measurePhase(
-      "bot.pvp.combat_execution.combat_sync_or_reissue",
-      () =>
-        ServerPerf.measurePhase("bot.pvp.combat_sync.stack_resolution", () => {
-          if (player.getFollowing?.() !== target) {
-            player.setFollowing?.(target);
-          }
-          if (player.getInteractingMobile?.() !== target) {
-            player.setMobileInteraction?.(target);
-          }
-          return this.tryStepOutOfStack?.(player, state, target, nowMs) === true;
-        })
-    );
-    if (steppedOutOfStack) {
-      this.setPhase?.(state, this.pvpPhase?.COMBAT ?? "combat");
+    const committedToTarget =
+      combat.getTarget?.() === target ||
+      combat.getAttacker?.() === target ||
+      player.getCombatFollowing?.() === target;
+    const canAttackTargetNow =
+      CombatFactory.canAttack(player, CombatFactory.getMethod(player), target) ===
+      CanAttackResponse.CAN_ATTACK;
+    const shouldApproachTarget = committedToTarget || canAttackTargetNow;
+    if (!shouldApproachTarget) {
+      clearApproachForTarget(player, target);
+      pvp.nextActionAt = Math.max(Number(pvp.nextActionAt ?? 0), nowMs + 600);
+      this.setPhase?.(state, this.pvpPhase?.SEEKING ?? "seeking");
       return "running";
     }
 
@@ -493,16 +510,19 @@ class PvpCombatExecutionNode {
       return "running";
     }
 
-    const combat = player.getCombat?.();
-    if (!combat) {
-      return "failure";
-    }
-
     ServerPerf.measurePhase("bot.pvp.combat_execution.combat_sync_or_reissue", () =>
       ServerPerf.measurePhase("bot.pvp.combat_sync.attack_reissue", () => {
         const currentTarget = combat.getTarget?.();
         if (currentTarget && currentTarget !== target) {
           combat.reset?.();
+        }
+
+        if (
+          CombatFactory.canAttack(player, CombatFactory.getMethod(player), target) !==
+          CanAttackResponse.CAN_ATTACK
+        ) {
+          clearApproachForTarget(player, target);
+          return;
         }
 
         if (combat.getTarget?.() !== target) {

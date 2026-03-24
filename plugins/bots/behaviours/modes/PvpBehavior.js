@@ -9,8 +9,6 @@ const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/c
 const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
-const { GameConstants } = require("../../../../src/main/typescript/elvarg/game/GameConstants");
-const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const {
   queueRouteAndFlagAppearance,
@@ -59,8 +57,6 @@ const POST_PVP_DECISION_MIN_MS = 3500;
 const POST_PVP_DECISION_MAX_MS = 9000;
 const POST_PVP_COOLDOWN_MIN_MS = 35000;
 const POST_PVP_COOLDOWN_MAX_MS = 110000;
-const UNSTACK_CHECK_INTERVAL_MS = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE * 2;
-const UNSTACK_COOLDOWN_MS = GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE * 3;
 const HOTSPOT_DECISION_JITTER_MS = 2600;
 const HOTSPOT_DYNAMIC_DECISION_JITTER_MS = 4200;
 const SEEKING_RESET_STAGGER_MIN_MS = 250;
@@ -252,8 +248,6 @@ class PvpBehavior {
     this.replenishAfterKillNode = new ReplenishAfterKillNode(botStatesByName, api);
     this.combatExecutionNode = new PvpCombatExecutionNode({
       setPhase: (state, phase) => this.setPhase(state, phase),
-      tryStepOutOfStack: (player, state, target, nowMs) =>
-        this.tryStepOutOfStack(player, state, target, nowMs),
       maybeSwitchBackToPrimaryWeapon,
       maybeUseSpecialAttack,
       maybeRunPressureCombatScript,
@@ -461,6 +455,45 @@ class PvpBehavior {
       combat?.getAttacker?.() ||
       player.getCombatFollowing?.()
     );
+  }
+
+  isAliveCombatEntity(entity) {
+    return !!(
+      entity &&
+      entity.isRegistered?.() === true &&
+      (entity.getHitpoints?.() ?? 0) > 0
+    );
+  }
+
+  isSingleWayEngagement(player, target) {
+    return !(
+      AreaManager.inMulti(player) &&
+      AreaManager.inMulti(target)
+    );
+  }
+
+  isTargetOccupiedByOtherInSingleWay(player, target) {
+    if (!player || !target) {
+      return false;
+    }
+    if (!this.isSingleWayEngagement(player, target)) {
+      return false;
+    }
+    const targetCombat = target.getCombat?.();
+    const occupants = [
+      targetCombat?.getTarget?.(),
+      targetCombat?.getAttacker?.(),
+      target.getCombatFollowing?.(),
+    ];
+    for (const occupant of occupants) {
+      if (occupant === player) {
+        continue;
+      }
+      if (this.isAliveCombatEntity(occupant)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   isActivelyEngagedWithTarget(player, target) {
@@ -950,6 +983,14 @@ class PvpBehavior {
       api: this.api,
     });
 
+    // Mirror real-player engagements: immediately lock combat targets so bots
+    // enter combat-follow instead of spending the initial action-delay window
+    // in mutual generic-follow orbiting.
+    sourcePlayer.getMovementQueue?.().reset?.();
+    opponentPlayer.getMovementQueue?.().reset?.();
+    sourcePlayer.getCombat?.()?.attack?.(opponentPlayer);
+    opponentPlayer.getCombat?.()?.attack?.(sourcePlayer);
+
     if (sourceAutonomy) {
       sourceAutonomy.modeEndsAt = nowMs + durationMs;
     }
@@ -1184,8 +1225,10 @@ class PvpBehavior {
     ) {
       return false;
     }
-    const isMultiEngagement =
-      AreaManager.inMulti(sourcePlayer) && AreaManager.inMulti(candidatePlayer);
+    const isMultiEngagement = !this.isSingleWayEngagement(sourcePlayer, candidatePlayer);
+    if (this.isTargetOccupiedByOtherInSingleWay(sourcePlayer, candidatePlayer)) {
+      return false;
+    }
     if (!isMultiEngagement && typeof isInCombat === "function" && isInCombat(candidatePlayer)) {
       return false;
     }
@@ -1262,13 +1305,19 @@ class PvpBehavior {
         return;
       }
       const isMultiEngagement =
-        AreaManager.inMulti(sourcePlayer) && AreaManager.inMulti(candidatePlayer);
+        !this.isSingleWayEngagement(sourcePlayer, candidatePlayer);
       const candidateUsername = candidatePlayer.getUsername?.() ?? null;
       const activeTargeters = this.getActivePvpTargetCount(
         candidateUsername,
         sourceUsername,
         pvpIndex
       );
+      if (!isMultiEngagement && activeTargeters > 0) {
+        return;
+      }
+      if (this.isTargetOccupiedByOtherInSingleWay(sourcePlayer, candidatePlayer)) {
+        return;
+      }
       if (!isMultiEngagement && typeof isInCombat === "function" && isInCombat(candidatePlayer)) {
         return;
       }
@@ -1372,108 +1421,6 @@ class PvpBehavior {
     ) {
       return false;
     }
-    return true;
-  }
-
-  tryStepOutOfStack(player, state, target, nowMs) {
-    const pvp = state?.pvp;
-    const playerLoc = player?.getLocation?.();
-    const targetLoc = target?.getLocation?.();
-    const pvpIndex = pvp?.currentCyclePvpIndex ?? null;
-    if (!pvp || !playerLoc || !targetLoc || !playerLoc.equals(targetLoc)) {
-      return false;
-    }
-    // Resolve stacks from one side only. If both bots try to sidestep at once they
-    // can trade places and oscillate between two tiles. Use a stable ordering so the
-    // same participant yields every time for a given pair.
-    if ((player.getIndex?.() ?? 0) > (target.getIndex?.() ?? 0)) {
-      return false;
-    }
-    if (player.getForceMovement?.() != null) {
-      return false;
-    }
-    if (nowMs < Number(pvp.nextUnstackCheckAt ?? 0)) {
-      return false;
-    }
-    pvp.nextUnstackCheckAt = nowMs + UNSTACK_CHECK_INTERVAL_MS;
-    if (nowMs < Number(pvp.nextUnstackAt ?? 0)) {
-      return false;
-    }
-
-    const privateArea = player.getPrivateArea?.() ?? null;
-    const size = Number(player.getSize?.() ?? 1);
-    const candidates = [
-      new Location(playerLoc.getX() - 1, playerLoc.getY(), playerLoc.getZ()),
-      new Location(playerLoc.getX() + 1, playerLoc.getY(), playerLoc.getZ()),
-      new Location(playerLoc.getX(), playerLoc.getY() - 1, playerLoc.getZ()),
-      new Location(playerLoc.getX(), playerLoc.getY() + 1, playerLoc.getZ()),
-    ];
-
-    let bestTile = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    const localPlayers =
-      pvpIndex?.playerTileOccupancyByArea instanceof Map
-        ? null
-        : player.getLocalPlayers?.() ?? [];
-    for (const tile of candidates) {
-      if (RegionManager.blocked(tile, privateArea)) {
-        continue;
-      }
-      if (!RegionManager.canMovestart(playerLoc, tile, size, size, privateArea)) {
-        continue;
-      }
-
-      let occupied =
-        (this.getIndexedPlayerTileOccupancyCount(pvpIndex, privateArea, tile) ?? 0) > 0;
-      if (!occupied && Array.isArray(localPlayers)) {
-        for (const candidate of localPlayers) {
-          if (!candidate || candidate === player || candidate === target) {
-            continue;
-          }
-          if (!candidate.isRegistered?.()) {
-            continue;
-          }
-          if (candidate.getPrivateArea?.() !== privateArea) {
-            continue;
-          }
-          const loc = candidate.getLocation?.();
-          if (!loc) {
-            continue;
-          }
-          if (
-            loc.getX() === tile.getX() &&
-            loc.getY() === tile.getY() &&
-            loc.getZ() === tile.getZ()
-          ) {
-            occupied = true;
-            break;
-          }
-        }
-      }
-      if (occupied) {
-        continue;
-      }
-
-      const distance = tile.getDistance(targetLoc);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestTile = tile;
-      }
-    }
-
-    if (!bestTile) {
-      return false;
-    }
-
-    pvp.nextUnstackAt = nowMs + UNSTACK_COOLDOWN_MS;
-    player.getMovementQueue?.().reset?.();
-    player.getMovementQueue?.().addFirstStep?.(bestTile);
-    player.getTimers?.().registers?.(TimerKey.STEPPING_OUT, 2);
-    player.setPositionToFaceCoordinates?.(
-      targetLoc.getX(),
-      targetLoc.getY(),
-      targetLoc.getZ()
-    );
     return true;
   }
 
