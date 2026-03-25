@@ -61,3 +61,10 @@ If in doubt:
 - Prefer enums/constants over magic numbers.
 - Do not hardcode semantic IDs when a named symbol exists (for example rights, opcodes, states, interface IDs).
 - If a constant does not exist yet, add one in the appropriate shared module instead of repeating raw numbers.
+
+## Pattern Consistency Rule
+
+- Follow the existing implementation pattern in the module/domain you are changing.
+- Prefer updating canonical data/config sources (for example `data/definitions/items.json`, `shops.json`) over adding runtime override maps or one-off adapter code.
+- Do not introduce single-item special-case paths, temporary override layers, or new abstractions for one value unless explicitly requested.
+- If a requested change appears to require a pattern deviation, stop and confirm with the requester before implementing.
