@@ -666,9 +666,9 @@ function priceCheck(player, shop, itemId, slot, fromShop) {
   }
 
   player.getPacketSender().sendMessage(
-    `@dre@${def.getName()}@bla@${
+    `${def.getName()}${
       fromShop ? " currently costs " : ": shop will buy for "
-    }@dre@${Misc.insertCommasToNumber(String(price))} x ${currencyName(shop.currency)}.`
+    }${Misc.insertCommasToNumber(String(price))} x ${currencyName(shop.currency)}.`
   );
 }
 

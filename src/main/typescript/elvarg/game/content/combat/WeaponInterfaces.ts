@@ -117,7 +117,10 @@ export class WeaponInterfaces {
                     player.setFightType(FightType.DAGGER_STAB);
                 } else if (player.getWeapon() == WeaponInterfaces.DRAGON_DAGGER) {
                     player.setFightType(FightType.DRAGON_DAGGER_STAB);
-                } else if (player.getWeapon() == WeaponInterfaces.SWORD) {
+                } else if (
+                    player.getWeapon() == WeaponInterfaces.SWORD ||
+                    player.getWeapon() == WeaponInterfaces.FANG
+                ) {
                     player.setFightType(FightType.SWORD_STAB);
                 } else if (player.getWeapon() == WeaponInterfaces.GHRAZI_RAPIER) {
                     player.setFightType(FightType.GHRAZI_RAPIER_STAB);
@@ -128,7 +131,10 @@ export class WeaponInterfaces {
                     player.setFightType(FightType.DAGGER_LUNGE);
                 } else if (player.getWeapon() == WeaponInterfaces.DRAGON_DAGGER) {
                     player.setFightType(FightType.DRAGON_DAGGER_LUNGE);
-                } else if (player.getWeapon() == WeaponInterfaces.SWORD) {
+                } else if (
+                    player.getWeapon() == WeaponInterfaces.SWORD ||
+                    player.getWeapon() == WeaponInterfaces.FANG
+                ) {
                     player.setFightType(FightType.SWORD_LUNGE);
                 } else if (player.getWeapon() == WeaponInterfaces.GHRAZI_RAPIER) {
                     player.setFightType(FightType.GHRAZI_RAPIER_LUNGE);
@@ -139,7 +145,10 @@ export class WeaponInterfaces {
                     player.setFightType(FightType.DAGGER_SLASH);
                 } else if (player.getWeapon() == WeaponInterfaces.DRAGON_DAGGER) {
                     player.setFightType(FightType.DRAGON_DAGGER_SLASH);
-                } else if (player.getWeapon() == WeaponInterfaces.SWORD) {
+                } else if (
+                    player.getWeapon() == WeaponInterfaces.SWORD ||
+                    player.getWeapon() == WeaponInterfaces.FANG
+                ) {
                     player.setFightType(FightType.SWORD_SLASH);
                 } else if (player.getWeapon() == WeaponInterfaces.GHRAZI_RAPIER) {
                     player.setFightType(FightType.GHRAZI_RAPIER_SLASH);
@@ -150,7 +159,10 @@ export class WeaponInterfaces {
                     player.setFightType(FightType.DAGGER_BLOCK);
                 } else if (player.getWeapon() == WeaponInterfaces.DRAGON_DAGGER) {
                     player.setFightType(FightType.DRAGON_DAGGER_BLOCK);
-                } else if (player.getWeapon() == WeaponInterfaces.SWORD) {
+                } else if (
+                    player.getWeapon() == WeaponInterfaces.SWORD ||
+                    player.getWeapon() == WeaponInterfaces.FANG
+                ) {
                     player.setFightType(FightType.SWORD_BLOCK);
                 } else if (player.getWeapon() == WeaponInterfaces.GHRAZI_RAPIER) {
                     player.setFightType(FightType.GHRAZI_RAPIER_BLOCK);
@@ -619,6 +631,17 @@ export class WeaponInterfaces {
         2276,
         2279,
         4,
+        [FightType.SWORD_STAB,
+        FightType.SWORD_LUNGE, FightType.SWORD_SLASH,
+        FightType.SWORD_BLOCK],
+        7574,
+        7586
+    )
+
+    public static readonly FANG = new WeaponInterfaces(
+        2276,
+        2279,
+        5,
         [FightType.SWORD_STAB,
         FightType.SWORD_LUNGE, FightType.SWORD_SLASH,
         FightType.SWORD_BLOCK],
