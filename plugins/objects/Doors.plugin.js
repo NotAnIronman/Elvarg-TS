@@ -7,7 +7,7 @@ const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/imp
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 
-const CLOSED_DOOR_IDS = new Set([1535, 11727, 14749, 14751]);
+const CLOSED_DOOR_IDS = new Set([1535, 11727, 14749, 14751, 11775]);
 const OPEN_OBJECT_STATES = new Map();
 const DOOR_RESYNC_TICKS_ATTR = "doors:resyncTicks";
 const DOUBLE_DOOR_ID_FAMILIES = Object.freeze([

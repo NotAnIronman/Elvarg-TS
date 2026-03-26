@@ -35,41 +35,39 @@ export class ItemOnGround {
         switch (this.state) {
             case State.SEEN_BY_EVERYONE:
             case State.SEEN_BY_PLAYER:
-                //If an update is required..
-                if (this.getTick() >= ItemOnGroundManager.STATE_UPDATE_DELAY) {
-                    this.setTick(0);
+                // Owner-only items reveal after 100 ticks, but all floor items should
+                // persist for a full 300 ticks before removal.
+                if (this.state == State.SEEN_BY_PLAYER
+                    && this.getgoesGlobal()
+                    && this.getTick() >= ItemOnGroundManager.PUBLIC_REVEAL_DELAY) {
 
-                    //Check if item is currently private and needs to go global..
-                    if (this.state == State.SEEN_BY_PLAYER && this.getgoesGlobal()) {
-
-                        //We make the item despawn for the owner..
-                        if (this.getOwner() != null) {
-                            let o = World.getPlayerByName(this.getOwner());
-                            if (o) {
-                                ItemOnGroundManager.performPlayer(o.getAsPlayer(), this, OperationType.DELETE);
-                            }
+                    // We make the item despawn for the owner before re-sending it as public.
+                    if (this.getOwner() != null) {
+                        let o = World.getPlayerByName(this.getOwner());
+                        if (o) {
+                            ItemOnGroundManager.performPlayer(o.getAsPlayer(), this, OperationType.DELETE);
                         }
+                    }
 
-                        //Check if we need to merge this ground item..
-                        //This basically puts together two stackables
-                        //that are on the same tile.
-                        if (this.getItem().getDefinition().isStackable()) {
-                            if (ItemOnGroundManager.merge(this)) {
-                                this.setPendingRemoval(true);
-                                return;
-                            }
+                    // Check if we need to merge this ground item.
+                    // This basically puts together two stackables that are on the same tile.
+                    if (this.getItem().getDefinition().isStackable()) {
+                        if (ItemOnGroundManager.merge(this)) {
+                            this.setPendingRemoval(true);
+                            return;
                         }
+                    }
 
-                        //Spawn the item globally..
-                        this.setState(State.SEEN_BY_EVERYONE);
-                        ItemOnGroundManager.perform(this, OperationType.CREATE);
-                        return;
-                    }
-                    //Item needs to be deleted.
-                    //However, there's no point in deleting items that will just respawn..
-                    if (!this.respawns()) {
-                        ItemOnGroundManager.deregister(this);
-                    }
+                    // Spawn the item globally.
+                    this.setState(State.SEEN_BY_EVERYONE);
+                    ItemOnGroundManager.perform(this, OperationType.CREATE);
+                    return;
+                }
+
+                // Item needs to be deleted after its full lifetime expires.
+                // However, there's no point in deleting items that will just respawn.
+                if (this.getTick() >= ItemOnGroundManager.DESPAWN_DELAY && !this.respawns()) {
+                    ItemOnGroundManager.deregister(this);
                 }
                 break;
             default:

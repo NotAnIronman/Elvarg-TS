@@ -13,6 +13,7 @@ const BOSS_MENU_BUTTON_IDS = new Set([7455, 13087, 30138]);
 const BOSS_TELEPORT_BUTTON_IDS = new Set([
   28151, 28152, 28153, 28154,
   28155, 28156, 28157, 28158,
+  28159,
 ]);
 const PVP_DIALOGUE_OPTION_BUTTON_IDS = new Set([
   2494, 2495, 2496, 2497, 2498,
@@ -20,10 +21,16 @@ const PVP_DIALOGUE_OPTION_BUTTON_IDS = new Set([
 ]);
 const ATTR_PVP_TELEPORT_PAGE = "teleports:pvp_page";
 const ATTR_BOSS_TELEPORT_PAGE = "teleports:boss_page";
+const ATTR_COUNT_DRAYNOR_PENDING_INSTANCE = "count_draynor:pending_instance";
+const ATTR_ELVARG_PENDING_INSTANCE = "elvarg:pending_instance";
 const DIALOGUE_OPTION_BUTTON_IDS = [2494, 2495, 2496, 2497, 2498, 2482, 2483, 2484, 2485];
 
 // Approximate Chaos Temple surface location matching the current bot hotspot anchor.
 const TRAINING_TELEPORT_DESTINATION = new Location(2955, 3816, 0);
+// Count Draynor lives in Draynor Manor's basement (OSRS).
+const COUNT_DRAYNOR_TELEPORT_DESTINATION = new Location(3077, 9772, 0);
+// Elvarg lives in the Crandor/Karamja dungeon lair (OSRS).
+const ELVARG_TELEPORT_DESTINATION = new Location(2852, 9637, 0);
 const BOSS_TELEPORT_DESTINATIONS = new Map([
   [28151, new Location(3290, 3847, 0)], // Callisto
   [28152, new Location(3261, 3927, 0)], // Chaos Elemental
@@ -33,7 +40,29 @@ const BOSS_TELEPORT_DESTINATIONS = new Map([
   [28156, new Location(3233, 10341, 0)], // Scorpia
   [28157, new Location(3332, 3734, 0)], // Venenatis
   [28158, new Location(3219, 3788, 0)], // Vet'ion
+  [28159, COUNT_DRAYNOR_TELEPORT_DESTINATION], // Count Draynor
 ]);
+
+function destinationMatches(destination, target) {
+  return (
+    destination &&
+    target &&
+    destination.getX?.() === target.getX?.() &&
+    destination.getY?.() === target.getY?.() &&
+    destination.getZ?.() === target.getZ?.()
+  );
+}
+
+function setBossInstancePending(player, destination) {
+  player.setAttribute(
+    ATTR_COUNT_DRAYNOR_PENDING_INSTANCE,
+    destinationMatches(destination, COUNT_DRAYNOR_TELEPORT_DESTINATION) === true
+  );
+  player.setAttribute(
+    ATTR_ELVARG_PENDING_INSTANCE,
+    destinationMatches(destination, ELVARG_TELEPORT_DESTINATION) === true
+  );
+}
 
 function sendFiveOptionDialogue(player, title, options) {
   player.getPacketSender().sendString(title, 2493);
@@ -149,8 +178,10 @@ function handlePvPTeleportOption(player, buttonId) {
   const destination = createHotspotAnchorLocation(option.hotspot);
   closeTeleportDialogue(player);
   if (!destination || !TeleportHandler.checkReqs(player, destination)) {
+    setBossInstancePending(player, null);
     return true;
   }
+  setBossInstancePending(player, destination);
 
   TeleportHandler.teleport(
     player,
@@ -180,7 +211,17 @@ function getBossTeleportPages() {
         { label: "Scorpia", destination: BOSS_TELEPORT_DESTINATIONS.get(28156) },
         { label: "Venenatis", destination: BOSS_TELEPORT_DESTINATIONS.get(28157) },
         { label: "Vet'ion", destination: BOSS_TELEPORT_DESTINATIONS.get(28158) },
-        { label: "Back", nextPage: 0 },
+        { label: "More options", nextPage: 2 },
+      ],
+    },
+    {
+      title: "Boss teleports",
+      options: [
+        { label: "Count Draynor", destination: BOSS_TELEPORT_DESTINATIONS.get(28159) },
+        { label: "Elvarg", destination: ELVARG_TELEPORT_DESTINATION },
+        { label: "Back", nextPage: 1 },
+        { label: "Close", close: true },
+        null,
       ],
     },
   ];
@@ -221,11 +262,18 @@ function handleBossTeleportOption(player, buttonId) {
     return true;
   }
 
+  if (option.close) {
+    closeTeleportDialogue(player);
+    return true;
+  }
+
   const destination = option.destination;
   closeTeleportDialogue(player);
   if (!destination || !TeleportHandler.checkReqs(player, destination)) {
+    setBossInstancePending(player, null);
     return true;
   }
+  setBossInstancePending(player, destination);
 
   TeleportHandler.teleport(
     player,
@@ -244,8 +292,10 @@ function handleTeleportButton(player, buttonId) {
   const numericButtonId = Number(buttonId);
   if (HOME_TELEPORT_BUTTON_IDS.has(numericButtonId)) {
     if (!TeleportHandler.checkReqs(player, GameConstants.DEFAULT_LOCATION)) {
+      setBossInstancePending(player, null);
       return true;
     }
+    setBossInstancePending(player, GameConstants.DEFAULT_LOCATION);
 
     TeleportHandler.teleport(
       player,
@@ -276,8 +326,10 @@ function handleTeleportButton(player, buttonId) {
   if (BOSS_TELEPORT_BUTTON_IDS.has(numericButtonId)) {
     const destination = BOSS_TELEPORT_DESTINATIONS.get(numericButtonId);
     if (!destination || !TeleportHandler.checkReqs(player, destination)) {
+      setBossInstancePending(player, null);
       return true;
     }
+    setBossInstancePending(player, destination);
 
     TeleportHandler.teleport(
       player,
@@ -293,8 +345,10 @@ function handleTeleportButton(player, buttonId) {
   }
 
   if (!TeleportHandler.checkReqs(player, TRAINING_TELEPORT_DESTINATION)) {
+    setBossInstancePending(player, null);
     return true;
   }
+  setBossInstancePending(player, TRAINING_TELEPORT_DESTINATION);
 
   TeleportHandler.teleport(
     player,

@@ -9,7 +9,10 @@ import { Item } from "../../../model/Item"
 //import { Optional } from "java.util"
 
 export class ItemOnGroundManager {
-    public static readonly STATE_UPDATE_DELAY: number = 50
+    // OSRS/Lost City floor-item behavior is owner-only for 100 ticks, then public,
+    // with a 300-tick total lifetime for revealable items.
+    public static readonly PUBLIC_REVEAL_DELAY: number = 100
+    public static readonly DESPAWN_DELAY: number = 300
 
     public static onRegionChange(player: Player): void {
         for (let item of World.getItems()) {
