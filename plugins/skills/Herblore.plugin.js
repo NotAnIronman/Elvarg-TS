@@ -56,7 +56,7 @@ module.exports = {
   name: "Herblore",
   register(api) {
     api.onItemFirstAction((event) => {
-      const { player, itemId } = event;
+      const { player, itemId, slot } = event;
       const herb = CLEANABLE_HERBS.get(itemId);
       if (!herb) {
         return false;
@@ -75,7 +75,7 @@ module.exports = {
         return true;
       }
 
-      player.getInventory().deleteNumber(itemId, 1);
+      player.getInventory().deleteAtSlot(slot, 1);
       player.getInventory().addItem(new Item(herb.clean, 1));
       player.getSkillManager().addExperiences(Skill.HERBLORE, herb.xp);
       player.getPacketSender().sendMessage("You clean the dirt off the leaf.");

@@ -6,6 +6,7 @@ const { Animation } = require("../../src/main/typescript/elvarg/game/model/Anima
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
+const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 
 const EAT_ANIMATION = new Animation(829);
 
@@ -120,10 +121,11 @@ module.exports = {
       Sounds.sendSound(player, Sound.FOOD_EAT);
       player.performAnimation(EAT_ANIMATION);
 
-      inventory.deleteNumber(itemId, 1);
+      inventory.deleteAtSlot(slot, 1, false);
       if (food.replacementId) {
-        inventory.adds(food.replacementId, 1);
+        inventory.setItem(slot, new Item(food.replacementId, 1));
       }
+      inventory.refreshItems();
 
       const currentHp = player.getSkillManager().getCurrentLevel(Skill.HITPOINTS);
       let maxHp = player.getSkillManager().getMaxLevel(Skill.HITPOINTS);
@@ -146,4 +148,3 @@ module.exports = {
     api.log("registered", { foods: FOOD.size });
   },
 };
-

@@ -32,7 +32,7 @@ module.exports = {
   name: "Prayer",
   register(api) {
     api.onItemFirstAction((event) => {
-      const { player, itemId } = event;
+      const { player, itemId, slot } = event;
       const xp = BONES.get(itemId);
       if (!xp) {
         return false;
@@ -47,7 +47,7 @@ module.exports = {
       player.performAnimation(BURY_ANIMATION);
       Sounds.sendSound(player, Sound.BURY_BONES);
       player.getPacketSender().sendMessage("You dig a hole in the ground..");
-      player.getInventory().deleteNumber(itemId, 1);
+      player.getInventory().deleteAtSlot(slot, 1);
       setTimeout(() => {
         const name = ItemDefinition.forId(itemId).getName();
         player.getPacketSender().sendMessage(`..and bury the ${name}.`);

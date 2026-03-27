@@ -562,6 +562,28 @@ export abstract class ItemContainer {
   }
 
   /**
+   * Deletes from an exact slot instead of the first matching item id.
+   * Use this after packet decoding has already validated the clicked slot.
+   */
+  public deleteAtSlot(slot: number, amount = 1, refresh = true): ItemContainer {
+    if (slot < 0 || slot >= this.capacity()) {
+      return this;
+    }
+
+    const item = this.items[slot];
+    if (!item || item.getId() <= 0 || item.getAmount() <= 0) {
+      return this;
+    }
+
+    const deleteAmount = Math.max(0, Math.min(amount, item.getAmount()));
+    if (deleteAmount <= 0) {
+      return this;
+    }
+
+    return this.deletedItem(new Item(item.getId(), deleteAmount), slot, refresh);
+  }
+
+  /**
    * Deletes an item from the item container.
    *
    * @param id     The id of the item to delete.
