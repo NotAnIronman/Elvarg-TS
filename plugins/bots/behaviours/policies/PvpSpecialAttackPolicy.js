@@ -29,6 +29,7 @@ const SWITCHABLE_SPEC_WEAPONS = new Set([
   ItemIdentifiers.MAGIC_SHORTBOW_I_,
   ItemIdentifiers.MAGIC_SHORTBOW_3,
   ItemIdentifiers.SARADOMIN_GODSWORD,
+  ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF,
   ItemIdentifiers.ZAMORAK_GODSWORD,
 ]);
 
@@ -231,6 +232,15 @@ function shouldUseSpecNow(player, target, state, profile, special, weaponId) {
       return false;
     }
     chance += 0.06;
+  }
+
+  if (weaponId === ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF) {
+    if (targetHpRatio > finisherHpRatio + 0.14 && !pressure) {
+      return false;
+    }
+    if (targetHpRatio <= finisherHpRatio + 0.08) {
+      chance += 0.12;
+    }
   }
 
   if (

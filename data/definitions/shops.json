@@ -67,7 +67,7 @@
   },
   {
     "id": 2,
-    "name": "PVP Shops",
+    "name": "PVP Shop",
     "currency": "BLOOD_MONEY",
     "originalStock": [
       {
@@ -84,6 +84,10 @@
       },
       {
         "id": 6585,
+        "amount": 2000000000
+      },
+      {
+        "id": 24777,
         "amount": 2000000000
       },
       {

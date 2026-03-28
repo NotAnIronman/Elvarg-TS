@@ -725092,6 +725092,7 @@
     "sellable": true,
     "noted": false,
     "value": 200000,
+    "bloodMoneyValue": 10000,
     "highAlch": 120000,
     "lowAlch": 80000,
     "dropValue": 0,

@@ -55,6 +55,7 @@ const SPEC_WEAPON_IDS = new Set([
   ItemIdentifiers.MAGIC_SHORTBOW_I_,
   ItemIdentifiers.MAGIC_SHORTBOW_3,
   ItemIdentifiers.SARADOMIN_GODSWORD,
+  ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF,
   ItemIdentifiers.ZAMORAK_GODSWORD,
 ]);
 const SUPPORTED_SPEC_WEAPONS = Object.freeze([
@@ -70,6 +71,7 @@ const SUPPORTED_SPEC_WEAPONS = Object.freeze([
   ItemIdentifiers.MAGIC_SHORTBOW_I_,
   ItemIdentifiers.MAGIC_SHORTBOW_3,
   ItemIdentifiers.SARADOMIN_GODSWORD,
+  ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF,
   ItemIdentifiers.ZAMORAK_GODSWORD,
 ]);
 
