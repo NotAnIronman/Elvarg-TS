@@ -154,10 +154,47 @@ export class PlayerUpdating {
         return true;
     }
 
-    private static compareBucketCandidates(
-        player: Player,
+    private static collectVisibleCandidates(
+        receiver: Player,
         localPlayers: Player[],
-        visibleCandidates: Player[]
+        candidates: Iterable<Player | null | undefined>
+    ): Player[] {
+        const localIndexes = new Set<number>();
+        for (const localPlayer of localPlayers) {
+            if (localPlayer) {
+                localIndexes.add(localPlayer.getIndex());
+            }
+        }
+
+        const visibleCandidates: Player[] = [];
+        let simulatedLocalCount = localPlayers.length;
+        let simulatedPlayersAdded = 0;
+        for (const candidate of candidates) {
+            if (
+                simulatedLocalCount >= PlayerUpdating.MAX_LOCAL_PLAYERS ||
+                simulatedPlayersAdded > PlayerUpdating.MAX_NEW_PLAYERS_PER_CYCLE
+            ) {
+                break;
+            }
+            if (
+                !candidate ||
+                localIndexes.has(candidate.getIndex()) ||
+                !this.isEligibleAddCandidate(receiver, candidate)
+            ) {
+                continue;
+            }
+            visibleCandidates.push(candidate);
+            localIndexes.add(candidate.getIndex());
+            simulatedLocalCount += 1;
+            simulatedPlayersAdded += 1;
+        }
+        return visibleCandidates;
+    }
+
+    private static compareVisibleCandidates(
+        player: Player,
+        indexedVisibleCandidates: Player[],
+        legacyVisibleCandidates: Player[]
     ): void {
         if (
             !PlayerUpdating.CANDIDATE_COMPARE_ENABLED ||
@@ -166,50 +203,28 @@ export class PlayerUpdating {
             return;
         }
 
-        const bucketCandidates = World.getBucketNearbyPlayersForUpdate(player);
-        const localIndexes = new Set<number>();
-        for (const localPlayer of localPlayers) {
-            if (localPlayer) {
-                localIndexes.add(localPlayer.getIndex());
-            }
+        const indexedIndexes = new Set<number>();
+        for (const candidate of indexedVisibleCandidates) {
+            indexedIndexes.add(candidate.getIndex());
         }
 
         const legacyIndexes = new Set<number>();
-        for (const candidate of visibleCandidates) {
+        for (const candidate of legacyVisibleCandidates) {
             legacyIndexes.add(candidate.getIndex());
         }
 
-        const bucketIndexes = new Set<number>();
         const extras: number[] = [];
-        let simulatedLocalCount = localPlayers.length;
-        let simulatedPlayersAdded = 0;
-        for (const candidate of bucketCandidates) {
-            if (
-                simulatedLocalCount >= PlayerUpdating.MAX_LOCAL_PLAYERS ||
-                simulatedPlayersAdded > PlayerUpdating.MAX_NEW_PLAYERS_PER_CYCLE
-            ) {
-                break;
-            }
-            if (
-                !this.isEligibleAddCandidate(player, candidate) ||
-                localIndexes.has(candidate.getIndex())
-            ) {
-                continue;
-            }
+        for (const candidate of indexedVisibleCandidates) {
             const index = candidate.getIndex();
-            bucketIndexes.add(index);
-            localIndexes.add(index);
-            simulatedLocalCount += 1;
-            simulatedPlayersAdded += 1;
             if (!legacyIndexes.has(index)) {
                 extras.push(index);
             }
         }
 
         const missing: number[] = [];
-        for (const candidate of visibleCandidates) {
+        for (const candidate of legacyVisibleCandidates) {
             const index = candidate.getIndex();
-            if (!bucketIndexes.has(index)) {
+            if (!indexedIndexes.has(index)) {
                 missing.push(index);
             }
         }
@@ -229,9 +244,8 @@ export class PlayerUpdating {
         console.warn("[player_update] bucket_candidate_mismatch", {
             receiver: this.playerName(player),
             receiverIndex: player.getIndex(),
-            localCount: localPlayers.length,
-            legacyVisibleCount: visibleCandidates.length,
-            bucketVisibleCount: bucketIndexes.size,
+            legacyVisibleCount: legacyVisibleCandidates.length,
+            bucketVisibleCount: indexedVisibleCandidates.length,
             missing: missing.slice(0, 10),
             extras: extras.slice(0, 10),
         });
@@ -268,47 +282,28 @@ export class PlayerUpdating {
         }
         localPlayers.length = 0;
         localPlayers.push(...retainedLocalPlayers);
-        const localPlayerIndexes = new Set<number>();
-        for (const localPlayer of localPlayers) {
-            if (localPlayer) {
-                localPlayerIndexes.add(localPlayer.getIndex());
-            }
-        }
-        let playersAdded = 0;
-        const visibleCandidates: Player[] = [];
 
-        // TODO: Finish player bucket semantics before reintroducing them to live updates.
-        // Local-player correctness is more important than the small cost of the legacy scan.
-        const tryAddCandidate = (otherPlayer: Player | null | undefined, recordCompare: boolean) => {
-            if (
-                player.getLocalPlayers().length >= PlayerUpdating.MAX_LOCAL_PLAYERS ||
-                playersAdded > PlayerUpdating.MAX_NEW_PLAYERS_PER_CYCLE
-            ) {
-                return true;
-            }
-            if (otherPlayer == null || otherPlayer == player || localPlayerIndexes.has(otherPlayer.getIndex())
-                || !otherPlayer.getLocation().isViewableFrom(player.getLocation())
-                || otherPlayer.getPrivateArea() !== player.getPrivateArea()) {
-                return false;
-            }
-            if (recordCompare && PlayerUpdating.CANDIDATE_COMPARE_ENABLED) {
-                visibleCandidates.push(otherPlayer);
-            }
+        const baseLocalPlayers = localPlayers.slice();
+        const indexedVisibleCandidates = this.collectVisibleCandidates(
+            player,
+            baseLocalPlayers,
+            World.getNearbyPlayersForUpdate(player)
+        );
+        const legacyVisibleCandidates = PlayerUpdating.CANDIDATE_COMPARE_ENABLED
+            ? this.collectVisibleCandidates(player, baseLocalPlayers, World.getPlayers())
+            : [];
+
+        for (const otherPlayer of indexedVisibleCandidates) {
             player.getLocalPlayers().push(otherPlayer);
-            localPlayerIndexes.add(otherPlayer.getIndex());
             this.addPlayer(player, otherPlayer, packet);
             this.appendUpdates(player, update, otherPlayer, true, false, updateId);
-            playersAdded++;
-            return false;
-        };
-
-        for (const otherPlayer of World.getPlayers()) {
-            if (tryAddCandidate(otherPlayer, true)) {
-                break;
-            }
         }
         if (PlayerUpdating.CANDIDATE_COMPARE_ENABLED) {
-            this.compareBucketCandidates(player, localPlayers, visibleCandidates);
+            this.compareVisibleCandidates(
+                player,
+                indexedVisibleCandidates,
+                legacyVisibleCandidates
+            );
         }
 
         const updateBuffer = update.getBuffer();

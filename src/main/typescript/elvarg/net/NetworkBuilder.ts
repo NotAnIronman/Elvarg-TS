@@ -13,7 +13,6 @@ import { PlayerSession } from "./PlayerSession";
 import { Appearance as GameAppearance } from "../game/model/Appearance";
 import { PACKET_GUIDE } from "./PacketGuide";
 import { PacketLogger } from "./PacketLogger";
-import { NOPPacketListener } from "./packet/impl/NOPPacketListener";
 import { Flag } from "../game/model/Flag";
 import { World } from "../game/World";
 import { PluginManager } from "../plugins/PluginManager";
@@ -366,6 +365,7 @@ class LoginSession {
       username: gamePlayer.getUsername(),
     });
     this.stage = "ESTABLISHED";
+    session.enableOutboundBatching();
   }
 
   private loadPersistedPlayer(gamePlayer: Player, loginPassword: string): boolean {
@@ -1201,52 +1201,16 @@ class LoginSession {
         });
       }
 
-      const hookPacket = new Packet(opcode, payload);
-      PluginManager.emitPacketReceived({
-        opcode,
-        packet: hookPacket,
-        player: this.gamePlayer,
-        stage: this.stage,
-      });
-
-      const exec =
-        PluginManager.getPacketListener(opcode) ??
-        PacketConstants.PACKETS.get(opcode) ??
-        new NOPPacketListener();
-      if (exec && this.gamePlayer) {
-        if (typeof (exec as any).execute !== "function") {
-          this.log("packet_listener_missing_execute", { opcode, listener: exec.constructor?.name });
-          continue;
-        }
-        try {
-          const packet = new Packet(opcode, payload);
-          exec.execute(this.gamePlayer, packet);
-          continue;
-        } catch (err) {
-          this.log("packet_listener_error", { opcode, err: (err as Error)?.message ?? String(err) });
-          continue;
-        }
+      if (!this.gamePlayer) {
+        this.log("packet_drop_missing_player", {
+          opcode,
+          payloadLength: payload.length,
+          stage: this.stage,
+        });
+        continue;
       }
 
-      switch (opcode) {
-        case PacketConstants.PLAYER_INACTIVE_OPCODE:
-          // Client idle keepalive; consume without echo for Java parity.
-          continue;
-        case 11:
-          this.handleAppearanceChange(payload);
-          continue;
-        case PacketConstants.FINALIZED_MAP_REGION_OPCODE:
-          // Let the server know the client finished loading; no-op for now.
-          continue;
-        case PacketConstants.CHANGE_MAP_REGION_OPCODE:
-          // Client is requesting a region change; acknowledge by resetting placement so next update teleports.
-          if (this.gamePlayer) {
-            this.gamePlayer.setNeedsPlacement(true);
-          }
-          continue;
-        default:
-          this.log("unhandled_packet", { opcode, payloadLength: payload.length });
-      }
+      this.gamePlayer.getSession()?.queuePacket(new Packet(opcode, Buffer.from(payload)));
     }
     this.recvBuffer = data.subarray(offset);
   }

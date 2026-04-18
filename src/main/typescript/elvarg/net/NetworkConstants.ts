@@ -10,4 +10,6 @@ export class NetworkConstants {
     public static readonly CONNECTION_LIMIT: number = 2;
     public static readonly SESSION_KEY: string = "session.key";
     public static readonly PACKET_PROCESS_LIMIT: number = 30;
+    // Allow short bursts to spill across ticks without executing gameplay on the socket callback.
+    public static readonly PACKET_QUEUE_LIMIT: number = 240;
 }

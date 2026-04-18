@@ -922,7 +922,7 @@ module.exports = {
         return true;
       }
       GameConstants.PLAYER_PERSISTENCE.save(player);
-      player.getPacketSender().sendMessage("Saved player.");
+      player.getPacketSender().sendMessage("Queued player save.");
       return true;
     });
 
@@ -1015,7 +1015,7 @@ module.exports = {
         return true;
       }
       World.savePlayers();
-      player.getPacketSender().sendMessage("Saved all players.");
+      player.getPacketSender().sendMessage("Queued save for all players.");
       return true;
     });
 

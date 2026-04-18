@@ -9,7 +9,6 @@ import { MapObjects } from './entity/impl/object/MapObjects';
 import { Player } from './entity/impl/player/Player';
 import { NPCUpdating } from '../game/entity/updating/NPCUpdating'
 import { PlayerUpdating } from './entity/updating/PlayerUpdating';
-import { GameSyncExecutor } from './entity/updating/sync/GameSyncExecutor';
 import { Graphic } from './model/Graphic';
 import { Location } from './model/Location';
 import { TaskManager } from './task/TaskManager';
@@ -17,19 +16,11 @@ import { GameConstants } from '../game/GameConstants'
 import { Misc } from '../util/Misc';
 import { List } from 'list'
 import { TreeMap } from 'treemap'
-import { Task } from './task/Task';
-import { GameSyncTask } from './entity/updating/sync/GameSyncTask';
 import { PluginManager } from '../plugins/PluginManager';
 import { ServerPerf } from '../util/ServerPerf';
 import { ActiveRegionIndex, ActiveRegionSnapshot } from './ActiveRegionIndex';
 
 const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
-
-interface GameSyncTaskInterface {
-    isParallel: boolean;
-    isPlayerTask: boolean;
-    execute(index: number): void;
-}
 
 export class World {
     private static readonly MAX_PLAYERS = 1024;
@@ -41,8 +32,6 @@ export class World {
     private static readonly BOT_PROCESS_LOD_MEDIUM_STRIDE = 2;
     private static readonly BOT_PROCESS_LOD_FAR_STRIDE = 12;
     private static readonly UPDATE_BUCKET_RADIUS = 2;
-    private static readonly PLAYER_UPDATE_BUCKET_COMPARE_ENABLED =
-        (process.env.PLAYER_UPDATE_BUCKET_COMPARE ?? "0") === "1";
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
@@ -87,10 +76,6 @@ export class World {
      */
     private static removeNPCQueue = new Array<NPC>();
 
-    /**
-     * The manager for game synchronization.
-     */
-    private static executor = new GameSyncExecutor();
     private static processCycle = 0;
 
     public players = new MobileList<Player>(0);
@@ -191,7 +176,7 @@ export class World {
             }
         });
         if (saved > 0 || failed > 0) {
-            console.info(`[world] savePlayers complete: saved=${saved}, failed=${failed}`);
+            console.info(`[world] savePlayers queued: saved=${saved}, failed=${failed}`);
         }
     }
 
@@ -327,17 +312,13 @@ export class World {
 
     private static rebuildUpdateBuckets(): void {
         World.npcUpdateBuckets.clear();
-        if (World.PLAYER_UPDATE_BUCKET_COMPARE_ENABLED) {
-            World.playerUpdateBuckets.clear();
-            World.players.forEach((player) => {
-                if (!player) {
-                    return;
-                }
-                World.addToUpdateBucket(World.playerUpdateBuckets, player);
-            });
-        } else if (World.playerUpdateBuckets.size > 0) {
-            World.playerUpdateBuckets.clear();
-        }
+        World.playerUpdateBuckets.clear();
+        World.players.forEach((player) => {
+            if (!player) {
+                return;
+            }
+            World.addToUpdateBucket(World.playerUpdateBuckets, player);
+        });
         for (const npc of World.activeNpcsForUpdate) {
             if (!npc || !npc.isVisible?.()) {
                 continue;
@@ -407,11 +388,7 @@ export class World {
     }
 
     public static getNearbyPlayersForUpdate(player: Player): Player[] {
-        const nearby = World.getBucketNearbyPlayersForUpdate(player);
-        if (nearby.length === 0) {
-            return Array.from(World.getPlayers()).sort((a, b) => a.getIndex() - b.getIndex());
-        }
-        return nearby;
+        return World.getBucketNearbyPlayersForUpdate(player);
     }
 
     public static getNearbyNpcsForUpdate(player: Player): NPC[] {
@@ -421,10 +398,6 @@ export class World {
         }
         nearby.sort((a, b) => a.getIndex() - b.getIndex());
         return nearby;
-    }
-
-    public static isPlayerUpdateBucketCompareEnabled(): boolean {
-        return World.PLAYER_UPDATE_BUCKET_COMPARE_ENABLED;
     }
 
     public static refreshActiveRegions(): void {
@@ -884,61 +857,6 @@ export class World {
                 }
             });
         });
-    }
-
-}
-
-class NPCSyncTask implements GameSyncTaskInterface {
-    isParallel: boolean;
-    isPlayerTask: boolean;
-
-    constructor(isParallel: boolean, isPlayerTask: boolean) {
-        this.isParallel = isParallel;
-        this.isPlayerTask = isPlayerTask;
-    }
-
-    execute(index: number) {
-        let npc = World.getNpcs().get(index);
-        try {
-            npc.process();
-        } catch (e) {
-            console.error("Erro ao processar NPC: ", e);
-            throw new Error("Erro ao processar NPC");
-        }
-    }
-}
-
-class PlayerSyncTask implements GameSyncTaskInterface {
-    isParallel: boolean;
-    isPlayerTask: boolean;
-
-    constructor(isPlayerTask: boolean) {
-        this.isParallel = true;
-        this.isPlayerTask = isPlayerTask;
-    }
-
-    execute(index: number) {
-        let player = World.getPlayers().get(index);
-        if (!player || player.isPlayerBot?.() === true || !World.isPlayerSessionConnected(player)) {
-            return;
-        }
-        try {
-            PlayerUpdating.update(player);
-            NPCUpdating.update(player);
-        } catch (e) {
-            console.error("Erro ao atualizar jogador: ", e);
-            player.onLogout();
-            throw new Error("Erro ao atualizar jogador");
-        }
-    }
-}
-
-export class GameTask extends GameSyncTask {
-    constructor(b: boolean, private readonly execFunc: Function, c?: boolean) {
-        super(b, c)
-    }
-    execute(): void {
-        this.execFunc();
     }
 
 }

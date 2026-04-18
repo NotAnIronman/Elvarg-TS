@@ -1,5 +1,7 @@
 const fs = require("fs");
+const fsp = fs.promises;
 const path = require("path");
+const { promisify } = require("util");
 const { PrayerData } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { FightType } = require("../../src/main/typescript/elvarg/game/content/combat/FightType");
 const {
@@ -21,17 +23,33 @@ const {
   PlayerFlagAttributes,
 } = require("../../src/main/typescript/elvarg/game/entity/flags/PlayerFlags");
 
-function fsyncDirectorySafe(directoryPath) {
+const openAsync = promisify(fs.open);
+const writeFileAsync = promisify(fs.writeFile);
+const fsyncAsync = promisify(fs.fsync);
+const closeAsync = promisify(fs.close);
+
+function isIgnorableFsyncError(error) {
+  const code = error?.code;
+  if (code === "ENOSYS" || code === "ENOTSUP" || code === "ERR_NOT_IMPLEMENTED") {
+    return true;
+  }
+  const message = String(error?.message ?? "");
+  return message.includes("Method not implemented");
+}
+
+async function fsyncDirectorySafeAsync(directoryPath) {
   let dirFd = null;
   try {
-    dirFd = fs.openSync(directoryPath, "r");
-    fs.fsyncSync(dirFd);
-  } catch (_error) {
-    // Directory fsync is best-effort and can be unsupported on some platforms/filesystems.
+    dirFd = await openAsync(directoryPath, "r");
+    await fsyncAsync(dirFd);
+  } catch (error) {
+    if (!isIgnorableFsyncError(error)) {
+      // Directory fsync is best-effort and can be unsupported on some platforms/filesystems.
+    }
   } finally {
     if (dirFd !== null) {
       try {
-        fs.closeSync(dirFd);
+        await closeAsync(dirFd);
       } catch (_error) {
         // no-op
       }
@@ -39,7 +57,17 @@ function fsyncDirectorySafe(directoryPath) {
   }
 }
 
-function writeFileAtomically(filePath, content) {
+async function fsyncFileSafeAsync(fd) {
+  try {
+    await fsyncAsync(fd);
+  } catch (error) {
+    if (!isIgnorableFsyncError(error)) {
+      throw error;
+    }
+  }
+}
+
+async function writeFileAtomicallyAsync(filePath, content) {
   const directory = path.dirname(filePath);
   const tempFilePath = path.join(
     directory,
@@ -47,17 +75,21 @@ function writeFileAtomically(filePath, content) {
   );
   let tempFd = null;
   try {
-    tempFd = fs.openSync(tempFilePath, "w");
-    fs.writeFileSync(tempFd, content, "utf8");
-    fs.fsyncSync(tempFd);
+    tempFd = await openAsync(tempFilePath, "w");
+    await writeFileAsync(tempFd, content, "utf8");
+    await fsyncFileSafeAsync(tempFd);
   } finally {
     if (tempFd !== null) {
-      fs.closeSync(tempFd);
+      try {
+        await closeAsync(tempFd);
+      } catch (_error) {
+        // no-op
+      }
     }
   }
 
-  fs.renameSync(tempFilePath, filePath);
-  fsyncDirectorySafe(directory);
+  await fsp.rename(tempFilePath, filePath);
+  await fsyncDirectorySafeAsync(directory);
 }
 
 class JsonPlayerPersistence extends PlayerPersistence {
@@ -71,17 +103,25 @@ class JsonPlayerPersistence extends PlayerPersistence {
   constructor() {
     super();
     this.prayerByConfig = new Map();
+    this.pendingSerializedSaves = new Map();
+    this.failedWrites = new Map();
+    this.pendingWriteChain = Promise.resolve();
+    this.nextWriteSequence = 0;
     for (const prayer of PrayerData.values()) {
       this.prayerByConfig.set(prayer.configId, prayer);
     }
   }
 
   load(username) {
-    if (!this.exists(username)) {
+    const filePath = this.resolveFilePath(username);
+    const pendingWrite = this.pendingSerializedSaves.get(filePath);
+    if (pendingWrite) {
+      const parsed = JSON.parse(pendingWrite.serialized, this.reviver.bind(this));
+      return this.hydratePlayerSave(parsed);
+    }
+    if (!fs.existsSync(filePath)) {
       return null;
     }
-
-    const filePath = this.resolveFilePath(username);
     const rawJson = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(rawJson, this.reviver.bind(this));
     return this.hydratePlayerSave(parsed);
@@ -121,12 +161,19 @@ class JsonPlayerPersistence extends PlayerPersistence {
     const serialized = JSON.stringify(save, this.replacer.bind(this), 2);
     this.validateSerializedSave(serialized, player.getUsername());
     const filePath = this.resolveFilePath(player.getUsername());
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFileAtomically(filePath, serialized);
+    this.enqueueSerializedWrite(filePath, serialized, player.getUsername());
   }
 
   exists(username) {
-    return fs.existsSync(this.resolveFilePath(username));
+    const filePath = this.resolveFilePath(username);
+    return this.pendingSerializedSaves.has(filePath) || fs.existsSync(filePath);
+  }
+
+  async flush() {
+    await this.pendingWriteChain.catch(() => undefined);
+    if (this.failedWrites.size > 0) {
+      throw this.failedWrites.values().next().value;
+    }
   }
 
   resolveFilePath(username) {
@@ -141,6 +188,27 @@ class JsonPlayerPersistence extends PlayerPersistence {
       .replace(/_+/g, "_")
       .replace(/^_+|_+$/g, "");
     return safe.length > 0 ? safe.toLowerCase() : "player";
+  }
+
+  enqueueSerializedWrite(filePath, serialized, username) {
+    const sequence = ++this.nextWriteSequence;
+    this.pendingSerializedSaves.set(filePath, { sequence, serialized });
+    this.pendingWriteChain = this.pendingWriteChain
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await fsp.mkdir(path.dirname(filePath), { recursive: true });
+          await writeFileAtomicallyAsync(filePath, serialized);
+          const pendingWrite = this.pendingSerializedSaves.get(filePath);
+          if (pendingWrite && pendingWrite.sequence === sequence) {
+            this.pendingSerializedSaves.delete(filePath);
+          }
+          this.failedWrites.delete(filePath);
+        } catch (error) {
+          this.failedWrites.set(filePath, error);
+          console.error(`[persistence] async save failed for ${username}`, error);
+        }
+      });
   }
 
   resolvePresetBaselineSave(player) {

@@ -10,7 +10,7 @@ import * as path from "path";
 import * as fs from "fs";
 import Module = require("module");
 import { GameBuilder } from "./game/GameBuilder";
-// import { GameConstants } from "./game/GameConstants";
+import { GameConstants } from "./game/GameConstants";
 import { World } from "./game/World";
 import { NetworkBuilder } from "./net/NetworkBuilder";
 import { NetworkConstants } from "./net/NetworkConstants";
@@ -126,20 +126,20 @@ export class Server {
     Server.gracefulHandlersInstalled = true;
 
     process.on("SIGINT", () => {
-      Server.gracefulShutdown("SIGINT");
+      void Server.gracefulShutdown("SIGINT");
     });
     process.on("SIGTERM", () => {
-      Server.gracefulShutdown("SIGTERM");
+      void Server.gracefulShutdown("SIGTERM");
     });
     process.once("SIGUSR2", () => {
-      Server.gracefulShutdown("SIGUSR2", "restart");
+      void Server.gracefulShutdown("SIGUSR2", "restart");
     });
   }
 
-  private static gracefulShutdown(
+  private static async gracefulShutdown(
     signal: NodeJS.Signals,
     mode: "exit" | "restart" = "exit"
-  ) {
+  ): Promise<void> {
     if (Server.shuttingDown) {
       console.info(`[shutdown] ${signal} ignored: shutdown already in progress`);
       return;
@@ -153,6 +153,7 @@ export class Server {
       );
       PluginManager.emitServerShutdown({ timestamp: Date.now() });
       World.savePlayers();
+      await GameConstants.PLAYER_PERSISTENCE.flush();
       console.info("[shutdown] Player persistence completed.");
     } catch (err) {
       console.error("[shutdown] Player persistence failed.", err);
