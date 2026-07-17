@@ -93,6 +93,10 @@ class LoginSession {
   }> = [];
   private recentKeepAliveCount = 0;
   private recentKeepAliveAt: string | null = null;
+  // Region replacement data can arrive before the client has finished installing
+  // its login scene. Track scene reloads so the finalized-region resend can force
+  // one client reload without creating an opcode-121 reload loop.
+  private replacementReloadSceneKeys = new Set<string>();
   private pendingInboundPacket: {
     opcode: number;
     encOpcode: number;
@@ -1225,14 +1229,22 @@ class LoginSession {
     }
     try {
       const loc = player.getLocation();
-      MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
+      const sceneKey = `${loc.getZ()}:${loc.getX() >> 6}:${loc.getY() >> 6}`;
+      // On first finalized load for this scene, a replacement payload may need to
+      // trigger one reload so the client applies terrain/object bytes it received
+      // during login. Later finalized packets for the same scene must not reload.
+      const shouldForceReload = !this.replacementReloadSceneKeys.has(sceneKey);
+      const sent = MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
         player,
         loc.getX(),
         loc.getY(),
         6,
         [],
-        true
+        shouldForceReload
       );
+      if (sent > 0 && shouldForceReload) {
+        this.replacementReloadSceneKeys.add(sceneKey);
+      }
     } catch (err) {
       this.log("visible_region_replacements_failed", {
         err: (err as Error)?.message ?? String(err),
