@@ -16,6 +16,8 @@ import { PluginManager } from "../plugins/PluginManager";
 import { NOPPacketListener } from "./packet/impl/NOPPacketListener";
 
 type SessionChannel = {
+  bufferedAmount?: number;
+  close?: (code?: number, reason?: string) => void;
   connected?: boolean;
   disconnect?: () => void;
   emit?: (event: string, payload: Packet) => void;
@@ -28,6 +30,8 @@ type SessionChannel = {
 const PACKET_OUT_LOGGING_ENABLED = process.env.PACKET_OUT_LOGGING === "1";
 const ESTABLISHED_STAGE = "ESTABLISHED";
 const NOP_PACKET_LISTENER = new NOPPacketListener();
+const OUTBOUND_BACKPRESSURE_LOG_COOLDOWN_MS = 5000;
+const WS_CLOSE_BACKPRESSURE = 1013;
 
 export interface OutboundPacketMeta {
   opcode: number;
@@ -39,7 +43,8 @@ export interface OutboundPacketMeta {
 
 export class PlayerSession {
   private packetsQueue: FastDeque<Packet> = new FastDeque<Packet>();
-  private outboundFrames: Buffer[] = [];
+  private outboundFrames: Array<{ opcode: number; frame: Buffer }> = [];
+  private outboundFrameBytes = 0;
   private outboundSocketPackets: Packet[] = [];
   private lastPacketOpcodeQueue: number[] = [];
   private channel: SessionChannel;
@@ -48,6 +53,8 @@ export class PlayerSession {
   private outboundPacketObserver?: (meta: OutboundPacketMeta) => void;
   private shouldLogPacketOut?: () => boolean;
   private player?: Player;
+  private lastBackpressureLogAt = 0;
+  private droppedOutboundFrames = 0;
 
   constructor(
     channel: SessionChannel,
@@ -141,7 +148,7 @@ export class PlayerSession {
     }
 
     if (isWebSocket) {
-      this.outboundFrames.push(outbound.encodedFrame as Buffer);
+      this.queueWebSocketFrame(outbound.packet.getOpcode(), outbound.encodedFrame as Buffer);
       return;
     }
 
@@ -155,21 +162,40 @@ export class PlayerSession {
   public flush() {
     if (this.isWebSocketChannel()) {
       if (typeof this.channel.readyState === "number" && this.channel.readyState !== 1) {
-        this.outboundFrames.length = 0;
+        this.clearWebSocketQueue();
         return;
       }
-      while (this.outboundFrames.length > 0) {
-        const payload = this.outboundFrames.shift();
-        if (!payload) {
+      if (this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES) {
+        this.closeBackpressuredWebSocket("critical_buffered_amount");
+        return;
+      }
+
+      let sent = 0;
+      while (
+        this.outboundFrames.length > 0 &&
+        sent < NetworkConstants.OUTBOUND_WS_MAX_FRAMES_PER_FLUSH &&
+        this.getBufferedAmount() < NetworkConstants.OUTBOUND_WS_BUFFER_HIGH_WATER_BYTES
+      ) {
+        const queued = this.outboundFrames.shift();
+        if (!queued) {
           continue;
         }
+        this.outboundFrameBytes = Math.max(
+          0,
+          this.outboundFrameBytes - queued.frame.length
+        );
         try {
-          this.channel.send?.(payload);
+          this.channel.send?.(queued.frame);
+          sent++;
         } catch (err) {
           // Ground-item/global updates can target stale sessions; never let this crash the server loop.
           console.error("[PlayerSession.flush] websocket send failed", err);
           break;
         }
+      }
+
+      if (this.outboundFrames.length > 0) {
+        this.logBackpressure("flush_deferred");
       }
       return;
     }
@@ -218,6 +244,87 @@ export class PlayerSession {
       typeof this.channel.readyState === "number" &&
       typeof this.channel.send === "function"
     );
+  }
+
+  private getBufferedAmount(): number {
+    const amount = this.channel.bufferedAmount;
+    return typeof amount === "number" && Number.isFinite(amount) && amount > 0
+      ? amount
+      : 0;
+  }
+
+  private isWebSocketBackpressured(): boolean {
+    return (
+      this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_HIGH_WATER_BYTES ||
+      this.outboundFrameBytes >= NetworkConstants.OUTBOUND_WS_QUEUE_HIGH_WATER_BYTES ||
+      this.outboundFrames.length >= NetworkConstants.OUTBOUND_WS_QUEUE_MAX_FRAMES
+    );
+  }
+
+  private queueWebSocketFrame(opcode: number, frame: Buffer): void {
+    if (!frame) {
+      return;
+    }
+
+    if (this.isWebSocketBackpressured()) {
+      this.logBackpressure("enqueue_backpressure");
+      if (
+        this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES ||
+        this.outboundFrames.length >= NetworkConstants.OUTBOUND_WS_QUEUE_MAX_FRAMES ||
+        this.outboundFrameBytes + frame.length >
+          NetworkConstants.OUTBOUND_WS_QUEUE_HIGH_WATER_BYTES
+      ) {
+        this.closeBackpressuredWebSocket("queue_capacity_exceeded");
+        return;
+      }
+    }
+
+    if (
+      this.outboundFrames.length >= NetworkConstants.OUTBOUND_WS_QUEUE_MAX_FRAMES ||
+      this.outboundFrameBytes + frame.length >
+        NetworkConstants.OUTBOUND_WS_QUEUE_HIGH_WATER_BYTES
+    ) {
+      this.closeBackpressuredWebSocket("queue_full");
+      return;
+    }
+
+    this.outboundFrames.push({ opcode, frame });
+    this.outboundFrameBytes += frame.length;
+  }
+
+  private clearWebSocketQueue(): void {
+    this.outboundFrames.length = 0;
+    this.outboundFrameBytes = 0;
+  }
+
+  private closeBackpressuredWebSocket(reason: string): void {
+    this.logBackpressure(reason);
+    this.clearWebSocketQueue();
+    try {
+      if (typeof this.channel.close === "function") {
+        this.channel.close(WS_CLOSE_BACKPRESSURE, "backpressure");
+        return;
+      }
+      this.channel.disconnect?.();
+    } catch (err) {
+      console.error("[PlayerSession] failed to close backpressured websocket", err);
+    }
+  }
+
+  private logBackpressure(reason: string): void {
+    const now = Date.now();
+    if (now - this.lastBackpressureLogAt < OUTBOUND_BACKPRESSURE_LOG_COOLDOWN_MS) {
+      return;
+    }
+    this.lastBackpressureLogAt = now;
+    console.warn("[PlayerSession] websocket_backpressure", {
+      reason,
+      player: this.player?.getUsername?.() ?? "unknown",
+      bufferedAmount: this.getBufferedAmount(),
+      queuedFrames: this.outboundFrames.length,
+      queuedBytes: this.outboundFrameBytes,
+      droppedTotal: this.droppedOutboundFrames,
+    });
   }
 
   private buildOutboundPacket(
@@ -342,6 +449,10 @@ export class PlayerSession {
         return;
       }
       if (!outbound.encodedFrame) {
+        return;
+      }
+      if (this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES) {
+        this.closeBackpressuredWebSocket("immediate_send_skipped");
         return;
       }
       try {

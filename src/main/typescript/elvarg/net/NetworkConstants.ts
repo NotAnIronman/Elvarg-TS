@@ -12,4 +12,11 @@ export class NetworkConstants {
     public static readonly PACKET_PROCESS_LIMIT: number = 30;
     // Allow short bursts to spill across ticks without executing gameplay on the socket callback.
     public static readonly PACKET_QUEUE_LIMIT: number = 240;
+    // WebSocket backpressure guardrails. These keep slow clients from making the
+    // single Node event loop spend every tick building and flushing stale updates.
+    public static readonly OUTBOUND_WS_BUFFER_HIGH_WATER_BYTES: number = parseInt(process.env.OUTBOUND_WS_BUFFER_HIGH_WATER_BYTES || "1048576", 10) || 1048576;
+    public static readonly OUTBOUND_WS_BUFFER_CRITICAL_BYTES: number = parseInt(process.env.OUTBOUND_WS_BUFFER_CRITICAL_BYTES || "4194304", 10) || 4194304;
+    public static readonly OUTBOUND_WS_QUEUE_HIGH_WATER_BYTES: number = parseInt(process.env.OUTBOUND_WS_QUEUE_HIGH_WATER_BYTES || "524288", 10) || 524288;
+    public static readonly OUTBOUND_WS_QUEUE_MAX_FRAMES: number = parseInt(process.env.OUTBOUND_WS_QUEUE_MAX_FRAMES || "512", 10) || 512;
+    public static readonly OUTBOUND_WS_MAX_FRAMES_PER_FLUSH: number = parseInt(process.env.OUTBOUND_WS_MAX_FRAMES_PER_FLUSH || "256", 10) || 256;
 }
