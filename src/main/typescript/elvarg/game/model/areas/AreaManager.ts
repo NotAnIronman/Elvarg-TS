@@ -73,10 +73,6 @@ export class AreaManager {
             z: position.getZ(),
         });
 
-        // Handle postLeave...
-        if (previousArea != null) {
-            previousArea.postLeave(c, false);
-        }
     }
 
     public static inMulti(c: Mobile): boolean {

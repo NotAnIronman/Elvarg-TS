@@ -7,6 +7,7 @@ const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/defini
 const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
+const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
 
 const EAT_ANIMATION = new Animation(829);
 
@@ -39,6 +40,7 @@ const FOOD = new Map([
   [ItemIds.MANTA_RAY, { heal: 22 }],
   [ItemIds.COOKED_KARAMBWAN, { heal: 18, karambwan: true }],
   [ItemIds.ANGLERFISH, { heal: 22, anglerfish: true }],
+  [ItemIdentifiers.BANDAGES, { heal: 12, verb: "use" }],
   [ItemIds.POTATO, { heal: 1 }],
   [ItemIds.BAKED_POTATO, { heal: 4 }],
   [ItemIds.POTATO_WITH_BUTTER, { heal: 14 }],
@@ -48,6 +50,8 @@ const FOOD = new Map([
   [ItemIds.MUSHROOM_POTATO, { heal: 20 }],
   [ItemIds.TUNA_POTATO, { heal: 20 }],
 ]);
+
+const FOOD_ITEM_IDS = [...FOOD.keys()];
 
 function getAnglerfishHeal(currentHp) {
   let c = 2;
@@ -73,6 +77,11 @@ function canEat(player, itemId) {
 
 module.exports = {
   name: "Food",
+  FOOD,
+  FOOD_ITEM_IDS,
+  isFoodItem(itemId) {
+    return FOOD.has(itemId);
+  },
   register(api) {
     api.onItemFirstAction((event) => {
       const { player, itemId, slot } = event;
