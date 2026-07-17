@@ -17,6 +17,7 @@ import {
   PluginModule,
   PluginItemOnGroundItemEvent,
   PluginItemOnItemEvent,
+  PluginItemOnPlayerEvent,
   PluginItemOnObjectEvent,
   PluginNpcDeathEvent,
   PluginNpcAggressionToleranceEvent,
@@ -131,6 +132,7 @@ export class PluginManager {
   private static playerDefeatedHooks: PluginHook<PluginPlayerDefeatedEvent>[] = [];
   private static itemOnObjectHooks: PluginHook<PluginItemOnObjectEvent>[] = [];
   private static itemOnItemHooks: PluginHook<PluginItemOnItemEvent>[] = [];
+  private static itemOnPlayerHooks: PluginHook<PluginItemOnPlayerEvent>[] = [];
   private static itemOnGroundItemHooks: PluginHook<PluginItemOnGroundItemEvent>[] =
     [];
   private static groundItemInteractionHooks: PluginHook<PluginGroundItemInteractionEvent>[] =
@@ -908,6 +910,13 @@ export class PluginManager {
   public static emitItemOnItem(event: PluginItemOnItemEvent): boolean {
     for (const hook of PluginManager.itemOnItemHooks) {
       PluginManager.executeHook(hook, event, "item_on_item", "item_on_item");
+    }
+    return event.handled === true;
+  }
+
+  public static emitItemOnPlayer(event: PluginItemOnPlayerEvent): boolean {
+    for (const hook of PluginManager.itemOnPlayerHooks) {
+      PluginManager.executeHook(hook, event, "item_on_player", "item_on_player");
     }
     return event.handled === true;
   }
@@ -2020,6 +2029,30 @@ export class PluginManager {
               !event.player ||
               !event.usedItem ||
               !event.usedWithItem
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onItemOnPlayer: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemOnPlayerHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              event.handled ||
+              !event.player ||
+              !event.target ||
+              !event.item ||
+              !Number.isInteger(event.itemId) ||
+              !Number.isInteger(event.slot) ||
+              !Number.isInteger(event.interfaceId) ||
+              !Number.isInteger(event.targetIndex)
             ) {
               return;
             }

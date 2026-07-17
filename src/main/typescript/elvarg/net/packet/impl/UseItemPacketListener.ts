@@ -1,4 +1,5 @@
 import { MapObjects } from "../../../game/entity/impl/object/MapObjects";
+import { World } from "../../../game/World";
 import { Location } from "../../../game/model/Location";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { Packet } from "../Packet";
@@ -119,6 +120,41 @@ export class UseItemPacketListener implements PacketExecutor {
     });
   }
 
+  private static itemOnPlayer(player: any, packet: Packet): void {
+    const interfaceId = packet.readUnsignedShortA();
+    const targetIndex = packet.readUnsignedShort();
+    const itemId = packet.readUnsignedShort();
+    const slot = packet.readLEShort();
+
+    if (slot < 0 || slot >= player.getInventory().capacity()) {
+      return;
+    }
+
+    const target = World.getPlayers().get(targetIndex);
+    if (!target) {
+      return;
+    }
+
+    const item = player.getInventory().getItems()[slot];
+    if (!item || item.getId() !== itemId) {
+      return;
+    }
+
+    player.getMovementQueue().walkToEntity(target, () => {
+      player.setPositionToFace(target.getLocation());
+      PluginManager.emitItemOnPlayer({
+        player,
+        target,
+        targetIndex,
+        interfaceId,
+        item,
+        itemId,
+        slot,
+        handled: false,
+      });
+    });
+  }
+
   public execute(player: any, packet: Packet) {
     if (!player || player.getHitpoints?.() <= 0) {
       return;
@@ -133,6 +169,9 @@ export class UseItemPacketListener implements PacketExecutor {
         break;
       case PacketConstants.ITEM_ON_GROUND_ITEM:
         UseItemPacketListener.itemOnGroundItem(player, packet);
+        break;
+      case PacketConstants.ITEM_ON_PLAYER:
+        UseItemPacketListener.itemOnPlayer(player, packet);
         break;
       default:
         break;

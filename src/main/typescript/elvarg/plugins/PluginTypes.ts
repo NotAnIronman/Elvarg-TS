@@ -223,6 +223,17 @@ export interface PluginItemOnItemEvent {
   handled: boolean;
 }
 
+export interface PluginItemOnPlayerEvent {
+  player: any;
+  target: any;
+  targetIndex: number;
+  interfaceId: number;
+  item: any;
+  itemId: number;
+  slot: number;
+  handled: boolean;
+}
+
 export interface PluginItemOnGroundItemEvent {
   player: any;
   inventoryItem: any;
@@ -412,6 +423,7 @@ export interface PluginApi {
   ): void;
   onItemOnObject(handler: (event: PluginItemOnObjectEvent) => void): void;
   onItemOnItem(handler: (event: PluginItemOnItemEvent) => void): void;
+  onItemOnPlayer(handler: (event: PluginItemOnPlayerEvent) => void): void;
   onItemOnGroundItem(handler: (event: PluginItemOnGroundItemEvent) => void): void;
   onItemAction(handler: (event: PluginItemActionEvent) => void): void;
   onItemDropPolicy(handler: (event: PluginItemDropEvent) => void): void;
