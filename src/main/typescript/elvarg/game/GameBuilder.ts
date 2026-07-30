@@ -6,6 +6,7 @@ import { GameEngine } from "./GameEngine";
 import { ObjectSpawnDefinitionLoader } from "./definition/loader/impl/ObjectSpawnDefinitionLoader";
 import { NpcDefinitionLoader } from "./definition/loader/impl/NpcDefinitionLoader";
 import { NpcDropDefinitionLoader } from "./definition/loader/impl/NpcDropDefinitionLoader";
+import { InterfaceLayoutDefinitionLoader } from "./definition/loader/impl/InterfaceLayoutDefinitionLoader";
 import { PluginManager } from "../plugins/PluginManager";
 
 export class GameBuilder {
@@ -30,6 +31,7 @@ export class GameBuilder {
     private loadStartupData(): void {
         CombatPoisonData.init();
         PlayerPunishment.init();
+        new InterfaceLayoutDefinitionLoader().load();
         new ObjectSpawnDefinitionLoader().load();
         new NpcDefinitionLoader().load();
         new NpcDropDefinitionLoader().load();

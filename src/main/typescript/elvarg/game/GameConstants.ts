@@ -37,8 +37,6 @@ export class GameConstants {
     public static readonly DEBUG_ATTACK_DISTANCE: boolean = false;
     // Verbose NPC face-change debug is expensive in large fights; keep off unless diagnosing.
     public static readonly DEBUG_NPC_FACE_POSITION_CHANGES: boolean = false;
-    public static readonly TAB_INTERFACES: number[] = [2423, 3917, 31000, 3213, 1644, 5608, -1, 37128, 5065, 5715, 2449,
-        42500, 147, 32000];
     public static readonly TELEPORT_INTERFACE_ENABLED: boolean = false;
 
     public static ALLOWED_SPAWNS = new Set([

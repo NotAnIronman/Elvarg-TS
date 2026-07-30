@@ -18,6 +18,7 @@ import { Location } from "../../game/model/Location";
 import { DonatorRights } from "../../game/model/rights/DonatorRights";
 import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
 import { World } from "../../game/World";
+import { InterfaceLayoutRegistry } from "../../game/definition/InterfaceLayoutDefinition";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
 // import { Mobile } from "../../game/entity/impl/Mobile";
@@ -302,6 +303,11 @@ export class PacketSender {
     return this;
   }
 
+  public sendConfiguredInterface(reference: string | number): this {
+    InterfaceLayoutRegistry.open(this, reference);
+    return this;
+  }
+
   sendWalkableInterface(interfaceId: number): this {
     this.player.setWalkableInterfaceId(interfaceId);
     const out = new PacketBuilder(208);
@@ -402,6 +408,13 @@ export class PacketSender {
     const out = new PacketBuilder(71);
     out.putShort(interfaceId);
     out.puts(tabId, ValueType.A);
+    this.player.getSession().write(out);
+    return this;
+  }
+
+  public sendSidebarInterface(interfaceId: number): PacketSender {
+    const out = new PacketBuilder(142);
+    out.putShorts(interfaceId, ByteOrder.LITTLE);
     this.player.getSession().write(out);
     return this;
   }

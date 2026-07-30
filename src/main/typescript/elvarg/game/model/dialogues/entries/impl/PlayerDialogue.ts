@@ -32,6 +32,6 @@ export class PlayerDialogue extends Dialogue {
         for (let i = 0; i < length; i++) {
             player.getPacketSender().sendString(lines[i], startDialogueChildId + i);
         }
-        player.getPacketSender().sendChatboxInterface(startDialogueChildId - 3);
+        player.getPacketSender().sendConfiguredInterface(startDialogueChildId - 3);
     }
 }

@@ -43,7 +43,7 @@ export class NpcDialogue extends Dialogue {
         for (let i = 0; i < length; i++) {
             player.getPacketSender().sendString(lines[i], startDialogueChildId + i);
         }
-        player.getPacketSender().sendChatboxInterface(startDialogueChildId - 3);
+        player.getPacketSender().sendConfiguredInterface(startDialogueChildId - 3);
     }
 
     public static sendStatement(player: Player, npcId: number, lines: string[], expression: DialogueExpression): void {
@@ -58,6 +58,6 @@ export class NpcDialogue extends Dialogue {
         for (let i = 0; i < length; i++) {
           player.getPacketSender().sendString(lines[i], startDialogueChildId + i);
         }
-        player.getPacketSender().sendChatboxInterface(startDialogueChildId - 3);
+        player.getPacketSender().sendConfiguredInterface(startDialogueChildId - 3);
       }
 }

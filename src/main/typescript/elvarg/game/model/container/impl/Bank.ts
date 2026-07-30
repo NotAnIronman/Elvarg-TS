@@ -607,7 +607,7 @@ export class Bank extends ItemContainer {
         this.getPlayer().getPacketSender().sendConfig(115, this.getPlayer().withdrawAsNote() ? 1 : 0)
                 .sendConfig(304, this.getPlayer().insertModeReturn() ? 1 : 0)
                 .sendConfig(117, this.getPlayer().isSearchingBank() ? 1 : 0)
-                .sendConfig(118, this.getPlayer().isPlaceholders() ? 1 : 0).sendInterfaceSet(5292, 5063);
+                .sendConfig(118, this.getPlayer().isPlaceholders() ? 1 : 0).sendConfiguredInterface("bank");
 
         // Resets the scroll bar in the interface
         this.getPlayer().getPacketSender().sendInterfaceScrollReset(Bank.BANK_SCROLL_BAR_INTERFACE_ID);

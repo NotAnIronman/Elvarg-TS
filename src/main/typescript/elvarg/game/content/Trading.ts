@@ -62,7 +62,7 @@ export class Trading {
     constructor(player: Player) {
         this.player = player;
         this.container = new PlayerItemContainer(player, ()=> {
-                player.getPacketSender().sendInterfaceSet(Trading.INTERFACE, Trading.CONTAINER_INVENTORY_INTERFACE);
+                player.getPacketSender().sendConfiguredInterface("trade-offer");
                 player.getPacketSender().sendItemContainer(this.container, Trading.CONTAINER_INTERFACE_ID);
                 player.getPacketSender().sendItemContainer(player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
                 player.getPacketSender().sendItemContainer(this.interact.getTrading().getContainer(), Trading.CONTAINER_INTERFACE_ID_2);
@@ -300,7 +300,7 @@ export class Trading {
         this.state = TradeState.CONFIRM_SCREEN;
 
         // Send new interface
-        this.player.getPacketSender().sendInterfaceSet(Trading.CONFIRM_SCREEN_INTERFACE, Trading.CONTAINER_INVENTORY_INTERFACE);
+        this.player.getPacketSender().sendConfiguredInterface("trade-confirm");
         this.player.getPacketSender().sendItemContainer(this.player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
 
         // Send new interface frames

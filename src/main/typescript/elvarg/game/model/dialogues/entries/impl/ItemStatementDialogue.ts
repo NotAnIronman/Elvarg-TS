@@ -30,6 +30,6 @@ export class ItemStatementDialogue extends Dialogue {
         for (let i = 0; i < statements.length; i++) {
             player.getPacketSender().sendString(statements[i],startDialogueChildId + i,);
         }
-        player.getPacketSender().sendChatboxInterface(startDialogueChildId - 3);
+        player.getPacketSender().sendConfiguredInterface(startDialogueChildId - 3);
     }
 }

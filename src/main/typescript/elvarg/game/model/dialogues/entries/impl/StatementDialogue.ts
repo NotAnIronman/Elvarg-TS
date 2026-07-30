@@ -22,7 +22,7 @@ export class StatementDialogue extends Dialogue {
         for (let i = 0; i < length; i++) {
             player.getPacketSender().sendString(lines[i], (chatboxInterface + 1) + i);
         }
-        player.getPacketSender().sendChatboxInterface(chatboxInterface);
+        player.getPacketSender().sendConfiguredInterface(chatboxInterface);
     }
 
     public static sends(player: Player, lines: string[]): void {
@@ -31,6 +31,6 @@ export class StatementDialogue extends Dialogue {
         for (let i = 0; i < length; i++) {
             player.getPacketSender().sendString(lines[i], (chatboxInterface + 1) + i);
         }
-        player.getPacketSender().sendChatboxInterface(chatboxInterface);
+        player.getPacketSender().sendConfiguredInterface(chatboxInterface);
     }
 }

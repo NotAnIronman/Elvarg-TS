@@ -512,7 +512,7 @@ export class MovementQueue {
             player.setWildernessLevel(wildernessLevel);
             player.setMultiIcon(multiIcon);
             packetSender.sendInteractionOption("Attack", 2, true);
-            packetSender.sendWalkableInterface(197);
+            packetSender.sendConfiguredInterface("wilderness-overlay");
             packetSender.sendString(`Level ${wildernessLevel}`, 199);
             return;
         }

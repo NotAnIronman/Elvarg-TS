@@ -5,32 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="286c1503-b08d-4a5e-bcd8-fae14731a9d8" name="Default Changelist" comment="Click to move (teleport), region loading">
-      <change afterPath="$PROJECT_DIR$/.pnp.cjs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.pnp.loader.mjs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/saves/characters/smoketest.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/logs/dev.stdout.log" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/logs/login-session.log" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/logs/movement.log" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/logs/packets.log" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/logs/server.log" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/nodemon.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/plugins/objects/WildernessDitch.plugin.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/plugins/persistence/JsonPlayerPersistence.plugin.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/login-protocol-harness.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/NullPlayerPersistence.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/PacketLogger.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/plugins/PluginManager.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/plugins/PluginTypes.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/working-login.patch" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/yarn.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Function" beforeDir="false" afterPath="$PROJECT_DIR$/Function" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/saves/characters/happysham31.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/saves/characters/happysham31.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/entity/impl/player/persistence/jsonfile/JSONFilePlayerPersistence.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/ForceMovementTask.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/task/impl/ForceMovementTask.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/CommandPacketListener.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/CommandPacketListener.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/ObjectActionPacketListener.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/impl/ObjectActionPacketListener.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameBuilder.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameBuilder.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameConstants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/GameConstants.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Duelling.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Duelling.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Trading.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/content/Trading.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Bank.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/container/impl/Bank.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/ItemStatementDialogue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/ItemStatementDialogue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/NpcDialogue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/NpcDialogue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/OptionDialogue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/OptionDialogue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/OptionsDialogue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/OptionsDialogue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/PlayerDialogue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/PlayerDialogue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/StatementDialogue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/dialogues/entries/impl/StatementDialogue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/equipment/BonusManager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/equipment/BonusManager.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/MovementQueue.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/game/model/movement/MovementQueue.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketSender.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/typescript/elvarg/net/packet/PacketSender.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,27 +47,30 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/toby/elvarg-web/elvarg-web-server&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/Applications/WebStorm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "master",
+    "javascript.preferred.runtime.type.id": "node",
+    "last_opened_file_path": "/Users/toby/rsps/elvarg-web-server",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "ts.external.directory.path": "/Applications/WebStorm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-WS-251.26927.40" />
+        <option value="bundled-js-predefined-d6986cc7102b-4abd2a77f808-JavaScript-WS-262.8665.341" />
       </set>
     </attachedChunks>
   </component>
@@ -97,6 +89,7 @@
       <workItem from="1771315519919" duration="470000" />
       <workItem from="1771321631099" duration="549000" />
       <workItem from="1771343308245" duration="899000" />
+      <workItem from="1785404540361" duration="2629000" />
     </task>
     <task id="LOCAL-00001" summary="Login working, player updating, chat, npcs, compilation &amp; runtime errors fixed">
       <option name="closed" value="true" />

@@ -49,7 +49,7 @@ export class BonusManager {
     private otherBonus: number[] = new Array(4).fill(0);
 
     public static open(player: Player) {
-        player.getPacketSender().sendInterface(BonusManager.INTERFACE_ID);
+        player.getPacketSender().sendConfiguredInterface("equipment-bonuses");
         BonusManager.update(player);
     }
 

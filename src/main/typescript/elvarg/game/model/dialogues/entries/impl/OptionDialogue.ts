@@ -31,6 +31,6 @@ export class OptionDialogue extends Dialogue {
         for (let i = 0; i < options.length; i++) {
             player.getPacketSender().sendString( options[i], firstChildId + i,);
         }
-        player.getPacketSender().sendChatboxInterface(firstChildId - 2);
+        player.getPacketSender().sendConfiguredInterface(firstChildId - 2);
     }
 }

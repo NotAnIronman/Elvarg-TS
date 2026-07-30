@@ -69,7 +69,7 @@ export class Dueling {
         this.rules = Array(Object.values(DuelRule).length).fill(false);
         this.player = player;
         this.container = new PlayerItemContainer(player, () =>{
-                player.getPacketSender().sendInterfaceSet(Dueling.INTERFACE_ID, Trading.CONTAINER_INVENTORY_INTERFACE);
+                player.getPacketSender().sendConfiguredInterface("duel-offer");
                 player.getPacketSender().sendItemContainer(player.getInventory(),
                     Trading.INVENTORY_CONTAINER_INTERFACE);
                 player.getPacketSender().sendInterfaceItems(Dueling.MAIN_INTERFACE_CONTAINER,
@@ -486,7 +486,7 @@ export class Dueling {
         this.player.getPacketSender().sendString("", Dueling.STATUS_FRAME_2);
 
         // Send new interface..
-        this.player.getPacketSender().sendInterfaceSet(Dueling.CONFIRM_INTERFACE_ID, Inventory.INTERFACE_ID);
+        this.player.getPacketSender().sendConfiguredInterface("duel-confirm");
         this.player.getPacketSender().sendItemContainer(this.player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
     }
 
