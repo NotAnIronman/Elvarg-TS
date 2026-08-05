@@ -45,6 +45,7 @@ export class PacketSender {
 
   public sendMapRegion(): PacketSender {
     this.player.setAllowRegionChangePacket(true);
+    MapRegionReplacementManager.markSceneLoadStarted(this.player);
     // Track the last known region using the player's actual position, matching the Java server.
     this.player.setLastKnownRegion(this.player.getLocation().clone());
     if (this.player?.isPlayerBot?.() !== true) {

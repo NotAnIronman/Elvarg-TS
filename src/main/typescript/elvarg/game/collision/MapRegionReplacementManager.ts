@@ -30,6 +30,7 @@ export type ReplaceMapRegionResult = {
 
 export class MapRegionReplacementManager {
   private static readonly PACKET_OPCODE = 12;
+  private static readonly MAX_PACKET_PAYLOAD = 0xffff;
   private static readonly PACKET_TYPE = Object.freeze({
     REGION_DATA: 0,
     ERROR: 3,
@@ -39,6 +40,7 @@ export class MapRegionReplacementManager {
 
   private static replacements: Map<number, RegionReplacement> = new Map();
   private static mapIndexCache: Map<number, RegionMapFiles> | null = null;
+  private static pendingSceneLoads: WeakSet<object> = new WeakSet();
 
   public static replaceMapRegion(
     regionId: number,
@@ -49,6 +51,19 @@ export class MapRegionReplacementManager {
     }
 
     const loadedSource = this.loadSource(regionId, source);
+    const payloadLength =
+      1 + // packet type
+      1 + // flags
+      4 + // region id
+      4 + // terrain length
+      4 + // object length
+      loadedSource.terrainData.length +
+      (loadedSource.objectData?.length ?? 0);
+    if (payloadLength > this.MAX_PACKET_PAYLOAD) {
+      throw new Error(
+        `region replacement is too large: region=${regionId} bytes=${payloadLength} max=${this.MAX_PACKET_PAYLOAD}`
+      );
+    }
     const objectCount = this.countObjectPlacements(loadedSource.objectData);
 
     this.replacements.set(regionId, {
@@ -65,6 +80,20 @@ export class MapRegionReplacementManager {
       objectBytes: loadedSource.objectData?.length ?? 0,
       objectCount,
     };
+  }
+
+  public static markSceneLoadStarted(player: any): void {
+    if (player && typeof player === "object") {
+      this.pendingSceneLoads.add(player);
+    }
+  }
+
+  public static consumeSceneLoadStarted(player: any): boolean {
+    if (!player || typeof player !== "object" || !this.pendingSceneLoads.has(player)) {
+      return false;
+    }
+    this.pendingSceneLoads.delete(player);
+    return true;
   }
 
   public static getReplacementMapData(
@@ -174,18 +203,17 @@ export class MapRegionReplacementManager {
       return false;
     }
 
-    this.sendProceduralPacket(player, replacement, allowReload);
-    return true;
+    return this.sendRegionReplacementPacket(player, replacement, allowReload);
   }
 
-  private static sendProceduralPacket(
+  private static sendRegionReplacementPacket(
     player: any,
     replacement: RegionReplacement,
     allowReload: boolean
-  ): void {
+  ): boolean {
     const session = player?.getSession?.();
     if (!session || typeof session.write !== "function") {
-      return;
+      return false;
     }
     const terrainBuffer = Buffer.from(replacement.terrainData);
     const objectBuffer = replacement.objectData
@@ -202,7 +230,7 @@ export class MapRegionReplacementManager {
       terrainBuffer.length +
       (objectBuffer?.length ?? 0);
 
-    if (payloadLength > 0xffff) {
+    if (payloadLength > this.MAX_PACKET_PAYLOAD) {
       const errorPacket = new PacketBuilder(
         this.PACKET_OPCODE,
         PacketType.VARIABLE_SHORT
@@ -213,7 +241,7 @@ export class MapRegionReplacementManager {
           `region_override_too_large region=${replacement.regionId} bytes=${payloadLength}`
         );
       session.write(errorPacket);
-      return;
+      return false;
     }
 
     const packet = new PacketBuilder(
@@ -231,6 +259,7 @@ export class MapRegionReplacementManager {
       packet.writeBuffer(objectBuffer);
     }
     session.write(packet);
+    return true;
   }
 
   private static computeVisibleRegionIds(
