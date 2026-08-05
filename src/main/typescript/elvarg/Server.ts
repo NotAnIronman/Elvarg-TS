@@ -194,7 +194,7 @@ export class Server {
       );
       // Start game logic (schedules GameEngine ticks, loads definitions, etc.)
       new GameBuilder().initialize();
-      new NetworkBuilder().initialize(NetworkConstants.GAME_PORT);
+      new NetworkBuilder().initialize(NetworkConstants.WEBSOCKET_PORT);
       console.log("Start");
       // console.info(`${GameConstants.NAME} is now online!`);
     } catch (e) {

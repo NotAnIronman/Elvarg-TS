@@ -1,5 +1,6 @@
 import { randomInt } from "crypto";
-import { RawData, WebSocket, WebSocketServer } from "ws";
+import { createServer } from "net";
+import { WebSocketServer } from "ws";
 import { Misc } from "../util/Misc";
 import { NetworkConstants } from "./NetworkConstants";
 import { LoginResponses } from "./login/LoginResponses";
@@ -28,6 +29,11 @@ import {
   getExpectedOutboundPacketType,
 } from "./OutboundPacketProfile";
 import { getInboundPacketSizeOrUndefined } from "./InboundPacketProfile";
+import {
+  BinaryChannel,
+  TcpBinaryChannel,
+  WebSocketBinaryChannel,
+} from "./BinaryChannel";
 
 type LoginStage = "HANDSHAKE" | "LOGIN" | "ESTABLISHED";
 
@@ -82,6 +88,7 @@ class LoginSession {
   private player: PlayerState | null = null;
   private gamePlayer: Player | null = null;
   private recvBuffer: Buffer = Buffer.alloc(0);
+  private preLoginBuffer: Buffer = Buffer.alloc(0);
   private disconnectedCleanupDone = false;
   private recentPacketEvents: Array<{
     direction: "IN" | "OUT";
@@ -93,10 +100,6 @@ class LoginSession {
   }> = [];
   private recentKeepAliveCount = 0;
   private recentKeepAliveAt: string | null = null;
-  // Region replacement data can arrive before the client has finished installing
-  // its login scene. Track scene reloads so the finalized-region resend can force
-  // one client reload without creating an opcode-121 reload loop.
-  private replacementReloadSceneKeys = new Set<string>();
   private pendingInboundPacket: {
     opcode: number;
     encOpcode: number;
@@ -106,11 +109,12 @@ class LoginSession {
     headerSize: number;
   } | null = null;
 
-  constructor(private socket: WebSocket) {
+  constructor(private channel: BinaryChannel) {
     this.log("connection_open", {
-      remote: (this.socket as any)?._socket?.remoteAddress ?? "unknown",
+      remote: this.channel.remoteAddress || "unknown",
+      transport: this.channel.kind,
     });
-    socket.on("message", (data) => {
+    channel.onData((data) => {
       try {
         this.onMessage(data);
       } catch (err) {
@@ -120,12 +124,12 @@ class LoginSession {
         });
       }
     });
-    socket.on("error", (err) => {
+    channel.onError((err) => {
       this.log("socket_error", { err: err?.message ?? err });
       this.cleanupDisconnected("socket_error");
-      this.socket.close();
+      this.channel.close();
     });
-    socket.on("close", (code, reason) => {
+    channel.onClose((code, reason) => {
       this.cleanupDisconnected("socket_close");
       const stack = new Error().stack;
       this.log("connection_closed", {
@@ -137,32 +141,51 @@ class LoginSession {
     });
   }
 
-  private onMessage(rawData: RawData) {
-    const buffer = Buffer.isBuffer(rawData)
-      ? rawData
-      : Buffer.from(rawData as ArrayBuffer);
-
-    if (this.stage === "HANDSHAKE") {
-      this.handleHandshake(buffer);
-      return;
-    }
-    if (this.stage === "LOGIN") {
-      this.handleLogin(buffer);
-      return;
-    }
+  private onMessage(buffer: Buffer) {
     if (this.stage === "ESTABLISHED") {
       this.handleGamePacket(buffer);
+      return;
+    }
+
+    this.preLoginBuffer = Buffer.concat([this.preLoginBuffer, buffer]);
+    while (true) {
+      if ((this.stage as LoginStage) === "ESTABLISHED") {
+        break;
+      }
+      if (this.stage === "HANDSHAKE") {
+        if (!this.tryHandleHandshake()) {
+          return;
+        }
+        continue;
+      }
+      if (this.stage === "LOGIN") {
+        if (!this.tryHandleLogin()) {
+          return;
+        }
+        continue;
+      }
+      return;
+    }
+
+    if (this.preLoginBuffer.length > 0) {
+      const remaining = this.preLoginBuffer;
+      this.preLoginBuffer = Buffer.alloc(0);
+      this.handleGamePacket(remaining);
     }
   }
 
-  private handleHandshake(buffer: Buffer) {
+  private tryHandleHandshake(): boolean {
+    const buffer = this.preLoginBuffer;
+    if (buffer.length < 1) {
+      return false;
+    }
     this.log("handshake_received", { length: buffer.length, opcode: buffer[0] });
     if (
       buffer.length < 1 ||
       buffer.readUInt8(0) !== NetworkConstants.LOGIN_REQUEST_OPCODE
     ) {
       this.sendResponse(LoginResponses.LOGIN_BAD_SESSION_ID, true, "bad_login_request_opcode");
-      return;
+      return false;
     }
 
     this.serverSeeds = [randomInt(0, 0x7fffffff), randomInt(0, 0x7fffffff)];
@@ -170,21 +193,24 @@ class LoginSession {
     response.writeUInt8(0, 0);
     response.writeInt32BE(this.serverSeeds[0], 1);
     response.writeInt32BE(this.serverSeeds[1], 5);
-    this.socket.send(response);
+    this.channel.send(response);
     this.stage = "LOGIN";
     this.log("handshake_sent", { seeds: this.serverSeeds });
+    const handshakeLength = this.channel.kind === "tcp" && buffer.length >= 2 ? 2 : 1;
+    this.preLoginBuffer = buffer.subarray(Math.min(handshakeLength, buffer.length));
+    return true;
   }
 
-  private handleLogin(buffer: Buffer) {
+  private tryHandleLogin(): boolean {
     if (!this.serverSeeds) {
       this.sendResponse(LoginResponses.LOGIN_BAD_SESSION_ID, true, "missing_server_seeds");
-      return;
+      return false;
     }
 
+    const buffer = this.preLoginBuffer;
     let offset = 0;
-    if (buffer.length < 5) {
-      this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "login_buffer_too_small");
-      return;
+    if (buffer.length < 2) {
+      return false;
     }
 
     const connectionType = buffer.readUInt8(offset++);
@@ -193,44 +219,50 @@ class LoginSession {
       connectionType !== NetworkConstants.RECONNECTION_OPCODE
     ) {
       this.sendResponse(LoginResponses.LOGIN_BAD_SESSION_ID, true, "bad_connection_type");
-      return;
+      return false;
     }
 
     const encryptedLoginBlockSize = buffer.readUInt8(offset++);
-    if (encryptedLoginBlockSize !== buffer.length - 2) {
-      this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "encrypted_block_size_mismatch");
-      return;
+    if (buffer.length - 2 < encryptedLoginBlockSize) {
+      return false;
     }
 
-    const magicId = buffer.readUInt8(offset++);
+    const loginBuffer = buffer.subarray(0, encryptedLoginBlockSize + 2);
+    this.preLoginBuffer = buffer.subarray(encryptedLoginBlockSize + 2);
+    if (encryptedLoginBlockSize !== loginBuffer.length - 2) {
+      this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "encrypted_block_size_mismatch");
+      return false;
+    }
+
+    const magicId = loginBuffer.readUInt8(offset++);
     if (magicId !== 0xff) {
       this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "bad_magic");
-      return;
+      return false;
     }
 
-    const memoryFlag = buffer.readUInt8(offset++);
+    const memoryFlag = loginBuffer.readUInt8(offset++);
     if (memoryFlag !== 0 && memoryFlag !== 1) {
       this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "bad_memory_flag");
-      return;
+      return false;
     }
 
-    const rsaBlockLength = buffer.readUInt8(offset++);
-    if (rsaBlockLength > buffer.length - offset) {
+    const rsaBlockLength = loginBuffer.readUInt8(offset++);
+    if (rsaBlockLength > loginBuffer.length - offset) {
       this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "rsa_length_too_big");
-      return;
+      return false;
     }
 
-    const rsaBytes = buffer.subarray(offset, offset + rsaBlockLength);
+    const rsaBytes = loginBuffer.subarray(offset, offset + rsaBlockLength);
     if (rsaBytes.length !== rsaBlockLength) {
       this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "rsa_length_mismatch");
-      return;
+      return false;
     }
 
     this.log("rsa_payload", { rsaLength: rsaBlockLength, rsaBytesHex: rsaBytes.toString("hex") });
     const decrypted = this.decryptRsa(rsaBytes);
     if (!decrypted) {
       this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "rsa_decrypt_failed");
-      return;
+      return false;
     }
 
     this.log("rsa_decrypted_raw", {
@@ -242,7 +274,7 @@ class LoginSession {
       this.parseLoginPayload(decrypted) ?? this.parseLoginPayload(rsaBytes, "raw");
     if (!parsed) {
       this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "login_parse_failed");
-      return;
+      return false;
     }
 
     const { securityId, seed0, seed1, seed2, seed3, usernameRaw, password } = parsed;
@@ -260,14 +292,14 @@ class LoginSession {
 
     if (securityId !== 10 && securityId !== 11) {
       this.sendResponse(LoginResponses.LOGIN_REJECT_SESSION, true, "bad_security_id");
-      return;
+      return false;
     }
     if (
       seed2 !== this.serverSeeds[0] ||
       seed3 !== this.serverSeeds[1]
     ) {
       this.sendResponse(LoginResponses.LOGIN_BAD_SESSION_ID, true, "server_seed_mismatch");
-      return;
+      return false;
     }
 
     const seed = [seed0, seed1, seed2, seed3];
@@ -284,7 +316,7 @@ class LoginSession {
       !Misc.isValidName(username)
     ) {
       this.sendResponse(LoginResponses.INVALID_CREDENTIALS_COMBINATION, true, "bad_lengths");
-      return;
+      return false;
     }
 
     this.log("login_success", {
@@ -307,7 +339,7 @@ class LoginSession {
 
     // Build game-layer player for packet listeners.
     const session = new PlayerSession(
-      this.socket as any,
+      this.channel as any,
       (meta) => {
         const label = PACKET_GUIDE[meta.opcode]?.name;
         this.recordRecentPacket(
@@ -337,7 +369,7 @@ class LoginSession {
     session.setPlayer(gamePlayer);
     gamePlayer.setUsername(username);
     gamePlayer.setLongUsername(Misc.stringToLongBigInt(username));
-    gamePlayer.setHostAddress((this.socket as any)?._socket?.remoteAddress ?? "");
+    gamePlayer.setHostAddress(this.channel.remoteAddress ?? "");
     const loadedPlayerSave = this.loadPersistedPlayer(gamePlayer, password);
     if (!loadedPlayerSave) {
       gamePlayer.setPasswordHashWithSalt(password);
@@ -355,7 +387,7 @@ class LoginSession {
     });
 
     // Plain login response
-    this.socket.send(
+    this.channel.send(
       Buffer.from([
         LoginResponses.LOGIN_SUCCESSFUL,
         this.gamePlayer.getRights().getId() & 0xff,
@@ -370,6 +402,7 @@ class LoginSession {
     });
     this.stage = "ESTABLISHED";
     session.enableOutboundBatching();
+    return true;
   }
 
   private loadPersistedPlayer(gamePlayer: Player, loginPassword: string): boolean {
@@ -571,7 +604,7 @@ class LoginSession {
       payloadPreview: payload.subarray(0, Math.min(16, payload.length)).toString("hex"),
     });
     try {
-      this.socket.send(this.encodePacket(opcode, payload, type));
+      this.channel.send(this.encodePacket(opcode, payload, type));
     } catch (err) {
       this.log("send_packet_error", {
         opcode,
@@ -644,6 +677,7 @@ class LoginSession {
     // apply it without an extra client-side loadRegion() pass.
     if (this.gamePlayer) {
       try {
+        MapRegionReplacementManager.markSceneLoadStarted(this.gamePlayer);
         MapRegionReplacementManager.sendReplacementToPlayer(
           this.gamePlayer,
           currentRegionId,
@@ -987,8 +1021,8 @@ class LoginSession {
 
   private sendResponse(response: number, closeAfter: boolean, reason?: string) {
     this.log("login_response", { response, reason, stage: this.stage });
-    this.socket.send(Buffer.from([response]));
-    if (closeAfter) this.socket.close();
+    this.channel.send(Buffer.from([response]));
+    if (closeAfter) this.channel.close();
   }
 
   private cleanupDisconnected(source: string) {
@@ -1224,17 +1258,17 @@ class LoginSession {
     if (!player || this.stage !== "ESTABLISHED") {
       return;
     }
-    if (this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.channel.isOpen()) {
       return;
     }
     try {
       const loc = player.getLocation();
-      const sceneKey = `${loc.getZ()}:${loc.getX() >> 6}:${loc.getY() >> 6}`;
-      // On first finalized load for this scene, a replacement payload may need to
-      // trigger one reload so the client applies terrain/object bytes it received
-      // during login. Later finalized packets for the same scene must not reload.
-      const shouldForceReload = !this.replacementReloadSceneKeys.has(sceneKey);
-      const sent = MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
+      // A map-region packet starts a new scene load. Only that scene's next
+      // finalized packet may request a client reload; client-triggered replacement reloads send
+      // finalized packets too, but must not create a reload loop.
+      const shouldForceReload =
+        MapRegionReplacementManager.consumeSceneLoadStarted(player);
+      MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
         player,
         loc.getX(),
         loc.getY(),
@@ -1242,9 +1276,6 @@ class LoginSession {
         [],
         shouldForceReload
       );
-      if (sent > 0 && shouldForceReload) {
-        this.replacementReloadSceneKeys.add(sceneKey);
-      }
     } catch (err) {
       this.log("visible_region_replacements_failed", {
         err: (err as Error)?.message ?? String(err),
@@ -1361,8 +1392,20 @@ class LoginSession {
 export class NetworkBuilder {
   public initialize(port: number): void {
     const host = process.env.HOST || process.env.BIND_HOST || "0.0.0.0";
-    const wss = new WebSocketServer({ port, host });
-    wss.on("connection", (socket) => new LoginSession(socket));
-    console.log(`WebSocket login server started on ${host}:${port}`);
+    if (port > 0) {
+      const wss = new WebSocketServer({ port, host });
+      wss.on("connection", (socket) => new LoginSession(new WebSocketBinaryChannel(socket)));
+      console.log(`WebSocket login server started on ${host}:${port}`);
+    }
+
+    const javaPort = NetworkConstants.TCP_PORT;
+    if (javaPort > 0) {
+      const tcpServer = createServer((socket) => {
+        new LoginSession(new TcpBinaryChannel(socket));
+      });
+      tcpServer.listen(javaPort, host, () => {
+        console.log(`TCP Java client login server started on ${host}:${javaPort}`);
+      });
+    }
   }
 }

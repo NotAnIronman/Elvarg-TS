@@ -38,7 +38,7 @@ export class VoiceChatSignalServer {
             return;
         }
         const host = process.env.HOST || process.env.BIND_HOST || "0.0.0.0";
-        const port = Number.parseInt(process.env.VOICE_SIGNAL_PORT || String(NetworkConstants.GAME_PORT + 1), 10);
+        const port = NetworkConstants.VOICE_SIGNAL_PORT;
         if (!Number.isInteger(port) || port <= 0) {
             console.warn("[voice-chat] skipping signal server start: invalid port");
             return;

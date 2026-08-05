@@ -16,6 +16,7 @@ import { PluginManager } from "../plugins/PluginManager";
 import { NOPPacketListener } from "./packet/impl/NOPPacketListener";
 
 type SessionChannel = {
+  binaryTransport?: boolean;
   bufferedAmount?: number;
   close?: (code?: number, reason?: string) => void;
   connected?: boolean;
@@ -25,6 +26,7 @@ type SessionChannel = {
   readyState?: number;
   removeAllListeners?: (event?: string) => void;
   send?: (payload: Buffer) => void;
+  isOpen?: (() => boolean) | boolean;
 };
 
 const PACKET_OUT_LOGGING_ENABLED = process.env.PACKET_OUT_LOGGING === "1";
@@ -136,8 +138,8 @@ export class PlayerSession {
   }
 
   public write(builder: PacketBuilder) {
-    const isWebSocket = this.isWebSocketChannel();
-    const outbound = this.buildOutboundPacket(builder, isWebSocket);
+    const isBinaryTransport = this.isBinaryTransport();
+    const outbound = this.buildOutboundPacket(builder, isBinaryTransport);
     if (!outbound) {
       return;
     }
@@ -147,7 +149,7 @@ export class PlayerSession {
       return;
     }
 
-    if (isWebSocket) {
+    if (isBinaryTransport) {
       this.queueWebSocketFrame(outbound.packet.getOpcode(), outbound.encodedFrame as Buffer);
       return;
     }
@@ -160,8 +162,8 @@ export class PlayerSession {
   }
 
   public flush() {
-    if (this.isWebSocketChannel()) {
-      if (typeof this.channel.readyState === "number" && this.channel.readyState !== 1) {
+    if (this.isBinaryTransport()) {
+      if (!this.isBinaryChannelOpen()) {
         this.clearWebSocketQueue();
         return;
       }
@@ -239,11 +241,22 @@ export class PlayerSession {
     this.outboundBatchingEnabled = true;
   }
 
-  private isWebSocketChannel(): boolean {
-    return (
-      typeof this.channel.readyState === "number" &&
-      typeof this.channel.send === "function"
-    );
+  private isBinaryTransport(): boolean {
+    return this.channel.binaryTransport === true && typeof this.channel.send === "function";
+  }
+
+  private isBinaryChannelOpen(): boolean {
+    const isOpen = this.channel.isOpen;
+    if (typeof isOpen === "function") {
+      return isOpen.call(this.channel);
+    }
+    if (typeof isOpen === "boolean") {
+      return isOpen;
+    }
+    if (typeof this.channel.readyState === "number") {
+      return this.channel.readyState === 1;
+    }
+    return true;
   }
 
   private getBufferedAmount(): number {
@@ -317,7 +330,7 @@ export class PlayerSession {
       return;
     }
     this.lastBackpressureLogAt = now;
-    console.warn("[PlayerSession] websocket_backpressure", {
+    console.warn("[PlayerSession] outbound_backpressure", {
       reason,
       player: this.player?.getUsername?.() ?? "unknown",
       bufferedAmount: this.getBufferedAmount(),
@@ -329,7 +342,7 @@ export class PlayerSession {
 
   private buildOutboundPacket(
     builder: PacketBuilder,
-    encodeForWebSocket: boolean
+    encodeForBinaryTransport: boolean
   ): { packet: Packet; encodedFrame: Buffer | null } | null {
     try {
       const packet = builder.toPacket();
@@ -361,10 +374,10 @@ export class PlayerSession {
         );
       }
 
-      const encodedFrame = encodeForWebSocket
+      const encodedFrame = encodeForBinaryTransport
         ? this.encodePacket(opcode, payload, packetType)
         : null;
-      if (encodeForWebSocket && !encodedFrame) {
+      if (encodeForBinaryTransport && !encodedFrame) {
         return null;
       }
 
@@ -444,8 +457,8 @@ export class PlayerSession {
     packet: Packet;
     encodedFrame: Buffer | null;
   }): void {
-    if (this.isWebSocketChannel()) {
-      if (typeof this.channel.readyState === "number" && this.channel.readyState !== 1) {
+    if (this.isBinaryTransport()) {
+      if (!this.isBinaryChannelOpen()) {
         return;
       }
       if (!outbound.encodedFrame) {

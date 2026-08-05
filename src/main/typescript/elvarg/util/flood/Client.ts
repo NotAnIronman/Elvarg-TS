@@ -44,7 +44,7 @@ export class Client {
     this.incoming = Buffer.create();
     this.outgoing = ByteBuffer.create(5000, false, null);
     this.socketStream = new BufferedConnection(
-      this.openSocket(NetworkConstants.GAME_PORT)
+      this.openSocket(NetworkConstants.TCP_PORT)
     );
 
     this.outgoing.putByte(14); //REQUEST
@@ -58,7 +58,7 @@ export class Client {
     this.incoming = Buffer.create();
     this.outgoing = ByteBuffer.create(5000, false, null);
     this.socketStream = new BufferedConnection(
-      this.openSocket(NetworkConstants.GAME_PORT)
+      this.openSocket(NetworkConstants.TCP_PORT)
     );
 
     this.outgoing.putByte(14); //REQUEST
