@@ -79,7 +79,7 @@ const RSA_PUBLIC = BigInt(65537);
 // Must mirror server PacketEncoder.CLIENTS_PACKET_SIZES for decoding server->client packets.
 const INCOMING_PACKET_SIZES: number[] = [
   0, 0, 0, 1, 6, 0, 0, 0, 4, 4, //0
-  6, 2, -1, 1, 1, -1, 1, 0, 0, 0, // 10
+  6, 2, -2, 1, 1, -1, 1, 0, 0, 0, // 10
   0, 0, 0, 0, 1, 0, 0, -1, 1, 1, //20
   0, 0, 0, 0, -2, 4, 3, 0, 2, 0, //30
   0, 0, 0, 0, 7, 8, 0, 6, 0, 0, //40

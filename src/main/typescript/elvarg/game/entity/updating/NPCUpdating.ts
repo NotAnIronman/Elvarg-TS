@@ -284,7 +284,7 @@ export class NPCUpdating {
 
     private static updateGraphics(builder: PacketBuilder, npc: NPC): void {
         builder.putShort(npc.getGraphic().getId());
-        builder.putInt(((npc.getGraphic().getHeight().valueOf() * 50) << 16) + (npc.getGraphic().getDelay() & 0xffff));
+        builder.putInt((npc.getGraphic().getHeight().valueOf() << 16) + (npc.getGraphic().getDelay() & 0xffff));
     }
 
     /**

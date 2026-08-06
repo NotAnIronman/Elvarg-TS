@@ -406,13 +406,10 @@ export class MapRegionReplacementManager {
     }
 
     if (!terrainData && !objectData) {
-      if (firstData.length >= secondData.length) {
-        terrainData = firstData;
-        objectData = secondData;
-      } else {
-        terrainData = secondData;
-        objectData = firstData;
-      }
+      // RSPSi's pack format always stores object data first, then terrain data.
+      // File size is not a discriminator: object archives are often much larger.
+      objectData = firstData;
+      terrainData = secondData;
     } else if (!terrainData) {
       terrainData = objectData === firstData ? secondData : firstData;
     } else if (!objectData) {

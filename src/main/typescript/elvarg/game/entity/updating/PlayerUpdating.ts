@@ -736,7 +736,7 @@ export class PlayerUpdating {
     private static updateGraphics(builder: PacketBuilder, target: Player) {
         builder.putShorts(target.graphic.id, ByteOrder.LITTLE);
         builder.putInt(
-            ((target.graphic.height * 50) << 16) + (target.graphic.delay & 0xffff));
+            (target.graphic.height << 16) + (target.graphic.delay & 0xffff));
     }
     private static resolveHitmaskValue(hit: any): number {
         const raw =

@@ -1,5 +1,5 @@
 export enum GraphicHeight {
-    LOW,
-    MIDDLE,
-    HIGH,
+    LOW = 0,
+    MIDDLE = 50,
+    HIGH = 100,
 }
