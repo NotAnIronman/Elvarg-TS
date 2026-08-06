@@ -1084,6 +1084,10 @@ export class PacketSender {
   }
 
   sendInterfaceRemoval(): this {
+    const { ShopManager } = require(
+      "../../game/model/container/shop/ShopManager"
+    ) as typeof import("../../game/model/container/shop/ShopManager");
+    ShopManager.close(this.player);
     // Keep client/server interface state aligned with Java behavior.
     // A no-op here can leave stale inventory context active client-side, which
     // affects default left-click item actions (e.g. "Drop" appearing as primary).

@@ -745,28 +745,36 @@ module.exports = {
       }
     });
 
-    api.onNpcInteraction((event) => {
+    function interactWithPet(event) {
       if (!event || !event.player || !event.npc) {
-        return;
+        return false;
       }
       if (event.clickType === 1) {
         if (interact(event.player, event.npc)) {
           event.handled = true;
+          return true;
         }
-        return;
+        return false;
       }
       if (event.clickType === 2) {
         if (pickup(event.player, event.npc)) {
           event.handled = true;
+          return true;
         }
-        return;
+        return false;
       }
       if (event.clickType === 3) {
         if (morph(event.player, event.npc)) {
           event.handled = true;
+          return true;
         }
       }
-    });
+      return false;
+    }
+    const petNpcIds = Array.from(PET_BY_ID.keys());
+    api.onNpcFirstClick(petNpcIds, interactWithPet);
+    api.onNpcSecondClick(petNpcIds, interactWithPet);
+    api.onNpcThirdClick(petNpcIds, interactWithPet);
 
     api.onPlayerLogout(({ player }) => {
       pickup(player, player.getCurrentPet?.());

@@ -29,6 +29,18 @@ const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/imp
 const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
 const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
 const { ServerLogger } = require("../../src/main/typescript/elvarg/util/ServerLogger");
+const {
+  DefinitionLoader,
+} = require("../../src/main/typescript/elvarg/game/definition/loader/DefinitionLoader");
+const {
+  NpcSpawnDefinitionLoader,
+} = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcSpawnDefinitionLoader");
+const {
+  ShopDefinitionLoader,
+} = require("../../src/main/typescript/elvarg/game/definition/loader/impl/ShopDefinitionLoader");
+const {
+  ShopManager,
+} = require("../../src/main/typescript/elvarg/game/model/container/shop/ShopManager");
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
@@ -1158,17 +1170,13 @@ module.exports = {
         return true;
       }
       try {
-        const reloadShops = globalThis.__shopReload;
-        if (typeof reloadShops !== "function") {
-          player
-            .getPacketSender()
-            .sendMessage(
-              "Shop plugin reload hook is unavailable. Check shop plugin startup logs."
-            );
-          return true;
+        const loaded = new ShopDefinitionLoader().load();
+        const shopCount = ShopManager.reload();
+        if (loaded === false) {
+          player.getPacketSender().sendMessage(
+            "Some plugin shop definition sources failed to reload."
+          );
         }
-        const result = reloadShops();
-        const shopCount = Number(result?.shopCount ?? 0);
         player.getPacketSender().sendConsoleMessage(`Reloaded shops (${shopCount}).`);
       } catch (error) {
         console.error(error);
@@ -1196,26 +1204,19 @@ module.exports = {
         return true;
       }
       try {
-        const reloadNpcSpawns = globalThis.__npcSpawnReload;
-        if (typeof reloadNpcSpawns !== "function") {
-          player
-            .getPacketSender()
-            .sendMessage(
-              "NPC spawn plugin reload hook is unavailable. Check NPC spawn plugin startup logs."
-            );
-          return true;
-        }
-
-        const loaded = reloadNpcSpawns();
+        const loader = new NpcSpawnDefinitionLoader();
+        const loaded = loader.load();
         if (loaded === false) {
           player.getPacketSender().sendMessage("Error reloading npc spawns.");
           return true;
         }
 
-        const source = String(globalThis.__npcSpawnSource ?? "unknown");
+        const source = DefinitionLoader.getSourceNames(
+          NpcSpawnDefinitionLoader.DEFINITION_TYPE
+        ).join("+") || "none";
         player
           .getPacketSender()
-          .sendConsoleMessage(`Reloaded npc spawns via plugin source: ${source}.`);
+          .sendConsoleMessage(`Reloaded npc spawns from: ${source}.`);
       } catch (error) {
         console.error(error);
         player.getPacketSender().sendMessage("Error reloading npc spawns.");

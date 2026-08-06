@@ -2,6 +2,8 @@ import type { Packet } from "../net/packet/Packet";
 import type { PacketExecutor } from "../net/packet/PacketExecutor";
 import type { PlayerPersistence } from "../game/entity/impl/player/persistence/PlayerPersistence";
 import type { ActiveRegionSnapshot } from "../game/ActiveRegionIndex";
+import type { ServerDataProvider } from "../game/data/ServerDataRegistry";
+import type { DefinitionSource } from "../game/definition/loader/DefinitionLoader";
 
 export interface PluginPacketEvent {
   opcode: number;
@@ -91,6 +93,29 @@ export interface PluginNpcInteractionEvent {
   clickType: number;
   location: { x: number; y: number; z: number };
   handled: boolean;
+}
+
+export interface PluginNpcInteractionTeleportLocation {
+  x: number;
+  y: number;
+  z?: number;
+}
+
+export type PluginNpcInteractionActionDefinition =
+  | {
+      shopId: number;
+      teleportLocation?: never;
+    }
+  | {
+      shopId?: never;
+      teleportLocation: PluginNpcInteractionTeleportLocation;
+    };
+
+export interface PluginNpcInteractionDefinition {
+  firstClick?: PluginNpcInteractionActionDefinition;
+  secondClick?: PluginNpcInteractionActionDefinition;
+  thirdClick?: PluginNpcInteractionActionDefinition;
+  fourthClick?: PluginNpcInteractionActionDefinition;
 }
 
 export interface PluginNpcDeathEvent {
@@ -375,6 +400,10 @@ export interface PluginApi {
   onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
   onNpcInteraction(handler: (event: PluginNpcInteractionEvent) => void): void;
+  registerNpcInteraction(
+    npcIds: number | number[],
+    definition: PluginNpcInteractionDefinition
+  ): void;
   onNpcDeath(handler: (event: PluginNpcDeathEvent) => void): void;
   onCanAttack(handler: (event: PluginCanAttackEvent) => void): void;
   onCanTeleport(handler: (event: PluginCanTeleportEvent) => void): void;
@@ -404,12 +433,24 @@ export interface PluginApi {
   onPlayerDefeated(handler: (event: PluginPlayerDefeatedEvent) => void): void;
   onSlayerAssignRequest(handler: (player: any) => boolean): void;
   onNpcClick(
-    npcId: number,
+    npcIds: number | number[],
     clickType: number,
     handler: (event: PluginNpcInteractionEvent) => void | boolean
   ): void;
+  onNpcFirstClick(
+    npcIds: number | number[],
+    handler: (event: PluginNpcInteractionEvent) => void | boolean
+  ): void;
   onNpcSecondClick(
-    npcId: number,
+    npcIds: number | number[],
+    handler: (event: PluginNpcInteractionEvent) => void | boolean
+  ): void;
+  onNpcThirdClick(
+    npcIds: number | number[],
+    handler: (event: PluginNpcInteractionEvent) => void | boolean
+  ): void;
+  onNpcFourthClick(
+    npcIds: number | number[],
     handler: (event: PluginNpcInteractionEvent) => void | boolean
   ): void;
   onGroundItemClick(
@@ -485,6 +526,14 @@ export interface PluginApi {
   ): void;
   registerPacketListener(opcode: number, listener: PacketExecutor): void;
   registerAlivePacketListener(opcode: number, listener: PacketExecutor): void;
+  registerServerDataResource(
+    name: string,
+    provider: ServerDataProvider
+  ): void;
+  registerDefinitionSource(
+    definitionType: string,
+    source: DefinitionSource
+  ): void;
   setPlayerPersistence(persistence: PlayerPersistence): void;
   getActiveRegionSnapshot(): PluginActiveRegionsEvent;
   log(message: string, extra?: Record<string, unknown>): void;

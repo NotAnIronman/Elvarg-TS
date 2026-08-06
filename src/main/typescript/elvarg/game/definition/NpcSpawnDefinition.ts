@@ -1,31 +1,55 @@
 import { Direction } from "../model/Direction";
-import { FacingDirection } from "../model/FacingDirection";
 import { Location } from "../model/Location";
 import { DefaultSpawnDefinition } from "./DefaultSpawnDefinition";
 
 export class NpcSpawnDefinition extends DefaultSpawnDefinition {
+    private static definitions: NpcSpawnDefinition[] = [];
 
-    facing: Direction;
-    radius: number;
-    description: string;
+    private facing: Direction;
+    private radius: number | null;
+    private description: string;
+    private source: string;
 
-
-    constructor(id: number, position: Location, facing: Direction, radius: number, descripton?: string) {
+    constructor(
+        id: number,
+        position: Location,
+        facing: Direction,
+        radius: number | null,
+        description: string = "",
+        source: string = "core"
+    ) {
         super(id, position);
         this.facing = facing;
         this.radius = radius;
-        this.description = descripton;
+        this.description = description;
+        this.source = source;
     }
 
-    getFacing(): Direction {
+    public static replace(definitions: NpcSpawnDefinition[]): void {
+        this.definitions = definitions.slice();
+    }
+
+    public static all(): readonly NpcSpawnDefinition[] {
+        return this.definitions;
+    }
+
+    public getFacing(): Direction {
         return this.facing;
     }
 
-    getRadius(): number {
+    public getRadius(): number | null {
         return this.radius;
     }
 
-    equals(o: Object): boolean {
+    public getDescription(): string {
+        return this.description;
+    }
+
+    public getSource(): string {
+        return this.source;
+    }
+
+    public equals(o: Object): boolean {
         if (!(o instanceof NpcSpawnDefinition))
             return false;
         let def = o as NpcSpawnDefinition;

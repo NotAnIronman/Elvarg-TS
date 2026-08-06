@@ -11,7 +11,7 @@ export class PlayerDialogue extends Dialogue {
     constructor(index: number, text: string, expression?: DialogueExpression) {
         super(index);
         this.text = text;
-        this.expression = expression;
+        this.expression = expression || DialogueExpression.CALM;
     }
 
     send(player: Player) {

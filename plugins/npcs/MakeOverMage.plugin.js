@@ -154,12 +154,10 @@ function handleMakeoverButton(player, button) {
 module.exports = {
   name: "MakeOverMage",
   register(api) {
-    api.onNpcInteraction((event) => {
-      if (event.clickType !== 1 || !MAKEOVER_NPC_ID_SET.has(event.npcId)) {
-        return;
-      }
+    api.onNpcFirstClick(MAKEOVER_NPC_IDS, function openMakeover(event) {
       openMakeoverInterface(event.player);
       event.handled = true;
+      return true;
     });
 
     api.onButtonClick((event) => {

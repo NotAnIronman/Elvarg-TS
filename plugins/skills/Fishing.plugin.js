@@ -99,6 +99,15 @@ for (const npcId of FISH_SPOT_CAGE_HARPOON_IDS) {
   addSpotTool(npcId, 1, TOOLS.LOBSTER_POT);
   addSpotTool(npcId, 2, TOOLS.HARPOON);
 }
+const FISHING_SPOT_NPC_IDS = Object.freeze(
+  Array.from(
+    new Set(
+      Array.from(SPOT_TOOL_BY_NPC_AND_CLICK.keys()).map((key) =>
+        Number.parseInt(key.split(":", 1)[0], 10)
+      )
+    )
+  )
+);
 
 function getFishingLevel(player) {
   return player.getSkillManager().getCurrentLevel(Skill.FISHING);
@@ -283,7 +292,7 @@ module.exports = {
       stopFishing(activeSessions, player, false);
     });
 
-    api.onNpcInteraction((event) => {
+    function startFishingInteraction(event) {
       const started = startFishing(
         event.player,
         event.npc,
@@ -293,7 +302,10 @@ module.exports = {
       if (started) {
         event.handled = true;
       }
-    });
+      return started;
+    }
+    api.onNpcClick(FISHING_SPOT_NPC_IDS, 1, startFishingInteraction);
+    api.onNpcClick(FISHING_SPOT_NPC_IDS, 2, startFishingInteraction);
 
     api.log("registered", {
       fishingSpotMappings: SPOT_TOOL_BY_NPC_AND_CLICK.size,

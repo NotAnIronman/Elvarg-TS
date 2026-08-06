@@ -3,14 +3,27 @@ import { DynamicDialogueBuilder } from "./builders/DynamicDialogueBuilder";
 import { DialogueBuilder } from "./builders/DialogueBuilder";
 import { Dialogue } from "./entries/Dialogue";
 import { TestStaticDialogue } from '../../model/dialogues/builders/impl/TestStaticDialogue'
+import { BankerDialogue } from "./builders/impl/BankedDialogue";
+import { NieveDialogue } from "./builders/impl/NieveDialogue";
+import { ParduDialogue } from "./builders/impl/ParduDialogue";
 import { DialogueOption } from "./DialogueOption";
 import { OptionsDialogue } from "./entries/impl/OptionsDialogue";
 import { OptionDialogue } from "./entries/impl/OptionDialogue";
 import { DialogueExpression } from "./DialogueExpression";
+import { DialogueIdentifiers } from "../../../util/DialogueIdentifiers";
+
+interface StaticDialogueDefinition {
+    create: () => DialogueBuilder;
+    startIndex: number;
+}
 
 export class DialogueManager {
-    public static readonly STATIC_DIALOGUES: Map<number, DialogueBuilder> = new Map<number, DialogueBuilder>([
-        [0, new TestStaticDialogue()]
+    public static readonly STATIC_DIALOGUES: Map<number, StaticDialogueDefinition> = new Map([
+        [DialogueIdentifiers.TEST, { create: () => new TestStaticDialogue(), startIndex: 0 }],
+        [DialogueIdentifiers.BANKER, { create: () => new BankerDialogue(), startIndex: 0 }],
+        [DialogueIdentifiers.PERDU, { create: () => new ParduDialogue(), startIndex: 0 }],
+        [DialogueIdentifiers.NIEVE, { create: () => new NieveDialogue(), startIndex: 0 }],
+        [DialogueIdentifiers.NIEVE_ASSIGNMENT, { create: () => new NieveDialogue(), startIndex: 2 }]
     ]);
 
     private readonly player: Player;
@@ -69,15 +82,17 @@ export class DialogueManager {
         this.startDialogueOption();
     }
 
-    public startStaticDialogue(id: number) {
-        const builder = DialogueManager.STATIC_DIALOGUES.get(id);
-        if (builder) {
-            this.startDialogueOption();
+    public startStaticDialogue(id: number): boolean {
+        const definition = DialogueManager.STATIC_DIALOGUES.get(id);
+        if (!definition) {
+            return false;
         }
+        this.startDialog(definition.create(), definition.startIndex);
+        return true;
     }
 
     public startDialogues(builder: DialogueBuilder) {
-        this.startDialogue(0);
+        this.startDialog(builder, 0);
     }
 
     public startDialog(builder: DialogueBuilder, index: number): DialogueExpression {
@@ -95,6 +110,7 @@ export class DialogueManager {
         entries.forEach((value, key) => {
             this.dialogues.set(key, value);
         });
+        this.index = index;
         this.startDialogueOption();
     }
 

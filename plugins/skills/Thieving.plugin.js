@@ -156,10 +156,7 @@ function pickpocketSucceeded(player, def) {
 module.exports = {
   name: "Thieving",
   register(api) {
-    api.onNpcInteraction((event) => {
-      if (event.clickType !== 1) {
-        return;
-      }
+    api.onNpcFirstClick(Array.from(PICKPOCKET_BY_NPC_ID.keys()), function pickpocket(event) {
       const { player, npc, npcId } = event;
       const def = PICKPOCKET_BY_NPC_ID.get(npcId);
       if (!def) {

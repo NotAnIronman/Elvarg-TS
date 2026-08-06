@@ -7,6 +7,10 @@ import { ObjectSpawnDefinitionLoader } from "./definition/loader/impl/ObjectSpaw
 import { NpcDefinitionLoader } from "./definition/loader/impl/NpcDefinitionLoader";
 import { NpcDropDefinitionLoader } from "./definition/loader/impl/NpcDropDefinitionLoader";
 import { InterfaceLayoutDefinitionLoader } from "./definition/loader/impl/InterfaceLayoutDefinitionLoader";
+import { NpcSpawnDefinitionLoader } from "./definition/loader/impl/NpcSpawnDefinitionLoader";
+import { ShopDefinitionLoader } from "./definition/loader/impl/ShopDefinitionLoader";
+import { NpcInteractionDefinitionLoader } from "./definition/loader/impl/NpcInteractionDefinitionLoader";
+import { ShopManager } from "./model/container/shop/ShopManager";
 import { PluginManager } from "../plugins/PluginManager";
 
 export class GameBuilder {
@@ -31,9 +35,13 @@ export class GameBuilder {
     private loadStartupData(): void {
         CombatPoisonData.init();
         PlayerPunishment.init();
+        new NpcInteractionDefinitionLoader().load();
         new InterfaceLayoutDefinitionLoader().load();
         new ObjectSpawnDefinitionLoader().load();
         new NpcDefinitionLoader().load();
+        new NpcSpawnDefinitionLoader().load();
         new NpcDropDefinitionLoader().load();
+        new ShopDefinitionLoader().load();
+        ShopManager.initialize();
     }
 }

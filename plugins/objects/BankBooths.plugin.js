@@ -534,17 +534,15 @@ module.exports = {
     api.onObjectFirstClick(BANK_BOOTH_IDS, onBankBoothClick);
     api.onObjectSecondClick(BANK_BOOTH_IDS, onBankBoothClick);
 
-    api.onNpcInteraction((event) => {
-      if (
-        (event.clickType !== 1 && event.clickType !== 2) ||
-        !BANKER_NPC_ID_SET.has(event.npcId)
-      ) {
-        return;
-      }
+    function openBankFromNpc(event) {
       if (openBank(event.player)) {
         event.handled = true;
+        return true;
       }
-    });
+      return false;
+    }
+    api.onNpcFirstClick(BANKER_NPC_IDS, openBankFromNpc);
+    api.onNpcSecondClick(BANKER_NPC_IDS, openBankFromNpc);
 
     api.onButtonClick((event) => {
       if (handleBankButton(event.player, event.buttonId)) {

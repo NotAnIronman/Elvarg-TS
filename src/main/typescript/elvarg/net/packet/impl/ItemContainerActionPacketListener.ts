@@ -3,6 +3,7 @@ import { Packet } from "../Packet";
 import { Sound } from "../../../game/Sound";
 import { Sounds } from "../../../game/Sounds";
 import { PluginManager } from "../../../plugins/PluginManager";
+import { ShopManager } from "../../../game/model/container/shop/ShopManager";
 // import { Bank } from "../../../game/model/container/impl/Bank";
 // import { DepositBox } from "../../../game/content/DepositBox";
 // import { Dueling } from "../../../game/content/Duelling";
@@ -67,6 +68,16 @@ export class ItemContainerActionPacketListener {
     let containerId = packet.readInt();
     let slot = packet.readShortA();
     let id = packet.readShortA();
+
+    if (ShopManager.handleItemContainerAction(player, {
+      kind: "value",
+      containerId,
+      slot,
+      itemId: id,
+      amount: 0,
+    })) {
+      return;
+    }
 
     // Some clients emit inventory first-clicks on container opcode 145 instead
     // of opcode 122. Route it through the same first-action handler so left-click
@@ -244,6 +255,16 @@ export class ItemContainerActionPacketListener {
     let id = packet.readLEShortA();
     let slot = packet.readLEShort();
 
+    if (ShopManager.handleItemContainerAction(player, {
+      kind: "buy_sell",
+      containerId: interfaceId,
+      slot,
+      itemId: id,
+      amount: 1,
+    })) {
+      return;
+    }
+
     // Some clients can emit inventory "Wield/Wear" through container option 2
     // instead of the dedicated equip opcode. Keep this tolerant.
     const Inventory = getInventoryCtor();
@@ -330,6 +351,16 @@ export class ItemContainerActionPacketListener {
     let id = packet.readShortA();
     let slot = packet.readShortA();
 
+    if (ShopManager.handleItemContainerAction(player, {
+      kind: "buy_sell",
+      containerId: interfaceId,
+      slot,
+      itemId: id,
+      amount: 5,
+    })) {
+      return;
+    }
+
     // Bank withdrawal..
     // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {
     //     Bank.withdraw(player, id, slot, 10, interfaceId - Bank.CONTAINER_START);
@@ -376,6 +407,16 @@ export class ItemContainerActionPacketListener {
     let slot = packet.readShortA();
     let interfaceId = packet.readInt();
     let id = packet.readShortA();
+
+    if (ShopManager.handleItemContainerAction(player, {
+      kind: "buy_sell",
+      containerId: interfaceId,
+      slot,
+      itemId: id,
+      amount: 10,
+    })) {
+      return;
+    }
 
     const Equipment = getEquipmentCtor();
     if (interfaceId === Equipment.INVENTORY_INTERFACE_ID) {
@@ -461,6 +502,16 @@ export class ItemContainerActionPacketListener {
     let interfaceId = packet.readInt();
     let slot = packet.readLEShort();
     let id = packet.readLEShort();
+
+    if (ShopManager.handleItemContainerAction(player, {
+      kind: "x",
+      containerId: interfaceId,
+      slot,
+      itemId: id,
+      amount: 0,
+    })) {
+      return;
+    }
 
     // Bank withdrawal..
     // if (interfaceId >= Bank.CONTAINER_START && interfaceId < Bank.CONTAINER_START + Bank.TOTAL_BANK_TABS) {

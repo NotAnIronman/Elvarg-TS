@@ -1,5 +1,6 @@
 import { World } from "../../../game/World";
 import { CombatSpells } from "../../../game/content/combat/magic/CombatSpells";
+import { NpcInteractionManager } from "../../../game/entity/impl/npc/NpcInteractionManager";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { Packet } from "../Packet";
 import { PacketConstants } from "../PacketConstants";
@@ -82,6 +83,17 @@ export class NPCOptionPacketListener implements PacketExecutor {
       player.setPositionToFace(npc.getLocation());
       npc.setMobileInteraction?.(player);
       npc.setPositionToFace?.(player.getLocation());
+
+      if (
+        NpcInteractionManager.handle(
+          player,
+          npc,
+          index,
+          clickType
+        )
+      ) {
+        return;
+      }
 
       const handled = PluginManager.emitNpcInteraction({
         player,

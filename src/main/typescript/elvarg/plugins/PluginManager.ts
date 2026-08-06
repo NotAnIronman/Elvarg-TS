@@ -2,6 +2,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { GameConstants } from "../game/GameConstants";
 import { MapRegionReplacementManager } from "../game/collision/MapRegionReplacementManager";
+import { ServerDataRegistry } from "../game/data/ServerDataRegistry";
+import { DefinitionLoader } from "../game/definition/loader/DefinitionLoader";
+import { NpcInteractionDefinitionLoader } from "../game/definition/loader/impl/NpcInteractionDefinitionLoader";
+import { NpcInteractionManager } from "../game/entity/impl/npc/NpcInteractionManager";
 import { MultiChatboxPrompt } from "../game/model/menu/MultiChatboxPrompt";
 import { PacketExecutor } from "../net/packet/PacketExecutor";
 import {
@@ -22,6 +26,7 @@ import {
   PluginNpcDeathEvent,
   PluginNpcAggressionToleranceEvent,
   PluginNpcInteractionEvent,
+  PluginNpcInteractionDefinition,
   PluginObjectInteractionEvent,
   PluginPlayerDefeatedEvent,
   PluginPathBlockedEvent,
@@ -581,10 +586,14 @@ export class PluginManager {
   // Keep common event guard clauses centralized in emit* methods so plugin
   // consumers do not have to repeat the same checks in every handler.
   public static emitNpcInteraction(event: PluginNpcInteractionEvent): boolean {
-    if (PluginManager.npcInteractionHooks.length === 0) {
-      return event.handled === true;
+    if (!event || !event.player || !event.npc) {
+      return false;
     }
+
     for (const hook of PluginManager.npcInteractionHooks) {
+      if (event.handled) {
+        break;
+      }
       PluginManager.executeHook(hook, event, "npc_interaction", "npc_interaction");
     }
     return event.handled === true;
@@ -1269,6 +1278,168 @@ export class PluginManager {
   }
 
   private static createApi(pluginName: string): PluginApi {
+    const npcInteractionDefinitions: Array<
+      PluginNpcInteractionDefinition & { npcId: number }
+    > = [];
+    let npcInteractionSourceRegistered = false;
+
+    const registerNpcInteractionDefinition = (
+      npcIds: number | number[],
+      definition: PluginNpcInteractionDefinition
+    ): void => {
+      const normalizedNpcIds = Array.isArray(npcIds) ? npcIds : [npcIds];
+      if (
+        normalizedNpcIds.length === 0 ||
+        normalizedNpcIds.some((npcId) => !Number.isInteger(npcId) || npcId < 0) ||
+        !definition ||
+        Array.isArray(definition) ||
+        typeof definition !== "object"
+      ) {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid NPC interaction definition registration`
+        );
+        return;
+      }
+
+      const normalized: PluginNpcInteractionDefinition = {};
+      for (const property of [
+        "firstClick",
+        "secondClick",
+        "thirdClick",
+        "fourthClick",
+      ] as const) {
+        const action = definition[property];
+        if (action === undefined) {
+          continue;
+        }
+        if (!action || Array.isArray(action) || typeof action !== "object") {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid ${property} NPC interaction action`
+          );
+          return;
+        }
+
+        const hasShopId = action.shopId !== undefined;
+        const hasTeleportLocation = action.teleportLocation !== undefined;
+        if (Number(hasShopId) + Number(hasTeleportLocation) !== 1) {
+          console.warn(
+            `[plugins] ${pluginName} ${property} must define exactly one of shopId or teleportLocation`
+          );
+          return;
+        }
+        if (
+          hasShopId &&
+          (!Number.isInteger(action.shopId) || (action.shopId as number) < 0)
+        ) {
+          console.warn(
+            `[plugins] ${pluginName} attempted invalid ${property}.shopId`
+          );
+          return;
+        }
+
+        if (hasTeleportLocation) {
+          const location = action.teleportLocation!;
+          const z = location?.z ?? 0;
+          if (
+            !location ||
+            !Number.isFinite(location.x) ||
+            !Number.isFinite(location.y) ||
+            !Number.isFinite(z)
+          ) {
+            console.warn(
+              `[plugins] ${pluginName} attempted invalid ${property}.teleportLocation`
+            );
+            return;
+          }
+          normalized[property] = {
+            teleportLocation: {
+              x: Math.trunc(location.x),
+              y: Math.trunc(location.y),
+              z: Math.trunc(z),
+            },
+          };
+        } else {
+          normalized[property] = { shopId: action.shopId };
+        }
+      }
+
+      if (
+        !normalized.firstClick &&
+        !normalized.secondClick &&
+        !normalized.thirdClick &&
+        !normalized.fourthClick
+      ) {
+        console.warn(
+          `[plugins] ${pluginName} attempted empty NPC interaction definition registration`
+        );
+        return;
+      }
+      if (!npcInteractionSourceRegistered) {
+        DefinitionLoader.registerSource(
+          NpcInteractionDefinitionLoader.DEFINITION_TYPE,
+          pluginName,
+          {
+            name: pluginName,
+            priority: 100,
+            load: () => npcInteractionDefinitions,
+          }
+        );
+        npcInteractionSourceRegistered = true;
+      }
+      for (const npcId of normalizedNpcIds) {
+        npcInteractionDefinitions.push({ npcId, ...normalized });
+      }
+    };
+
+    const registerNpcClickHook = (
+      clickType: number,
+      npcIds: number | number[],
+      handler: (event: PluginNpcInteractionEvent) => void | boolean,
+      label = "npc"
+    ): void => {
+      const normalized = Array.isArray(npcIds) ? npcIds : [npcIds];
+      if (
+        normalized.length === 0 ||
+        normalized.some((npcId) => !Number.isInteger(npcId) || npcId < 0) ||
+        !Number.isInteger(clickType) ||
+        clickType < 1 ||
+        clickType > 4 ||
+        typeof handler !== "function"
+      ) {
+        console.warn(
+          `[plugins] ${pluginName} attempted invalid ${label} click hook registration ` +
+          `npcIds=${JSON.stringify(npcIds)} clickType=${clickType}`
+        );
+        return;
+      }
+
+      const validIds = normalized as number[];
+      const npcIdSet = new Set(validIds);
+      NpcInteractionManager.registerPluginInteraction(
+        pluginName,
+        validIds,
+        clickType,
+        handler
+      );
+      PluginManager.npcInteractionHooks.push({
+        pluginName,
+        handler: (event) => {
+          if (
+            !event ||
+            event.handled ||
+            event.clickType !== clickType ||
+            !npcIdSet.has(event.npcId)
+          ) {
+            return;
+          }
+          const result = handler(event);
+          if (result !== false) {
+            event.handled = true;
+          }
+        },
+      });
+    };
+
     const registerObjectClickHook = (
       clickType: number,
       objectIds: number | number[],
@@ -1663,6 +1834,7 @@ export class PluginManager {
           },
         });
       },
+      registerNpcInteraction: registerNpcInteractionDefinition,
       onNpcDeath: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -1928,66 +2100,20 @@ export class PluginManager {
         }
         PluginManager.slayerAssignHooks.push({ pluginName, handler });
       },
-      onNpcClick: (npcId, clickType, handler) => {
-        if (
-          !Number.isInteger(npcId) ||
-          npcId < 0 ||
-          !Number.isInteger(clickType) ||
-          clickType < 1 ||
-          clickType > 4 ||
-          typeof handler !== "function"
-        ) {
-          console.warn(
-            `[plugins] ${pluginName} attempted invalid npc click hook registration npcId=${npcId} clickType=${clickType}`
-          );
-          return;
-        }
-
-        PluginManager.npcInteractionHooks.push({
-          pluginName,
-          handler: (event) => {
-            if (!event || event.handled) {
-              return;
-            }
-            if (event.npcId !== npcId || event.clickType !== clickType) {
-              return;
-            }
-
-            const result = handler(event);
-            if (result !== false) {
-              event.handled = true;
-            }
-          },
-        });
+      onNpcClick: (npcIds, clickType, handler) => {
+        registerNpcClickHook(clickType, npcIds, handler);
       },
-      onNpcSecondClick: (npcId, handler) => {
-        if (
-          !Number.isInteger(npcId) ||
-          npcId < 0 ||
-          typeof handler !== "function"
-        ) {
-          console.warn(
-            `[plugins] ${pluginName} attempted invalid second-click npc hook registration npcId=${npcId}`
-          );
-          return;
-        }
-
-        PluginManager.npcInteractionHooks.push({
-          pluginName,
-          handler: (event) => {
-            if (!event || event.handled) {
-              return;
-            }
-            if (event.npcId !== npcId || event.clickType !== 2) {
-              return;
-            }
-
-            const result = handler(event);
-            if (result !== false) {
-              event.handled = true;
-            }
-          },
-        });
+      onNpcFirstClick: (npcIds, handler) => {
+        registerNpcClickHook(1, npcIds, handler, "first");
+      },
+      onNpcSecondClick: (npcIds, handler) => {
+        registerNpcClickHook(2, npcIds, handler, "second");
+      },
+      onNpcThirdClick: (npcIds, handler) => {
+        registerNpcClickHook(3, npcIds, handler, "third");
+      },
+      onNpcFourthClick: (npcIds, handler) => {
+        registerNpcClickHook(4, npcIds, handler, "fourth");
       },
       onGroundItemClick: (itemIds, clickType, handler) => {
         if (!Number.isInteger(clickType) || clickType < 1 || clickType > 5) {
@@ -2390,6 +2516,32 @@ export class PluginManager {
           opcode,
           guardedListener
         );
+      },
+      registerServerDataResource: (name, provider) => {
+        try {
+          ServerDataRegistry.register(name, `plugin:${pluginName}`, provider);
+        } catch (error) {
+          console.warn(
+            `[plugins] ${pluginName} failed to register server data resource ${String(
+              name
+            )}`,
+            error
+          );
+          throw error;
+        }
+      },
+      registerDefinitionSource: (definitionType, source) => {
+        try {
+          DefinitionLoader.registerSource(definitionType, pluginName, source);
+        } catch (error) {
+          console.warn(
+            `[plugins] ${pluginName} failed to register definition source ${String(
+              definitionType
+            )}`,
+            error
+          );
+          throw error;
+        }
       },
       setPlayerPersistence: (persistence) => {
         if (

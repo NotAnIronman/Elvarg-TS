@@ -34,6 +34,59 @@ Java remains the behavior reference. The TS server prioritizes parity with Java 
  
  ```yarn dev```
 
+## Development data API
+
+`yarn dev` starts a loopback-only REST API at
+`http://127.0.0.1:49600/dev-api`. The API is not loaded or started by the
+production server. It exposes canonical runtime data registered by core server
+systems and plugins; the HTTP layer does not read definition files directly.
+
+Plugins contribute definition records through
+`api.registerDefinitionSource(type, { name, priority, load })`. The matching
+core `DefinitionLoader` validates and merges those sources into its canonical
+definition collection; API routes read that collection rather than invoking
+plugin loaders or reading files themselves.
+
+Plugins can register basic NPC actions declaratively without installing a
+general NPC click hook:
+
+```js
+api.registerNpcInteraction([506, 512], {
+  firstClick: { shopId: 0 },
+  secondClick: { teleportLocation: { x: 3200, y: 3200, z: 0 } },
+});
+```
+
+Use `onNpcInteraction` for stateful or otherwise scripted interactions.
+
+Available routes:
+
+1. `GET /npc_spawns` reads the minimal, merged canonical NPC spawn list.
+2. `GET /dev-api/data` lists the registered server data resources.
+3. `GET /dev-api/data/:resource` reads a complete canonical document.
+4. `GET /dev-api/data/:resource/:id` reads one addressable entry.
+5. `PUT /dev-api/data/:resource` replaces a complete writable document.
+6. `PUT /dev-api/data/:resource/:id` replaces or creates one writable entry.
+7. `POST /dev-api/data/:resource` appends or creates an entry.
+
+Generic data GET responses include an `ETag`. Send it back as `If-Match` when saving to
+avoid overwriting canonical state that changed after it was loaded. Writes are
+serialized per resource and delegated to the owning provider.
+
+Plugins publish data explicitly through `api.registerServerDataResource(name,
+provider)`. A provider supplies `documentKind`, `read`, and optional `replace`
+or `create` callbacks. `read` should return the plugin's canonical in-memory
+state; persistence and runtime reload behavior remain the provider's
+responsibility. No gameplay resource is exposed until its owning subsystem is
+ready to register one.
+
+Configuration:
+
+1. `DEVELOPMENT_API_PORT` changes the API port (default: game port + 2).
+2. `DEVELOPMENT_API_HOST` changes the bind address (default: `127.0.0.1`).
+3. `DEVELOPMENT_API_ALLOWED_ORIGINS` adds comma-separated browser origins.
+4. `DEVELOPMENT_API_MAX_BODY_BYTES` changes the JSON request limit (default: 20 MiB).
+
 ## Logging
 
 Server logging is centralized and all `console.log/info/warn/error/debug` calls go through one logger.

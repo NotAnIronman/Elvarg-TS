@@ -1,10 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const {
-  registerNpcSpawnSource,
-  ensureNpcSpawnsLoaded,
-} = require("./lib/NpcSpawnRegistry");
-
 const SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
   path.join(process.cwd(), "data", "npc_spawns.json"),
@@ -124,14 +119,10 @@ function loadSpawns() {
 module.exports = {
   name: "ElvargNpcSpawns",
   register(api) {
-    registerNpcSpawnSource({
-      api,
-      sourceName: "elvarg",
-      loadSpawns,
-    });
-
-    api.onPlayerLogin(() => {
-      ensureNpcSpawnsLoaded(api);
+    api.registerDefinitionSource("npc_spawns", {
+      name: "elvarg",
+      priority: 20,
+      load: loadSpawns,
     });
   },
 };

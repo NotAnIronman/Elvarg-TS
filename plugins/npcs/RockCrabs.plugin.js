@@ -226,11 +226,11 @@ module.exports = {
     const playerProcessAt = new WeakMap();
     const wakeAttemptAt = new WeakMap();
 
-    api.onNpcInteraction((event) => {
+    function wakeRockCrab(event) {
       const npc = event.npc;
       const variant = resolveVariant(npc);
       if (!variant) {
-        return;
+        return false;
       }
       const nowMs = Date.now();
       transformAwake(npc, variant, npcState, nowMs, api, "npc_interaction");
@@ -238,7 +238,11 @@ module.exports = {
       if (isValidPlayerTarget(player)) {
         tryAggroPlayer(npc, player, npcState, nowMs, api, "npc_interaction");
       }
-    });
+      return false;
+    }
+    for (let clickType = 1; clickType <= 4; clickType++) {
+      api.onNpcClick(ROCK_CRAB_NPC_IDS, clickType, wakeRockCrab);
+    }
 
     api.onCanAttack((event) => {
       if (event.allow !== null) {

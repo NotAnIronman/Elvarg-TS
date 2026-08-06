@@ -19,6 +19,7 @@ import { TreeMap } from 'treemap'
 import { PluginManager } from '../plugins/PluginManager';
 import { ServerPerf } from '../util/ServerPerf';
 import { ActiveRegionIndex, ActiveRegionSnapshot } from './ActiveRegionIndex';
+import { ShopManager } from './model/container/shop/ShopManager';
 
 const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
 
@@ -792,6 +793,7 @@ export class World {
                         return;
                     }
                     player.process();
+                    ShopManager.processPlayer(player);
                     if (player.isPlayerBot?.() !== true) {
                         PluginManager.emitPlayerProcess({ player });
                     }
