@@ -355,6 +355,7 @@ export class PlayerSession {
       const face = npc.getFace()?.getDirection?.();
       return {
         ...this.createActorUpdates(npc, npc.getDefinition().getHitpoints(), false),
+        interactionIndex: this.interactionIndex(npc.getInteractingMobile()),
         index: npc.getIndex(),
         typeId: npc.getId(),
         x: location.getX(),
@@ -474,7 +475,7 @@ export class PlayerSession {
         ? actor.getForcedChat()
         : undefined,
       interactionIndex: flags.flagged(Flag.ENTITY_INTERACTION)
-        ? interaction == null ? -1 : interaction.getIndex() + (interaction.isPlayer() ? 0x8000 : 0)
+        ? this.interactionIndex(interaction)
         : undefined,
       animation: flags.flagged(Flag.ANIMATION) && animation
         ? { id: animation.getId(), delay: animation.getDelay() }
@@ -499,6 +500,10 @@ export class PlayerSession {
     if (mask === HitMask.GREEN) return mine ? 65 : 66;
     if (mask === HitMask.YELLOW) return mine ? 22 : 23;
     return mine ? 16 : 17;
+  }
+
+  private interactionIndex(target: any): number {
+    return target == null ? -1 : target.getIndex() + (target.isPlayer() ? 0x8000 : 0);
   }
 
   private faceDirection(from: any, to: any): number {

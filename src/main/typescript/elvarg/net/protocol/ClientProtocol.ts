@@ -104,6 +104,7 @@ export type NpcSyncState = {
   indices: number[];
   lastTiles: Map<number, Tile>;
   typeIds: Map<number, number>;
+  interactionIndices: Map<number, number>;
 };
 
 export type ProjectileView = {
@@ -625,7 +626,7 @@ export function createPlayerSyncState(
 }
 
 export function createNpcSyncState(): NpcSyncState {
-  return { indices: [], lastTiles: new Map(), typeIds: new Map() };
+  return { indices: [], lastTiles: new Map(), typeIds: new Map(), interactionIndices: new Map() };
 }
 
 export function encodePlayerAppearance(
@@ -816,8 +817,8 @@ function playerUpdateMask(
     (view.graphic ? PLAYER_MASK.SPOT_ANIM : 0);
 }
 
-function npcUpdateMask(view: NpcView): number {
-  return (view.interactionIndex !== undefined ? NPC_MASK.FACE_ENTITY : 0) |
+function npcUpdateMask(view: NpcView, writeInteraction: boolean): number {
+  return (writeInteraction ? NPC_MASK.FACE_ENTITY : 0) |
     (view.animation ? NPC_MASK.ANIMATION : 0) |
     (view.hits ? NPC_MASK.HIT : 0) |
     (view.forcedChat !== undefined ? NPC_MASK.FORCED_CHAT : 0) |
@@ -869,12 +870,12 @@ function writePlayerUpdateBlock(
   return Buffer.from(bytes);
 }
 
-function writeNpcUpdateBlock(view: NpcView): Buffer {
+function writeNpcUpdateBlock(view: NpcView, writeInteraction: boolean): Buffer {
   const bytes: number[] = [];
-  const mask = npcUpdateMask(view);
+  const mask = npcUpdateMask(view, writeInteraction);
   writeMask(bytes, mask);
-  if (view.interactionIndex !== undefined) {
-    const target = view.interactionIndex < 0 ? 0xffffff : view.interactionIndex & 0xffffff;
+  if (writeInteraction) {
+    const target = (view.interactionIndex ?? -1) < 0 ? 0xffffff : view.interactionIndex! & 0xffffff;
     bytes.push((target >>> 8) & 0xff, (target + 128) & 0xff);
     byteA(bytes, target >>> 16);
   }
@@ -1099,7 +1100,8 @@ export function encodeNpcSync(
       if (view) readd.add(index);
       continue;
     }
-    const block = npcUpdateMask(view) !== 0;
+    const writeInteraction = state.interactionIndices.get(index) !== (view.interactionIndex ?? -1);
+    const block = npcUpdateMask(view, writeInteraction) !== 0;
     if (view.runDirection >= 0 && view.walkDirection >= 0) {
       writer.writeBits(1, 1);
       writer.writeBits(2, 2);
@@ -1128,7 +1130,7 @@ export function encodeNpcSync(
       readd.add(index);
     }
     if (block && nextIndices[nextIndices.length - 1] === index) {
-      updateBlocks.push(writeNpcUpdateBlock(view));
+      updateBlocks.push(writeNpcUpdateBlock(view, writeInteraction));
     }
   }
 
@@ -1143,7 +1145,8 @@ export function encodeNpcSync(
   for (const view of additions) {
     if (nextIndices.length >= 255 || view.level !== local.level) break;
     writer.writeBits(16, view.index);
-    const block = npcUpdateMask(view) !== 0;
+    const writeInteraction = (view.interactionIndex ?? -1) >= 0;
+    const block = npcUpdateMask(view, writeInteraction) !== 0;
     writer.writeBits(1, block ? 1 : 0);
     writer.writeBits(1, 0); // no world view
     writer.writeBits(1, readd.has(view.index) ? 1 : 0);
@@ -1153,18 +1156,20 @@ export function encodeNpcSync(
     writer.writeBits(14, view.typeId & 0x3fff);
     nextIndices.push(view.index);
     nextSet.add(view.index);
-    if (block) updateBlocks.push(writeNpcUpdateBlock(view));
+    if (block) updateBlocks.push(writeNpcUpdateBlock(view, writeInteraction));
   }
   writer.writeBits(16, 0xffff);
 
   state.indices = nextIndices;
   state.lastTiles.clear();
   state.typeIds.clear();
+  state.interactionIndices.clear();
   for (const index of nextIndices) {
     const view = desired.get(index);
     if (view) {
       state.lastTiles.set(index, { x: view.x, y: view.y, level: view.level });
       state.typeIds.set(index, view.typeId);
+      state.interactionIndices.set(index, view.interactionIndex ?? -1);
     }
   }
   const sync = Buffer.concat([writer.toBuffer(), ...updateBlocks]);

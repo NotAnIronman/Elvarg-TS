@@ -24,6 +24,7 @@ async function main() {
     new NpcDefinitionLoader().load();
     assert.equal(NpcDefinition.forId(100).getName(), CacheDefinitions.getNpc(100).name);
     assert.equal(NpcDefinition.forId(100).getAttackAnim(), 1312);
+    assert.equal(NpcDefinition.forId(7).getAttackAnim(), 6184);
     assert(NpcDefinition.forId(239).getMaxHit() > 1);
     require("../plugins/items/ItemDefinitionLoader.plugin.js").register({ log() {} });
     assert.equal(ItemDefinition.forId(4151).getEquipmentType(), EquipmentType.WEAPON);

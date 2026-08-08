@@ -29,8 +29,12 @@ type CombatStats = {
 };
 
 type CombatAnimation = {
-    name?: string;
     anims?: { attack?: number; block?: number; death?: number };
+};
+
+const ANIMATION_FALLBACKS: Record<number, CombatAnimation> = {
+    7: { anims: { attack: 6184, block: 6188, death: 6182 } },
+    15: { anims: { attack: 390, block: 391, death: 392 } },
 };
 
 const normalizeName = (value?: string) => (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -49,6 +53,9 @@ export class NpcDefinitionLoader extends DefinitionLoader {
             animations[String(id)] = { anims: { attack, block, death } };
         }
         Object.assign(animations, animationFile.npcs ?? {});
+        for (const [id, fallback] of Object.entries(ANIMATION_FALLBACKS)) {
+            if (!animations[id]) animations[id] = fallback;
+        }
 
         const ids = new Set([...Object.keys(stats), ...Object.keys(animations), ...Object.keys(aggression)]);
         let applied = 0;
@@ -87,21 +94,19 @@ export class NpcDefinitionLoader extends DefinitionLoader {
             }
 
             const animation = animations[key];
-            if (animation && (!animation.name || normalizeName(animation.name) === normalizeName(cached.name))) {
+            if (animation) {
                 Object.assign(definition, {
                     attackAnim: animation.anims?.attack ?? definition.getAttackAnim(),
                     defenceAnim: animation.anims?.block ?? definition.getDefenceAnim(),
                     deathAnim: animation.anims?.death ?? definition.getDeathAnim(),
                 });
-            } else if (animation) {
-                mismatched++;
             }
 
             if (typeof aggression[key]?.aggressive === "boolean") {
                 definition.aggressive = aggression[key].aggressive;
             }
         }
-        console.info(`[npc-definitions] cache-backed; server profiles applied=${applied}, mismatched=${mismatched}`);
+        console.info(`[npc-definitions] cache-backed; XRSPS stats applied=${applied}, mismatched=${mismatched}`);
         return true;
     }
 

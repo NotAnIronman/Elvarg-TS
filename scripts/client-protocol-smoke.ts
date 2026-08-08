@@ -159,6 +159,18 @@ assert.deepStrictEqual([...npcCombatFrame.subarray(-29)], [
   248, 64, 2, 128, 129, 128, 127, 17, 4, 0, 129, 0, 0, 0, 238,
   72, 105, 0, 1, 128, 44, 1, 0, 1, 0, 0, 0, 200, 0,
 ]);
+const npcClearFaceFrame = encodeNpcSync(12, { x: 3090, y: 3524, level: 0 }, [{
+  index: 7,
+  typeId: 1,
+  x: 3091,
+  y: 3524,
+  level: 0,
+  rotation: 4,
+  walkDirection: -1,
+  runDirection: -1,
+  interactionIndex: -1,
+}], npcState);
+assert.deepStrictEqual([...npcClearFaceFrame.subarray(-4)], [8, 255, 127, 127]);
 
 const projectile = encodeProjectiles([{
   projectileId: 91,
