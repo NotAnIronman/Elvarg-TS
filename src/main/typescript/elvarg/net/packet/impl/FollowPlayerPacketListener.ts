@@ -5,6 +5,10 @@ import { TaskManager } from "../../../game/task/TaskManager";
 
 export class FollowPlayerPacketListener implements PacketExecutor {
   execute(player: any, packet: Packet): void {
+    FollowPlayerPacketListener.request(player, packet.readLEShort());
+  }
+
+  public static request(player: any, otherPlayersIndex: number): void {
     if (player.busy()) {
       return;
     }
@@ -12,7 +16,6 @@ export class FollowPlayerPacketListener implements PacketExecutor {
     // Keep parity with Java FollowPlayerPacketListener and clear prior follow tasks.
     TaskManager.cancelTasks(player.getIndex());
 
-    const otherPlayersIndex = packet.readLEShort();
     if (
       otherPlayersIndex < 0 ||
       otherPlayersIndex > World.getPlayers().capacityReturn()

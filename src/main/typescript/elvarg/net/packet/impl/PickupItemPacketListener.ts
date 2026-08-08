@@ -11,6 +11,10 @@ export class PickupItemPacketListener implements PacketExecutor {
     const y = packet.readLEShort();
     const itemId = packet.readShort();
     const x = packet.readLEShort();
+    PickupItemPacketListener.pickup(player, itemId, x, y);
+  }
+
+  public static pickup(player: any, itemId: number, x: number, y: number): void {
     const position = new Location(x, y, player.getLocation().getZ());
 
     const item = ItemOnGroundManager.getGroundItem(player.getUsername(), itemId, position);
@@ -27,7 +31,7 @@ export class PickupItemPacketListener implements PacketExecutor {
       .walkToGroundItem(position, () => this.takeItem(player, itemId, position));
   }
 
-  private takeItem(player: any, itemId: number, position: Location) {
+  private static takeItem(player: any, itemId: number, position: Location) {
     const x = position.getX();
     const y = position.getY();
 

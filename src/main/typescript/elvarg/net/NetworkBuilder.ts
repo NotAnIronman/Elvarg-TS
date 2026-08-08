@@ -27,9 +27,22 @@ import { ObjectActionPacketListener } from "./packet/impl/ObjectActionPacketList
 import { NPCOptionPacketListener } from "./packet/impl/NPCOptionPacketListener";
 import { ChatPacketListener } from "./packet/impl/ChatPacketListener";
 import { DialogueOption } from "../game/model/dialogues/DialogueOption";
+import { PlayerOptionPacketListener } from "./packet/impl/PlayerOptionPacketListener";
+import { MagicOnPlayerPacketListener } from "./packet/impl/MagicOnPlayerPacketListener";
+import { MagicOnItemPacketListener } from "./packet/impl/MagicOnItemPacketListener";
+import { UseItemPacketListener } from "./packet/impl/UseItemPacketListener";
+import { ItemActionPacketListener } from "./packet/impl/ItemActionPacketListener";
+import { EquipPacketListener } from "./packet/impl/EquipPacketListener";
+import { DropItemPacketListener } from "./packet/impl/DropItemPacketListener";
+import { SwitchItemSlotPacketListener } from "./packet/impl/SwitchItemSlotPacketListener";
+import { PickupItemPacketListener } from "./packet/impl/PickupItemPacketListener";
+import { SecondGroundItemOptionPacketListener } from "./packet/impl/SecondGroundItemOptionPacketListener";
+import { ItemDefinition } from "../game/definition/ItemDefinition";
+import { Bank } from "../game/model/container/impl/Bank";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
+const MAGIC_ITEMS = new MagicOnItemPacketListener();
 
 type PendingLogin = {
   username: string;
@@ -109,6 +122,76 @@ class ClientConnection {
           if (this.player) OBJECT_ACTIONS.executeAction(
             this.player, packet.id, packet.x, packet.y, packet.clickType, packet.action
           );
+          continue;
+        case "player_option":
+          if (this.player) PlayerOptionPacketListener.executeClientOption(this.player, packet.index, packet.option);
+          continue;
+        case "item_on_player":
+          if (this.player) UseItemPacketListener.itemOnPlayer(
+            this.player, packet.widgetId, packet.targetIndex, packet.itemId, packet.slot
+          );
+          continue;
+        case "spell_on_player":
+          if (this.player) {
+            for (const spellId of [packet.spellChild, packet.spellWidget & 0xffff, packet.spellItemId]) {
+              if (MagicOnPlayerPacketListener.cast(this.player, packet.targetIndex, spellId)) break;
+            }
+          }
+          continue;
+        case "inventory_action":
+          if (this.player) this.inventoryAction(packet);
+          continue;
+        case "inventory_use_on":
+          if (this.player) {
+            const target = packet.target;
+            if (target.kind === "inventory") {
+              UseItemPacketListener.itemOnItem(this.player, packet.slot, target.slot);
+            } else if (target.kind === "player") {
+              UseItemPacketListener.itemOnPlayer(this.player, 3214, target.id, packet.itemId, packet.slot);
+            } else if (target.kind === "ground" && target.x != null && target.y != null) {
+              UseItemPacketListener.itemOnGroundItem(
+                this.player, packet.itemId, target.id, target.x, target.y, packet.slot
+              );
+            }
+          }
+          continue;
+        case "inventory_move":
+          if (this.player) SwitchItemSlotPacketListener.move(
+            this.player, packet.widgetId ?? 3214, packet.from, packet.to
+          );
+          continue;
+        case "bank_deposit_inventory":
+          if (this.player) Bank.depositItems(this.player, this.player.getInventory(), false);
+          continue;
+        case "bank_deposit_equipment":
+          if (this.player) Bank.depositItems(this.player, this.player.getEquipment(), false);
+          continue;
+        case "bank_move":
+          if (this.player && this.player.getInterfaceId() === 5292) {
+            const tab = packet.tab ?? this.player.getCurrentBankTab();
+            if (tab >= 0 && tab < Bank.TOTAL_BANK_TABS) {
+              const bank = this.player.getBank(tab);
+              if (packet.from < 0 || packet.from >= bank.capacity() ||
+                  packet.to < 0 || packet.to >= bank.capacity()) continue;
+              this.player.setInsertMode(packet.mode === "insert");
+              Bank.rearrange(this.player, bank, packet.from, packet.to);
+            }
+          }
+          continue;
+        case "ground_item_action":
+          if (this.player) this.groundItemAction(packet);
+          continue;
+        case "item_on_ground":
+          if (this.player) UseItemPacketListener.itemOnGroundItem(
+            this.player, packet.itemId, packet.groundItemId, packet.x, packet.y, packet.slot
+          );
+          continue;
+        case "spell_on_ground":
+          if (this.player) {
+            const spellId = [packet.spellChild, packet.spellWidget & 0xffff, packet.spellItemId]
+              .find((id) => id === 1168) ?? packet.spellChild;
+            MAGIC_ITEMS.castGroundItem(this.player, packet.groundItemId, packet.x, packet.y, spellId);
+          }
           continue;
         case "chat":
           if (this.player && packet.messageType === "public") {
@@ -286,6 +369,38 @@ class ClientConnection {
       new Location(x, y, player.getLocation().getZ())
     );
     player.getPacketSender().sendDestination(x, y).sendRunStatus();
+  }
+
+  private inventoryAction(packet: Extract<ReturnType<typeof decodeClientPackets>[number], { type: "inventory_action" }>): void {
+    const player = this.player!;
+    const item = player.getInventory().getItems()[packet.slot];
+    if (!item || item.getId() !== packet.itemId) return;
+    const option = packet.option?.toLowerCase() ?? "";
+    if (/^(wield|wear|equip)$/.test(option)) {
+      EquipPacketListener.equip(player, packet.itemId, packet.slot, 3214);
+    } else if (option === "drop" || option === "destroy" || packet.optionIndex === 5) {
+      DropItemPacketListener.drop(player, packet.itemId, 3214, packet.slot);
+    } else if (option === "examine") {
+      const definition = ItemDefinition.forId(packet.itemId);
+      player.getPacketSender().sendMessage(definition.getExamine() || definition.getName());
+    } else {
+      ItemActionPacketListener.handleAction(player, packet.widgetId, packet.itemId, packet.slot, packet.optionIndex ?? 1);
+    }
+  }
+
+  private groundItemAction(packet: Extract<ReturnType<typeof decodeClientPackets>[number], { type: "ground_item_action" }>): void {
+    const player = this.player!;
+    const option = packet.option?.toLowerCase() ?? "";
+    if (option === "examine") {
+      const definition = ItemDefinition.forId(packet.itemId);
+      player.getPacketSender().sendMessage(definition.getExamine() || definition.getName());
+    } else if (option === "take" || packet.optionIndex === 1 || packet.optionIndex == null) {
+      PickupItemPacketListener.pickup(player, packet.itemId, packet.x, packet.y);
+    } else {
+      SecondGroundItemOptionPacketListener.interact(
+        player, packet.itemId, packet.x, packet.y, packet.optionIndex ?? 2
+      );
+    }
   }
 
   private getPlayerAppearance(player: Player): PlayerAppearance {

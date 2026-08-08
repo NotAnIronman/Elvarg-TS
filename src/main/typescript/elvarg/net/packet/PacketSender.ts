@@ -24,6 +24,8 @@ import { InterfaceLayoutRegistry } from "../../game/definition/InterfaceLayoutDe
 import {
   encodeChatMessage,
   encodeDestination,
+  encodeGroundItems,
+  encodeGroundItemsDelta,
   encodeInventorySlot,
   encodeInventorySnapshot,
   encodePlayJingle,
@@ -51,6 +53,7 @@ import {
   encodeWidgetSetRoot,
   encodeWidgetSetText,
   SkillView,
+  GroundItemView,
 } from "../protocol/ClientProtocol";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
@@ -59,6 +62,7 @@ import {
 // import { DonatorRights } from "../../game/model/rights/DonatorRights";
 
 export class PacketSender {
+  private groundItemSerial = 0;
   // private player: Player;
   // constructor(player: Player) {
   //     this.player = player;
@@ -1480,6 +1484,9 @@ export class PacketSender {
     if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
       return this;
     }
+    if (this.player.getSession().sendClientPacket(encodeGroundItemsDelta(
+      ++this.groundItemSerial, [this.groundItemView(item)], []
+    ))) return this;
     if (!this.sendPositionIfVisible(item.getPosition())) {
       return this;
     }
@@ -1497,6 +1504,9 @@ export class PacketSender {
     if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
       return this;
     }
+    if (this.player.getSession().sendClientPacket(encodeGroundItemsDelta(
+      ++this.groundItemSerial, [], [item.getId()]
+    ))) return this;
     if (!this.sendPositionIfVisible(item.getPosition())) {
       return this;
     }
@@ -1511,6 +1521,9 @@ export class PacketSender {
     if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
       return this;
     }
+    if (this.player.getSession().sendClientPacket(encodeGroundItemsDelta(
+      ++this.groundItemSerial, [this.groundItemView(item)], []
+    ))) return this;
     if (!this.sendPositionIfVisible(item.getPosition())) {
       return this;
     }
@@ -1519,6 +1532,30 @@ export class PacketSender {
     out.putInt(item.getItem().getAmount()).put(0);
     this.player.getSession().write(out);
     return this;
+  }
+
+  sendGroundItems(items: any[]): this {
+    this.player.getSession().sendClientPacket(encodeGroundItems(
+      ++this.groundItemSerial, items.map((item) => this.groundItemView(item))
+    ));
+    return this;
+  }
+
+  private groundItemView(item: any): GroundItemView {
+    const position = item.getPosition();
+    const owner = item.getOwner?.();
+    const mine = owner === this.player.getUsername();
+    return {
+      id: item.getId(),
+      itemId: item.getItem().getId(),
+      quantity: item.getItem().getAmount(),
+      x: position.getX(),
+      y: position.getY(),
+      level: position.getZ(),
+      ownerId: mine ? this.player.getIndex() : -1,
+      isPrivate: item.getState?.() === 0,
+      ownership: owner == null ? 0 : mine ? 1 : 2,
+    };
   }
 
   sendItemOnEquipment(_slot: number): this {

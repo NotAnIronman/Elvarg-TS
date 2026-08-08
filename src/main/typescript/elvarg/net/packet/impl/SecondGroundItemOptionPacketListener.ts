@@ -9,7 +9,10 @@ export class SecondGroundItemOptionPacketListener implements PacketExecutor {
     const y = packet.readLEShort();
     const itemId = packet.readShort();
     const x = packet.readLEShort();
+    SecondGroundItemOptionPacketListener.interact(player, itemId, x, y, 2);
+  }
 
+  public static interact(player: any, itemId: number, x: number, y: number, clickType: number): void {
     if (!player || player.getHitpoints() <= 0) {
       return;
     }
@@ -44,7 +47,7 @@ export class SecondGroundItemOptionPacketListener implements PacketExecutor {
         player,
         groundItem,
         groundItemId: itemId,
-        clickType: 2,
+        clickType,
         location: {
           x: position.getX(),
           y: position.getY(),

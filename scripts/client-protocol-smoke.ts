@@ -24,6 +24,8 @@ import {
   encodeSound,
   encodeServerPacket,
   encodeDestination,
+  encodeGroundItems,
+  encodeGroundItemsDelta,
   encodeVarbit,
   encodeVarp,
   encodeWidgetOpen,
@@ -73,6 +75,12 @@ assert.deepStrictEqual(decodeClientPackets(Buffer.concat([npcClick, objectClick]
   { type: "npc_option", index: 7, clickType: 1 },
   { type: "object_option", id: 1000, x: 3091, y: 3524, clickType: 1 },
 ]);
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([44, 128, 0, 7])), {
+  type: "player_option", index: 7, option: 1,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([102, 128, 0xc4, 0x0d, 0x63, 0x03, 0x93, 0x0c])), {
+  type: "ground_item_action", itemId: 995, x: 3091, y: 3524, optionIndex: 1,
+});
 const chat = Buffer.from([190, 7, 0, ...Buffer.from("hello\0", "latin1")]);
 assert.deepStrictEqual(decodeClientPacket(chat), {
   type: "chat", text: "hello", messageType: "public",
@@ -106,6 +114,8 @@ assert.strictEqual(encodeSkillsSnapshot([{
 }], 24, 3)[0], 70);
 assert.deepStrictEqual([...encodeRunEnergy(65, true)], [81, 65, 1]);
 assert.deepStrictEqual([...encodeDestination(3091, 3524)], [87, 12, 19, 13, 196]);
+assert.strictEqual(encodeGroundItems(1, [{ id: 7, itemId: 995, quantity: 1, x: 3091, y: 3524, level: 0 }])[0], 54);
+assert.strictEqual(encodeGroundItemsDelta(2, [], [7])[0], 55);
 assert.deepStrictEqual([...encodeWidgetOpen(12)], [100, 0, 12, 1]);
 assert.deepStrictEqual([...encodeWidgetSetText(42, "Hi")], [105, 0, 7, 0, 0, 0, 42, 72, 105, 0]);
 assert.strictEqual(encodeWidgetOpenSub((161 << 16) | 7, 122)[0], 103);

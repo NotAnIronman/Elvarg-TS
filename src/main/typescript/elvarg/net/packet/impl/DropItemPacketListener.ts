@@ -29,10 +29,12 @@ export class DropItemPacketListener implements PacketExecutor {
   }
 
   public execute(player: any, packet: Packet) {
-    let id = packet.readUnsignedShortA();
-    let interfaceId = packet.readUnsignedShort();
-    let itemSlot = packet.readUnsignedShortA();
+    DropItemPacketListener.drop(
+      player, packet.readUnsignedShortA(), packet.readUnsignedShort(), packet.readUnsignedShortA()
+    );
+  }
 
+  public static drop(player: any, id: number, interfaceId: number, itemSlot: number): void {
     if (player == null || player.getHitpoints() <= 0) {
       return;
     }

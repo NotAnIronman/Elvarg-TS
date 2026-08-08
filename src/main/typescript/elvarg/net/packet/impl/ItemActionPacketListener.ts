@@ -21,6 +21,12 @@ const getEquipPacketListener = () =>
     .EquipPacketListener as typeof import("./EquipPacketListener").EquipPacketListener;
 
 export class ItemActionPacketListener implements PacketExecutor {
+  public static handleAction(player: any, interfaceId: number, itemId: number, slot: number, clickType: number): void {
+    if (clickType === 1) return this.handleFirstAction(player, interfaceId, itemId, slot);
+    const item = player?.getInventory?.().getItems()[slot];
+    if (!item || item.getId() !== itemId) return;
+    PluginManager.emitItemAction({ player, interfaceId, item, itemId, slot, clickType, handled: false });
+  }
   /**
    * Decode 16-bit short values in all layouts we have seen across client builds.
    * We keep this logic centralized so inventory click decoding is deterministic.

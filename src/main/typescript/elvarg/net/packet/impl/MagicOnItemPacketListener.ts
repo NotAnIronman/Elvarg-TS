@@ -72,12 +72,7 @@ export class MagicOnItemPacketListener {
     return definition?.isStackable?.() && inventory.contains(itemId);
   }
 
-  private castTelekineticGrab(player: any, packet: Packet): void {
-    const y = packet.readLEShort();
-    const groundItemId = packet.readShort();
-    const x = packet.readLEShort();
-    const spellId = packet.readShortA();
-
+  public castGroundItem(player: any, groundItemId: number, x: number, y: number, spellId: number): void {
     if (spellId !== MagicOnItemPacketListener.TELEKINETIC_GRAB_SPELL_ID) {
       return;
     }
@@ -254,7 +249,10 @@ export class MagicOnItemPacketListener {
         this.castAlchemy(player, spellId, item, itemId);
         break;
       case PacketConstants.MAGIC_ON_GROUND_ITEM_OPCODE:
-        this.castTelekineticGrab(player, packet);
+        const y = packet.readLEShort();
+        const groundItemId = packet.readShort();
+        const x = packet.readLEShort();
+        this.castGroundItem(player, groundItemId, x, y, packet.readShortA());
         break;
     }
   }

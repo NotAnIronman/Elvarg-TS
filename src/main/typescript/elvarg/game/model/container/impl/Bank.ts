@@ -460,7 +460,7 @@ export class Bank extends ItemContainer {
         }
         return false;
     }
-    public static depositItems(player: Player, from: Inventory, ignoreReqs: boolean) {
+    public static depositItems(player: Player, from: ItemContainer, ignoreReqs: boolean) {
         if (!ignoreReqs) {
             if (player.getStatus() !== PlayerStatus.BANKING || player.getInterfaceId() !== 5292) {
                 return;

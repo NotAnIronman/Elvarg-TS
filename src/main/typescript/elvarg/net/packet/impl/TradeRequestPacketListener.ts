@@ -6,7 +6,10 @@ import { PluginManager } from "../../../plugins/PluginManager";
 
 export class TradeRequestPacketListener implements PacketExecutor {
   execute(player: any, packet: Packet): void {
-    const index = packet.readLEShort();
+    TradeRequestPacketListener.request(player, packet.readLEShort());
+  }
+
+  static request(player: any, index: number): void {
 
     if (index < 0 || index >= World.getPlayers().capacityReturn()) {
       return;

@@ -85,6 +85,7 @@ export class PlayerSession {
   private appearanceCache = new Map<number, { player: Player; payload: Buffer }>();
   private lastMusicRegion = -1;
   private lastMusicTrack = -1;
+  private lastGroundItemRegion = -1;
 
   constructor(
     channel: SessionChannel,
@@ -285,6 +286,7 @@ export class PlayerSession {
     this.appearanceCache.clear();
     this.lastMusicRegion = -1;
     this.lastMusicTrack = -1;
+    this.lastGroundItemRegion = -1;
     this.clearWebSocketQueue();
   }
 
@@ -320,6 +322,11 @@ export class PlayerSession {
       level: location.getZ(),
     };
     const musicRegion = ((current.x >> 6) << 8) | (current.y >> 6);
+    if (musicRegion !== this.lastGroundItemRegion) {
+      this.lastGroundItemRegion = musicRegion;
+      require("../game/entity/impl/grounditem/ItemOnGroundManager")
+        .ItemOnGroundManager.onRegionChange(player);
+    }
     if (musicRegion !== this.lastMusicRegion) {
       this.lastMusicRegion = musicRegion;
       const track = Music.forRegion(musicRegion);

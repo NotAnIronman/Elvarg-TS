@@ -7,10 +7,7 @@ import { PacketConstants } from "../PacketConstants";
 import { PacketExecutor } from "../PacketExecutor";
 
 export class UseItemPacketListener implements PacketExecutor {
-  private static itemOnItem(player: any, packet: Packet): void {
-    const usedWithSlot = packet.readUnsignedShort();
-    const usedItemSlot = packet.readUnsignedShortA();
-
+  public static itemOnItem(player: any, usedItemSlot: number, usedWithSlot: number): void {
     if (
       usedWithSlot < 0 ||
       usedItemSlot < 0 ||
@@ -90,23 +87,15 @@ export class UseItemPacketListener implements PacketExecutor {
     });
   }
 
-  private static itemOnGroundItem(player: any, packet: Packet): void {
-    packet.readLEShort(); // interfaceId
-    const inventoryItemId = packet.readShortA();
-    const groundItemId = packet.readShort();
-    const y = packet.readShortA();
-    packet.readLEShortA(); // unused
-    const x = packet.readShort();
-
+  public static itemOnGroundItem(player: any, inventoryItemId: number, groundItemId: number, x: number, y: number, inventorySlot?: number): void {
     if (!player.getInventory().contains(inventoryItemId)) {
       return;
     }
 
-    const inventoryItem = player
-      .getInventory()
-      .getItems()
-      .find((it: any) => it && it.getId() === inventoryItemId);
-    if (!inventoryItem) {
+    const inventoryItem = Number.isInteger(inventorySlot)
+      ? player.getInventory().getItems()[inventorySlot!]
+      : player.getInventory().getItems().find((it: any) => it && it.getId() === inventoryItemId);
+    if (!inventoryItem || inventoryItem.getId() !== inventoryItemId) {
       return;
     }
 
@@ -120,12 +109,7 @@ export class UseItemPacketListener implements PacketExecutor {
     });
   }
 
-  private static itemOnPlayer(player: any, packet: Packet): void {
-    const interfaceId = packet.readUnsignedShortA();
-    const targetIndex = packet.readUnsignedShort();
-    const itemId = packet.readUnsignedShort();
-    const slot = packet.readLEShort();
-
+  public static itemOnPlayer(player: any, interfaceId: number, targetIndex: number, itemId: number, slot: number): void {
     if (slot < 0 || slot >= player.getInventory().capacity()) {
       return;
     }
@@ -161,17 +145,28 @@ export class UseItemPacketListener implements PacketExecutor {
     }
 
     switch (packet.getOpcode()) {
-      case PacketConstants.ITEM_ON_ITEM:
-        UseItemPacketListener.itemOnItem(player, packet);
+      case PacketConstants.ITEM_ON_ITEM: {
+        const usedWithSlot = packet.readUnsignedShort();
+        const usedItemSlot = packet.readUnsignedShortA();
+        UseItemPacketListener.itemOnItem(player, usedItemSlot, usedWithSlot);
         break;
+      }
       case PacketConstants.ITEM_ON_OBJECT:
         UseItemPacketListener.itemOnObject(player, packet);
         break;
       case PacketConstants.ITEM_ON_GROUND_ITEM:
-        UseItemPacketListener.itemOnGroundItem(player, packet);
+        packet.readLEShort();
+        const inventoryItemId = packet.readShortA();
+        const groundItemId = packet.readShort();
+        const y = packet.readShortA();
+        const inventorySlot = packet.readLEShortA();
+        UseItemPacketListener.itemOnGroundItem(player, inventoryItemId, groundItemId, packet.readShort(), y, inventorySlot);
         break;
       case PacketConstants.ITEM_ON_PLAYER:
-        UseItemPacketListener.itemOnPlayer(player, packet);
+        UseItemPacketListener.itemOnPlayer(
+          player, packet.readUnsignedShortA(), packet.readUnsignedShort(),
+          packet.readUnsignedShort(), packet.readLEShort()
+        );
         break;
       default:
         break;

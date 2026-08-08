@@ -1,6 +1,6 @@
 import { BitWriter } from "./BitWriter";
-import { CLIENT_PACKET_LENGTHS as CLIENT_PACKET_LENGTHS } from "./ClientPackets";
-import { CLIENT_PACKET_LENGTHS as NATIVE_CLIENT_PACKET_LENGTHS } from "./NativeClientPackets";
+import { CLIENT_PACKET_LENGTHS as CLIENT_PACKET_LENGTHS, ClientPacketId as HighClientPacket } from "./ClientPackets";
+import { CLIENT_PACKET_LENGTHS as NATIVE_CLIENT_PACKET_LENGTHS, ClientPacketId as NativeClientPacket } from "./NativeClientPackets";
 import { SERVER_PACKET_LENGTHS, ServerPacketId } from "./ServerPackets";
 
 export const enum ClientPacket {
@@ -131,12 +131,38 @@ export type SkillView = {
   currentLevel: number;
 };
 
+export type GroundItemView = {
+  id: number;
+  itemId: number;
+  quantity: number;
+  x: number;
+  y: number;
+  level: number;
+  createdTick?: number;
+  privateUntilTick?: number;
+  expiresTick?: number;
+  ownerId?: number;
+  isPrivate?: boolean;
+  ownership?: 0 | 1 | 2 | 3;
+};
+
 export type ClientMessage =
   | { type: "move"; worldX: number; worldY: number; modifierFlags: number }
   | { type: "npc_option"; index: number; clickType: number }
   | { type: "object_option"; id: number; x: number; y: number; clickType?: number; action?: string }
   | { type: "chat"; text: string; messageType: "public" | "game" }
   | { type: "widget_action"; widgetId: number; groupId: number; childId: number; buttonNum: number }
+  | { type: "player_option"; index: number; option: number }
+  | { type: "item_on_player"; targetIndex: number; itemId: number; slot: number; widgetId: number }
+  | { type: "spell_on_player"; targetIndex: number; spellWidget: number; spellChild: number; spellItemId: number }
+  | { type: "inventory_action"; slot: number; itemId: number; widgetId: number; option?: string; optionIndex?: number }
+  | { type: "inventory_use_on"; slot: number; itemId: number; target: { kind: "npc" | "loc" | "ground" | "player"; id: number; x?: number; y?: number; level?: number } | { kind: "inventory"; slot: number; itemId: number } }
+  | { type: "inventory_move"; from: number; to: number; widgetId?: number }
+  | { type: "bank_deposit_inventory" | "bank_deposit_equipment" }
+  | { type: "bank_move"; from: number; to: number; mode: "swap" | "insert"; tab?: number }
+  | { type: "ground_item_action"; itemId: number; x: number; y: number; option?: string; optionIndex?: number }
+  | { type: "item_on_ground"; itemId: number; slot: number; widgetId: number; groundItemId: number; x: number; y: number }
+  | { type: "spell_on_ground"; spellWidget: number; spellChild: number; spellItemId: number; groundItemId: number; x: number; y: number }
   | { type: "dialogue_continue"; widgetId: number; childIndex: number }
   | { type: "dialogue_amount"; amount: number }
   | { type: "dialogue_input"; value: string }
@@ -204,6 +230,23 @@ class Reader {
     return value;
   }
 
+  public intLE(): number {
+    if (this.offset + 4 > this.data.length) throw new Error("Unexpected end of packet");
+    const value = this.data.readInt32LE(this.offset);
+    this.offset += 4;
+    return value;
+  }
+
+  public intME(): number {
+    const b0 = this.byte(), b1 = this.byte(), b2 = this.byte(), b3 = this.byte();
+    return (b2 << 24) | (b3 << 16) | (b0 << 8) | b1;
+  }
+
+  public intIME(): number {
+    const b0 = this.byte(), b1 = this.byte(), b2 = this.byte(), b3 = this.byte();
+    return (b1 << 24) | (b0 << 16) | (b3 << 8) | b2;
+  }
+
   public string(): string {
     const end = this.data.indexOf(0, this.offset);
     if (end === -1) throw new Error("Unterminated packet string");
@@ -255,6 +298,126 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
   }
 
   switch (opcode) {
+    case NativeClientPacket.OPPLAYER1:
+      reader.byteSub();
+      return { type: "player_option", index: reader.short(), option: 1 };
+    case NativeClientPacket.OPPLAYER2:
+      reader.byte();
+      return { type: "player_option", index: reader.short(), option: 2 };
+    case NativeClientPacket.OPPLAYER3:
+      reader.byteSub();
+      return { type: "player_option", index: reader.short(), option: 3 };
+    case NativeClientPacket.OPPLAYER4: {
+      const index = reader.short();
+      reader.byteNeg();
+      return { type: "player_option", index, option: 4 };
+    }
+    case NativeClientPacket.OPPLAYER5: {
+      const index = reader.shortAddLE();
+      reader.byteSub();
+      return { type: "player_option", index, option: 5 };
+    }
+    case NativeClientPacket.OPPLAYER6: {
+      const index = reader.short();
+      reader.byteNeg();
+      return { type: "player_option", index, option: 6 };
+    }
+    case NativeClientPacket.OPPLAYER7: {
+      const index = reader.shortAdd();
+      reader.byteSub();
+      return { type: "player_option", index, option: 7 };
+    }
+    case NativeClientPacket.OPPLAYER8:
+      reader.byte();
+      return { type: "player_option", index: reader.shortAdd(), option: 8 };
+    case NativeClientPacket.OPPLAYER_U: {
+      const targetIndex = reader.shortAddLE();
+      const itemId = reader.shortAddLE();
+      const slot = reader.shortAdd();
+      const widgetId = reader.int();
+      reader.byteAdd();
+      return { type: "item_on_player", targetIndex, itemId, slot, widgetId };
+    }
+    case NativeClientPacket.OPPLAYER_T:
+      reader.byteNeg();
+      return {
+        type: "spell_on_player",
+        spellItemId: reader.shortLE(),
+        spellChild: reader.shortLE(),
+        spellWidget: reader.intIME(),
+        targetIndex: reader.shortLE(),
+      };
+    case NativeClientPacket.OPOBJ1:
+      reader.byteSub();
+      return { type: "ground_item_action", y: reader.shortLE(), itemId: reader.shortAdd(), x: reader.shortAdd(), optionIndex: 1 };
+    case NativeClientPacket.OPOBJ2: {
+      const x = reader.shortAdd(), y = reader.shortLE(), itemId = reader.short();
+      reader.byte();
+      return { type: "ground_item_action", itemId, x, y, optionIndex: 2 };
+    }
+    case NativeClientPacket.OPOBJ3: {
+      const itemId = reader.shortLE(), x = reader.shortAdd(), y = reader.shortAddLE();
+      reader.byteSub();
+      return { type: "ground_item_action", itemId, x, y, optionIndex: 3 };
+    }
+    case NativeClientPacket.OPOBJ4: {
+      const itemId = reader.shortAddLE(), y = reader.shortAddLE();
+      reader.byteNeg();
+      return { type: "ground_item_action", itemId, x: reader.shortAdd(), y, optionIndex: 4 };
+    }
+    case NativeClientPacket.OPOBJ5: {
+      const itemId = reader.shortAdd(), x = reader.shortLE(), y = reader.shortLE();
+      reader.byteSub();
+      return { type: "ground_item_action", itemId, x, y, optionIndex: 5 };
+    }
+    case NativeClientPacket.EXAMINE_OBJ:
+      return { type: "ground_item_action", itemId: reader.short(), y: reader.shortLE(), x: reader.shortLE(), option: "Examine" };
+    case NativeClientPacket.OPOBJ_U: {
+      const groundItemId = reader.shortAddLE();
+      const y = reader.shortAdd();
+      const widgetId = reader.intME();
+      const x = reader.shortAdd();
+      const slot = reader.shortAddLE();
+      reader.byteSub();
+      return { type: "item_on_ground", groundItemId, y, widgetId, x, slot, itemId: reader.shortLE() };
+    }
+    case NativeClientPacket.OPLOC_T_ALT:
+      return {
+        type: "spell_on_ground",
+        spellWidget: reader.intLE(),
+        spellChild: reader.shortAdd(),
+        groundItemId: reader.shortAdd(),
+        x: reader.shortAddLE(),
+        y: reader.short(),
+        spellItemId: (reader.byte(), reader.shortAddLE()),
+      };
+    case NativeClientPacket.IF_BUTTON1:
+    case NativeClientPacket.IF_BUTTON2:
+    case NativeClientPacket.IF_BUTTON3:
+    case NativeClientPacket.IF_BUTTON4:
+    case NativeClientPacket.IF_BUTTON5:
+    case NativeClientPacket.IF_BUTTON6:
+    case NativeClientPacket.IF_BUTTON7:
+    case NativeClientPacket.IF_BUTTON8:
+    case NativeClientPacket.IF_BUTTON9:
+    case NativeClientPacket.IF_BUTTON10: {
+      const optionIndex = [
+        NativeClientPacket.IF_BUTTON1, NativeClientPacket.IF_BUTTON2, NativeClientPacket.IF_BUTTON3,
+        NativeClientPacket.IF_BUTTON4, NativeClientPacket.IF_BUTTON5, NativeClientPacket.IF_BUTTON6,
+        NativeClientPacket.IF_BUTTON7, NativeClientPacket.IF_BUTTON8, NativeClientPacket.IF_BUTTON9,
+        NativeClientPacket.IF_BUTTON10,
+      ].indexOf(opcode) + 1;
+      return { type: "inventory_action", widgetId: reader.int(), slot: reader.short(), itemId: reader.signedShort(), optionIndex };
+    }
+    case NativeClientPacket.IF_BUTTOND: {
+      reader.shortLE();
+      const targetWidget = reader.intLE();
+      reader.short();
+      const from = reader.shortAddLE();
+      const sourceWidget = reader.intME();
+      const to = reader.shortLE();
+      return { type: "inventory_move", from, to, widgetId: sourceWidget || targetWidget };
+    }
     case ClientPacket.NPC_OPTION_1:
       reader.byte();
       return { type: "npc_option", index: reader.shortAddLE(), clickType: 1 };
@@ -336,6 +499,45 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
         messageType: reader.byte() === 1 ? "game" : "public",
         text: reader.string(),
       };
+    case HighClientPacket.INTERACT:
+      return { type: "player_option", option: reader.byte() === 0 ? 3 : 2, index: reader.short() };
+    case HighClientPacket.INVENTORY_USE:
+      return { type: "inventory_action", slot: reader.short(), itemId: reader.short(), widgetId: 3214, option: (reader.int(), reader.string()) };
+    case HighClientPacket.INVENTORY_USE_ON: {
+      const slot = reader.short(), itemId = reader.short();
+      const kind = reader.byte();
+      const id = reader.short();
+      const hasTile = reader.byte() !== 0;
+      const x = hasTile ? reader.short() : undefined;
+      const y = hasTile ? reader.short() : undefined;
+      const level = reader.byte();
+      if (kind === 4) {
+        return { type: "inventory_use_on", slot, itemId, target: { kind: "inventory", slot: reader.short(), itemId: reader.short() } };
+      }
+      return {
+        type: "inventory_use_on", slot, itemId,
+        target: { kind: (["npc", "loc", "ground", "player"] as const)[kind] ?? "npc", id, x, y, level },
+      };
+    }
+    case HighClientPacket.INVENTORY_MOVE:
+      return { type: "inventory_move", from: reader.short(), to: reader.short(), widgetId: 3214 };
+    case HighClientPacket.BANK_DEPOSIT_INVENTORY:
+      return { type: "bank_deposit_inventory" };
+    case HighClientPacket.BANK_DEPOSIT_EQUIPMENT:
+      return { type: "bank_deposit_equipment" };
+    case HighClientPacket.BANK_MOVE: {
+      const from = reader.short(), to = reader.short(), mode = reader.byte() === 1 ? "insert" : "swap";
+      return { type: "bank_move", from, to, mode, tab: reader.byte() || undefined };
+    }
+    case HighClientPacket.GROUND_ITEM_ACTION: {
+      reader.int();
+      const x = reader.short(), y = reader.short();
+      reader.byte();
+      const itemId = reader.short();
+      reader.int();
+      const option = reader.string() || undefined;
+      return { type: "ground_item_action", itemId, x, y, option, optionIndex: reader.byte() || undefined };
+    }
     case 251: {
       const widgetId = reader.int();
       const groupId = reader.short();
@@ -477,6 +679,42 @@ export function encodeInventorySnapshot(slots: Array<{ slot: number; itemId: num
 
 export function encodeInventorySlot(slot: number, itemId: number, quantity: number): Buffer {
   return encodeServerPacket(ServerPacketId.INVENTORY_SLOT, encodeItemSlot(slot, itemId, quantity));
+}
+
+function encodeGroundItem(stack: GroundItemView): Buffer {
+  const payload = Buffer.alloc(33);
+  payload.writeInt32BE(stack.id | 0);
+  payload.writeUInt16BE(stack.itemId & 0xffff, 4);
+  payload.writeInt32BE(stack.quantity | 0, 6);
+  payload.writeUInt16BE(stack.x & 0xffff, 10);
+  payload.writeUInt16BE(stack.y & 0xffff, 12);
+  payload[14] = stack.level;
+  payload.writeInt32BE(stack.createdTick ?? -1, 15);
+  payload.writeInt32BE(stack.privateUntilTick ?? 0, 19);
+  payload.writeInt32BE(stack.expiresTick ?? 0, 23);
+  payload.writeInt32BE(stack.ownerId ?? -1, 27);
+  payload[31] = stack.isPrivate ? 1 : 0;
+  payload[32] = stack.ownership ?? 0;
+  return payload;
+}
+
+export function encodeGroundItems(serial: number, stacks: GroundItemView[]): Buffer {
+  const header = Buffer.alloc(6);
+  header.writeInt32BE(serial | 0);
+  header.writeUInt16BE(stacks.length, 4);
+  return encodeServerPacket(ServerPacketId.GROUND_ITEMS, Buffer.concat([header, ...stacks.map(encodeGroundItem)]));
+}
+
+export function encodeGroundItemsDelta(serial: number, upserts: GroundItemView[], removes: number[]): Buffer {
+  const header = Buffer.alloc(6);
+  header.writeInt32BE(serial | 0);
+  header.writeUInt16BE(upserts.length, 4);
+  const removed = Buffer.alloc(2 + removes.length * 4);
+  removed.writeUInt16BE(removes.length);
+  removes.forEach((id, index) => removed.writeInt32BE(id | 0, 2 + index * 4));
+  return encodeServerPacket(ServerPacketId.GROUND_ITEMS_DELTA, Buffer.concat([
+    header, ...upserts.map(encodeGroundItem), removed,
+  ]));
 }
 
 function encodeSkills(opcode: ServerPacketId.SKILLS_SNAPSHOT | ServerPacketId.SKILLS_DELTA, skills: SkillView[], totalLevel: number, combatLevel: number): Buffer {

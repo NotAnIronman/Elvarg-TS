@@ -15,9 +15,9 @@ export class ItemOnGroundManager {
     public static readonly DESPAWN_DELAY: number = 300
 
     public static onRegionChange(player: Player): void {
-        for (let item of World.getItems()) {
-            ItemOnGroundManager.performPlayer(player, item, OperationType.CREATE)
-        }
+        player.getPacketSender().sendGroundItems(
+            World.getItems().filter((item) => this.canSee(player, item))
+        );
     }
 
     public static process(): void {
@@ -62,12 +62,7 @@ export class ItemOnGroundManager {
         if (!World.isPlayerSessionConnected(player)) {
             return;
         }
-        if (item.getPosition().getZ() != player.getLocation().getZ())
-            return;
-        if (player.getPrivateArea() != item.getPrivateArea()) {
-            return;
-        }
-        if (item.getPosition().getDistance(player.getLocation()) > 64)
+        if (!this.canSee(player, item))
             return;
         switch (type) {
             case OperationType.ALTER:
@@ -77,12 +72,6 @@ export class ItemOnGroundManager {
                 player.getPacketSender().deleteGroundItem(item);
                 break;
             case OperationType.CREATE:
-                if (!ItemOnGroundManager.isOwner(player.getUsername(), item)) {
-                    if (item.getState() == State.SEEN_BY_PLAYER)
-                        return;
-                    if (!item.getItem().getDefinition().isTradeable() || !item.getItem().getDefinition().isDropable())
-                        return;
-                }
                 player.getPacketSender().createGroundItem(item);
                 break;
             default:
@@ -199,6 +188,14 @@ export class ItemOnGroundManager {
 
     private static isOwner(username: string, item: ItemOnGround): boolean {
         return item.getOwner() === username;
+    }
+
+    private static canSee(player: Player, item: ItemOnGround): boolean {
+        if (!item || item.isPendingRemoval() || item.getPosition().getZ() !== player.getLocation().getZ()) return false;
+        if (player.getPrivateArea() !== item.getPrivateArea() || item.getPosition().getDistance(player.getLocation()) > 64) return false;
+        if (item.getState() === State.SEEN_BY_PLAYER) return this.isOwner(player.getUsername(), item);
+        return this.isOwner(player.getUsername(), item)
+            || (item.getItem().getDefinition().isTradeable() && item.getItem().getDefinition().isDropable());
     }
 
 

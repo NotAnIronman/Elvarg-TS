@@ -18,6 +18,10 @@ export class SwitchItemSlotPacketListener implements PacketExecutor {
     packet.readByteC();
     const fromSlot = packet.readLEShortA();
     const toSlot = packet.readLEShort();
+    SwitchItemSlotPacketListener.move(player, interfaceId, fromSlot, toSlot);
+  }
+
+  public static move(player: any, interfaceId: number, fromSlot: number, toSlot: number): void {
     if (player == null || player.getHitpoints() <= 0) {
       return;
     }

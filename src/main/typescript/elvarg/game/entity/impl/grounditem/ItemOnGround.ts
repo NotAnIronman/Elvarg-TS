@@ -6,6 +6,8 @@ import { Location } from "../../../model/Location"
 import { PrivateArea } from "../../../model/areas/impl/PrivateArea";
 
 export class ItemOnGround {
+    private static nextId = 1;
+    private readonly id = ItemOnGround.nextId++;
     position: Location;
     state: State = State.SEEN_BY_PLAYER;
     owner: string | null;
@@ -77,6 +79,10 @@ export class ItemOnGround {
 
     public getPosition(): Location {
         return this.position;
+    }
+
+    public getId(): number {
+        return this.id;
     }
 
     public getOwner(): string | undefined {
