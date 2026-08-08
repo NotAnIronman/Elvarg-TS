@@ -884,23 +884,6 @@ class PvpBehavior {
         return false;
       }
     }
-    if (realPlayerOpponent) {
-      const durationMs = randomInRange(pvpMinMs, pvpMaxMs);
-      if (this.tryStartRealPlayerEngagement({
-        sourcePlayer,
-        sourceState,
-        sourceAutonomy,
-        targetPlayer: realPlayerOpponent,
-        pvpIndex: sharedCycleState?.pvpIndex ?? null,
-        nowMs,
-        durationMs,
-        postPvpCooldownMinMs,
-        postPvpCooldownMaxMs,
-      })) {
-        return true;
-      }
-    }
-
     const opponentEntry = ServerPerf.measurePhase(
       "bot.pvp.try_start.bot_opponent_selection",
       () =>
@@ -920,6 +903,22 @@ class PvpBehavior {
         })
     );
     if (!opponentEntry) {
+      if (realPlayerOpponent) {
+        const durationMs = randomInRange(pvpMinMs, pvpMaxMs);
+        if (this.tryStartRealPlayerEngagement({
+          sourcePlayer,
+          sourceState,
+          sourceAutonomy,
+          targetPlayer: realPlayerOpponent,
+          pvpIndex: sharedCycleState?.pvpIndex ?? null,
+          nowMs,
+          durationMs,
+          postPvpCooldownMinMs,
+          postPvpCooldownMaxMs,
+        })) {
+          return true;
+        }
+      }
       return false;
     }
 

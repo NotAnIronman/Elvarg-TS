@@ -364,19 +364,10 @@ class BotBehaviorTask extends Task {
       if ((candidatePlayer.getHitpoints?.() ?? 0) <= 0) {
         return;
       }
-      if (!Wilderness.isIn(candidatePlayer)) {
-        return;
-      }
       const location = candidatePlayer.getLocation?.();
       if (!location) {
         return;
       }
-      this.addToSpatialBucket(realPlayerBuckets, location, candidatePlayer, chunkSizeTiles);
-      this.addToTileOccupancy(
-        playerTileOccupancyByArea,
-        candidatePlayer.getPrivateArea?.() ?? null,
-        location
-      );
       if (observerBuckets) {
         const observer = {
           x: location.getX?.(),
@@ -392,6 +383,15 @@ class BotBehaviorTask extends Task {
         }
         observerCount += 1;
       }
+      if (!Wilderness.isIn(candidatePlayer)) {
+        return;
+      }
+      this.addToSpatialBucket(realPlayerBuckets, location, candidatePlayer, chunkSizeTiles);
+      this.addToTileOccupancy(
+        playerTileOccupancyByArea,
+        candidatePlayer.getPrivateArea?.() ?? null,
+        location
+      );
     });
 
     if (observerBuckets) {
