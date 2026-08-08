@@ -26,6 +26,7 @@ import {
 import { ObjectActionPacketListener } from "./packet/impl/ObjectActionPacketListener";
 import { NPCOptionPacketListener } from "./packet/impl/NPCOptionPacketListener";
 import { ChatPacketListener } from "./packet/impl/ChatPacketListener";
+import { DialogueOption } from "../game/model/dialogues/DialogueOption";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -112,6 +113,26 @@ class ClientConnection {
         case "chat":
           if (this.player && packet.messageType === "public") {
             ChatPacketListener.handleText(this.player, packet.text);
+          }
+          continue;
+        case "dialogue_continue":
+          this.player?.getDialogueManager().advance();
+          continue;
+        case "dialogue_amount": {
+          const action = this.player?.getEnteredAmountAction();
+          if (action && packet.amount > 0) action.execute(packet.amount);
+          this.player?.setEnteredAmountAction(null);
+          continue;
+        }
+        case "dialogue_input": {
+          const action = this.player?.getEnteredSyntaxAction();
+          if (action) action.execute(packet.value);
+          this.player?.setEnteredSyntaxAction(null);
+          continue;
+        }
+        case "widget_action":
+          if (this.player?.getDialogueManager().isActive() && packet.buttonNum > 0 && packet.buttonNum <= 5) {
+            this.player.getDialogueManager().handleOption(packet.buttonNum - 1 as DialogueOption);
           }
           continue;
         case "raw":
@@ -249,6 +270,10 @@ class ClientConnection {
     );
     this.send(encodeDefaultAnimations());
     for (const packet of encodeGameframeBootstrap(player.getUsername())) this.send(packet);
+    player.getPacketSender()
+      .sendItemContainer(player.getInventory(), 3214)
+      .sendSkillsSnapshot()
+      .sendRunEnergy();
   }
 
   private walk(x: number, y: number, modifierFlags: number): void {
@@ -260,6 +285,7 @@ class ClientConnection {
     player.getMovementQueue().requestWalk(
       new Location(x, y, player.getLocation().getZ())
     );
+    player.getPacketSender().sendDestination(x, y).sendRunStatus();
   }
 
   private getPlayerAppearance(player: Player): PlayerAppearance {
@@ -284,6 +310,7 @@ class ClientConnection {
         look[Appearance.FEET],
       ].map((value) => value ?? -1),
       equip: displayEquipment.map((item) => item?.getId?.() ?? -1),
+      equipQty: displayEquipment.map((item) => item?.getAmount?.() ?? 0),
     };
   }
 

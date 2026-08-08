@@ -8,16 +8,28 @@ import {
   createPlayerSyncState,
   encodeGameframeBootstrap,
   encodeHandshake,
+  encodeInventorySlot,
+  encodeInventorySnapshot,
   encodeLoginResponse,
   encodeNpcSync,
   encodePlayJingle,
   encodePlaySong,
+  encodeRunClientScript,
+  encodeRunEnergy,
+  encodeSkillsSnapshot,
   encodePlayerAppearance,
   encodePlayerSync,
   encodeProjectiles,
   encodeWelcome,
   encodeSound,
   encodeServerPacket,
+  encodeDestination,
+  encodeVarbit,
+  encodeVarp,
+  encodeWidgetOpen,
+  encodeWidgetOpenSub,
+  encodeWidgetRunScript,
+  encodeWidgetSetText,
 } from "../src/main/typescript/elvarg/net/protocol/ClientProtocol";
 import { ServerPacketId } from "../src/main/typescript/elvarg/net/protocol/ServerPackets";
 import { Music } from "../src/main/typescript/elvarg/game/Music";
@@ -71,11 +83,34 @@ assert.deepStrictEqual(decodeClientPacket(Buffer.from([55])), {
 assert.deepStrictEqual(decodeClientPackets(Buffer.concat([chat, Buffer.from([55])])).map(({ type }) => type), [
   "chat", "raw",
 ]);
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([252, 0, 0, 0, 42, 0, 3])), {
+  type: "dialogue_continue", widgetId: 42, childIndex: 3,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([192, 0, 0, 0, 10])), {
+  type: "dialogue_amount", amount: 10,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([194, 3, 111, 107, 0])), {
+  type: "dialogue_input", value: "ok",
+});
 assert.deepStrictEqual([...encodeChatMessage("game", "Hi")], [
   120, 8, 72, 105, 0, 0, 0, 0, 255, 255,
 ]);
 assert.deepStrictEqual([...encodeServerPacket(ServerPacketId.SHOP_CLOSE, Buffer.alloc(0))], [152]);
 assert.throws(() => encodeServerPacket(ServerPacketId.RUN_ENERGY, Buffer.alloc(1)));
+assert.deepStrictEqual([...encodeVarp(12, 3)], [40, 0, 12, 3]);
+assert.deepStrictEqual([...encodeVarbit(12, 300)], [42, 0, 12, 0, 0, 1, 44]);
+assert.deepStrictEqual([...encodeInventorySlot(2, 4151, 1)], [51, 5, 0, 2, 16, 56, 1]);
+assert.strictEqual(encodeInventorySnapshot([{ slot: 0, itemId: -1, quantity: 0 }])[0], 50);
+assert.strictEqual(encodeSkillsSnapshot([{
+  id: 0, xp: 83, baseLevel: 2, virtualLevel: 2, boost: 0, currentLevel: 2,
+}], 24, 3)[0], 70);
+assert.deepStrictEqual([...encodeRunEnergy(65, true)], [81, 65, 1]);
+assert.deepStrictEqual([...encodeDestination(3091, 3524)], [87, 12, 19, 13, 196]);
+assert.deepStrictEqual([...encodeWidgetOpen(12)], [100, 0, 12, 1]);
+assert.deepStrictEqual([...encodeWidgetSetText(42, "Hi")], [105, 0, 7, 0, 0, 0, 42, 72, 105, 0]);
+assert.strictEqual(encodeWidgetOpenSub((161 << 16) | 7, 122)[0], 103);
+assert.strictEqual(encodeWidgetRunScript(876, ["Toby", 1])[0], 110);
+assert.deepStrictEqual([...encodeRunClientScript(626)], [170, 0, 3, 2, 114, 0]);
 assert.deepStrictEqual(parseCacheTarget("osrs-237_2026-03-25"), {
   revision: 237,
   date: "2026-03-25",

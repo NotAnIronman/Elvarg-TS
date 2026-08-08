@@ -48,6 +48,7 @@ export type PlayerAppearance = {
   colors: number[];
   kits: number[];
   equip: number[];
+  equipQty?: number[];
 };
 
 export type Tile = { x: number; y: number; level: number };
@@ -121,11 +122,24 @@ export type ProjectileView = {
   targetActor?: { kind: "player" | "npc"; index: number };
 };
 
+export type SkillView = {
+  id: number;
+  xp: number;
+  baseLevel: number;
+  virtualLevel: number;
+  boost: number;
+  currentLevel: number;
+};
+
 export type ClientMessage =
   | { type: "move"; worldX: number; worldY: number; modifierFlags: number }
   | { type: "npc_option"; index: number; clickType: number }
   | { type: "object_option"; id: number; x: number; y: number; clickType?: number; action?: string }
   | { type: "chat"; text: string; messageType: "public" | "game" }
+  | { type: "widget_action"; widgetId: number; groupId: number; childId: number; buttonNum: number }
+  | { type: "dialogue_continue"; widgetId: number; childIndex: number }
+  | { type: "dialogue_amount"; amount: number }
+  | { type: "dialogue_input"; value: string }
   | { type: "raw"; opcode: number; payload: Buffer }
   | { type: "face" }
   | { type: "hello" }
@@ -149,6 +163,11 @@ class Reader {
     const value = this.data.readUInt16BE(this.offset);
     this.offset += 2;
     return value;
+  }
+
+  public signedShort(): number {
+    const value = this.short();
+    return value > 0x7fff ? value - 0x10000 : value;
   }
 
   public shortAdd(): number {
@@ -317,6 +336,28 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
         messageType: reader.byte() === 1 ? "game" : "public",
         text: reader.string(),
       };
+    case 251: {
+      const widgetId = reader.int();
+      const groupId = reader.short();
+      const childId = reader.short();
+      reader.string();
+      reader.string();
+      const opId = reader.byte();
+      const buttonNum = reader.byte() || opId;
+      reader.short();
+      reader.short();
+      reader.byte();
+      reader.signedShort();
+      reader.signedShort();
+      return { type: "widget_action", widgetId, groupId, childId, buttonNum };
+    }
+    case 252:
+      return { type: "dialogue_continue", widgetId: reader.int(), childIndex: reader.short() };
+    case 192:
+      return { type: "dialogue_amount", amount: reader.int() };
+    case 193:
+    case 194:
+      return { type: "dialogue_input", value: reader.string() };
     case ClientPacket.HELLO:
       reader.string();
       reader.string();
@@ -398,6 +439,234 @@ export function encodeChatMessage(
   return encodeServerPacket(ServerPacketId.CHAT_MESSAGE, Buffer.concat([
     string(text), Buffer.from([type]), string(from), string(prefix), id,
   ]));
+}
+
+export function encodeVarp(id: number, value: number): Buffer {
+  const payload = Buffer.alloc(value >= 0 && value <= 255 ? 3 : 6);
+  payload.writeUInt16BE(id & 0xffff);
+  if (payload.length === 3) payload[2] = value;
+  else payload.writeInt32BE(value | 0, 2);
+  return encodeServerPacket(payload.length === 3 ? ServerPacketId.VARP_SMALL : ServerPacketId.VARP_LARGE, payload);
+}
+
+export function encodeVarbit(id: number, value: number): Buffer {
+  const payload = Buffer.alloc(6);
+  payload.writeUInt16BE(id & 0xffff);
+  payload.writeInt32BE(value | 0, 2);
+  return encodeServerPacket(ServerPacketId.VARBIT, payload);
+}
+
+function encodeItemSlot(slot: number, itemId: number, quantity: number): Buffer {
+  const large = quantity >= 255;
+  const payload = Buffer.alloc(large ? 9 : 5);
+  payload.writeUInt16BE(slot & 0xffff);
+  payload.writeUInt16BE((itemId + 1) & 0xffff, 2);
+  payload[4] = large ? 255 : Math.max(0, quantity);
+  if (large) payload.writeInt32BE(quantity | 0, 5);
+  return payload;
+}
+
+export function encodeInventorySnapshot(slots: Array<{ slot: number; itemId: number; quantity: number }>): Buffer {
+  const count = Buffer.alloc(2);
+  count.writeUInt16BE(slots.length);
+  return encodeServerPacket(ServerPacketId.INVENTORY_SNAPSHOT, Buffer.concat([
+    count,
+    ...slots.map(({ slot, itemId, quantity }) => encodeItemSlot(slot, itemId, quantity)),
+  ]));
+}
+
+export function encodeInventorySlot(slot: number, itemId: number, quantity: number): Buffer {
+  return encodeServerPacket(ServerPacketId.INVENTORY_SLOT, encodeItemSlot(slot, itemId, quantity));
+}
+
+function encodeSkills(opcode: ServerPacketId.SKILLS_SNAPSHOT | ServerPacketId.SKILLS_DELTA, skills: SkillView[], totalLevel: number, combatLevel: number): Buffer {
+  const payload = Buffer.alloc(1 + skills.length * 10 + 3);
+  payload[0] = skills.length;
+  let offset = 1;
+  for (const skill of skills) {
+    payload[offset++] = skill.id;
+    payload.writeInt32BE(skill.xp | 0, offset);
+    offset += 4;
+    payload[offset++] = skill.baseLevel;
+    payload[offset++] = skill.virtualLevel;
+    payload[offset++] = skill.boost + 128;
+    payload[offset++] = skill.currentLevel;
+  }
+  payload.writeUInt16BE(totalLevel & 0xffff, offset);
+  payload[offset + 2] = combatLevel;
+  return encodeServerPacket(opcode, payload);
+}
+
+export function encodeSkillsSnapshot(skills: SkillView[], totalLevel: number, combatLevel: number): Buffer {
+  return encodeSkills(ServerPacketId.SKILLS_SNAPSHOT, skills, totalLevel, combatLevel);
+}
+
+export function encodeSkillsDelta(skills: SkillView[], totalLevel: number, combatLevel: number): Buffer {
+  return encodeSkills(ServerPacketId.SKILLS_DELTA, skills, totalLevel, combatLevel);
+}
+
+export function encodeRunEnergy(percent: number, running: boolean): Buffer {
+  return encodeServerPacket(ServerPacketId.RUN_ENERGY, Buffer.from([Math.max(0, Math.min(100, percent)), running ? 1 : 0]));
+}
+
+export function encodeDestination(x: number, y: number): Buffer {
+  const payload = Buffer.alloc(4);
+  payload.writeUInt16BE(x & 0xffff);
+  payload.writeUInt16BE(y & 0xffff, 2);
+  return encodeServerPacket(ServerPacketId.DESTINATION, payload);
+}
+
+export function encodeWidgetOpen(groupId: number, modal = true): Buffer {
+  const payload = Buffer.alloc(3);
+  payload.writeUInt16BE(groupId & 0xffff);
+  payload[2] = modal ? 1 : 0;
+  return encodeServerPacket(ServerPacketId.WIDGET_OPEN, payload);
+}
+
+export function encodeWidgetClose(groupId: number): Buffer {
+  const payload = Buffer.alloc(2);
+  payload.writeUInt16BE(groupId & 0xffff);
+  return encodeServerPacket(ServerPacketId.WIDGET_CLOSE, payload);
+}
+
+export function encodeWidgetSetRoot(groupId: number): Buffer {
+  const payload = Buffer.alloc(2);
+  payload.writeUInt16BE(groupId & 0xffff);
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_ROOT, payload);
+}
+
+function intPairs(values?: Record<number, number>, shortKeys = false): Buffer {
+  const entries = values ? Object.entries(values) : [];
+  const payload = Buffer.alloc(1 + entries.length * (shortKeys ? 6 : 8));
+  payload[0] = entries.length;
+  let offset = 1;
+  for (const [key, value] of entries) {
+    if (shortKeys) {
+      payload.writeUInt16BE(Number(key) & 0xffff, offset);
+      offset += 2;
+    } else {
+      payload.writeInt32BE(Number(key) | 0, offset);
+      offset += 4;
+    }
+    payload.writeInt32BE(value | 0, offset);
+    offset += 4;
+  }
+  return payload;
+}
+
+function scriptList(scripts: Array<{ scriptId: number; args?: (number | string)[] }> = []): Buffer {
+  const parts: Buffer[] = [Buffer.from([scripts.length])];
+  for (const script of scripts) {
+    const id = Buffer.alloc(4);
+    id.writeInt32BE(script.scriptId | 0);
+    parts.push(id, scriptArgs(script.args ?? []));
+  }
+  return Buffer.concat(parts);
+}
+
+export function encodeWidgetOpenSub(targetUid: number, groupId: number, type = 1, options: {
+  varps?: Record<number, number>;
+  varbits?: Record<number, number>;
+  hiddenUids?: number[];
+  preScripts?: Array<{ scriptId: number; args?: (number | string)[] }>;
+  postScripts?: Array<{ scriptId: number; args?: (number | string)[] }>;
+} = {}): Buffer {
+  const header = Buffer.alloc(7);
+  header.writeInt32BE(targetUid | 0);
+  header.writeUInt16BE(groupId & 0xffff, 4);
+  header[6] = type;
+  const hidden = Buffer.alloc(1 + (options.hiddenUids?.length ?? 0) * 4);
+  hidden[0] = options.hiddenUids?.length ?? 0;
+  options.hiddenUids?.forEach((uid, index) => hidden.writeInt32BE(uid | 0, 1 + index * 4));
+  return encodeServerPacket(ServerPacketId.WIDGET_OPEN_SUB, Buffer.concat([
+    header,
+    intPairs(options.varps, true),
+    intPairs(options.varbits, true),
+    hidden,
+    scriptList(options.preScripts),
+    scriptList(options.postScripts),
+  ]));
+}
+
+function widgetIntPacket(opcode: ServerPacketId, uid: number, value?: number): Buffer {
+  const payload = Buffer.alloc(value === undefined ? 4 : 8);
+  payload.writeInt32BE(uid | 0);
+  if (value !== undefined) payload.writeInt32BE(value | 0, 4);
+  return encodeServerPacket(opcode, payload);
+}
+
+export function encodeWidgetCloseSub(uid: number): Buffer {
+  return widgetIntPacket(ServerPacketId.WIDGET_CLOSE_SUB, uid);
+}
+
+export function encodeWidgetSetText(uid: number, text: string): Buffer {
+  const id = Buffer.alloc(4);
+  id.writeInt32BE(uid | 0);
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_TEXT, Buffer.concat([id, string(text)]));
+}
+
+export function encodeWidgetSetHidden(uid: number, hidden: boolean): Buffer {
+  const payload = Buffer.alloc(5);
+  payload.writeInt32BE(uid | 0);
+  payload[4] = hidden ? 1 : 0;
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_HIDDEN, payload);
+}
+
+export function encodeWidgetSetItem(uid: number, itemId: number, quantity = 1): Buffer {
+  const payload = Buffer.alloc(10);
+  payload.writeInt32BE(uid | 0);
+  payload.writeInt16BE(itemId, 4);
+  payload.writeInt32BE(quantity | 0, 6);
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_ITEM, payload);
+}
+
+export function encodeWidgetSetNpcHead(uid: number, npcId: number): Buffer {
+  const payload = Buffer.alloc(6);
+  payload.writeInt32BE(uid | 0);
+  payload.writeInt16BE(npcId, 4);
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_NPC_HEAD, payload);
+}
+
+export function encodeWidgetSetPlayerHead(uid: number): Buffer {
+  return widgetIntPacket(ServerPacketId.WIDGET_SET_PLAYER_HEAD, uid);
+}
+
+export function encodeWidgetSetFlags(uid: number, flags: number): Buffer {
+  return widgetIntPacket(ServerPacketId.WIDGET_SET_FLAGS, uid, flags);
+}
+
+export function encodeWidgetSetFlagsRange(uid: number, fromSlot: number, toSlot: number, flags: number): Buffer {
+  const payload = Buffer.alloc(12);
+  payload.writeInt32BE(uid | 0);
+  payload.writeUInt16BE(fromSlot & 0xffff, 4);
+  payload.writeUInt16BE(toSlot & 0xffff, 6);
+  payload.writeInt32BE(flags | 0, 8);
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_FLAGS_RANGE, payload);
+}
+
+export function encodeWidgetSetAnimation(uid: number, animationId: number): Buffer {
+  const payload = Buffer.alloc(6);
+  payload.writeInt32BE(uid | 0);
+  payload.writeInt16BE(animationId, 4);
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_ANIMATION, payload);
+}
+
+export function encodeWidgetRunScript(scriptId: number, args: (number | string)[] = [], varps?: Record<number, number>, varbits?: Record<number, number>): Buffer {
+  const id = Buffer.alloc(4);
+  id.writeInt32BE(scriptId | 0);
+  const vars = (values?: Record<number, number>) => {
+    const pairs = intPairs(values);
+    const count = Buffer.alloc(2);
+    count.writeUInt16BE(pairs[0]);
+    return Buffer.concat([count, pairs.subarray(1)]);
+  };
+  return encodeServerPacket(ServerPacketId.WIDGET_RUN_SCRIPT, Buffer.concat([id, scriptArgs(args), vars(varps), vars(varbits)]));
+}
+
+export function encodeRunClientScript(scriptId: number, args: (number | string)[] = []): Buffer {
+  const id = Buffer.alloc(2);
+  id.writeUInt16BE(scriptId & 0xffff);
+  return encodeServerPacket(ServerPacketId.RUN_CLIENT_SCRIPT, Buffer.concat([id, scriptArgs(args)]));
 }
 
 function scriptArgs(args: (number | string)[]): Buffer {
@@ -684,7 +953,7 @@ export function encodePlayerAppearance(
   text("");
   text("");
   byte(0);
-  int(0); // ammo quantity; inventory sync will own this later
+  int(appearance.equipQty?.[13] ?? 0);
   int(appearance.equip[13] ?? -1);
   return Buffer.from(bytes);
 }

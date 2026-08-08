@@ -288,6 +288,10 @@ export class PlayerSession {
     this.clearWebSocketQueue();
   }
 
+  public isClientProtocol(): boolean {
+    return this.clientProtocol;
+  }
+
   public sendClientPacket(frame: Buffer): boolean {
     if (!this.clientProtocol) return false;
     if (!this.isBinaryChannelOpen() || this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES) {
@@ -426,6 +430,7 @@ export class PlayerSession {
             look[Appearance.FEET],
           ].map((value) => value ?? -1),
           equip: equipment.map((item) => item?.getId?.() ?? -1),
+          equipQty: equipment.map((item) => item?.getAmount?.() ?? 0),
         },
         player.getUsername(),
         player.getSkillManager().getCombatLevel(),

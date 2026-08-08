@@ -11,6 +11,7 @@ export class OptionDialogue extends Dialogue {
 
     constructor(index: number, action: DialogueOptionAction, ...options: string[]) {
         super(index);
+        this.action = action;
         this.options = options;
     }
 

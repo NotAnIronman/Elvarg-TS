@@ -55,6 +55,10 @@ export class DialogueManager {
         this.index = -1;
     }
 
+    public isActive(): boolean {
+        return this.dialogues.has(this.index);
+    }
+
     /**
      * Advances, starting the next dialogue.
      */
