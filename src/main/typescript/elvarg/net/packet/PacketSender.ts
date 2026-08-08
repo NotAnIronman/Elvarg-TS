@@ -19,6 +19,7 @@ import { DonatorRights } from "../../game/model/rights/DonatorRights";
 import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
 import { World } from "../../game/World";
 import { InterfaceLayoutRegistry } from "../../game/definition/InterfaceLayoutDefinition";
+import { encodeChatMessage, encodePlayJingle, encodePlaySong, encodeSound } from "../protocol/ClientProtocol";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
 // import { Mobile } from "../../game/entity/impl/Mobile";
@@ -117,6 +118,10 @@ export class PacketSender {
     delay: number,
     volume: number
   ): this {
+    if (this.player.getSession().sendClientPacket(encodeSound(soundId, {
+      loops: Math.max(1, loopType),
+      delay,
+    }))) return this;
     const out = new PacketBuilder(174);
     out.putShort(soundId).put(loopType).putShort(delay).putShort(volume);
     this.player.getSession().write(out);
@@ -130,6 +135,7 @@ export class PacketSender {
   }
 
   sendSong(id: number): this {
+    if (this.player.getSession().sendClientPacket(encodePlaySong(id))) return this;
     const out = new PacketBuilder(74);
     out.putShorts(id, ByteOrder.LITTLE);
     this.player.getSession().write(out);
@@ -137,9 +143,26 @@ export class PacketSender {
   }
 
   sendJingle(id: number, delayTicks: number): this {
+    if (this.player.getSession().sendClientPacket(encodePlayJingle(id, delayTicks))) return this;
     const out = new PacketBuilder(121);
     out.putShort(id < 0 ? 65535 : id).putShort(delayTicks < 0 ? 65535 : delayTicks);
     this.player.getSession().write(out);
+    return this;
+  }
+
+  sendAreaSound(
+    soundId: number,
+    x: number,
+    y: number,
+    level: number,
+    loops = 1,
+    delay = 0,
+    radius = 0,
+    attenuation = 0
+  ): this {
+    this.player.getSession().sendClientPacket(encodeSound(soundId, {
+      x, y, level, loops, delay, radius, attenuation,
+    }));
     return this;
   }
 
@@ -1072,9 +1095,17 @@ export class PacketSender {
 
   // Basic chat message to client.
   sendMessage(message: string): this {
+    if (this.player.getSession().sendClientPacket(encodeChatMessage("game", message ?? ""))) return this;
     const out = new PacketBuilder(253, PacketType.VARIABLE);
     out.putString(message ?? "");
     this.player.getSession().write(out);
+    return this;
+  }
+
+  sendPublicChat(message: string, from: string, playerId: number): this {
+    this.player.getSession().sendClientPacket(
+      encodeChatMessage("public", message, from, "", playerId)
+    );
     return this;
   }
 

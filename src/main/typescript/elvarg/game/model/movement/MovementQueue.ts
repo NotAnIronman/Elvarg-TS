@@ -302,6 +302,23 @@ export class MovementQueue {
         return true;
     }
 
+    public requestWalk(destination: Location): void {
+        if (!this.player || this.player.getHitpoints() <= 0) {
+            return;
+        }
+        const mobility = this.getMobility();
+        if (!mobility.canMove()) {
+            mobility.sendMessage(this.player);
+            return;
+        }
+        if (!this.checkDestination(destination)) {
+            return;
+        }
+        this.reset();
+        this.walkToReset();
+        PathFinder.calculateWalkRoute(this.player, destination.getX(), destination.getY());
+    }
+
     private getLast(): Point {
         let last = this.points.peekLast();
         if (!last)

@@ -1,6 +1,7 @@
 import { Player } from '../game/entity/impl/player/Player'
 import { LostCitySynthId } from '../game/LostCityAudioIds'
 import { Sound } from '../game/Sound'
+import { World } from './World'
 export class Sounds {
     private static readonly knownSoundsByName = Sounds.buildKnownSoundsByName();
     private static readonly generatedLostCitySoundsByName = Sounds.buildGeneratedLostCitySoundsByName();
@@ -75,6 +76,40 @@ export class Sounds {
 
     public static sendSoundEffect(player: Player, soundId: number, loopType: number, delay: number, volume: number) {
         player.getPacketSender().sendSoundEffect(soundId, loopType, delay, volume);
+    }
+
+    public static playAreaSound(options: {
+        soundId: number;
+        x: number;
+        y: number;
+        level?: number;
+        loops?: number;
+        delay?: number;
+        radius?: number;
+        attenuation?: number;
+    }): void {
+        if (!(options.soundId > 0)) return;
+        const level = options.level ?? 0;
+        const radius = Math.max(0, Math.min(31, options.radius ?? 0));
+        const broadcastRadius = Math.max(15, radius + 1);
+        for (const player of World.getPlayers()) {
+            if (player.isPlayerBot()) continue;
+            const location = player.getLocation();
+            if (location.getZ() !== level || Math.max(
+                Math.abs(location.getX() - options.x),
+                Math.abs(location.getY() - options.y),
+            ) > broadcastRadius) continue;
+            player.getPacketSender().sendAreaSound(
+                options.soundId,
+                options.x,
+                options.y,
+                level,
+                options.loops,
+                options.delay,
+                radius,
+                options.attenuation,
+            );
+        }
     }
 
     public static resolveKnownSound(token: string | number): Sound | null {

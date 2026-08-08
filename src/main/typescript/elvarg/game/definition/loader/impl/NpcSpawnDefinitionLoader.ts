@@ -5,6 +5,7 @@ import { NPC } from "../../../entity/impl/npc/NPC";
 import { Direction } from "../../../model/Direction";
 import { Location } from "../../../model/Location";
 import { DefinitionLoader } from "../DefinitionLoader";
+import { CacheDefinitions } from "../../../cache/CacheDefinitions";
 
 interface RawNpcSpawnDefinition {
     id: number;
@@ -39,7 +40,7 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
                 }
                 if (
                     source.name !== "elvarg" &&
-                    !NpcDefinition.definitions.has(definition.getId())
+                    definition.getId() >= CacheDefinitions.getCounts().npcs
                 ) {
                     unsupported++;
                     continue;

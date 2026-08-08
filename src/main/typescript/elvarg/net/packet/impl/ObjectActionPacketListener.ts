@@ -15,24 +15,38 @@ type ParsedObjectAction = {
 
 export class ObjectActionPacketListener implements PacketExecutor {
   public execute(player: Player, packet: Packet): void {
+    const parsed = this.parseObjectAction(packet);
+    if (parsed) this.executeAction(player, parsed.id, parsed.x, parsed.y, parsed.clickType);
+  }
+
+  public executeAction(
+    player: Player,
+    id: number,
+    x: number,
+    y: number,
+    clickType = 0,
+    action?: string
+  ): void {
     if (!player || player.getHitpoints() <= 0 || player.busy()) {
       return;
     }
-
-    const parsed = this.parseObjectAction(packet);
-    if (!parsed) {
-      return;
-    }
     const objectLocation = new Location(
-      parsed.x,
-      parsed.y,
+      x,
+      y,
       player.getLocation().getZ()
     );
     const sourceLocation = player.getLocation().clone();
-    const object = MapObjects.getPrivateArea(player, parsed.id, objectLocation);
+    const object = MapObjects.getPrivateArea(player, id, objectLocation);
     if (!object) {
       return;
     }
+    if (clickType < 1 || clickType > 5) {
+      const normalized = action?.trim().toLowerCase();
+      clickType = normalized
+        ? (object.getDefinition()?.getInteractions()?.findIndex((option) => option?.toLowerCase() === normalized) ?? -1) + 1
+        : 0;
+    }
+    if (clickType < 1 || clickType > 5) return;
 
     player.getMovementQueue().walkToObject(object, {
       execute: () => {
@@ -44,7 +58,7 @@ export class ObjectActionPacketListener implements PacketExecutor {
           player,
           object,
           objectId: object.getId(),
-          clickType: parsed.clickType,
+          clickType,
           location: {
             x: object.getLocation().getX(),
             y: object.getLocation().getY(),
@@ -61,7 +75,7 @@ export class ObjectActionPacketListener implements PacketExecutor {
           return;
         }
 
-        player.getArea()?.handleObjectClick(player, object, parsed.clickType);
+        player.getArea()?.handleObjectClick(player, object, clickType);
       },
     });
   }

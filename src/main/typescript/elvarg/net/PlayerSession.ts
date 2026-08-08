@@ -11,9 +11,26 @@ import {
 } from "./OutboundPacketProfile";
 import type { Player } from "../game/entity/impl/player/Player";
 import { GameConstants } from "../game/GameConstants";
+import { Appearance } from "../game/model/Appearance";
+import { Flag } from "../game/model/Flag";
 import { FastDeque } from "../util/FastDeque";
 import { PluginManager } from "../plugins/PluginManager";
 import { NOPPacketListener } from "./packet/impl/NOPPacketListener";
+import {
+  createNpcSyncState,
+  createPlayerSyncState,
+  encodePlayerAppearance,
+  encodeInitialPlayerSync,
+  encodeNpcSync,
+  encodePlaySong,
+  encodePlayerSync,
+  encodeTick,
+  NpcSyncState,
+  NpcView,
+  PlayerSyncState,
+  PlayerView,
+} from "./protocol/ClientProtocol";
+import { Music } from "../game/Music";
 
 type SessionChannel = {
   binaryTransport?: boolean;
@@ -57,6 +74,14 @@ export class PlayerSession {
   private player?: Player;
   private lastBackpressureLogAt = 0;
   private droppedOutboundFrames = 0;
+  private clientProtocol = false;
+  private sceneBaseX = -1;
+  private sceneBaseY = -1;
+  private playerSyncState?: PlayerSyncState;
+  private npcSyncState: NpcSyncState = createNpcSyncState();
+  private appearanceCache = new Map<number, { player: Player; payload: Buffer }>();
+  private lastMusicRegion = -1;
+  private lastMusicTrack = -1;
 
   constructor(
     channel: SessionChannel,
@@ -138,6 +163,9 @@ export class PlayerSession {
   }
 
   public write(builder: PacketBuilder) {
+    // Legacy Elvarg frames are not valid on the primary client connection. New packet
+    // encoders replace these incrementally as the server port progresses.
+    if (this.clientProtocol) return;
     const isBinaryTransport = this.isBinaryTransport();
     const outbound = this.buildOutboundPacket(builder, isBinaryTransport);
     if (!outbound) {
@@ -161,7 +189,11 @@ export class PlayerSession {
     this.outboundSocketPackets.push(outbound.packet);
   }
 
-  public flush() {
+  public flush(tick = 0) {
+    if (this.clientProtocol) {
+      this.flushClient(tick);
+      return;
+    }
     if (this.isBinaryTransport()) {
       if (!this.isBinaryChannelOpen()) {
         this.clearWebSocketQueue();
@@ -239,6 +271,172 @@ export class PlayerSession {
 
   public enableOutboundBatching(): void {
     this.outboundBatchingEnabled = true;
+  }
+
+  public useClientProtocol(): void {
+    this.clientProtocol = true;
+    this.sceneBaseX = -1;
+    this.sceneBaseY = -1;
+    this.playerSyncState = undefined;
+    this.npcSyncState = createNpcSyncState();
+    this.appearanceCache.clear();
+    this.lastMusicRegion = -1;
+    this.lastMusicTrack = -1;
+    this.clearWebSocketQueue();
+  }
+
+  public sendClientPacket(frame: Buffer): boolean {
+    if (!this.clientProtocol) return false;
+    if (!this.isBinaryChannelOpen() || this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES) {
+      return true;
+    }
+    try {
+      this.channel.send?.(frame);
+    } catch (error) {
+      console.warn("[PlayerSession] client packet send failed", error);
+    }
+    return true;
+  }
+
+  private flushClient(tick: number): void {
+    const player = this.player;
+    if (!player || !this.isBinaryChannelOpen()) return;
+    if (this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES) {
+      this.closeBackpressuredWebSocket("critical_buffered_amount");
+      return;
+    }
+
+    const location = player.getLocation();
+    const current = {
+      x: location.getX(),
+      y: location.getY(),
+      level: location.getZ(),
+    };
+    const musicRegion = ((current.x >> 6) << 8) | (current.y >> 6);
+    if (musicRegion !== this.lastMusicRegion) {
+      this.lastMusicRegion = musicRegion;
+      const track = Music.forRegion(musicRegion);
+      if (track !== undefined && track !== this.lastMusicTrack) {
+        this.lastMusicTrack = track;
+        this.sendClientPacket(encodePlaySong(track));
+      }
+    }
+    let playerSync: Buffer;
+    if (!this.playerSyncState) {
+      this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
+      this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
+      playerSync = encodeInitialPlayerSync(
+        player.getIndex(), current.x, current.y, current.level, tick
+      );
+      this.playerSyncState = createPlayerSyncState(player.getIndex(), current);
+    } else {
+      const localX = current.x - this.sceneBaseX;
+      const localY = current.y - this.sceneBaseY;
+      if (localX < 16 || localX >= 88) this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
+      if (localY < 16 || localY >= 88) this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
+      const views: PlayerView[] = [player, ...player.getLocalPlayers()].map((target) =>
+        this.createPlayerView(target)
+      );
+      playerSync = encodePlayerSync(
+        player.getIndex(),
+        this.sceneBaseX,
+        this.sceneBaseY,
+        tick,
+        views,
+        this.playerSyncState
+      );
+    }
+
+    const npcViews: NpcView[] = player.getLocalNpcs().map((npc) => {
+      const location = npc.getLocation();
+      const face = npc.getFace()?.getDirection?.();
+      return {
+        index: npc.getIndex(),
+        typeId: npc.getId(),
+        x: location.getX(),
+        y: location.getY(),
+        level: location.getZ(),
+        rotation: this.clientDirection(face),
+        walkDirection: this.clientDirection(npc.getWalkingDirection()),
+        runDirection: this.clientDirection(npc.getRunningDirection()),
+      };
+    });
+    const npcSync = encodeNpcSync(tick, current, npcViews, this.npcSyncState);
+
+    try {
+      this.channel.send?.(encodeTick(tick, Date.now()));
+      this.channel.send?.(playerSync);
+      this.channel.send?.(npcSync);
+    } catch (error) {
+      console.warn("[PlayerSession] client sync failed", error);
+    }
+  }
+
+  private createPlayerView(player: Player): PlayerView {
+    const location = player.getLocation();
+    const dirty = player.getUpdateFlag().flagged(Flag.APPEARANCE);
+    const cached = this.appearanceCache.get(player.getIndex());
+    let payload = cached?.player === player && !dirty ? cached.payload : undefined;
+    if (!payload) {
+      const look = player.getAppearance().getLook();
+      const equipment = player.getEquipment().getItems();
+      const skillAnimation = player.getSkillAnimation();
+      const weapon = equipment[3]?.getDefinition?.();
+      const animations = skillAnimation > 0
+        ? new Array(7).fill(skillAnimation)
+        : [
+            weapon?.getStandAnim?.() ?? 808,
+            823,
+            weapon?.getWalkAnim?.() ?? 819,
+            820,
+            821,
+            822,
+            weapon?.getRunAnim?.() ?? 824,
+          ];
+      payload = encodePlayerAppearance(
+        {
+          gender: look[Appearance.GENDER] ?? 0,
+          colors: [
+            look[Appearance.HAIR_COLOUR],
+            look[Appearance.TORSO_COLOUR],
+            look[Appearance.LEG_COLOUR],
+            look[Appearance.FEET_COLOUR],
+            look[Appearance.SKIN_COLOUR],
+          ].map((value) => value ?? 0),
+          kits: [
+            look[Appearance.HEAD],
+            look[Appearance.BEARD],
+            look[Appearance.CHEST],
+            look[Appearance.ARMS],
+            look[Appearance.HANDS],
+            look[Appearance.LEGS],
+            look[Appearance.FEET],
+          ].map((value) => value ?? -1),
+          equip: equipment.map((item) => item?.getId?.() ?? -1),
+        },
+        player.getUsername(),
+        player.getSkillManager().getCombatLevel(),
+        player.getSkillManager().getTotalLevel(),
+        animations
+      );
+      this.appearanceCache.set(player.getIndex(), { player, payload });
+    }
+    return {
+      index: player.getIndex(),
+      x: location.getX(),
+      y: location.getY(),
+      level: location.getZ(),
+      appearance: payload,
+      appearanceDirty: dirty,
+    };
+  }
+
+  private clientDirection(direction: { getX(): number; getY(): number } | null | undefined): number {
+    if (!direction) return -1;
+    const x = direction.getX();
+    const y = direction.getY();
+    if (x === 0 && y === 0) return -1;
+    return [0, 1, 2, 3, -1, 4, 5, 6, 7][(y + 1) * 3 + x + 1] ?? -1;
   }
 
   private isBinaryTransport(): boolean {

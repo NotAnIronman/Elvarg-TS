@@ -14,7 +14,6 @@ export class GameConstants {
     public static readonly PROCESS_NPCS_BY_ACTIVE_REGIONS: boolean = true;
     public static readonly CLIENT_UID: number = 8784521;
     public static readonly DEFINITIONS_DIRECTORY: string = "./data/definitions/";
-    public static readonly CLIPPING_DIRECTORY: string = "./data/clipping/";
     public static PLAYER_PERSISTENCE: PlayerPersistence = new NullPlayerPersistence();
     public static readonly CONCURRENCY: boolean = false;
     // Disable regional NPC processing optimization to avoid visibility churn during login/debug.

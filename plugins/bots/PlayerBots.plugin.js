@@ -29,9 +29,6 @@ const BOT_BEHAVIOR_MODE = Object.freeze({
   RETURN_HOME: "return_home",
 });
 const MANUAL_CONTROL_PACKET_OPCODES = new Set([
-  PacketConstants.COMMAND_MOVEMENT_OPCODE,
-  PacketConstants.GAME_MOVEMENT_OPCODE,
-  PacketConstants.MINIMAP_MOVEMENT_OPCODE,
   PacketConstants.OBJECT_FIRST_CLICK_OPCODE,
   PacketConstants.OBJECT_SECOND_CLICK_OPCODE,
   PacketConstants.OBJECT_THIRD_CLICK_OPCODE,

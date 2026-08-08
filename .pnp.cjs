@@ -35,12 +35,14 @@ const RAW_RUNTIME_STATE =
           ["@aws/dynamodb-data-mapper", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.7.3"],\
           ["@azure/data-tables", "npm:13.3.2"],\
           ["@fastify/cors", "npm:11.3.0"],\
+          ["@types/adm-zip", "npm:0.5.8"],\
           ["@types/async-lock", "npm:1.4.2"],\
           ["@types/logger", "npm:0.0.5"],\
           ["@types/node", "npm:18.19.130"],\
           ["@types/node-schedule", "npm:2.1.8"],\
           ["@types/nodemon", "npm:1.19.6"],\
           ["@types/ws", "npm:8.18.1"],\
+          ["adm-zip", "npm:0.5.18"],\
           ["agenda", "npm:5.0.0"],\
           ["async-lock", "npm:1.4.1"],\
           ["async-mutex", "npm:0.4.1"],\
@@ -2265,6 +2267,16 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["@types/adm-zip", [\
+      ["npm:0.5.8", {\
+        "packageLocation": "../../.yarn/berry/cache/@types-adm-zip-npm-0.5.8-1b88fecc8d-10c0.zip/node_modules/@types/adm-zip/",\
+        "packageDependencies": [\
+          ["@types/adm-zip", "npm:0.5.8"],\
+          ["@types/node", "npm:25.2.3"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["@types/async-lock", [\
       ["npm:1.4.2", {\
         "packageLocation": "../../.yarn/berry/cache/@types-async-lock-npm-1.4.2-7de893ec1e-10c0.zip/node_modules/@types/async-lock/",\
@@ -2434,6 +2446,15 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["acorn", "npm:8.15.0"],\
           ["acorn-walk", "npm:8.3.4"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["adm-zip", [\
+      ["npm:0.5.18", {\
+        "packageLocation": "../../.yarn/berry/cache/adm-zip-npm-0.5.18-64f4ff779b-10c0.zip/node_modules/adm-zip/",\
+        "packageDependencies": [\
+          ["adm-zip", "npm:0.5.18"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -6716,12 +6737,14 @@ const RAW_RUNTIME_STATE =
           ["@aws/dynamodb-data-mapper", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.7.3"],\
           ["@azure/data-tables", "npm:13.3.2"],\
           ["@fastify/cors", "npm:11.3.0"],\
+          ["@types/adm-zip", "npm:0.5.8"],\
           ["@types/async-lock", "npm:1.4.2"],\
           ["@types/logger", "npm:0.0.5"],\
           ["@types/node", "npm:18.19.130"],\
           ["@types/node-schedule", "npm:2.1.8"],\
           ["@types/nodemon", "npm:1.19.6"],\
           ["@types/ws", "npm:8.18.1"],\
+          ["adm-zip", "npm:0.5.18"],\
           ["agenda", "npm:5.0.0"],\
           ["async-lock", "npm:1.4.1"],\
           ["async-mutex", "npm:0.4.1"],\

@@ -1,5 +1,7 @@
 import { WeaponInterfaces } from "../content/combat/WeaponInterfaces";
 import { EquipmentType } from "../model/EquipmentType";
+import { CacheDefinitions } from "../cache/CacheDefinitions";
+import { ObjStackability } from "../cache/codec/rs/config/objtype/ObjStackability";
 
 export class ItemDefinition {
     public static definitions: Map<number, ItemDefinition> = new Map<number, ItemDefinition>();
@@ -33,9 +35,34 @@ export class ItemDefinition {
     private weight: number;
     private bonuses: number[];
     private requirements: number[];
+    private cacheHydrated: boolean = false;
 
     public static forId(item: number) {
-        return this.definitions.get(item) || this.DEFAULT;
+        if (!Number.isInteger(item) || item < 0 || item >= CacheDefinitions.getCounts().items) {
+            return this.definitions.get(item) || this.DEFAULT;
+        }
+        let definition = this.definitions.get(item);
+        if (!definition) {
+            definition = new ItemDefinition();
+            this.definitions.set(item, definition);
+        }
+        definition.hydrateFromCache(item);
+        return definition;
+    }
+
+    private hydrateFromCache(id: number): void {
+        if (this.cacheHydrated) return;
+        const cached = CacheDefinitions.getItem(id);
+        this.id = id;
+        this.name = cached.name;
+        this.examine = cached.examine ?? this.examine;
+        this.stackable = cached.stackability === ObjStackability.ALWAYS;
+        this.tradeable = cached.isTradable;
+        this.noted = cached.noteTemplate !== -1;
+        this.noteId = cached.note;
+        this.value = cached.price;
+        this.weight = cached.weight;
+        this.cacheHydrated = true;
     }
 
     public getId(): number {
@@ -151,6 +178,6 @@ export class ItemDefinition {
     }
 
     public unNote(): number {
-        return ItemDefinition.forId(this.id - 1).getName().toString() ? this.id - 1 : this.id;
+        return this.noted && this.noteId >= 0 ? this.noteId : this.id;
     }
 }

@@ -1,9 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const zlib = require("zlib");
 
-const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
+const { MapRegionReplacementManager } = require("../../src/main/typescript/elvarg/game/collision/MapRegionReplacementManager");
+const { CacheMaps } = require("../../src/main/typescript/elvarg/game/cache/CacheMaps");
 const { Buffer } = require("../../src/main/typescript/elvarg/game/collision/Buffer");
 const { ObjectDefinition } = require("../../src/main/typescript/elvarg/game/definition/ObjectDefinition");
 const { ObjectType } = require("./ObjectType");
@@ -64,18 +64,10 @@ function decodeRegionObjects(regionId) {
   if (!region) {
     return [];
   }
-  const objectFile = region.getObjectFile();
-  if (!Number.isInteger(objectFile) || objectFile < 0) {
-    return [];
-  }
-
-  const objectPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${objectFile}.dat`);
-  if (!fs.existsSync(objectPath)) {
-    return [];
-  }
-
-  const compressed = fs.readFileSync(objectPath);
-  const raw = zlib.gunzipSync(compressed);
+  const cached = CacheMaps.getRegion(regionId);
+  const replacement = MapRegionReplacementManager.getReplacementMapData(regionId);
+  const raw = replacement ? (replacement.objectData ?? cached?.objectData) : cached?.objectData;
+  if (!raw) return [];
   const objectStream = new Buffer(raw);
   const absX = ((regionId >> 8) & 0xff) * 64;
   const absY = (regionId & 0xff) * 64;
@@ -83,7 +75,7 @@ function decodeRegionObjects(regionId) {
   const objects = [];
   let objectId = -1;
   let incr;
-  while ((incr = objectStream.getUSmart()) !== 0) {
+  while ((incr = objectStream.readSmart()) !== 0) {
     objectId += incr;
     let location = 0;
     let incr2;
@@ -177,18 +169,9 @@ function decodeRegionTerrainData(regionId) {
   if (!region) {
     return null;
   }
-  const terrainFile = region.getTerrainFile();
-  if (!Number.isInteger(terrainFile) || terrainFile < 0) {
-    return null;
-  }
-
-  const terrainPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${terrainFile}.dat`);
-  if (!fs.existsSync(terrainPath)) {
-    return null;
-  }
-
-  const compressed = fs.readFileSync(terrainPath);
-  const raw = zlib.gunzipSync(compressed);
+  const cached = CacheMaps.getRegion(regionId);
+  const raw = MapRegionReplacementManager.getReplacementMapData(regionId)?.terrainData ?? cached?.terrainData;
+  if (!raw) return null;
   const stream = new Buffer(raw);
   const absX = ((regionId >> 8) & 0xff) * 64;
   const absY = (regionId & 0xff) * 64;
@@ -201,7 +184,7 @@ function decodeRegionTerrainData(regionId) {
     for (let tileX = 0; tileX < 64; tileX++) {
       for (let tileY = 0; tileY < 64; tileY++) {
         while (true) {
-          const tileType = stream.readUnsignedByte();
+          const tileType = stream.readUShort();
           if (tileType === 0) {
             if (z === 0) {
               heights[0][tileX][tileY] = -terrainVertexHeight(932731 + absX + tileX, 556238 + absY + tileY) * 8;
@@ -223,7 +206,7 @@ function decodeRegionTerrainData(regionId) {
             break;
           }
           if (tileType <= 49) {
-            overlays[z][tileX][tileY] = stream.readUnsignedByte() & 0xff;
+            overlays[z][tileX][tileY] = stream.readUShort();
           } else if (tileType <= 81) {
             flags[z][tileX][tileY] = tileType - 49;
           } else {

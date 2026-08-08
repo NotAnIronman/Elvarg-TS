@@ -7,5 +7,6 @@ dist
 # Runtime/server state
 data/saves/characters
 logs/
+caches/
 Function
 Server

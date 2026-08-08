@@ -1,33 +1,71 @@
+import { CacheDefinitions } from "../cache/CacheDefinitions";
+
 export class NpcDefinition {
     static definitions: Map<number, NpcDefinition> = new Map<number, NpcDefinition>();
-    private static DEFAULT: NpcDefinition = new NpcDefinition();
     private static DEFAULT_STATS: number[] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    private static DEFAULT: NpcDefinition = new NpcDefinition();
     
-    private id: number;
-    private name: string;
-    private examine: string;
-    private size: number;
-    private walkRadius: number;
-    private attackable: boolean;
-    private retreats: boolean;
-    private aggressive: boolean;
+    private id: number = -1;
+    private name: string = "null";
+    private examine: string = "";
+    private size: number = 1;
+    private walkRadius: number = 0;
+    private attackable: boolean = false;
+    private retreats: boolean = false;
+    private aggressive: boolean = false;
     private aggressiveTolerance: boolean = true;
-    private poisonous: boolean;
+    private poisonous: boolean = false;
     private fightsBack: boolean = true;
-    private respawn: number;
-    private maxHit: number;
+    private respawn: number = 25;
+    private maxHit: number = 1;
     private hitpoints: number = 10;
-    private attackSpeed: number;
-    private attackAnim: number;
-    private defenceAnim: number;
-    private deathAnim: number;
-    private combatLevel: number;
-    private stats: number[];
-    private slayerLevel: number;
-    private combatFollowDistance: number;
+    private attackSpeed: number = 4;
+    private attackAnim: number = 422;
+    private defenceAnim: number = 424;
+    private deathAnim: number = 836;
+    private combatLevel: number = 0;
+    private stats: number[] = [...NpcDefinition.DEFAULT_STATS];
+    private slayerLevel: number = 0;
+    private combatFollowDistance: number = 7;
+    private actions: string[] = [];
+    private cacheHydrated: boolean = false;
     
     public static forId(id: number): NpcDefinition {
-        return this.definitions.get(id) || this.DEFAULT;
+        if (!Number.isInteger(id) || id < 0 || id >= CacheDefinitions.getCounts().npcs) {
+            return this.definitions.get(id) || this.DEFAULT;
+        }
+        let definition = this.definitions.get(id);
+        if (!definition) {
+            definition = new NpcDefinition();
+            this.definitions.set(id, definition);
+        }
+        definition.hydrateFromCache(id);
+        return definition;
+    }
+
+    private hydrateFromCache(id: number): void {
+        if (this.cacheHydrated) return;
+        const cached = CacheDefinitions.getNpc(id);
+        this.id = id;
+        this.name = cached.name;
+        this.examine = cached.desc ?? this.examine;
+        this.size = cached.size;
+        this.attackable = cached.actions.some((action) => action?.toLowerCase() === "attack");
+        this.actions = [...cached.actions];
+        if (cached.combatLevel >= 0) this.combatLevel = cached.combatLevel;
+        if (cached.hitpoints > 0) this.hitpoints = cached.hitpoints;
+        const stats = this.stats ? [...this.stats] : [...NpcDefinition.DEFAULT_STATS];
+        for (const [index, value] of [
+            [0, cached.attackLevel],
+            [1, cached.strengthLevel],
+            [2, cached.defenceLevel],
+            [3, cached.rangedLevel],
+            [4, cached.magicLevel],
+        ]) {
+            if (value >= 0) stats[index] = value;
+        }
+        this.stats = stats;
+        this.cacheHydrated = true;
     }
     
     public getId(): number {
@@ -52,6 +90,10 @@ export class NpcDefinition {
     
     public isAttackable(): boolean {
         return this.attackable;
+    }
+
+    public getActions(): string[] {
+        return this.actions;
     }
     
     public doesRetreat(): boolean {

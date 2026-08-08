@@ -11,6 +11,7 @@ import * as fs from "fs";
 import Module = require("module");
 import { GameBuilder } from "./game/GameBuilder";
 import { GameConstants } from "./game/GameConstants";
+import { CachePipeline } from "./game/cache/CachePipeline";
 import { World } from "./game/World";
 import { NetworkBuilder } from "./net/NetworkBuilder";
 import { NetworkConstants } from "./net/NetworkConstants";
@@ -171,7 +172,7 @@ export class Server {
     process.exit(0);
   }
 
-  public static main(args: string[]) {
+  public static async main(args: string[]): Promise<void> {
     try {
       Server.setupFileLogging();
       Server.installGlobalCrashHandlers();
@@ -187,6 +188,9 @@ export class Server {
         process.env.DISABLE_PLAYER_BOTS = "1";
         console.info("[Server] --disablePlayerBots enabled");
       }
+
+      const cache = await CachePipeline.initialize();
+      console.info(`[cache] active ${cache.name} (revision ${cache.revision})`);
 
       PluginManager.loadFromDirectory(path.join(process.cwd(), "plugins"));
 
@@ -238,5 +242,5 @@ export class Server {
 }
 
 if (require.main === module) {
-  Server.main(process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["1"]);
+  void Server.main(process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["1"]);
 }

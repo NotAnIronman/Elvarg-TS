@@ -1,4 +1,3 @@
-import { GameConstants } from '../GameConstants'
 import { ObjectDefinition } from '../definition/ObjectDefinition'
 import type { Mobile } from '../entity/impl/Mobile'
 import { GameObject } from '../entity/impl/object/GameObject'
@@ -6,14 +5,14 @@ import { MapObjects } from '../entity/impl/object/MapObjects'
 import { Direction } from '../model/Direction'
 import { Location } from '../model/Location'
 import { PrivateArea } from '../model/areas/impl/PrivateArea'
-import * as fs from "fs";
 import { Buffer } from './Buffer'
 import { Region } from './Region'
-import pako from 'pako';
-import * as zlib from "zlib";
+import * as fs from "fs";
 import * as path from "path";
 import { PluginManager } from "../../plugins/PluginManager";
 import { MapRegionReplacementManager } from "./MapRegionReplacementManager";
+import { CacheMaps } from "../cache/CacheMaps";
+import { CachePipeline } from "../cache/CachePipeline";
 
 export class RegionManager {
     public static PROJECTILE_NORTH_WEST_BLOCKED = 0x200;
@@ -34,23 +33,22 @@ export class RegionManager {
     private static loadingRegions: Set<number> = new Set<number>();
 
     public static init(): void {
-        // Load object definitions..
         ObjectDefinition.init();
-        // Load regions..
-        const mapIndexPath = GameConstants.CLIPPING_DIRECTORY + "map_index";
-        if (!fs.existsSync(mapIndexPath)) {
-            console.warn("RegionManager: map_index not found; skipping region load (no clipping).");
-            return;
+        RegionManager.regions.clear();
+        for (const regionId of CacheMaps.getRegionIds()) {
+            const files = CacheMaps.getArchiveIds(regionId)!;
+            RegionManager.regions.set(regionId, new Region(regionId, files.terrainFile, files.objectFile));
         }
-        let data = fs.readFileSync(mapIndexPath);
-        let stream = new Buffer(data);
-        let size = stream.readUShort();
-        for (let i = 0; i < size; i++) {
-            let regionId = stream.readUShort();
-            let terrainFile = stream.readUShort();
-            let objectFile = stream.readUShort();
-            RegionManager.regions.set(regionId, new Region(regionId, terrainFile, objectFile));
+        const replacementDir = path.resolve(process.cwd(), "data", "regions");
+        if (fs.existsSync(replacementDir)) {
+            for (const name of fs.readdirSync(replacementDir).sort()) {
+                const match = /^(\d+)\.pack$/.exec(name);
+                if (match) MapRegionReplacementManager.replaceMapRegion(
+                    Number(match[1]), path.join(replacementDir, name),
+                );
+            }
         }
+        console.info(`[collision] indexed ${RegionManager.regions.size} cache regions`);
     }
 
     public static getRegionid(regionId: number): Region | undefined {
@@ -62,9 +60,6 @@ export class RegionManager {
     }
 
     public static getRegion(x: number, y: number): Region | undefined {
-        if (RegionManager.regions.size === 0) {
-            return undefined;
-        }
         RegionManager.loadMapFiles(x, y);
         let regionId = RegionManager.regionIdForTile(x, y);
         return RegionManager.getRegionid(regionId);
@@ -344,10 +339,10 @@ export class RegionManager {
         }
 
         if (type === 22) {
-            if (def.hasActions() && def.isSolid()) {
-                RegionManager.addClipping(x, y, height, 0x200000, object.getPrivateArea());
+            if (def.isClippedDecoration()) {
+                RegionManager.addClipping(x, y, height, 0x40000, object.getPrivateArea());
             }
-        } else if (type >= 9) {
+        } else if (type >= 9 && type <= 11) {
             if (def.isSolid()) {
                 RegionManager.addClippingForSolidObject(x, y, height, xLength, yLength, def.isImpenetrable(), object.getPrivateArea());
             }
@@ -384,10 +379,10 @@ export class RegionManager {
         }
 
         if (type === 22) {
-            if (def.hasActions() && def.isSolid()) {
-                this.removeClipping(x, y, height, 0x200000, object.getPrivateArea());
+            if (def.isClippedDecoration()) {
+                this.removeClipping(x, y, height, 0x40000, object.getPrivateArea());
             }
-        } else if (type >= 9) {
+        } else if (type >= 9 && type <= 11) {
             if (def.isSolid()) {
                 this.removeClippingForSolidObject(x, y, height, xLength, yLength, def.isSolid(), object.getPrivateArea());
             }
@@ -773,15 +768,13 @@ export class RegionManager {
 
             // Attempt to create streams..
             const replacement = MapRegionReplacementManager.getReplacementMapData(regionId);
-            const terrainPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${r.getTerrainFile()}.dat`);
-            const objectPath = path.join(GameConstants.CLIPPING_DIRECTORY, "maps", `${r.getObjectFile()}.dat`);
-            const defaultObjectData = fs.existsSync(objectPath) ? zlib.gunzipSync(fs.readFileSync(objectPath)) : null;
+            const cached = CacheMaps.getRegion(regionId);
             const gFileData = replacement?.terrainData
                 ? replacement.terrainData
-                : (fs.existsSync(terrainPath) ? zlib.gunzipSync(fs.readFileSync(terrainPath)) : null);
+                : cached?.terrainData;
             const oFileData = replacement
-                ? (replacement.objectData ?? defaultObjectData)
-                : defaultObjectData;
+                ? (replacement.objectData ?? cached?.objectData)
+                : cached?.objectData;
 
             // Don't allow ground file to be invalid..
             if (!gFileData) {
@@ -796,18 +789,22 @@ export class RegionManager {
             const heightMap = Array.from({ length: 4 }, () =>
                 Array.from({ length: 64 }, () => new Array(64).fill(0))
             );
+            const newTerrainFormat = CachePipeline.getActive().revision >= 209;
             for (let z = 0; z < 4; z++) {
                 for (let tileX = 0; tileX < 64; tileX++) {
                     for (let tileY = 0; tileY < 64; tileY++) {
                         while (true) {
-                            const tileType = groundStream.readUnsignedByte();
+                            const tileType = newTerrainFormat
+                                ? groundStream.readUShort()
+                                : groundStream.readUnsignedByte();
                             if (tileType === 0) {
                                 break;
                             } else if (tileType === 1) {
                                 groundStream.readUnsignedByte();
                                 break;
                             } else if (tileType <= 49) {
-                                groundStream.readUnsignedByte();
+                                if (newTerrainFormat) groundStream.readUShort();
+                                else groundStream.readUnsignedByte();
                             } else if (tileType <= 81) {
                                 heightMap[z][tileX][tileY] = tileType - 49;
                             }
@@ -835,7 +832,7 @@ export class RegionManager {
                 const objectStream = new Buffer(oFileData);
                 let objectId = -1;
                 let incr;
-                while ((incr = objectStream.getUSmart()) !== 0) {
+                while ((incr = objectStream.readSmart()) !== 0) {
                     objectId += incr;
                     let location = 0;
                     let incr2;

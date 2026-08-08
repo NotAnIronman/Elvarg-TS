@@ -16,7 +16,6 @@ import { DialoguePacketListener } from "../packet/impl/DialoguePacketListener";
 import { PlayerInactivePacketListener } from "../packet/impl/PlayerInactivePacketListener";
 import { ChatSettingsPacketListener } from "../packet/impl/ChatSettingsPacketListener";
 import { CommandPacketListener } from "../packet/impl/CommandPacketListener";
-import { MovementPacketListener } from "../packet/impl/MovementPacketListener";
 import { PickupItemPacketListener } from "../packet/impl/PickupItemPacketListener";
 import { SecondGroundItemOptionPacketListener } from "../packet/impl/SecondGroundItemOptionPacketListener";
 import { SwitchItemSlotPacketListener } from "../packet/impl/SwitchItemSlotPacketListener";
@@ -57,9 +56,6 @@ export class PacketConstants {
   public static readonly PLAYER_INACTIVE_OPCODE = 202;
   public static readonly CHAT_SETTINGS_OPCODE = 95;
   public static readonly COMMAND_OPCODE = 103;
-  public static readonly COMMAND_MOVEMENT_OPCODE = 98;
-  public static readonly GAME_MOVEMENT_OPCODE = 164;
-  public static readonly MINIMAP_MOVEMENT_OPCODE = 248;
   public static readonly MAP_STATE_OPCODE = 99;
   public static readonly SOUND_AREA_OPCODE = 209;
   public static readonly PICKUP_ITEM_OPCODE = 236;
@@ -129,9 +125,6 @@ export class PacketConstants {
     [PacketConstants.PLAYER_INACTIVE_OPCODE, new PlayerInactivePacketListener()],
     [PacketConstants.CHAT_SETTINGS_OPCODE, new ChatSettingsPacketListener()],
     [PacketConstants.COMMAND_OPCODE, new CommandPacketListener()],
-    [PacketConstants.COMMAND_MOVEMENT_OPCODE, new MovementPacketListener()],
-    [PacketConstants.GAME_MOVEMENT_OPCODE, new MovementPacketListener()],
-    [PacketConstants.MINIMAP_MOVEMENT_OPCODE, new MovementPacketListener()],
     [PacketConstants.MAP_STATE_OPCODE, new NOPPacketListener()],
     [PacketConstants.PICKUP_ITEM_OPCODE, new PickupItemPacketListener()],
     [PacketConstants.SECOND_GROUNDITEM_OPTION_OPCODE, new SecondGroundItemOptionPacketListener()],
@@ -195,6 +188,5 @@ export class PacketConstants {
     [200, new NOPPacketListener()],
     [209, new NOPPacketListener()],
     [210, new RegionChangePacketListener()],
-    [248, new MovementPacketListener()],
   ]);
 }

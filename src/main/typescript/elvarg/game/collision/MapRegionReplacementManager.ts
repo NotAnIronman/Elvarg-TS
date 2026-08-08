@@ -1,15 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
-import { GameConstants } from "../GameConstants";
+import { CacheMaps } from "../cache/CacheMaps";
 import { Buffer as CollisionBuffer } from "./Buffer";
 import { PacketBuilder } from "../../net/packet/PacketBuilder";
 import { PacketType } from "../../net/packet/PacketType";
-
-type RegionMapFiles = {
-  terrainFile: number;
-  objectFile: number;
-};
 
 export type ReplaceMapRegionSource = string | [string, string];
 
@@ -39,7 +34,6 @@ export class MapRegionReplacementManager {
   private static readonly PACKET_FLAG_ALLOW_RELOAD = 0x1;
 
   private static replacements: Map<number, RegionReplacement> = new Map();
-  private static mapIndexCache: Map<number, RegionMapFiles> | null = null;
   private static pendingSceneLoads: WeakSet<object> = new WeakSet();
 
   public static replaceMapRegion(
@@ -107,6 +101,29 @@ export class MapRegionReplacementManager {
       terrainData: replacement.terrainData,
       objectData: replacement.objectData,
     };
+  }
+
+  public static getRegionIds(): number[] {
+    return Array.from(this.replacements.keys()).sort((a, b) => a - b);
+  }
+
+  public static getRegionPack(regionId: number): Buffer | null {
+    const replacement = this.replacements.get(regionId);
+    const files = CacheMaps.getArchiveIds(regionId);
+    if (!replacement || !files || !replacement.objectData) return null;
+    const objectData = Buffer.from(replacement.objectData);
+    const terrainData = Buffer.from(replacement.terrainData);
+    const pack = Buffer.alloc(28 + objectData.length + terrainData.length);
+    pack.writeInt32BE(1, 0);
+    pack.writeInt32BE(files.objectFile, 4);
+    pack.writeInt32BE(files.terrainFile, 8);
+    pack.writeInt32BE(regionId >> 8, 12);
+    pack.writeInt32BE(regionId & 0xff, 16);
+    pack.writeInt32BE(objectData.length, 20);
+    objectData.copy(pack, 24);
+    pack.writeInt32BE(terrainData.length, 24 + objectData.length);
+    terrainData.copy(pack, 28 + objectData.length);
+    return pack;
   }
 
   public static sendAllReplacementsToPlayer(player: any): number {
@@ -362,8 +379,15 @@ export class MapRegionReplacementManager {
       throw new Error(`pack file too short: ${packPath}`);
     }
 
-    const firstFileId = data.readInt32BE(4);
-    const secondFileId = data.readInt32BE(8);
+    if (data.readInt32BE(0) !== 1 || data.readInt32BE(12) !== (regionId >> 8) ||
+        data.readInt32BE(16) !== (regionId & 0xff)) {
+      throw new Error(`pack region does not match ${regionId}: ${packPath}`);
+    }
+    const files = CacheMaps.getArchiveIds(regionId);
+    if (!files || data.readInt32BE(4) !== files.objectFile ||
+        data.readInt32BE(8) !== files.terrainFile) {
+      throw new Error(`pack archive IDs do not match the active cache: ${packPath}`);
+    }
     const firstLength = data.readInt32BE(20);
     if (firstLength <= 0) {
       throw new Error(`invalid first entry length in pack: ${packPath}`);
@@ -385,42 +409,9 @@ export class MapRegionReplacementManager {
       throw new Error(`truncated second entry in pack: ${packPath}`);
     }
 
-    const firstData = data.subarray(firstDataStart, firstDataEnd);
-    const secondData = data.subarray(secondDataStart, secondDataEnd);
-    const mapFiles = this.lookupMapFiles(regionId);
-
-    let terrainData: Uint8Array | null = null;
-    let objectData: Uint8Array | null = null;
-    if (mapFiles) {
-      if (firstFileId === mapFiles.terrainFile) {
-        terrainData = firstData;
-      } else if (firstFileId === mapFiles.objectFile) {
-        objectData = firstData;
-      }
-
-      if (secondFileId === mapFiles.terrainFile) {
-        terrainData = secondData;
-      } else if (secondFileId === mapFiles.objectFile) {
-        objectData = secondData;
-      }
-    }
-
-    if (!terrainData && !objectData) {
-      // RSPSi's pack format always stores object data first, then terrain data.
-      // File size is not a discriminator: object archives are often much larger.
-      objectData = firstData;
-      terrainData = secondData;
-    } else if (!terrainData) {
-      terrainData = objectData === firstData ? secondData : firstData;
-    } else if (!objectData) {
-      objectData = terrainData === firstData ? secondData : firstData;
-    }
-
     return {
-      terrainData: this.decodeMapFileBytes(terrainData, `${packPath}#terrain`),
-      objectData: objectData
-        ? this.decodeMapFileBytes(objectData, `${packPath}#object`)
-        : null,
+      objectData: this.decodeMapFileBytes(data.subarray(firstDataStart, firstDataEnd), `${packPath}#object`),
+      terrainData: this.decodeMapFileBytes(data.subarray(secondDataStart, secondDataEnd), `${packPath}#terrain`),
       resolvedSource: packPath,
     };
   }
@@ -462,26 +453,4 @@ export class MapRegionReplacementManager {
     return raw;
   }
 
-  private static lookupMapFiles(regionId: number): RegionMapFiles | null {
-    if (!this.mapIndexCache) {
-      this.mapIndexCache = new Map<number, RegionMapFiles>();
-      const mapIndexPath = path.resolve(
-        process.cwd(),
-        GameConstants.CLIPPING_DIRECTORY,
-        "map_index"
-      );
-      if (!fs.existsSync(mapIndexPath)) {
-        return null;
-      }
-      const stream = new CollisionBuffer(fs.readFileSync(mapIndexPath));
-      const size = stream.readUShort();
-      for (let i = 0; i < size; i++) {
-        const id = stream.readUShort();
-        const terrainFile = stream.readUShort();
-        const objectFile = stream.readUShort();
-        this.mapIndexCache.set(id, { terrainFile, objectFile });
-      }
-    }
-    return this.mapIndexCache.get(regionId) ?? null;
-  }
 }

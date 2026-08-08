@@ -3,6 +3,7 @@ import { Misc } from "../../../util/Misc";
 import { Packet } from "../Packet";
 import { PacketConstants } from "../PacketConstants";
 import { PacketExecutor } from "../../packet/PacketExecutor";
+import { CommandPacketListener } from "./CommandPacketListener";
 
 export class ChatPacketListener implements PacketExecutor {
   private static allowChat(player: any, text: string) {
@@ -25,6 +26,30 @@ export class ChatPacketListener implements PacketExecutor {
     return true;
   }
 
+  public static handleText(player: any, value: string): void {
+    const text = String(value ?? "").replace(/[<>]/g, "").trim().slice(0, 80);
+    if (text.startsWith("::")) {
+      new CommandPacketListener().execute(
+        player,
+        new Packet(CommandPacketListener.OP_CODE, Buffer.from(`${text.slice(2)}\n`, "latin1"))
+      );
+      return;
+    }
+    if (!ChatPacketListener.allowChat(player, text)) return;
+
+    const recipients = [player, ...player.getLocalPlayers()];
+    const sent = new Set<number>();
+    for (const recipient of recipients) {
+      if (
+        !recipient ||
+        sent.has(recipient.getIndex()) ||
+        recipient.getRelations?.().hasIgnore?.(player.getLongUsername())
+      ) continue;
+      sent.add(recipient.getIndex());
+      recipient.getPacketSender().sendPublicChat(text, player.getUsername(), player.getIndex());
+    }
+  }
+
   execute(player: any, packet: Packet) {
     switch (packet.getOpcode()) {
       case PacketConstants.REGULAR_CHAT_OPCODE:
@@ -36,12 +61,7 @@ export class ChatPacketListener implements PacketExecutor {
           Misc.textUnpack(text, size).toLowerCase()
         );
 
-        if (!ChatPacketListener.allowChat(player, chatMessage)) {
-          return;
-        }
-        if (player.getChatMessageQueue().length >= 5) {
-          return;
-        }
+        ChatPacketListener.handleText(player, chatMessage);
         break;
     }
   }

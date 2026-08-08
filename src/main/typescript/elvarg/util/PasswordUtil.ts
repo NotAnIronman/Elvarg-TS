@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt = require("bcrypt");
 
 export class PasswordUtil {
     private static pbkdf2 = 10;

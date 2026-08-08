@@ -1,6 +1,6 @@
 export class NetworkConstants {
     public static readonly TCP_PORT: number = parseInt(process.env.TCP_PORT || "43594", 10) || 0;
-    public static readonly WEBSOCKET_PORT: number = parseInt(process.env.WEBSOCKET_PORT || "49598", 10) || 0;
+    public static readonly WEBSOCKET_PORT: number = parseInt(process.env.WEBSOCKET_PORT || "43594", 10) || 0;
     public static readonly VOICE_SIGNAL_PORT: number = parseInt(process.env.VOICE_SIGNAL_PORT || "49599", 10) || 0;
     public static readonly DEVELOPMENT_API_PORT: number = parseInt(
         process.env.DEVELOPMENT_API_PORT || "49600",

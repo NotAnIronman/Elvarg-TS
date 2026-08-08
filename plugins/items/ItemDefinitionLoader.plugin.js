@@ -61,7 +61,7 @@ function getItemDefinitionsPath() {
   return path.resolve(
     process.cwd(),
     GameConstants.DEFINITIONS_DIRECTORY,
-    "items.json"
+    "item-gameplay.json"
   );
 }
 
@@ -76,24 +76,35 @@ function loadItemDefinitions() {
 
   let loaded = 0;
   let unresolvedWeaponInterfaces = 0;
+  let mismatched = 0;
   for (const rawDef of defs) {
     if (!rawDef || typeof rawDef !== "object") {
       continue;
     }
 
-    const def = Object.assign(new ItemDefinition(), rawDef);
+    const id = rawDef.id;
+    if (!Number.isInteger(id) || id < 0) {
+      continue;
+    }
+    const def = ItemDefinition.forId(id);
+    if ((rawDef.name || "").trim().toLowerCase() !== def.getName().trim().toLowerCase()) {
+      mismatched++;
+      continue;
+    }
     def.equipmentType = hydrateEquipmentType(rawDef.equipmentType);
     def.weaponInterface = hydrateWeaponInterface(rawDef.weaponInterface);
+    for (const property of [
+      "doubleHanded", "dropable", "sellable", "bloodMoneyValue", "highAlch",
+      "lowAlch", "dropValue", "blockAnim", "standAnim", "walkAnim", "runAnim",
+      "standTurnAnim", "turn180Anim", "turn90CWAnim", "turn90CCWAnim", "bonuses",
+      "requirements",
+    ]) {
+      if (rawDef[property] !== undefined) def[property] = rawDef[property];
+    }
     if (rawDef.weaponInterface != null && def.weaponInterface == null) {
       unresolvedWeaponInterfaces++;
     }
 
-    const id = rawDef.id ?? def.getId?.();
-    if (!Number.isInteger(id) || id < 0) {
-      continue;
-    }
-
-    ItemDefinition.definitions.set(id, def);
     loaded += 1;
   }
 
@@ -102,6 +113,7 @@ function loadItemDefinitions() {
     loaded,
     total: ItemDefinition.definitions.size,
     unresolvedWeaponInterfaces,
+    mismatched,
   };
 }
 
@@ -115,6 +127,7 @@ module.exports = {
       loaded: result.loaded,
       total: result.total,
       unresolvedWeaponInterfaces: result.unresolvedWeaponInterfaces,
+      mismatched: result.mismatched,
       elapsedMs: Date.now() - startedAt,
     });
   },

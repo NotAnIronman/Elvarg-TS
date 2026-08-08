@@ -394,9 +394,6 @@ export class World {
 
     public static getNearbyNpcsForUpdate(player: Player): NPC[] {
         const nearby = World.collectFromBuckets(World.npcUpdateBuckets, player.getLocation());
-        if (nearby.length === 0) {
-            return Array.from(World.getActiveNpcsForUpdate()).sort((a, b) => a.getIndex() - b.getIndex());
-        }
         nearby.sort((a, b) => a.getIndex() - b.getIndex());
         return nearby;
     }
@@ -838,11 +835,11 @@ export class World {
         timed("flush_players", () => {
             World.players.forEach((player) => {
                 try {
+                    if (World.shouldRunNetworkUpdates(player)) {
+                        player.getSession().flush(World.processCycle);
+                    }
                     player.resetUpdating();
                     player.setCachedUpdateBlock(null);
-                    if (World.shouldRunNetworkUpdates(player)) {
-                        player.getSession().flush();
-                    }
                 } catch (e) {
                     console.log(e);
                     player.requestLogout();

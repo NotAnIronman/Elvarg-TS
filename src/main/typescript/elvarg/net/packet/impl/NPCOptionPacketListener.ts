@@ -75,7 +75,21 @@ export class NPCOptionPacketListener implements PacketExecutor {
     }
 
     const clickType = opcodeToClickType(opcode);
-    if (clickType === 0) {
+    this.executeOption(player, index, clickType);
+  }
+
+  public executeOption(player: any, index: number, clickType: number): void {
+    if (!player || player.getHitpoints?.() <= 0 || player.busy?.() || clickType < 1 || clickType > 5) return;
+    if (index < 0 || index > World.getNpcs().capacityReturn()) return;
+    const npc = World.getNpcs().get(index);
+    if (!npc || !player.getLocation().isWithinDistance(npc.getLocation(), 24)) return;
+
+    player.setPositionToFace(npc.getLocation());
+    const option = npc.getCurrentDefinition?.()?.getActions?.()?.[clickType - 1]?.toLowerCase();
+    if (option === "attack") {
+      if (!npc.getCurrentDefinition?.()?.isAttackable?.() || npc.getHitpoints?.() <= 0) return;
+      if (player.getCombat?.().getAutocastSpell?.() != null) player.getCombat().setCastSpell(null);
+      player.getCombat().attack(npc);
       return;
     }
 
