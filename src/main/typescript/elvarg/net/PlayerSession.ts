@@ -19,6 +19,7 @@ import { NOPPacketListener } from "./packet/impl/NOPPacketListener";
 import {
   createNpcSyncState,
   createPlayerSyncState,
+  ActorUpdateView,
   encodePlayerAppearance,
   encodeInitialPlayerSync,
   encodeNpcSync,
@@ -31,6 +32,8 @@ import {
   PlayerView,
 } from "./protocol/ClientProtocol";
 import { Music } from "../game/Music";
+import { Skill } from "../game/model/Skill";
+import { HitMask } from "../game/content/combat/hit/HitMask";
 
 type SessionChannel = {
   binaryTransport?: boolean;
@@ -351,6 +354,7 @@ export class PlayerSession {
       const location = npc.getLocation();
       const face = npc.getFace()?.getDirection?.();
       return {
+        ...this.createActorUpdates(npc, npc.getDefinition().getHitpoints(), false),
         index: npc.getIndex(),
         typeId: npc.getId(),
         x: location.getX(),
@@ -421,14 +425,86 @@ export class PlayerSession {
       );
       this.appearanceCache.set(player.getIndex(), { player, payload });
     }
+    const updates = this.createActorUpdates(
+      player,
+      player.getSkillManager().getMaxLevel(Skill.HITPOINTS),
+      player === this.player
+    );
+    const positionToFace = player.getPositionToFace();
+    const forceMovement = player.getForceMovement();
+    const forceMovementDirty = player.getUpdateFlag().flagged(Flag.FORCED_MOVEMENT);
+    if (forceMovementDirty && forceMovement && !updates.animation && forceMovement.getAnimation() > 0) {
+      updates.animation = { id: forceMovement.getAnimation(), delay: 0 };
+    }
     return {
+      ...updates,
       index: player.getIndex(),
       x: location.getX(),
       y: location.getY(),
       level: location.getZ(),
       appearance: payload,
       appearanceDirty: dirty,
+      faceDirection: player.getUpdateFlag().flagged(Flag.FACE_POSITION) && positionToFace
+        ? this.faceDirection(location, positionToFace)
+        : undefined,
+      forcedMovement: forceMovementDirty && forceMovement
+        ? {
+            startDeltaX: forceMovement.getStart().getX() - location.getX(),
+            startDeltaY: forceMovement.getStart().getY() - location.getY(),
+            endDeltaX: forceMovement.getEnd().getX(),
+            endDeltaY: forceMovement.getEnd().getY(),
+            startCycleOffset: forceMovement.getSpeed(),
+            endCycleOffset: forceMovement.getReverseSpeed(),
+            direction: [1024, 1536, 0, 512][forceMovement.getDirection()] ?? forceMovement.getDirection(),
+          }
+        : undefined,
     };
+  }
+
+  private createActorUpdates(actor: any, maxHitpoints: number, mine: boolean): ActorUpdateView {
+    const flags = actor.getUpdateFlag();
+    const hits = [];
+    if (flags.flagged(Flag.SINGLE_HIT) && actor.getPrimaryHit()) hits.push(actor.getPrimaryHit());
+    if (flags.flagged(Flag.DOUBLE_HIT) && actor.getSecondaryHit()) hits.push(actor.getSecondaryHit());
+    const interaction = actor.getInteractingMobile();
+    const animation = actor.getAnimation();
+    const graphic = actor.getGraphic();
+    return {
+      forcedChat: flags.flagged(Flag.FORCED_CHAT) && actor.getForcedChat() != null
+        ? actor.getForcedChat()
+        : undefined,
+      interactionIndex: flags.flagged(Flag.ENTITY_INTERACTION)
+        ? interaction == null ? -1 : interaction.getIndex() + (interaction.isPlayer() ? 0x8000 : 0)
+        : undefined,
+      animation: flags.flagged(Flag.ANIMATION) && animation
+        ? { id: animation.getId(), delay: animation.getDelay() }
+        : undefined,
+      graphic: flags.flagged(Flag.GRAPHIC) && graphic
+        ? { id: graphic.getId(), height: graphic.getHeight(), delay: graphic.getDelay() }
+        : undefined,
+      hits: hits.length > 0
+        ? hits.map((hit: any) => ({
+            type: this.hitsplatType(hit.getHitmask(), mine),
+            damage: hit.getDamage(),
+          }))
+        : undefined,
+      health: hits.length > 0
+        ? { current: actor.getHitpoints(), max: maxHitpoints }
+        : undefined,
+    };
+  }
+
+  private hitsplatType(mask: HitMask, mine: boolean): number {
+    if (mask === HitMask.BLUE) return mine ? 12 : 13;
+    if (mask === HitMask.GREEN) return mine ? 65 : 66;
+    if (mask === HitMask.YELLOW) return mine ? 22 : 23;
+    return mine ? 16 : 17;
+  }
+
+  private faceDirection(from: any, to: any): number {
+    const dx = from.getX() - to.getX();
+    const dy = from.getY() - to.getY();
+    return dx === 0 && dy === 0 ? 0 : (Math.atan2(dx, dy) * (1024 / Math.PI)) & 2047;
   }
 
   private clientDirection(direction: { getX(): number; getY(): number } | null | undefined): number {

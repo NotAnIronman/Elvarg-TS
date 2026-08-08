@@ -19,7 +19,7 @@ import { DonatorRights } from "../../game/model/rights/DonatorRights";
 import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
 import { World } from "../../game/World";
 import { InterfaceLayoutRegistry } from "../../game/definition/InterfaceLayoutDefinition";
-import { encodeChatMessage, encodePlayJingle, encodePlaySong, encodeSound } from "../protocol/ClientProtocol";
+import { encodeChatMessage, encodePlayJingle, encodePlaySong, encodeProjectiles, encodeSound } from "../protocol/ClientProtocol";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
 // import { Mobile } from "../../game/entity/impl/Mobile";
@@ -1234,6 +1234,22 @@ export class PacketSender {
       return this;
     }
 
+    const targetIndex = this.resolveProjectileTargetIndex(lockon);
+    if (this.player.getSession().sendClientPacket(encodeProjectiles([{
+      projectileId,
+      source: { x: start.getX(), y: start.getY(), level: start.getZ?.() ?? 0 },
+      target: { x: end.getX(), y: end.getY(), level: end.getZ?.() ?? start.getZ?.() ?? 0 },
+      sourceHeight: startHeight * 4,
+      endHeight: endHeight * 4,
+      slope: angle,
+      startPos: distanceOffset,
+      startCycleOffset: delay,
+      endCycleOffset: Math.max(delay + 1, speed),
+      targetActor: targetIndex < 0
+        ? { kind: "player", index: -targetIndex - 1 }
+        : targetIndex > 0 ? { kind: "npc", index: targetIndex - 1 } : undefined,
+    }]))) return this;
+
     if (!this.sendPositionIfVisible(start)) {
       return this;
     }
@@ -1243,7 +1259,6 @@ export class PacketSender {
     out.put(end.getX() - start.getX());
     out.put(end.getY() - start.getY());
 
-    const targetIndex = this.resolveProjectileTargetIndex(lockon);
     out.putShort(targetIndex);
 
     out.putShort(projectileId);

@@ -14,6 +14,7 @@ import {
   encodePlaySong,
   encodePlayerAppearance,
   encodePlayerSync,
+  encodeProjectiles,
   encodeWelcome,
   encodeSound,
   encodeServerPacket,
@@ -104,6 +105,26 @@ const playerFrame = encodePlayerSync(1, 3040, 3472, 10, [
 assert.strictEqual(playerFrame[0], 20);
 assert.deepStrictEqual(playerState.active, [1, 2]);
 
+const combatPlayerState = createPlayerSyncState(1, { x: 3090, y: 3524, level: 0 });
+const combatPlayerFrame = encodePlayerSync(1, 3040, 3472, 11, [{
+  index: 1,
+  x: 3090,
+  y: 3524,
+  level: 0,
+  appearance,
+  forcedChat: "Ow",
+  faceDirection: 1024,
+  interactionIndex: 7,
+  animation: { id: 123, delay: 2 },
+  hits: [{ type: 16, damage: 5 }],
+  health: { current: 5, max: 10 },
+  graphic: { id: 456, height: 50, delay: 3 },
+}], combatPlayerState);
+assert.deepStrictEqual([...combatPlayerFrame.subarray(-31)], [
+  235, 64, 1, 79, 119, 0, 0, 4, 0, 7, 0, 251, 0, 2,
+  255, 16, 5, 0, 255, 0, 0, 0, 15, 129, 0, 1, 200, 0, 3, 0, 50,
+]);
+
 const npcState = createNpcSyncState();
 const npcFrame = encodeNpcSync(10, { x: 3090, y: 3524, level: 0 }, [{
   index: 7,
@@ -117,5 +138,44 @@ const npcFrame = encodeNpcSync(10, { x: 3090, y: 3524, level: 0 }, [{
 }], npcState);
 assert.strictEqual(npcFrame[0], 21);
 assert.deepStrictEqual(npcState.indices, [7]);
+
+const npcCombatFrame = encodeNpcSync(11, { x: 3090, y: 3524, level: 0 }, [{
+  index: 7,
+  typeId: 1,
+  x: 3091,
+  y: 3524,
+  level: 0,
+  rotation: 4,
+  walkDirection: -1,
+  runDirection: -1,
+  forcedChat: "Hi",
+  interactionIndex: 0x8001,
+  animation: { id: 200, delay: 0 },
+  hits: [{ type: 17, damage: 4 }],
+  health: { current: 6, max: 10 },
+  graphic: { id: 300, height: 0, delay: 1 },
+}], npcState);
+assert.deepStrictEqual([...npcCombatFrame.subarray(-29)], [
+  248, 64, 2, 128, 129, 128, 127, 17, 4, 0, 129, 0, 0, 0, 238,
+  72, 105, 0, 1, 128, 44, 1, 0, 1, 0, 0, 0, 200, 0,
+]);
+
+const projectile = encodeProjectiles([{
+  projectileId: 91,
+  source: { x: 3090, y: 3524, level: 0 },
+  target: { x: 3094, y: 3524, level: 0 },
+  sourceHeight: 172,
+  endHeight: 124,
+  slope: 16,
+  startPos: 64,
+  startCycleOffset: 40,
+  endCycleOffset: 57,
+  targetActor: { kind: "npc", index: 7 },
+}]);
+assert.strictEqual(projectile[0], 84);
+assert.strictEqual(projectile.readUInt16BE(1), 31);
+assert.strictEqual(projectile.readUInt16BE(3), 1);
+assert.strictEqual(projectile.readUInt16BE(5), 91);
+assert.deepStrictEqual([...projectile.subarray(-3)], [2, 0, 7]);
 
 console.log("cache, login, and client protocol smoke test passed");

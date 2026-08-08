@@ -52,10 +52,35 @@ export type PlayerAppearance = {
 
 export type Tile = { x: number; y: number; level: number };
 
-export type PlayerView = Tile & {
+export type HitsplatView = { type: number; damage: number; delay?: number };
+export type HealthView = { current: number; max: number };
+export type AnimationView = { id: number; delay: number };
+export type GraphicView = { id: number; height: number; delay: number };
+export type ForcedMovementView = {
+  startDeltaX: number;
+  startDeltaY: number;
+  endDeltaX: number;
+  endDeltaY: number;
+  startCycleOffset: number;
+  endCycleOffset: number;
+  direction: number;
+};
+
+export type ActorUpdateView = {
+  forcedChat?: string;
+  interactionIndex?: number;
+  animation?: AnimationView;
+  graphic?: GraphicView;
+  hits?: HitsplatView[];
+  health?: HealthView;
+};
+
+export type PlayerView = Tile & ActorUpdateView & {
   index: number;
   appearance: Buffer;
   appearanceDirty?: boolean;
+  faceDirection?: number;
+  forcedMovement?: ForcedMovementView;
 };
 
 export type PlayerSyncState = {
@@ -67,7 +92,7 @@ export type PlayerSyncState = {
   movementTypes: Map<number, 1 | 2>;
 };
 
-export type NpcView = Tile & {
+export type NpcView = Tile & ActorUpdateView & {
   index: number;
   typeId: number;
   rotation: number;
@@ -78,6 +103,20 @@ export type NpcView = Tile & {
 export type NpcSyncState = {
   indices: number[];
   lastTiles: Map<number, Tile>;
+  typeIds: Map<number, number>;
+};
+
+export type ProjectileView = {
+  projectileId: number;
+  source: Tile;
+  target: Tile;
+  sourceHeight: number;
+  endHeight: number;
+  slope: number;
+  startPos: number;
+  startCycleOffset: number;
+  endCycleOffset: number;
+  targetActor?: { kind: "player" | "npc"; index: number };
 };
 
 export type ClientMessage =
@@ -586,7 +625,7 @@ export function createPlayerSyncState(
 }
 
 export function createNpcSyncState(): NpcSyncState {
-  return { indices: [], lastTiles: new Map() };
+  return { indices: [], lastTiles: new Map(), typeIds: new Map() };
 }
 
 export function encodePlayerAppearance(
@@ -662,6 +701,198 @@ function writeSkipCount(writer: BitWriter, count: number): void {
   }
 }
 
+const PLAYER_MASK = {
+  FORCED_CHAT: 0x01,
+  FACE_DIR: 0x02,
+  APPEARANCE: 0x04,
+  ANIMATION: 0x08,
+  HIT: 0x20,
+  FACE_ENTITY: 0x40,
+  FORCE_MOVEMENT: 0x400,
+  MOVEMENT_TYPE: 0x1000,
+  SPOT_ANIM: 0x10000,
+} as const;
+
+const NPC_MASK = {
+  FACE_ENTITY: 0x08,
+  ANIMATION: 0x10,
+  HIT: 0x20,
+  FORCED_CHAT: 0x40,
+  SPOT_ANIM: 0x20000,
+} as const;
+
+function writeMask(bytes: number[], rawMask: number): void {
+  const third = (rawMask & 0xffff0000) !== 0;
+  const second = third || (rawMask & 0xff00) !== 0;
+  const mask = third ? rawMask | 0x4000 : rawMask;
+  bytes.push((mask & 0xff) | (second ? 0x80 : 0));
+  if (second) bytes.push((mask >>> 8) & 0xff);
+  if (third) bytes.push((mask >>> 16) & 0xff);
+}
+
+function byteA(bytes: number[], value: number): void {
+  bytes.push((value + 128) & 0xff);
+}
+
+function byteC(bytes: number[], value: number): void {
+  bytes.push((-value) & 0xff);
+}
+
+function byteS(bytes: number[], value: number): void {
+  bytes.push((128 - value) & 0xff);
+}
+
+function shortBE(bytes: number[], value: number): void {
+  bytes.push((value >>> 8) & 0xff, value & 0xff);
+}
+
+function shortLE(bytes: number[], value: number): void {
+  bytes.push(value & 0xff, (value >>> 8) & 0xff);
+}
+
+function shortBEA(bytes: number[], value: number): void {
+  bytes.push((value >>> 8) & 0xff, (value + 128) & 0xff);
+}
+
+function shortLEA(bytes: number[], value: number): void {
+  bytes.push((value + 128) & 0xff, (value >>> 8) & 0xff);
+}
+
+function intME(bytes: number[], value: number): void {
+  bytes.push((value >>> 8) & 0xff, value & 0xff, (value >>> 24) & 0xff, (value >>> 16) & 0xff);
+}
+
+function smart(bytes: number[], value: number): void {
+  const safe = Math.max(0, Math.min(32767, value | 0));
+  if (safe < 128) bytes.push(safe);
+  else shortBE(bytes, safe + 32768);
+}
+
+function writeText(bytes: number[], value: string): void {
+  bytes.push(...Buffer.from(value, "latin1"), 0);
+}
+
+function scaledHealth(health: HealthView): number {
+  if (health.current <= 0 || health.max <= 0) return 0;
+  return Math.max(1, Math.min(30, Math.floor((health.current * 30) / health.max)));
+}
+
+function writeHits(bytes: number[], view: ActorUpdateView, npc: boolean): void {
+  const hits = view.hits?.slice(0, 255) ?? [];
+  if (npc) byteS(bytes, hits.length);
+  else byteC(bytes, hits.length);
+  for (const hit of hits) {
+    smart(bytes, hit.type);
+    smart(bytes, hit.damage);
+    smart(bytes, hit.delay ?? 0);
+  }
+  const health = view.health;
+  const count = health ? 1 : 0;
+  if (npc) byteA(bytes, count);
+  else byteC(bytes, count);
+  if (health) {
+    smart(bytes, 0);
+    smart(bytes, 0);
+    smart(bytes, 0);
+    const value = scaledHealth(health);
+    if (npc) byteC(bytes, value);
+    else bytes.push(value);
+  }
+}
+
+function playerUpdateMask(
+  view: PlayerView,
+  writeMovementType: boolean,
+  writeAppearance: boolean
+): number {
+  return (view.forcedChat !== undefined ? PLAYER_MASK.FORCED_CHAT : 0) |
+    (view.faceDirection !== undefined ? PLAYER_MASK.FACE_DIR : 0) |
+    (writeAppearance ? PLAYER_MASK.APPEARANCE : 0) |
+    (view.animation ? PLAYER_MASK.ANIMATION : 0) |
+    (view.hits ? PLAYER_MASK.HIT : 0) |
+    (view.interactionIndex !== undefined ? PLAYER_MASK.FACE_ENTITY : 0) |
+    (view.forcedMovement ? PLAYER_MASK.FORCE_MOVEMENT : 0) |
+    (writeMovementType ? PLAYER_MASK.MOVEMENT_TYPE : 0) |
+    (view.graphic ? PLAYER_MASK.SPOT_ANIM : 0);
+}
+
+function npcUpdateMask(view: NpcView): number {
+  return (view.interactionIndex !== undefined ? NPC_MASK.FACE_ENTITY : 0) |
+    (view.animation ? NPC_MASK.ANIMATION : 0) |
+    (view.hits ? NPC_MASK.HIT : 0) |
+    (view.forcedChat !== undefined ? NPC_MASK.FORCED_CHAT : 0) |
+    (view.graphic ? NPC_MASK.SPOT_ANIM : 0);
+}
+
+function writePlayerUpdateBlock(
+  view: PlayerView,
+  writeMovementType: boolean,
+  movementType: 1 | 2 | undefined,
+  writeAppearance: boolean
+): Buffer {
+  const bytes: number[] = [];
+  const mask = playerUpdateMask(view, writeMovementType, writeAppearance);
+  writeMask(bytes, mask);
+  if (view.forcedChat !== undefined) writeText(bytes, view.forcedChat);
+  if (view.faceDirection !== undefined) shortLE(bytes, view.faceDirection & 2047);
+  if (view.interactionIndex !== undefined) {
+    const target = view.interactionIndex < 0 ? 0xffffff : view.interactionIndex & 0xffffff;
+    shortBE(bytes, target & 0xffff);
+    bytes.push((target >>> 16) & 0xff);
+  }
+  if (view.animation) {
+    shortLEA(bytes, view.animation.id < 0 ? 0xffff : view.animation.id);
+    bytes.push(view.animation.delay & 0xff);
+  }
+  if (view.hits) writeHits(bytes, view, false);
+  if (writeMovementType) byteC(bytes, movementType ?? 0);
+  if (writeAppearance) {
+    const length = Math.min(255, view.appearance.length);
+    byteC(bytes, length);
+    bytes.push(...view.appearance.subarray(0, length));
+  }
+  if (view.forcedMovement) {
+    const movement = view.forcedMovement;
+    byteS(bytes, movement.startDeltaX);
+    bytes.push(movement.startDeltaY & 0xff, movement.endDeltaX & 0xff);
+    byteA(bytes, movement.endDeltaY);
+    shortBEA(bytes, movement.startCycleOffset);
+    shortBE(bytes, movement.endCycleOffset);
+    shortLEA(bytes, movement.direction & 2047);
+  }
+  if (view.graphic) {
+    byteA(bytes, 1);
+    bytes.push(0);
+    shortBE(bytes, view.graphic.id < 0 ? 0xffff : view.graphic.id);
+    intME(bytes, ((view.graphic.height & 0xffff) << 16) | (view.graphic.delay & 0xffff));
+  }
+  return Buffer.from(bytes);
+}
+
+function writeNpcUpdateBlock(view: NpcView): Buffer {
+  const bytes: number[] = [];
+  const mask = npcUpdateMask(view);
+  writeMask(bytes, mask);
+  if (view.interactionIndex !== undefined) {
+    const target = view.interactionIndex < 0 ? 0xffffff : view.interactionIndex & 0xffffff;
+    bytes.push((target >>> 8) & 0xff, (target + 128) & 0xff);
+    byteA(bytes, target >>> 16);
+  }
+  if (view.hits) writeHits(bytes, view, true);
+  if (view.forcedChat !== undefined) writeText(bytes, view.forcedChat);
+  if (view.graphic) {
+    bytes.push(1);
+    byteA(bytes, 0);
+    shortLE(bytes, view.graphic.id < 0 ? 0xffff : view.graphic.id);
+    intME(bytes, ((view.graphic.height & 0xffff) << 16) | (view.graphic.delay & 0xffff));
+  }
+  if (view.animation) {
+    shortBE(bytes, view.animation.id < 0 ? 0xffff : view.animation.id);
+    bytes.push(view.animation.delay & 0xff);
+  }
+  return Buffer.from(bytes);
+}
+
 export function encodePlayerSync(
   localIndex: number,
   baseX: number,
@@ -703,8 +934,8 @@ export function encodePlayerSync(
     const view = viewByIndex.get(index);
     if (!view) return false;
     const nextType = movement(index).movementType;
-    return view.appearanceDirty === true ||
-      (nextType !== undefined && state.movementTypes.get(index) !== nextType);
+    const writeMovementType = nextType !== undefined && state.movementTypes.get(index) !== nextType;
+    return playerUpdateMask(view, writeMovementType, view.appearanceDirty === true) !== 0;
   };
   const shouldUpdatePlayer = (index: number): boolean =>
     !viewByIndex.has(index) || movement(index).changed || needsBlock(index);
@@ -715,16 +946,7 @@ export function encodePlayerSync(
     const nextType = movement(index).movementType;
     const writeMovementType = nextType !== undefined && state.movementTypes.get(index) !== nextType;
     const writeAppearance = forceAppearance || view.appearanceDirty === true;
-    const mask = (writeMovementType ? 0x1000 : 0) | (writeAppearance ? 0x04 : 0);
-    const bytes: number[] = [];
-    bytes.push((mask & 0xff) | (mask > 0xff ? 0x80 : 0));
-    if (mask > 0xff) bytes.push((mask >>> 8) & 0xff);
-    if (writeMovementType) bytes.push((-nextType!) & 0xff);
-    if (writeAppearance) {
-      const length = Math.min(255, view.appearance.length);
-      bytes.push((-length) & 0xff, ...view.appearance.subarray(0, length));
-    }
-    updateBlocks.push(Buffer.from(bytes));
+    updateBlocks.push(writePlayerUpdateBlock(view, writeMovementType, nextType, writeAppearance));
   };
 
   const writePlayerUpdate = (index: number): void => {
@@ -865,37 +1087,48 @@ export function encodeNpcSync(
   }
   const nextIndices: number[] = [];
   const readd = new Set<number>();
+  const updateBlocks: Buffer[] = [];
   writer.writeBits(8, Math.min(255, state.indices.length));
 
   for (const index of state.indices.slice(0, 255)) {
     const view = desired.get(index);
     const last = state.lastTiles.get(index);
-    if (!view || !last || view.level !== local.level) {
+    if (!view || !last || view.level !== local.level || state.typeIds.get(index) !== view.typeId) {
       writer.writeBits(1, 1);
       writer.writeBits(2, 3);
+      if (view) readd.add(index);
       continue;
     }
+    const block = npcUpdateMask(view) !== 0;
     if (view.runDirection >= 0 && view.walkDirection >= 0) {
       writer.writeBits(1, 1);
       writer.writeBits(2, 2);
       writer.writeBits(1, 1);
       writer.writeBits(3, view.walkDirection);
       writer.writeBits(3, view.runDirection);
-      writer.writeBits(1, 0);
+      writer.writeBits(1, block ? 1 : 0);
       nextIndices.push(index);
     } else if (view.walkDirection >= 0) {
       writer.writeBits(1, 1);
       writer.writeBits(2, 1);
       writer.writeBits(3, view.walkDirection);
-      writer.writeBits(1, 0);
+      writer.writeBits(1, block ? 1 : 0);
       nextIndices.push(index);
     } else if (view.x === last.x && view.y === last.y) {
-      writer.writeBits(1, 0);
+      if (block) {
+        writer.writeBits(1, 1);
+        writer.writeBits(2, 0);
+      } else {
+        writer.writeBits(1, 0);
+      }
       nextIndices.push(index);
     } else {
       writer.writeBits(1, 1);
       writer.writeBits(2, 3);
       readd.add(index);
+    }
+    if (block && nextIndices[nextIndices.length - 1] === index) {
+      updateBlocks.push(writeNpcUpdateBlock(view));
     }
   }
 
@@ -910,7 +1143,8 @@ export function encodeNpcSync(
   for (const view of additions) {
     if (nextIndices.length >= 255 || view.level !== local.level) break;
     writer.writeBits(16, view.index);
-    writer.writeBits(1, 0); // no update block yet
+    const block = npcUpdateMask(view) !== 0;
+    writer.writeBits(1, block ? 1 : 0);
     writer.writeBits(1, 0); // no world view
     writer.writeBits(1, readd.has(view.index) ? 1 : 0);
     writer.writeBits(large ? 8 : 5, signed(view.y - local.y, large ? 8 : 5));
@@ -919,21 +1153,54 @@ export function encodeNpcSync(
     writer.writeBits(14, view.typeId & 0x3fff);
     nextIndices.push(view.index);
     nextSet.add(view.index);
+    if (block) updateBlocks.push(writeNpcUpdateBlock(view));
   }
   writer.writeBits(16, 0xffff);
 
   state.indices = nextIndices;
   state.lastTiles.clear();
+  state.typeIds.clear();
   for (const index of nextIndices) {
     const view = desired.get(index);
-    if (view) state.lastTiles.set(index, { x: view.x, y: view.y, level: view.level });
+    if (view) {
+      state.lastTiles.set(index, { x: view.x, y: view.y, level: view.level });
+      state.typeIds.set(index, view.typeId);
+    }
   }
-  const sync = writer.toBuffer();
+  const sync = Buffer.concat([writer.toBuffer(), ...updateBlocks]);
   const header = Buffer.alloc(7);
   header.writeInt32BE(loopCycle | 0, 0);
   header[4] = large ? 1 : 0;
   header.writeUInt16BE(sync.length, 5);
   return packet(ServerPacket.NPC_INFO, Buffer.concat([header, sync]), 2);
+}
+
+export function encodeProjectiles(projectiles: ProjectileView[]): Buffer {
+  const payload = Buffer.alloc(2 + projectiles.length * 29);
+  payload.writeUInt16BE(projectiles.length, 0);
+  let offset = 2;
+  for (const projectile of projectiles) {
+    payload.writeUInt16BE(projectile.projectileId & 0xffff, offset);
+    payload.writeUInt16BE(projectile.source.x & 0xffff, offset + 2);
+    payload.writeUInt16BE(projectile.source.y & 0xffff, offset + 4);
+    payload[offset + 6] = projectile.source.level & 0xff;
+    payload.writeUInt16BE(projectile.sourceHeight & 0xffff, offset + 7);
+    payload.writeUInt16BE(projectile.target.x & 0xffff, offset + 9);
+    payload.writeUInt16BE(projectile.target.y & 0xffff, offset + 11);
+    payload[offset + 13] = projectile.target.level & 0xff;
+    payload.writeUInt16BE(projectile.endHeight & 0xffff, offset + 14);
+    payload[offset + 16] = projectile.slope & 0xff;
+    payload.writeUInt16BE(projectile.startPos & 0xffff, offset + 17);
+    payload.writeUInt16BE(projectile.startCycleOffset & 0xffff, offset + 19);
+    payload.writeUInt16BE(projectile.endCycleOffset & 0xffff, offset + 21);
+    payload[offset + 23] = 0;
+    payload.writeUInt16BE(0, offset + 24);
+    payload[offset + 26] = projectile.targetActor?.kind === "player" ? 1
+      : projectile.targetActor?.kind === "npc" ? 2 : 0;
+    payload.writeUInt16BE(projectile.targetActor?.index ?? 0, offset + 27);
+    offset += 29;
+  }
+  return encodeServerPacket(ServerPacketId.PROJECTILES, payload);
 }
 
 export function encodeDefaultAnimations(): Buffer {
