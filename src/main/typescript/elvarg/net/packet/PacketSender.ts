@@ -243,6 +243,9 @@ export class PacketSender {
   }
 
   sendSpecialMessage(name: string, type: number, message: string): this {
+    if (this.player.getSession().sendClientPacket(encodeChatMessage(
+      type === 16 ? "clan" : "channel", message, name
+    ))) return this;
     const out = new PacketBuilder(252, PacketType.VARIABLE);
     out.put(type);
     out.putString(name);
