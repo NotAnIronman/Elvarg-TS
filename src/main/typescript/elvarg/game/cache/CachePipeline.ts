@@ -41,6 +41,7 @@ export function parseCacheTarget(target: string): { revision: number; date: stri
 export class CachePipeline {
   private static active?: ActiveCache;
   private static store?: MemoryStore;
+  private static xteas = new Map<number, number[]>();
 
   public static getActive(): ActiveCache {
     if (!this.active) throw new Error("Cache pipeline has not been initialized");
@@ -60,6 +61,10 @@ export class CachePipeline {
     return this.store = MemoryStore.fromFiles(new CacheFiles(files));
   }
 
+  public static getXtea(regionId: number): number[] {
+    return this.xteas.get(regionId) ?? [0, 0, 0, 0];
+  }
+
   public static async initialize(root = process.cwd()): Promise<ActiveCache> {
     this.store = undefined;
     const name = fs.readFileSync(path.join(root, "target.txt"), "utf8").trim();
@@ -73,6 +78,9 @@ export class CachePipeline {
     }
 
     const info = JSON.parse(fs.readFileSync(path.join(directory, "info.json"), "utf8"));
+    this.xteas = new Map(Object.entries(JSON.parse(
+      fs.readFileSync(path.join(directory, "keys.json"), "utf8")
+    ) as Record<string, number[]>).map(([regionId, key]) => [Number(regionId), key]));
     const manifestPath = path.join(caches, "caches.json");
     const manifest = JSON.stringify([
       {

@@ -21,16 +21,23 @@ import { DonatorRights } from "../../game/model/rights/DonatorRights";
 import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
 import { World } from "../../game/World";
 import { InterfaceLayoutRegistry } from "../../game/definition/InterfaceLayoutDefinition";
+import { CachePipeline } from "../../game/cache/CachePipeline";
+import { Misc } from "../../util/Misc";
 import {
+  encodeBankSnapshot,
   encodeChatMessage,
   encodeDestination,
   encodeGroundItems,
   encodeGroundItemsDelta,
+  encodeLocAddChange,
+  encodeLocAnim,
+  encodeLocDel,
   encodeInventorySlot,
   encodeInventorySnapshot,
   encodePlayJingle,
   encodePlaySong,
   encodeProjectiles,
+  encodeRebuildNormal,
   encodeRunClientScript,
   encodeRunEnergy,
   encodeSkillsDelta,
@@ -54,6 +61,7 @@ import {
   encodeWidgetSetText,
   SkillView,
   GroundItemView,
+  BankSlotView,
 } from "../protocol/ClientProtocol";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
@@ -94,6 +102,18 @@ export class PacketSender {
       MapRegionReplacementManager.sendReplacementToPlayer(this.player, currentRegionId, false);
     } catch (_err) {
       // Region replacement refresh is best-effort; map-region sync must still proceed.
+    }
+    if (this.player.getSession().isClientProtocol?.()) {
+      const regionX = this.player.getLocation().getRegionX() + 6;
+      const regionY = this.player.getLocation().getRegionY() + 6;
+      const regionIds: number[] = [];
+      for (let x = ((regionX - 6) / 8) | 0; x <= (((regionX + 6) / 8) | 0); x++) {
+        for (let y = ((regionY - 6) / 8) | 0; y <= (((regionY + 6) / 8) | 0); y++) regionIds.push((x << 8) | y);
+      }
+      this.player.getSession().sendClientPacket(encodeRebuildNormal(
+        regionX, regionY, true, regionIds.map((regionId) => CachePipeline.getXtea(regionId))
+      ));
+      return this;
     }
     let out = new PacketBuilder(73);
     out.putShort(this.player.getLocation().getRegionX() + 6, ValueType.A);
@@ -1173,7 +1193,32 @@ export class PacketSender {
   }
 
   // Stubs to satisfy gameplay code; implement client opcodes as needed.
-  sendPrivateMessage(..._args: any[]): this {
+  sendPrivateMessage(target: any, message: Uint8Array, size: number): this {
+    const text = Misc.ucFirst(Misc.textUnpack(Array.from(message), size).toLowerCase());
+    this.player.getSession().sendClientPacket(encodeChatMessage(
+      "private_in", text, target?.getUsername?.() ?? "", "", target?.getIndex?.() ?? 0
+    ));
+    return this;
+  }
+
+  sendBankSnapshot(): this {
+    const slots: BankSlotView[] = [];
+    let slot = 0;
+    const banks = this.player.getBanks?.() ?? this.player.getBankTabs?.();
+    if (Array.isArray(banks)) {
+      banks.slice(0, 10).forEach((bank: any, tab: number) => {
+        for (const item of bank?.getValidItems?.() ?? []) {
+          slots.push({ slot: slot++, itemId: item.getId(), quantity: item.getAmount(), tab });
+        }
+      });
+    } else {
+      for (let tab = 0; tab < 10; tab++) {
+        for (const item of this.player.getBank?.(tab)?.getValidItems?.() ?? []) {
+          slots.push({ slot: slot++, itemId: item.getId(), quantity: item.getAmount(), tab });
+        }
+      }
+    }
+    this.player.getSession().sendClientPacket(encodeBankSnapshot(1410, slots));
     return this;
   }
 
@@ -1401,6 +1446,12 @@ export class PacketSender {
     }
 
     const location = object.getLocation();
+    if (this.player.getSession().isClientProtocol?.()) {
+      this.player.getSession().sendClientPacket(encodeLocAddChange(
+        object.getId(), location.getX(), location.getY(), location.getZ(), object.getType(), object.getFace()
+      ));
+      return this;
+    }
     if (!this.sendPositionIfVisible(location)) {
       return this;
     }
@@ -1429,6 +1480,12 @@ export class PacketSender {
     }
 
     const location = object.getLocation();
+    if (this.player.getSession().isClientProtocol?.()) {
+      this.player.getSession().sendClientPacket(encodeLocDel(
+        location.getX(), location.getY(), location.getZ(), object.getType(), object.getFace()
+      ));
+      return this;
+    }
     if (!this.sendPositionIfVisible(location)) {
       return this;
     }
@@ -1439,7 +1496,14 @@ export class PacketSender {
     return this;
   }
 
-  sendObjectAnimation(..._args: any[]): this {
+  sendObjectAnimation(object: any, animation: any): this {
+    if (object?.getLocation && this.player.getSession().isClientProtocol?.()) {
+      const location = object.getLocation();
+      this.player.getSession().sendClientPacket(encodeLocAnim(
+        object.getId(), location.getX(), location.getY(), location.getZ(),
+        object.getType(), object.getFace(), animation?.getId?.() ?? animation?.id ?? -1
+      ));
+    }
     return this;
   }
 

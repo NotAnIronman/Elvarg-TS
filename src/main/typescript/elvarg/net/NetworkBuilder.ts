@@ -39,6 +39,12 @@ import { PickupItemPacketListener } from "./packet/impl/PickupItemPacketListener
 import { SecondGroundItemOptionPacketListener } from "./packet/impl/SecondGroundItemOptionPacketListener";
 import { ItemDefinition } from "../game/definition/ItemDefinition";
 import { Bank } from "../game/model/container/impl/Bank";
+import { ButtonClickPacketListener } from "./packet/impl/ButtonClickPacketListener";
+import { InterfaceActionClickOpcode } from "./packet/impl/InterfaceActionClickOpcode";
+import { ChangeAppearancePacketListener } from "./packet/impl/ChangeAppearancePacketListener";
+import { NpcDefinition } from "../game/definition/NpcDefinition";
+import { ObjectDefinition } from "../game/definition/ObjectDefinition";
+import { Emotes } from "../game/content/Emotes";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -214,13 +220,87 @@ class ClientConnection {
           continue;
         }
         case "widget_action":
-          if (this.player?.getDialogueManager().isActive() && packet.buttonNum > 0 && packet.buttonNum <= 5) {
-            this.player.getDialogueManager().handleOption(packet.buttonNum - 1 as DialogueOption);
+          if (this.player) {
+            if (packet.itemId != null && packet.slot != null &&
+                this.player.getInventory().getItems()[packet.slot]?.getId() === packet.itemId) {
+              this.inventoryAction({
+                type: "inventory_action", widgetId: packet.widgetId, slot: packet.slot,
+                itemId: packet.itemId, option: packet.option, optionIndex: packet.buttonNum,
+              });
+            } else if (packet.simple) {
+              ButtonClickPacketListener.handle(this.player, packet.childId);
+            } else {
+              InterfaceActionClickOpcode.handle(this.player, packet.widgetId, packet.buttonNum);
+            }
+            if (this.player.getDialogueManager().isActive() && packet.buttonNum > 0 && packet.buttonNum <= 5) {
+              this.player.getDialogueManager().handleOption(packet.buttonNum - 1 as DialogueOption);
+            }
           }
+          continue;
+        case "widget":
+          if (this.player && packet.action === "close") this.player.getPacketSender().sendInterfaceRemoval();
+          continue;
+        case "widget_target":
+          if (this.player) InterfaceActionClickOpcode.handle(this.player, packet.targetWidgetId, packet.sourceSlot);
+          continue;
+        case "widget_drag":
+          if (this.player) SwitchItemSlotPacketListener.move(
+            this.player, packet.sourceWidgetId, packet.sourceSlot, packet.targetSlot
+          );
+          continue;
+        case "interface_close":
+          this.player?.getPacketSender().sendInterfaceRemoval();
+          continue;
+        case "local_trigger":
+          if (this.player) InterfaceActionClickOpcode.handle(this.player, packet.widgetId, packet.opcodeParam);
+          continue;
+        case "examine_npc":
+          if (this.player) {
+            const definition = NpcDefinition.forId(packet.id);
+            this.player.getPacketSender().sendMessage(definition.getExamine() || definition.getName());
+          }
+          continue;
+        case "examine_object":
+          if (this.player) {
+            const definition = ObjectDefinition.forId(packet.id);
+            this.player.getPacketSender().sendMessage(definition?.description || definition?.getName() || "It's an object.");
+          }
+          continue;
+        case "appearance":
+          if (this.player) ChangeAppearancePacketListener.apply(
+            this.player, packet.gender, packet.kits, packet.colors
+          );
+          continue;
+        case "world_map_click":
+        case "teleport":
+          if (this.player && PlayerRights.hasAdminRights(this.player)) {
+            this.player.moveTo(new Location(packet.x, packet.y, packet.level));
+          }
+          continue;
+        case "pathfind":
+          this.walk(packet.toX, packet.toY, 0);
+          continue;
+        case "emote":
+          if (this.player) Emotes.doEmote(this.player, packet.index);
+          continue;
+        case "interaction_stop":
+          if (this.player) {
+            this.player.getCombat().reset();
+            this.player.setFollowing(null);
+            this.player.setMobileInteraction(null);
+            this.player.setPositionToFace(null);
+          }
+          continue;
+        case "face":
+          if (this.player && packet.x != null && packet.y != null) {
+            this.player.setPositionToFace(new Location(packet.x, packet.y, this.player.getLocation().getZ()));
+          }
+          continue;
+        case "trade_action":
+          if (this.player) this.tradeAction(packet);
           continue;
         case "raw":
           continue;
-        case "face":
         case "hello":
         case "ping":
           continue;
@@ -399,6 +479,23 @@ class ClientConnection {
     } else {
       SecondGroundItemOptionPacketListener.interact(
         player, packet.itemId, packet.x, packet.y, packet.optionIndex ?? 2
+      );
+    }
+  }
+
+  private tradeAction(packet: Extract<ReturnType<typeof decodeClientPackets>[number], { type: "trade_action" }>): void {
+    const player = this.player!;
+    const trading = player.getTrading();
+    if (packet.action === "accept" || packet.action === "confirm_accept") {
+      trading.acceptTrade();
+    } else if (packet.action === "decline" || packet.action === "confirm_decline") {
+      trading.closeTrade();
+    } else if (packet.itemId != null && packet.quantity > 0) {
+      const offer = packet.action === "offer";
+      trading.handleItem(
+        packet.itemId, packet.quantity, packet.slot,
+        offer ? player.getInventory() : trading.getContainer(),
+        offer ? trading.getContainer() : player.getInventory()
       );
     }
   }

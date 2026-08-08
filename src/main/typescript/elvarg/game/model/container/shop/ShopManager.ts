@@ -10,6 +10,7 @@ import { PluginManager } from "../../../../plugins/PluginManager";
 import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
 import { Misc } from "../../../../util/Misc";
 import { ShopIdentifiers } from "../../../../util/ShopIdentifiers";
+import { encodeShopClose, encodeShopOpen } from "../../../../net/protocol/ClientProtocol";
 
 export interface ShopItemContainerAction {
     kind: "value" | "buy_sell" | "x";
@@ -111,6 +112,7 @@ export class ShopManager {
             this.viewersByShopId.delete(shopId!);
         }
         this.activeShopByPlayer.delete(player);
+        player.getSession?.().sendClientPacket?.(encodeShopClose());
     }
 
     public static processPlayer(player: any): void {
@@ -280,6 +282,26 @@ export class ShopManager {
         const opening =
             player.getStatus?.() !== PlayerStatus.SHOPPING ||
             player.getInterfaceId?.() !== this.SHOP_INTERFACE_ID;
+
+        if (player.getSession().isClientProtocol?.()) {
+            const stock = this.displayEntries(shop).map((entry, slot) => {
+                const definition = ItemDefinition.forId(entry.itemId);
+                const price = definition ? this.itemPrice(shop, definition) : 0;
+                return {
+                    slot, itemId: entry.itemId, quantity: entry.amount,
+                    defaultQuantity: shop.originalAmounts.get(entry.itemId) ?? 0,
+                    priceEach: price, sellPrice: Math.max(1, Math.floor(price * this.SALES_TAX)),
+                };
+            });
+            player.setInterfaceId(this.SHOP_INTERFACE_ID);
+            player.setStatus(PlayerStatus.SHOPPING);
+            player.getSession().sendClientPacket(encodeShopOpen(
+                String(shop.definition.getId()), shop.definition.getName(),
+                this.currencyItemId(shop.definition.getCurrency()), this.isGeneralStore(shop), 1, 1, stock
+            ));
+            if (opening) Sounds.sendSound(player, Sound.CONTAINER_OPEN);
+            return true;
+        }
 
         sender.sendItemContainer(player.getInventory(), this.INVENTORY_INTERFACE_ID);
         sender.sendInterfaceItems(this.ITEMS_INTERFACE_ID, items);

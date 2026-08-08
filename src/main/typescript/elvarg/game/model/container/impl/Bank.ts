@@ -603,6 +603,12 @@ export class Bank extends ItemContainer {
         // Sort and refresh items in the container
         this.sortItems().refreshItems();
 
+        if (this.getPlayer().getSession().isClientProtocol?.()) {
+            this.getPlayer().getPacketSender().sendInterface(12);
+            if (opening) Sounds.sendSound(this.getPlayer(), Sound.CONTAINER_OPEN);
+            return this;
+        }
+
         // Send configs
         this.getPlayer().getPacketSender().sendConfig(115, this.getPlayer().withdrawAsNote() ? 1 : 0)
                 .sendConfig(304, this.getPlayer().insertModeReturn() ? 1 : 0)
@@ -621,6 +627,12 @@ export class Bank extends ItemContainer {
     public refreshItems(): Bank {
         // Reconfigure bank tabs.
         if (Bank.reconfigureTabs(this.getPlayer())) {
+            return this;
+        }
+
+        if (this.getPlayer().getSession().isClientProtocol?.()) {
+            this.getPlayer().getPacketSender().sendBankSnapshot()
+                .sendItemContainer(this.getPlayer().getInventory(), Bank.INVENTORY_INTERFACE_ID);
             return this;
         }
 

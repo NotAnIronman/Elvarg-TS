@@ -151,7 +151,12 @@ export type ClientMessage =
   | { type: "npc_option"; index: number; clickType: number }
   | { type: "object_option"; id: number; x: number; y: number; clickType?: number; action?: string }
   | { type: "chat"; text: string; messageType: "public" | "game" }
-  | { type: "widget_action"; widgetId: number; groupId: number; childId: number; buttonNum: number }
+  | { type: "widget_action"; widgetId: number; groupId: number; childId: number; buttonNum: number; option?: string; target?: string; slot?: number; itemId?: number; subOpId?: number; simple?: boolean }
+  | { type: "widget"; action: "open" | "close"; groupId: number; modal?: boolean }
+  | { type: "widget_target"; targetWidgetId: number; targetSlot: number; targetItemId: number; sourceWidgetId: number; sourceSlot: number; sourceItemId: number }
+  | { type: "widget_drag"; targetItemId: number; targetWidgetId: number; sourceItemId: number; sourceSlot: number; sourceWidgetId: number; targetSlot: number }
+  | { type: "interface_close" }
+  | { type: "local_trigger"; widgetId: number; childIndex: number; itemId: number; opcodeParam: number }
   | { type: "player_option"; index: number; option: number }
   | { type: "item_on_player"; targetIndex: number; itemId: number; slot: number; widgetId: number }
   | { type: "spell_on_player"; targetIndex: number; spellWidget: number; spellChild: number; spellItemId: number }
@@ -163,11 +168,20 @@ export type ClientMessage =
   | { type: "ground_item_action"; itemId: number; x: number; y: number; option?: string; optionIndex?: number }
   | { type: "item_on_ground"; itemId: number; slot: number; widgetId: number; groundItemId: number; x: number; y: number }
   | { type: "spell_on_ground"; spellWidget: number; spellChild: number; spellItemId: number; groundItemId: number; x: number; y: number }
+  | { type: "examine_npc"; id: number }
+  | { type: "examine_object"; id: number }
+  | { type: "appearance"; gender: number; kits: number[]; colors: number[] }
+  | { type: "world_map_click"; x: number; y: number; level: number }
+  | { type: "emote"; index: number; loop: boolean }
+  | { type: "teleport"; x: number; y: number; level: number }
+  | { type: "pathfind"; id: number; fromX: number; fromY: number; level: number; toX: number; toY: number; size: number }
+  | { type: "interaction_stop" }
+  | { type: "trade_action"; action: "offer" | "remove" | "accept" | "decline" | "confirm_accept" | "confirm_decline"; slot: number; quantity: number; itemId?: number }
   | { type: "dialogue_continue"; widgetId: number; childIndex: number }
   | { type: "dialogue_amount"; amount: number }
   | { type: "dialogue_input"; value: string }
   | { type: "raw"; opcode: number; payload: Buffer }
-  | { type: "face" }
+  | { type: "face"; rotation?: number; x?: number; y?: number }
   | { type: "hello" }
   | { type: "ping" }
   | { type: "logout" }
@@ -298,6 +312,43 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
   }
 
   switch (opcode) {
+    case NativeClientPacket.IF_BUTTON: {
+      const widgetId = reader.int();
+      return { type: "widget_action", widgetId, groupId: widgetId >>> 16, childId: widgetId & 0xffff, buttonNum: 1, simple: true };
+    }
+    case NativeClientPacket.IF_BUTTON_SUB: {
+      const widgetId = reader.int(), slot = reader.short(), itemId = reader.signedShort();
+      return { type: "widget_action", widgetId, groupId: widgetId >>> 16, childId: widgetId & 0xffff, buttonNum: reader.byte(), subOpId: reader.byte() + 1, slot, itemId };
+    }
+    case NativeClientPacket.IF_BUTTONT:
+      return {
+        type: "widget_target",
+        targetWidgetId: reader.intIME(), targetSlot: reader.shortAddLE(),
+        sourceWidgetId: reader.intLE(), sourceSlot: reader.shortLE(),
+        sourceItemId: reader.signedShort(), targetItemId: reader.shortAddLE(),
+      };
+    case NativeClientPacket.IF_TRIGGEROPLOCAL:
+      reader.short();
+      return {
+        type: "local_trigger", opcodeParam: reader.intLE(), childIndex: reader.shortLE(),
+        widgetId: reader.intLE(), itemId: reader.shortLE(),
+      };
+    case NativeClientPacket.IF_CLOSE:
+      return { type: "interface_close" };
+    case NativeClientPacket.EXAMINE_NPC:
+      return { type: "examine_npc", id: reader.shortAdd() };
+    case NativeClientPacket.EXAMINE_LOC:
+      return { type: "examine_object", id: reader.shortAddLE() };
+    case NativeClientPacket.APPEARANCE_SET:
+      return {
+        type: "appearance", gender: reader.byte(),
+        kits: Array.from({ length: 7 }, () => reader.byte()),
+        colors: Array.from({ length: 5 }, () => reader.byte()),
+      };
+    case NativeClientPacket.WORLD_MAP_CLICK: {
+      const packed = reader.intIME() >>> 0;
+      return { type: "world_map_click", level: packed >>> 28, x: (packed >>> 14) & 0x3fff, y: packed & 0x3fff };
+    }
     case NativeClientPacket.OPPLAYER1:
       reader.byteSub();
       return { type: "player_option", index: reader.short(), option: 1 };
@@ -407,16 +458,19 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
         NativeClientPacket.IF_BUTTON7, NativeClientPacket.IF_BUTTON8, NativeClientPacket.IF_BUTTON9,
         NativeClientPacket.IF_BUTTON10,
       ].indexOf(opcode) + 1;
-      return { type: "inventory_action", widgetId: reader.int(), slot: reader.short(), itemId: reader.signedShort(), optionIndex };
+      const widgetId = reader.int(), slot = reader.short(), itemId = reader.signedShort();
+      return {
+        type: "widget_action", widgetId, groupId: widgetId >>> 16, childId: widgetId & 0xffff,
+        buttonNum: optionIndex, slot: slot === 0xffff ? undefined : slot,
+        itemId: itemId >= 0 ? itemId : undefined,
+      };
     }
     case NativeClientPacket.IF_BUTTOND: {
-      reader.shortLE();
-      const targetWidget = reader.intLE();
-      reader.short();
-      const from = reader.shortAddLE();
-      const sourceWidget = reader.intME();
-      const to = reader.shortLE();
-      return { type: "inventory_move", from, to, widgetId: sourceWidget || targetWidget };
+      return {
+        type: "widget_drag", targetItemId: reader.shortLE(), targetWidgetId: reader.intLE(),
+        sourceItemId: reader.short(), sourceSlot: reader.shortAddLE(),
+        sourceWidgetId: reader.intME(), targetSlot: reader.shortLE(),
+      };
     }
     case ClientPacket.NPC_OPTION_1:
       reader.byte();
@@ -476,14 +530,23 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
       reader.shortAdd(); // target loc id; zero for walk-here
       return { type: "move", worldX, worldY, modifierFlags };
     }
-    case ClientPacket.FACE: {
-      if (reader.byte()) reader.short();
-      if (reader.byte()) {
-        reader.short();
-        reader.short();
-      }
-      return { type: "face" };
+    case HighClientPacket.WALK: {
+      const worldX = reader.short(), worldY = reader.short(), flags = reader.byte();
+      return { type: "move", worldX, worldY, modifierFlags: (flags & 1) !== 0 ? 2 : flags >> 1 };
     }
+    case ClientPacket.FACE: {
+      const rotation = reader.byte() ? reader.short() : undefined;
+      return reader.byte()
+        ? { type: "face", rotation, x: reader.short(), y: reader.short() }
+        : { type: "face", rotation };
+    }
+    case HighClientPacket.TELEPORT:
+      return { type: "teleport", x: reader.short(), y: reader.short(), level: reader.byte() };
+    case HighClientPacket.PATHFIND:
+      return {
+        type: "pathfind", id: reader.int(), fromX: reader.short(), fromY: reader.short(),
+        level: reader.byte(), toX: reader.short(), toY: reader.short(), size: reader.byte() || 1,
+      };
     case ClientPacket.LOC_INTERACT: {
       const id = reader.short();
       const x = reader.short();
@@ -501,6 +564,8 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
       };
     case HighClientPacket.INTERACT:
       return { type: "player_option", option: reader.byte() === 0 ? 3 : 2, index: reader.short() };
+    case HighClientPacket.INTERACT_STOP:
+      return { type: "interaction_stop" };
     case HighClientPacket.INVENTORY_USE:
       return { type: "inventory_action", slot: reader.short(), itemId: reader.short(), widgetId: 3214, option: (reader.int(), reader.string()) };
     case HighClientPacket.INVENTORY_USE_ON: {
@@ -538,20 +603,37 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
       const option = reader.string() || undefined;
       return { type: "ground_item_action", itemId, x, y, option, optionIndex: reader.byte() || undefined };
     }
-    case 251: {
+    case HighClientPacket.WIDGET: {
+      const action = reader.byte() === 0 ? "open" : "close";
+      return { type: "widget", action, groupId: reader.short(), modal: reader.byte() !== 0 || undefined };
+    }
+    case HighClientPacket.WIDGET_ACTION: {
       const widgetId = reader.int();
       const groupId = reader.short();
       const childId = reader.short();
-      reader.string();
-      reader.string();
+      const option = reader.string() || undefined;
+      const target = reader.string() || undefined;
       const opId = reader.byte();
       const buttonNum = reader.byte() || opId;
       reader.short();
       reader.short();
       reader.byte();
-      reader.signedShort();
-      reader.signedShort();
-      return { type: "widget_action", widgetId, groupId, childId, buttonNum };
+      const slot = reader.signedShort(), itemId = reader.signedShort();
+      return { type: "widget_action", widgetId, groupId, childId, buttonNum, option, target, slot: slot >= 0 ? slot : undefined, itemId: itemId >= 0 ? itemId : undefined };
+    }
+    case HighClientPacket.IF_BUTTOND:
+      return {
+        type: "widget_drag", targetItemId: reader.shortLE(), targetWidgetId: reader.intLE(),
+        sourceItemId: reader.short(), sourceSlot: reader.shortAddLE(), sourceWidgetId: reader.intME(),
+        targetSlot: reader.shortLE(),
+      };
+    case HighClientPacket.EMOTE:
+      return { type: "emote", index: reader.short(), loop: reader.byte() !== 0 };
+    case HighClientPacket.TRADE_ACTION: {
+      const action = (["offer", "remove", "accept", "decline", "confirm_accept", "confirm_decline"] as const)[reader.byte()];
+      if (!action) return { type: "raw", opcode, payload: frame.subarray(frame.length) };
+      const slot = reader.short(), quantity = reader.int(), itemId = reader.signedShort();
+      return { type: "trade_action", action, slot, quantity, itemId: itemId >= 0 ? itemId : undefined };
     }
     case 252:
       return { type: "dialogue_continue", widgetId: reader.int(), childIndex: reader.short() };
@@ -681,6 +763,26 @@ export function encodeInventorySlot(slot: number, itemId: number, quantity: numb
   return encodeServerPacket(ServerPacketId.INVENTORY_SLOT, encodeItemSlot(slot, itemId, quantity));
 }
 
+export type BankSlotView = { slot: number; itemId: number; quantity: number; placeholder?: boolean; tab?: number };
+
+function encodeBankSlotPayload(slot: BankSlotView): Buffer {
+  return Buffer.concat([
+    encodeItemSlot(slot.slot, slot.itemId, slot.quantity),
+    Buffer.from([(slot.placeholder ? 1 : 0) | ((slot.tab ?? 0) << 1)]),
+  ]);
+}
+
+export function encodeBankSnapshot(capacity: number, slots: BankSlotView[]): Buffer {
+  const header = Buffer.alloc(4);
+  header.writeUInt16BE(capacity & 0xffff);
+  header.writeUInt16BE(slots.length, 2);
+  return encodeServerPacket(ServerPacketId.BANK_SNAPSHOT, Buffer.concat([header, ...slots.map(encodeBankSlotPayload)]));
+}
+
+export function encodeBankSlot(slot: BankSlotView): Buffer {
+  return encodeServerPacket(ServerPacketId.BANK_SLOT, encodeBankSlotPayload(slot));
+}
+
 function encodeGroundItem(stack: GroundItemView): Buffer {
   const payload = Buffer.alloc(33);
   payload.writeInt32BE(stack.id | 0);
@@ -715,6 +817,115 @@ export function encodeGroundItemsDelta(serial: number, upserts: GroundItemView[]
   return encodeServerPacket(ServerPacketId.GROUND_ITEMS_DELTA, Buffer.concat([
     header, ...upserts.map(encodeGroundItem), removed,
   ]));
+}
+
+export function encodeLocAddChange(id: number, x: number, y: number, level: number, shape: number, rotation: number): Buffer {
+  const payload = Buffer.alloc(8);
+  payload.writeUInt16BE(id & 0xffff);
+  payload.writeUInt16BE(x & 0xffff, 2);
+  payload.writeUInt16BE(y & 0xffff, 4);
+  payload[6] = level;
+  payload[7] = (shape << 2) | (rotation & 3);
+  return encodeServerPacket(ServerPacketId.LOC_ADD_CHANGE, payload);
+}
+
+export function encodeLocDel(x: number, y: number, level: number, shape: number, rotation: number): Buffer {
+  const payload = Buffer.alloc(6);
+  payload.writeUInt16BE(x & 0xffff);
+  payload.writeUInt16BE(y & 0xffff, 2);
+  payload[4] = level;
+  payload[5] = (shape << 2) | (rotation & 3);
+  return encodeServerPacket(ServerPacketId.LOC_DEL, payload);
+}
+
+export function encodeLocAnim(id: number, x: number, y: number, level: number, shape: number, rotation: number, animationId: number): Buffer {
+  const payload = Buffer.alloc(10);
+  payload.writeUInt16BE(id & 0xffff);
+  payload.writeUInt16BE(x & 0xffff, 2);
+  payload.writeUInt16BE(y & 0xffff, 4);
+  payload[6] = level;
+  payload[7] = (shape << 2) | (rotation & 3);
+  payload.writeUInt16BE(animationId & 0xffff, 8);
+  return encodeServerPacket(ServerPacketId.LOC_ANIM, payload);
+}
+
+export function encodeRebuildNormal(regionX: number, regionY: number, forceReload: boolean, xteaKeys: number[][]): Buffer {
+  const payload = Buffer.alloc(7 + xteaKeys.length * 16);
+  payload.writeUInt16BE(regionX & 0xffff);
+  payload.writeUInt16BE(regionY & 0xffff, 2);
+  payload[4] = forceReload ? 0 : 1;
+  payload.writeUInt16BE(xteaKeys.length, 5);
+  xteaKeys.forEach((key, i) => key.slice(0, 4).forEach((value, j) => payload.writeInt32BE(value | 0, 7 + i * 16 + j * 4)));
+  return encodeServerPacket(ServerPacketId.REBUILD_NORMAL, payload);
+}
+
+export type ShopSlotView = { slot: number; itemId: number; quantity: number; defaultQuantity?: number; priceEach?: number; sellPrice?: number };
+
+function encodeShopSlotPayload(slot: ShopSlotView): Buffer {
+  const payload = Buffer.alloc(20);
+  payload.writeUInt16BE(slot.slot & 0xffff);
+  payload.writeUInt16BE(slot.itemId & 0xffff, 2);
+  payload.writeInt32BE(slot.quantity | 0, 4);
+  payload.writeInt32BE((slot.defaultQuantity ?? slot.quantity) | 0, 8);
+  payload.writeInt32BE((slot.priceEach ?? 0) | 0, 12);
+  payload.writeInt32BE((slot.sellPrice ?? 0) | 0, 16);
+  return payload;
+}
+
+export function encodeShopOpen(id: string, name: string, currencyItemId: number, general: boolean, buyMode: number, sellMode: number, stock: ShopSlotView[]): Buffer {
+  const header = Buffer.alloc(7);
+  header.writeUInt16BE(currencyItemId & 0xffff);
+  header[2] = general ? 1 : 0;
+  header[3] = buyMode;
+  header[4] = sellMode;
+  header.writeUInt16BE(stock.length, 5);
+  return encodeServerPacket(ServerPacketId.SHOP_OPEN, Buffer.concat([string(id), string(name), header, ...stock.map(encodeShopSlotPayload)]));
+}
+
+export function encodeShopClose(): Buffer {
+  return encodeServerPacket(ServerPacketId.SHOP_CLOSE, Buffer.alloc(0));
+}
+
+export type TradePartyView = { playerId?: number; name?: string; offers: Array<{ slot: number; itemId: number; quantity: number }>; accepted?: boolean; confirmAccepted?: boolean };
+
+function encodeTradeParty(party: TradePartyView): Buffer {
+  const header = Buffer.alloc(5);
+  header.writeInt16BE(party.playerId ?? -1);
+  header[2] = party.accepted ? 1 : 0;
+  header[3] = party.confirmAccepted ? 1 : 0;
+  header[4] = party.offers.length;
+  const offers = party.offers.map((offer) => {
+    const payload = Buffer.alloc(8);
+    payload.writeUInt16BE(offer.slot & 0xffff);
+    payload.writeUInt16BE(offer.itemId & 0xffff, 2);
+    payload.writeInt32BE(offer.quantity | 0, 4);
+    return payload;
+  });
+  return Buffer.concat([header.subarray(0, 2), string(party.name ?? ""), header.subarray(2), ...offers]);
+}
+
+export function encodeTradeRequest(playerId: number, name: string): Buffer {
+  const id = Buffer.alloc(2);
+  id.writeUInt16BE(playerId & 0xffff);
+  return encodeServerPacket(ServerPacketId.TRADE_REQUEST, Buffer.concat([id, string(name)]));
+}
+
+function encodeTrade(opcode: ServerPacketId.TRADE_OPEN | ServerPacketId.TRADE_UPDATE, sessionId: string, stage: "offer" | "confirm", self: TradePartyView, other: TradePartyView, info = ""): Buffer {
+  return encodeServerPacket(opcode, Buffer.concat([
+    string(sessionId), Buffer.from([stage === "offer" ? 0 : 1]), string(info), encodeTradeParty(self), encodeTradeParty(other),
+  ]));
+}
+
+export function encodeTradeOpen(sessionId: string, stage: "offer" | "confirm", self: TradePartyView, other: TradePartyView, info = ""): Buffer {
+  return encodeTrade(ServerPacketId.TRADE_OPEN, sessionId, stage, self, other, info);
+}
+
+export function encodeTradeUpdate(sessionId: string, stage: "offer" | "confirm", self: TradePartyView, other: TradePartyView, info = ""): Buffer {
+  return encodeTrade(ServerPacketId.TRADE_UPDATE, sessionId, stage, self, other, info);
+}
+
+export function encodeTradeClose(reason = ""): Buffer {
+  return encodeServerPacket(ServerPacketId.TRADE_CLOSE, string(reason));
 }
 
 function encodeSkills(opcode: ServerPacketId.SKILLS_SNAPSHOT | ServerPacketId.SKILLS_DELTA, skills: SkillView[], totalLevel: number, combatLevel: number): Buffer {

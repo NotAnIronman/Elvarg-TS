@@ -7,6 +7,7 @@ import { ItemContainer } from "../model/container/ItemContainer";
 import { StackType } from "../model/container/StackType";
 import { Inventory } from "../model/container/impl/Inventory";
 import { Misc } from "../../util/Misc";
+import { encodeTradeClose, encodeTradeOpen, encodeTradeRequest, encodeTradeUpdate, TradePartyView } from "../../net/protocol/ClientProtocol";
 
 class PlayerItemContainer extends ItemContainer {
     constructor(player, private readonly execFunc: Function) {
@@ -67,6 +68,8 @@ export class Trading {
                 player.getPacketSender().sendItemContainer(player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
                 player.getPacketSender().sendItemContainer(this.interact.getTrading().getContainer(), Trading.CONTAINER_INTERFACE_ID_2);
                 this.interact.getPacketSender().sendItemContainer(player.getTrading().getContainer(), Trading.CONTAINER_INTERFACE_ID_2);
+                this.sendState(false);
+                this.interact?.getTrading().sendState(false);
                 return this;
         });
     }
@@ -172,6 +175,7 @@ export class Trading {
             } else {
                 this.player.getPacketSender().sendMessage("You've sent a trade request to " + t_.getUsername() + ".");
                 t_.getPacketSender().sendMessage(this.player.getUsername() + ":tradereq:");
+                t_.getSession().sendClientPacket(encodeTradeRequest(this.player.getIndex(), this.player.getUsername()));
                 if (t_.isPlayerBot && t_.isPlayerBot()) {
                     // Player Bots: Automatically accept any trade request
                     (t_ as any).getTradingInteraction?.().acceptTradeRequest?.(this.player);
@@ -192,6 +196,8 @@ export class Trading {
             .sendString("0 bm", Trading.ITEM_VALUE_1_FRAME).sendString( "0 bm", Trading.ITEM_VALUE_2_FRAME);
         this.container.resetItems();
         this.container.refreshItems();
+        this.player.setInterfaceId(Trading.INTERFACE);
+        this.sendState(true);
         if (this.player.isPlayerBot && this.player.isPlayerBot()) {
             (this.player as any).getTradingInteraction?.().addItemsToTrade?.(this.container, this.interact);
         }
@@ -200,6 +206,7 @@ export class Trading {
     public closeTrade() {
         if (this.state != TradeState.NONE) {
             let interact_ = this.interact;
+            this.player.getSession().sendClientPacket(encodeTradeClose("Trade declined."));
             for (let t of this.container.getValidItems()) {
                 this.container.switchItems(this.player.getInventory(), t.clone(), false, false);
             }
@@ -210,6 +217,7 @@ export class Trading {
             if (interact_ != null) {
                 if (interact_.getStatus() == PlayerStatus.TRADING) {
                     if (interact_.getTrading().getInteract() != null && interact_.getTrading().getInteract() == this.player) {
+                        interact_.getSession().sendClientPacket(encodeTradeClose("Trade declined."));
                         interact_.getPacketSender().sendInterfaceRemoval();
                     }
                 }
@@ -245,6 +253,8 @@ export class Trading {
                 return;
             }
             this.state = (TradeState.ACCEPTED_TRADE_SCREEN);
+            this.sendState(false);
+            interact_.getTrading().sendState(false);
 
             this.player.getPacketSender().sendString( "Waiting for other player..", Trading.STATUS_FRAME_1);
             this.interact.getPacketSender().sendString( "" + this.player.getUsername() + " has accepted.", Trading.STATUS_FRAME_1,);
@@ -280,6 +290,8 @@ export class Trading {
                 // Reset attributes for both players...
                 this.resetAttributes();
                 interact_.getTrading().resetAttributes();
+                this.player.getSession().sendClientPacket(encodeTradeClose("Trade accepted!"));
+                interact_.getSession().sendClientPacket(encodeTradeClose("Trade accepted!"));
                 // Send interface removal for both players...
                 this.player.getPacketSender().sendInterfaceRemoval();
                 interact_.getPacketSender().sendInterfaceRemoval();
@@ -298,6 +310,7 @@ export class Trading {
     private confirmScreen() {
         // Update state
         this.state = TradeState.CONFIRM_SCREEN;
+        this.sendState(true);
 
         // Send new interface
         this.player.getPacketSender().sendConfiguredInterface("trade-confirm");
@@ -418,6 +431,29 @@ export class Trading {
 
     getContainer(): ItemContainer {
         return this.container;
+    }
+
+    private party(player: Player): TradePartyView {
+        const trading = player.getTrading();
+        return {
+            playerId: player.getIndex(), name: player.getUsername(),
+            accepted: trading.getState() === TradeState.ACCEPTED_TRADE_SCREEN,
+            confirmAccepted: trading.getState() === TradeState.ACCEPTED_CONFIRM_SCREEN,
+            offers: trading.getContainer().getItems().flatMap((item, slot) =>
+                item?.getId?.() >= 0 && item?.getAmount?.() > 0
+                    ? [{ slot, itemId: item.getId(), quantity: item.getAmount() }]
+                    : []
+            ),
+        };
+    }
+
+    private sendState(open: boolean): void {
+        if (!this.interact || !this.player.getSession().isClientProtocol?.()) return;
+        const sessionId = [this.player.getIndex(), this.interact.getIndex()].sort((a, b) => a - b).join(":");
+        const stage = this.state >= TradeState.CONFIRM_SCREEN ? "confirm" : "offer";
+        this.player.getSession().sendClientPacket((open ? encodeTradeOpen : encodeTradeUpdate)(
+            sessionId, stage, this.party(this.player), this.party(this.interact)
+        ));
     }
 }
 

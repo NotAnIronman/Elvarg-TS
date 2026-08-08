@@ -53,7 +53,10 @@ export class ButtonClickPacketListener implements PacketExecutor {
   private static readonly OPEN_KEY_BINDINGS: number = 42552;
 
   execute(player: any, packet: Packet): void {
-    let button = packet.readInt();
+    ButtonClickPacketListener.handle(player, packet.readInt());
+  }
+
+  public static handle(player: any, button: number): void {
 
     if (player.getHitpoints() <= 0 || player.isTeleporting) {
       return;

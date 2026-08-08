@@ -26,6 +26,11 @@ import {
   encodeDestination,
   encodeGroundItems,
   encodeGroundItemsDelta,
+  encodeBankSnapshot,
+  encodeLocAddChange,
+  encodeRebuildNormal,
+  encodeShopOpen,
+  encodeTradeOpen,
   encodeVarbit,
   encodeVarp,
   encodeWidgetOpen,
@@ -85,11 +90,9 @@ const chat = Buffer.from([190, 7, 0, ...Buffer.from("hello\0", "latin1")]);
 assert.deepStrictEqual(decodeClientPacket(chat), {
   type: "chat", text: "hello", messageType: "public",
 });
-assert.deepStrictEqual(decodeClientPacket(Buffer.from([55])), {
-  type: "raw", opcode: 55, payload: Buffer.alloc(0),
-});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([55])), { type: "interface_close" });
 assert.deepStrictEqual(decodeClientPackets(Buffer.concat([chat, Buffer.from([55])])).map(({ type }) => type), [
-  "chat", "raw",
+  "chat", "interface_close",
 ]);
 assert.deepStrictEqual(decodeClientPacket(Buffer.from([252, 0, 0, 0, 42, 0, 3])), {
   type: "dialogue_continue", widgetId: 42, childIndex: 3,
@@ -116,6 +119,13 @@ assert.deepStrictEqual([...encodeRunEnergy(65, true)], [81, 65, 1]);
 assert.deepStrictEqual([...encodeDestination(3091, 3524)], [87, 12, 19, 13, 196]);
 assert.strictEqual(encodeGroundItems(1, [{ id: 7, itemId: 995, quantity: 1, x: 3091, y: 3524, level: 0 }])[0], 54);
 assert.strictEqual(encodeGroundItemsDelta(2, [], [7])[0], 55);
+assert.strictEqual(encodeBankSnapshot(1410, [{ slot: 0, itemId: 995, quantity: 1000, tab: 0 }])[0], 52);
+assert.deepStrictEqual([...encodeLocAddChange(1000, 3091, 3524, 0, 10, 2)], [134, 8, 3, 232, 12, 19, 13, 196, 0, 42]);
+assert.strictEqual(encodeRebuildNormal(386, 440, true, [[1, 2, 3, 4]])[0], 141);
+assert.strictEqual(encodeShopOpen("1", "Shop", 995, false, 1, 1, [
+  { slot: 0, itemId: 4151, quantity: 1 },
+])[0], 150);
+assert.strictEqual(encodeTradeOpen("1:2", "offer", { offers: [] }, { offers: [] })[0], 155);
 assert.deepStrictEqual([...encodeWidgetOpen(12)], [100, 0, 12, 1]);
 assert.deepStrictEqual([...encodeWidgetSetText(42, "Hi")], [105, 0, 7, 0, 0, 0, 42, 72, 105, 0]);
 assert.strictEqual(encodeWidgetOpenSub((161 << 16) | 7, 122)[0], 103);

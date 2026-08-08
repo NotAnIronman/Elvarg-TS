@@ -36,6 +36,7 @@ export class ChatPacketListener implements PacketExecutor {
       return;
     }
     if (!ChatPacketListener.allowChat(player, text)) return;
+    player.forceChat(text);
 
     const recipients = [player, ...player.getLocalPlayers()];
     const sent = new Set<number>();

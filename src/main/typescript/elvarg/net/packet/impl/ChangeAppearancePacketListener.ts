@@ -3,6 +3,7 @@
 // import { Flag } from '../../../game/model/Flag';
 import { Packet } from "../Packet";
 import { PacketExecutor } from "../PacketExecutor";
+import { Appearance } from "../../../game/model/Appearance";
 
 export class ChangeAppearancePacketListener implements PacketExecutor {
   private static readonly ALLOWED_COLORS: number[][] = [
@@ -33,69 +34,24 @@ export class ChangeAppearancePacketListener implements PacketExecutor {
 
   // public execute(player: Player, packet: Packet) {
   public execute(player: any, packet: Packet) {
-    try {
-      let gender = packet.readByte();
-      if (gender !== 0 && gender !== 1) {
-        return;
-      }
-      const apperances = new Array(
-        ChangeAppearancePacketListener.MALE_VALUES.length
-      );
-      const colors = new Array(
-        ChangeAppearancePacketListener.ALLOWED_COLORS.length
-      );
-      for (let i = 0; i < apperances.length; i++) {
-        let value = packet.readByte();
-        if (
-          value <
-            (gender === 0
-              ? ChangeAppearancePacketListener.MALE_VALUES[i][0]
-              : ChangeAppearancePacketListener.FEMALE_VALUES[i][0]) ||
-          value >
-            (gender === 0
-              ? ChangeAppearancePacketListener.MALE_VALUES[i][1]
-              : ChangeAppearancePacketListener.FEMALE_VALUES[i][1])
-        )
-          value =
-            gender === 0
-              ? ChangeAppearancePacketListener.MALE_VALUES[i][0]
-              : ChangeAppearancePacketListener.FEMALE_VALUES[i][0];
-        apperances[i] = value;
-      }
-      for (let i = 0; i < colors.length; i++) {
-        let value = packet.readByte();
-        if (
-          value < ChangeAppearancePacketListener.ALLOWED_COLORS[i][0] ||
-          value > ChangeAppearancePacketListener.ALLOWED_COLORS[i][1]
-        )
-          value = ChangeAppearancePacketListener.ALLOWED_COLORS[i][0];
-        colors[i] = value;
-      }
-      if (
-        player.getAppearance().getCanChangeAppearance() &&
-        player.getInterfaceId() > 0
-      ) {
-        //Appearance looks
-        // player.getAppearance().setLook(Appearance.GENDER, gender);
-        // player.getAppearance().setLook(Appearance.HEAD, apperances[0]);
-        // player.getAppearance().setLook(Appearance.CHEST, apperances[2]);
-        // player.getAppearance().setLook(Appearance.ARMS, apperances[3]);
-        // player.getAppearance().setLook(Appearance.HANDS, apperances[4]);
-        // player.getAppearance().setLook(Appearance.LEGS, apperances[5]);
-        // player.getAppearance().setLook(Appearance.FEET, apperances[6]);
-        // player.getAppearance().setLook(Appearance.BEARD, apperances[1]);
-        // //Colors
-        // player.getAppearance().setLook(Appearance.HAIR_COLOUR, colors[0]);
-        // player.getAppearance().setLook(Appearance.TORSO_COLOUR, colors[1]);
-        // player.getAppearance().setLook(Appearance.LEG_COLOUR, colors[2]);
-        // player.getAppearance().setLook(Appearance.FEET_COLOUR, colors[3]);
-        // player.getAppearance().setLook(Appearance.SKIN_COLOUR, colors[4]);
-        // player.getUpdateFlag().flag(Flag.APPEARANCE);
-      }
-    } catch (e) {
-      player.getAppearance().set();
-      //e.printStackTrace();
-    }
+    const gender = packet.readByte();
+    const kits = Array.from({ length: 7 }, () => packet.readByte());
+    const colors = Array.from({ length: 5 }, () => packet.readByte());
+    ChangeAppearancePacketListener.apply(player, gender, kits, colors);
+  }
+
+  public static apply(player: any, gender: number, kits: number[], colors: number[]): void {
+    if (!player?.getAppearance?.().getCanChangeAppearance() || player.getInterfaceId() <= 0) return;
+    if ((gender !== 0 && gender !== 1) || kits.length !== 7 || colors.length !== 5) return;
+    const look = [...player.getAppearance().getLook()];
+    look[Appearance.GENDER] = gender;
+    [Appearance.HEAD, Appearance.BEARD, Appearance.CHEST, Appearance.ARMS,
+      Appearance.HANDS, Appearance.LEGS, Appearance.FEET]
+      .forEach((index, i) => look[index] = kits[i] === 255 ? -1 : kits[i]);
+    [Appearance.HAIR_COLOUR, Appearance.TORSO_COLOUR, Appearance.LEG_COLOUR,
+      Appearance.FEET_COLOUR, Appearance.SKIN_COLOUR]
+      .forEach((index, i) => look[index] = colors[i]);
+    player.getAppearance().setLookArray(look);
     player.getPacketSender().sendInterfaceRemoval();
     player.getAppearance().setCanChangeAppearance(false);
   }

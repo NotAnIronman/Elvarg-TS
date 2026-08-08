@@ -8,8 +8,10 @@ import { FightType } from "../../../game/content/combat/FightType";
 
 export class InterfaceActionClickOpcode implements PacketExecutor {
   execute(player: any, packet: Packet) {
-    let interfaceId = packet.readInt();
-    let action = packet.readByte();
+    InterfaceActionClickOpcode.handle(player, packet.readInt(), packet.readByte());
+  }
+
+  public static handle(player: any, interfaceId: number, action: number): void {
 
     if (
       player == null ||
