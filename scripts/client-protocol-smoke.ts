@@ -21,6 +21,15 @@ import {
 } from "../src/main/typescript/elvarg/net/protocol/ClientProtocol";
 import { ServerPacketId } from "../src/main/typescript/elvarg/net/protocol/ServerPackets";
 import { Music } from "../src/main/typescript/elvarg/game/Music";
+import { NPC } from "../src/main/typescript/elvarg/game/entity/impl/npc/NPC";
+import { Direction } from "../src/main/typescript/elvarg/game/model/Direction";
+import { Location } from "../src/main/typescript/elvarg/game/model/Location";
+
+for (let id = 0; id < 8; id++) {
+  const npc = new NPC(-1, new Location(0, 0));
+  npc.setFace(Direction.valueOf(id));
+  assert.strictEqual(npc.getFace().getDirection().getId(), id);
+}
 
 const loginPayload = Buffer.alloc(4);
 loginPayload.writeInt32BE(237);
@@ -105,6 +114,22 @@ const playerFrame = encodePlayerSync(1, 3040, 3472, 10, [
 assert.strictEqual(playerFrame[0], 20);
 assert.deepStrictEqual(playerState.active, [1, 2]);
 
+const forcedState = createPlayerSyncState(1, { x: 3089, y: 3521, level: 0 });
+const forcedEnd = { x: 3089, y: 3524, level: 0 };
+encodePlayerSync(1, 3040, 3472, 10, [{
+  index: 1, x: 3089, y: 3521, level: 0, appearance,
+  forcedMovement: {
+    startDeltaX: 0, startDeltaY: 0, endDeltaX: 0, endDeltaY: 3,
+    startCycleOffset: 0, endCycleOffset: 70, direction: 0,
+  },
+  forcedMovementEnd: forcedEnd,
+}], forcedState);
+assert.deepStrictEqual(forcedState.lastTiles.get(1), forcedEnd);
+encodePlayerSync(1, 3040, 3472, 11, [{
+  index: 1, x: 3089, y: 3521, level: 0, appearance, forcedMovementEnd: forcedEnd,
+}], forcedState);
+assert.deepStrictEqual(forcedState.lastTiles.get(1), forcedEnd);
+
 const combatPlayerState = createPlayerSyncState(1, { x: 3090, y: 3524, level: 0 });
 const combatPlayerFrame = encodePlayerSync(1, 3040, 3472, 11, [{
   index: 1,
@@ -156,7 +181,7 @@ const npcCombatFrame = encodeNpcSync(11, { x: 3090, y: 3524, level: 0 }, [{
   graphic: { id: 300, height: 0, delay: 1 },
 }], npcState);
 assert.deepStrictEqual([...npcCombatFrame.subarray(-29)], [
-  248, 64, 2, 128, 129, 128, 127, 17, 4, 0, 129, 0, 0, 0, 238,
+  248, 64, 2, 129, 128, 128, 127, 17, 4, 0, 129, 0, 0, 0, 238,
   72, 105, 0, 1, 128, 44, 1, 0, 1, 0, 0, 0, 200, 0,
 ]);
 const npcClearFaceFrame = encodeNpcSync(12, { x: 3090, y: 3524, level: 0 }, [{
@@ -170,7 +195,7 @@ const npcClearFaceFrame = encodeNpcSync(12, { x: 3090, y: 3524, level: 0 }, [{
   runDirection: -1,
   interactionIndex: -1,
 }], npcState);
-assert.deepStrictEqual([...npcClearFaceFrame.subarray(-4)], [8, 255, 127, 127]);
+assert.deepStrictEqual([...npcClearFaceFrame.subarray(-4)], [8, 127, 255, 127]);
 
 const projectile = encodeProjectiles([{
   projectileId: 91,

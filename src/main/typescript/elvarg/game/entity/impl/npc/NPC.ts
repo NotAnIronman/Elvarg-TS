@@ -459,14 +459,22 @@ export class NPC extends Mobile {
                 ? face
                 : Direction.valueOf(Number.isInteger(face) ? face : Direction.SOUTH.getId());
         switch (direction.getId()) {
+            case 0:
+                return FacingDirection.NORTH_WEST;
             case 1:
                 return FacingDirection.NORTH;
+            case 2:
+                return FacingDirection.NORTH_EAST;
             case 3:
                 return FacingDirection.WEST;
             case 4:
                 return FacingDirection.EAST;
+            case 5:
+                return FacingDirection.SOUTH_WEST;
             case 6:
                 return FacingDirection.SOUTH;
+            case 7:
+                return FacingDirection.SOUTH_EAST;
             default:
                 return FacingDirection.SOUTH;
         }

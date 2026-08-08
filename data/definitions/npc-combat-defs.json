@@ -1,6 +1,14 @@
 {
   "$comment": "NPC combat definitions - server-side only. Client loads animations dynamically.",
   "npcs": {
+    "73": {
+      "name": "Skeleton",
+      "anims": {
+        "attack": 5485,
+        "block": 5489,
+        "death": 5491
+      }
+    },
     "100": {
       "name": "Rock Crab",
       "anims": {

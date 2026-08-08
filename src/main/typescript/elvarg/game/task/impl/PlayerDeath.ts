@@ -193,6 +193,7 @@ export class PlayerDeathTask extends Task {
                     this.player.setFollowing(null);
                     this.player.setMobileInteraction(null);
                     this.player.setPositionToFace(null);
+                    this.player.setForceMovement(null);
 
                     // Reset movement queue and disable it..
                     this.player.getMovementQueue().setBlockMovement(true).reset();

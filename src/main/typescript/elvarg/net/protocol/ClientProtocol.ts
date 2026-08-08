@@ -81,6 +81,7 @@ export type PlayerView = Tile & ActorUpdateView & {
   appearanceDirty?: boolean;
   faceDirection?: number;
   forcedMovement?: ForcedMovementView;
+  forcedMovementEnd?: Tile;
 };
 
 export type PlayerSyncState = {
@@ -876,7 +877,7 @@ function writeNpcUpdateBlock(view: NpcView, writeInteraction: boolean): Buffer {
   writeMask(bytes, mask);
   if (writeInteraction) {
     const target = (view.interactionIndex ?? -1) < 0 ? 0xffffff : view.interactionIndex! & 0xffffff;
-    bytes.push((target >>> 8) & 0xff, (target + 128) & 0xff);
+    shortLEA(bytes, target);
     byteA(bytes, target >>> 16);
   }
   if (view.hits) writeHits(bytes, view, true);
@@ -922,9 +923,10 @@ export function encodePlayerSync(
     const view = viewByIndex.get(index);
     const from = state.lastTiles.get(index);
     if (!view || !from) return { changed: !!view, dx: 0, dy: 0, planeDelta: 0, movementType: undefined };
-    const dx = view.x - from.x;
-    const dy = view.y - from.y;
-    const planeDelta = (view.level - from.level) & 3;
+    const tile = view.forcedMovementEnd && !view.forcedMovement ? view.forcedMovementEnd : view;
+    const dx = tile.x - from.x;
+    const dy = tile.y - from.y;
+    const planeDelta = (tile.level - from.level) & 3;
     const distance = Math.max(Math.abs(dx), Math.abs(dy));
     const movementType = planeDelta === 0 && distance > 0 && distance <= 2
       ? (distance === 2 ? 2 : 1) as 1 | 2
@@ -1061,7 +1063,8 @@ export function encodePlayerSync(
   for (const [index] of state.lastTiles) if (!activeNow.has(index)) state.lastTiles.delete(index);
   for (const view of viewByIndex.values()) {
     const nextType = movement(view.index).movementType;
-    state.lastTiles.set(view.index, { x: view.x, y: view.y, level: view.level });
+    const tile = view.forcedMovementEnd ?? view;
+    state.lastTiles.set(view.index, { x: tile.x, y: tile.y, level: tile.level });
     if (nextType !== undefined) state.movementTypes.set(view.index, nextType);
   }
 

@@ -23,6 +23,10 @@ export class ForceMovementTask extends Task {
     }
 
     public execute() {
+        if (this.player.getForceMovement() !== this.forceMovement) {
+            this.stop();
+            return;
+        }
         let x = this.start.getX() + this.end.getX();
         let y = this.start.getY() + this.end.getY();
         // Use moveTo() so completion emits placement/reset semantics that match

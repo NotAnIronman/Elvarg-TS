@@ -366,7 +366,15 @@ export class PlayerSession {
         runDirection: this.clientDirection(npc.getRunningDirection()),
       };
     });
-    const npcSync = encodeNpcSync(tick, current, npcViews, this.npcSyncState);
+    const localForceMovement = player.getForceMovement();
+    const npcLocal = localForceMovement
+      ? {
+          x: localForceMovement.getStart().getX() + localForceMovement.getEnd().getX(),
+          y: localForceMovement.getStart().getY() + localForceMovement.getEnd().getY(),
+          level: current.level,
+        }
+      : current;
+    const npcSync = encodeNpcSync(tick, npcLocal, npcViews, this.npcSyncState);
 
     try {
       this.channel.send?.(encodeTick(tick, Date.now()));
@@ -457,6 +465,13 @@ export class PlayerSession {
             startCycleOffset: forceMovement.getSpeed(),
             endCycleOffset: forceMovement.getReverseSpeed(),
             direction: [1024, 1536, 0, 512][forceMovement.getDirection()] ?? forceMovement.getDirection(),
+          }
+        : undefined,
+      forcedMovementEnd: forceMovement
+        ? {
+            x: forceMovement.getStart().getX() + forceMovement.getEnd().getX(),
+            y: forceMovement.getStart().getY() + forceMovement.getEnd().getY(),
+            level: location.getZ(),
           }
         : undefined,
     };
