@@ -188,14 +188,12 @@ class ClientConnection {
           if (this.player) Bank.depositItems(this.player, this.player.getEquipment(), false);
           continue;
         case "bank_move":
-          if (this.player && this.player.getInterfaceId() === 5292) {
-            const tab = packet.tab ?? this.player.getCurrentBankTab();
-            if (tab >= 0 && tab < Bank.TOTAL_BANK_TABS) {
-              const bank = this.player.getBank(tab);
-              if (packet.from < 0 || packet.from >= bank.capacity() ||
-                  packet.to < 0 || packet.to >= bank.capacity()) continue;
+          if (this.player && Bank.isOpen(this.player)) {
+            const from = Bank.resolveModernClientSlot(this.player, packet.from);
+            const to = Bank.resolveModernClientSlot(this.player, packet.to);
+            if (from && to && from.tab === to.tab) {
               this.player.setInsertMode(packet.mode === "insert");
-              Bank.rearrange(this.player, bank, packet.from, packet.to);
+              Bank.rearrange(this.player, this.player.getBank(from.tab), from.slot, to.slot);
             }
           }
           continue;
@@ -225,6 +223,10 @@ class ClientConnection {
         case "dialogue_amount": {
           const action = this.player?.getEnteredAmountAction();
           if (action && packet.amount > 0) action.execute(packet.amount);
+          else if (this.player && Bank.isOpen(this.player) && packet.amount > 0) {
+            this.player.setBankCustomQuantity(packet.amount);
+            this.player.getPacketSender().sendVarbit(3960, packet.amount);
+          }
           this.player?.setEnteredAmountAction(null);
           continue;
         }
@@ -241,6 +243,8 @@ class ClientConnection {
               EquipPacketListener.unequip(this.player, equipmentSlot);
             } else if (packet.groupId === 387 && packet.childId === 1) {
               BonusManager.open(this.player);
+            } else if (Bank.handleModernWidgetAction(this.player, packet)) {
+              // Bank owns its cache-native widgets while the bank modal is open.
             } else if (packet.itemId != null && packet.slot != null &&
                 this.player.getInventory().getItems()[packet.slot]?.getId() === packet.itemId) {
               this.inventoryAction({

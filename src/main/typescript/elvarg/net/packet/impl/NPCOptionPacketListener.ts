@@ -5,6 +5,7 @@ import { PluginManager } from "../../../plugins/PluginManager";
 import { Packet } from "../Packet";
 import { PacketConstants } from "../PacketConstants";
 import { PacketExecutor } from "../PacketExecutor";
+import { Bank } from "../../../game/model/container/impl/Bank";
 
 function opcodeToClickType(opcode: number): number {
   switch (opcode) {
@@ -106,6 +107,11 @@ export class NPCOptionPacketListener implements PacketExecutor {
           clickType
         )
       ) {
+        return;
+      }
+
+      if (option === "bank") {
+        player.getBank(player.getCurrentBankTab()).open();
         return;
       }
 

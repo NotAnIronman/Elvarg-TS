@@ -1229,6 +1229,9 @@ export class PacketSender {
 
   sendInterfaceRemoval(): this {
     const interfaceId = this.player.getInterfaceId?.() ?? -1;
+    if (interfaceId === 12 && this.player.getSession().isClientProtocol?.()) {
+      this.sendConfig(548, 0);
+    }
     const { ShopManager } = require(
       "../../game/model/container/shop/ShopManager"
     ) as typeof import("../../game/model/container/shop/ShopManager");

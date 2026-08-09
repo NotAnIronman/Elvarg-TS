@@ -190,6 +190,8 @@ export class Player extends Mobile {
     public banks: Bank[] = Array(Bank.TOTAL_BANK_TABS).fill(null); // last index is for bank searches
     private noteWithdrawal = false;
     private insertMode = false;
+    private bankQuantityMode = 0;
+    private bankCustomQuantity = 0;
     private searchingBank = false;
     private searchSyntax = "";
     private placeholders = false;
@@ -1091,6 +1093,22 @@ export class Player extends Mobile {
 
     public insertModeReturn(): boolean {
         return this.insertMode;
+    }
+
+    public setBankQuantityMode(mode: number): void {
+        this.bankQuantityMode = Math.max(0, Math.min(4, Math.trunc(mode)));
+    }
+
+    public getBankQuantityMode(): number {
+        return this.bankQuantityMode;
+    }
+
+    public setBankCustomQuantity(amount: number): void {
+        this.bankCustomQuantity = Math.max(0, Math.trunc(amount));
+    }
+
+    public getBankCustomQuantity(): number {
+        return this.bankCustomQuantity;
     }
 
     public getBanks(): Bank[] {

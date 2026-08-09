@@ -169,8 +169,7 @@ function openBank(player) {
   lastBankOpenAt.set(player, now);
 
   if (
-    player.getStatus?.() === PlayerStatus.BANKING &&
-    player.getInterfaceId?.() === REGULAR_BANK_INTERFACE_ID
+    Bank.isOpen(player)
   ) {
     return true;
   }
@@ -287,7 +286,7 @@ function getContainerForInterface(player, interfaceId) {
   // Web client can still emit inventory interface id 3214 while banking.
   if (
     interfaceId === Inventory.INTERFACE_ID &&
-    player?.getInterfaceId?.() === 5292
+    Bank.isOpen(player)
   ) {
     return player.getInventory();
   }
@@ -463,7 +462,7 @@ function handleBankContainerAction(player, opcode, payload) {
   const isBankInventoryInterface =
     decoded.interfaceId === Bank.INVENTORY_INTERFACE_ID ||
     (decoded.interfaceId === Inventory.INTERFACE_ID &&
-      player?.getInterfaceId?.() === 5292);
+      Bank.isOpen(player));
 
   if (isBankInventoryInterface) {
     if (decoded.amount == null) {

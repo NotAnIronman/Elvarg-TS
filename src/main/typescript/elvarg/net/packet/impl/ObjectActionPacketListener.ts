@@ -5,6 +5,7 @@ import { PluginManager } from "../../../plugins/PluginManager";
 import { Packet } from "../Packet";
 import { PacketConstants } from "../PacketConstants";
 import { PacketExecutor } from "../PacketExecutor";
+import { Bank } from "../../../game/model/container/impl/Bank";
 
 type ParsedObjectAction = {
   id: number;
@@ -53,6 +54,12 @@ export class ObjectActionPacketListener implements PacketExecutor {
         player.getMovementQueue().reset();
         player.getMovementQueue().walkToReset();
         player.setPositionToFace(object.getLocation());
+
+        const option = object.getDefinition()?.getInteractions()?.[clickType - 1]?.toLowerCase();
+        if (option === "bank") {
+          player.getBank(player.getCurrentBankTab()).open();
+          return;
+        }
 
         const pluginHandled = PluginManager.emitObjectInteraction({
           player,

@@ -49,11 +49,16 @@ import { Sound } from "../src/main/typescript/elvarg/game/Sound";
 import { FightType } from "../src/main/typescript/elvarg/game/content/combat/FightType";
 import { MagicCombatMethod } from "../src/main/typescript/elvarg/game/content/combat/method/impl/MagicCombatMethod";
 import { EquipPacketListener } from "../src/main/typescript/elvarg/net/packet/impl/EquipPacketListener";
+import { Bank } from "../src/main/typescript/elvarg/game/model/container/impl/Bank";
 
 assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(387, 15), 0);
 assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(387, 25), 13);
 assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(84, 16), 7);
 assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(12, 15), -1);
+assert.strictEqual(Bank.modernActionAmount("withdraw", 3, undefined, 100), 5);
+assert.strictEqual(Bank.modernActionAmount("withdraw", 1, undefined, 100, 0, 2), 10);
+assert.strictEqual(Bank.modernActionAmount("withdraw", 1, "Withdraw-All-but-1", 100), 99);
+assert.strictEqual(Bank.modernActionAmount("deposit", 8, undefined, 100), 100);
 
 for (let id = 0; id < 8; id++) {
   const npc = new NPC(-1, new Location(0, 0));

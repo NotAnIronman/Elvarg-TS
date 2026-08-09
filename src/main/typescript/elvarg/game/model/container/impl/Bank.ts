@@ -18,7 +18,6 @@ import { EnteredSyntaxAction } from "../../EnteredSyntaxAction";
 import { DialogueOptionAction } from "../../dialogues/DialogueOptionAction";
 import { Sound } from "../../../Sound";
 import { Sounds } from "../../../Sounds";
-import { exec } from "child_process";
 const getPluginManager = () =>
     require("../../../../plugins/PluginManager").PluginManager as typeof import("../../../../plugins/PluginManager").PluginManager;
 
@@ -34,13 +33,20 @@ export class Bank extends ItemContainer {
     public static readonly BANK_SCROLL_BAR_INTERFACE_ID = 5385;
     public static readonly BANK_TAB_INTERFACE_ID = 5383;
     public static readonly INVENTORY_INTERFACE_ID = 5064;
+    public static readonly MAIN_INTERFACE_ID = 12;
+    public static readonly SIDE_INTERFACE_ID = 15;
 
     constructor(public player: Player) {
         super(player);
     }
 
+    public static isOpen(player: Player): boolean {
+        return player.getStatus() === PlayerStatus.BANKING &&
+            (player.getInterfaceId() === 5292 || player.getInterfaceId() === Bank.MAIN_INTERFACE_ID);
+    }
+
     public static withdraw(player: Player, item: number, slot: number, amount: number, fromBankTab: number) {
-        if (player.getStatus() === PlayerStatus.BANKING && player.getInterfaceId() === 5292) {
+        if (Bank.isOpen(player)) {
 
             // The item's real tab
             const itemTab = Bank.getTabForItem(player, item);
@@ -197,9 +203,7 @@ export class Bank extends ItemContainer {
      */
 
     public static deposit(player: Player, item: number, slot: number, amount: number, ignore: boolean) {
-        if (ignore || player.getStatus() === PlayerStatus.BANKING
-            && player.getInterfaceId() === 5292 /* Regular bank */
-            || player.getInterfaceId() === 4465 /* Bank deposit booth */) {
+        if (ignore || Bank.isOpen(player) || player.getInterfaceId() === 4465 /* Bank deposit booth */) {
             if (player.getInventory().getItems()[slot].getId() !== item) {
                 return;
             }
@@ -230,7 +234,7 @@ export class Bank extends ItemContainer {
     }
 
     public static search(player: Player, syntax: string) {
-        if (player.getStatus() === PlayerStatus.BANKING && player.getInterfaceId() === 5292) {
+        if (Bank.isOpen(player)) {
 
             // Set search fields
             player.setSearchSyntax(syntax);
@@ -263,7 +267,7 @@ export class Bank extends ItemContainer {
     }
 
     public static exitSearch(player: Player, openBank: boolean) {
-        if (player.getStatus() === PlayerStatus.BANKING && player.getInterfaceId() === 5292) {
+        if (Bank.isOpen(player)) {
 
             // Set search fields
             player.setSearchSyntax("");
@@ -292,6 +296,102 @@ export class Bank extends ItemContainer {
         if (item.getDefinition().getName().toLowerCase().includes(player.getSearchSyntax())) {
             player.getBank(this.BANK_SEARCH_TAB_INDEX).add(item, refresh);
         }
+    }
+
+    public static resolveModernClientSlot(player: Player, clientSlot: number): { tab: number; slot: number; item: Item } | null {
+        if (!Number.isInteger(clientSlot) || clientSlot < 0) return null;
+        let current = 0;
+        for (let tab = 0; tab < 10; tab++) {
+            const bank = player.getBank(tab);
+            for (const item of bank.getValidItems()) {
+                if (current++ === clientSlot) {
+                    return { tab, slot: bank.getSlotForItemId(item.getId()), item };
+                }
+            }
+        }
+        return null;
+    }
+
+    public static modernActionAmount(
+        kind: "withdraw" | "deposit",
+        button: number,
+        option: string | undefined,
+        available: number,
+        custom = 0,
+        defaultMode = 0,
+    ): number {
+        const total = Math.max(0, Math.trunc(available));
+        const named = option?.trim().toLowerCase();
+        if (named) {
+            if (named.endsWith("-all-but-1")) return Math.max(0, total - 1);
+            if (named.endsWith("-1")) return Math.min(total, 1);
+            if (named.endsWith("-5")) return Math.min(total, 5);
+            if (named.endsWith("-10")) return Math.min(total, 10);
+            if (named.endsWith("-all")) return total;
+            if (named.endsWith("-x")) return Math.min(total, custom);
+        }
+
+        const defaultAmounts = [1, 5, 10, custom, total];
+        if (kind === "withdraw") {
+            if (button === 1) return Math.min(total, defaultAmounts[defaultMode] ?? 1);
+            return Math.max(0, Math.min(total, ({ 2: 1, 3: 5, 4: 10, 5: custom, 6: custom, 7: total, 8: total - 1 } as Record<number, number>)[button] ?? 0));
+        }
+        if (button === 2) return Math.min(total, defaultAmounts[defaultMode] ?? 1);
+        return Math.min(total, ({ 1: 1, 3: 1, 4: 5, 5: 10, 6: custom, 7: custom, 8: total } as Record<number, number>)[button] ?? 0);
+    }
+
+    public static handleModernWidgetAction(player: Player, packet: {
+        groupId: number;
+        childId: number;
+        buttonNum: number;
+        option?: string;
+        slot?: number;
+        itemId?: number;
+    }): boolean {
+        if (!Bank.isOpen(player)) return false;
+
+        if (packet.groupId === Bank.MAIN_INTERFACE_ID && packet.childId === 12 && packet.slot != null) {
+            const entry = Bank.resolveModernClientSlot(player, packet.slot);
+            if (!entry || (packet.itemId != null && packet.itemId !== entry.item.getId())) return true;
+            const amount = Bank.modernActionAmount(
+                "withdraw", packet.buttonNum, packet.option, entry.item.getAmount(),
+                player.getBankCustomQuantity(), player.getBankQuantityMode(),
+            );
+            if (amount > 0) Bank.withdraw(player, entry.item.getId(), entry.slot, amount, entry.tab);
+            return true;
+        }
+
+        if (packet.groupId === Bank.SIDE_INTERFACE_ID &&
+            (packet.childId === 3 || packet.childId >= 0x8000) && packet.slot != null) {
+            const item = player.getInventory().getItems()[packet.slot];
+            if (!item || item.getId() < 0 || (packet.itemId != null && packet.itemId !== item.getId())) return true;
+            const amount = Bank.modernActionAmount(
+                "deposit", packet.buttonNum, packet.option, item.getAmount(),
+                player.getBankCustomQuantity(), player.getBankQuantityMode(),
+            );
+            if (amount > 0) Bank.deposits(player, item.getId(), packet.slot, amount);
+            return true;
+        }
+
+        if (packet.groupId !== Bank.MAIN_INTERFACE_ID) return false;
+        const sender = player.getPacketSender();
+        if (packet.childId === 2) sender.sendInterfaceRemoval();
+        else if (packet.childId === 17) {
+            player.setInsertMode(!player.insertModeReturn());
+            sender.sendVarbit(3959, player.insertModeReturn() ? 1 : 0);
+        } else if (packet.childId === 19) {
+            player.setNoteWithdrawal(!player.withdrawAsNote());
+            sender.sendVarbit(3958, player.withdrawAsNote() ? 1 : 0);
+        } else if ([23, 25, 27, 29, 31].includes(packet.childId)) {
+            player.setBankQuantityMode([23, 25, 27, 29, 31].indexOf(packet.childId));
+            sender.sendVarbit(6590, player.getBankQuantityMode());
+        } else if (packet.childId === 34) {
+            player.setPlaceholders(!player.isPlaceholders());
+            sender.sendVarbit(3755, player.isPlaceholders() ? 1 : 0);
+        } else if (packet.childId === 41) Bank.depositItems(player, player.getInventory(), false);
+        else if (packet.childId === 43) Bank.depositItems(player, player.getEquipment(), false);
+        else return false;
+        return true;
     }
 
     /**
@@ -367,7 +467,7 @@ export class Bank extends ItemContainer {
                 break;
             }
             return true;
-        } else if (player.getInterfaceId() == 5292) {
+        } else if (Bank.isOpen(player)) {
             if (player.getStatus() == PlayerStatus.BANKING) {
                 let tab_select_start = 50070;
                 for (let bankId = 0; bankId < this.TOTAL_BANK_TABS; bankId++) {
@@ -462,7 +562,7 @@ export class Bank extends ItemContainer {
     }
     public static depositItems(player: Player, from: ItemContainer, ignoreReqs: boolean) {
         if (!ignoreReqs) {
-            if (player.getStatus() !== PlayerStatus.BANKING || player.getInterfaceId() !== 5292) {
+            if (!Bank.isOpen(player)) {
                 return;
             }
         }
@@ -592,19 +692,33 @@ export class Bank extends ItemContainer {
         if (pluginCanBank === false) {
             return this;
         }
-        const opening =
-            this.getPlayer().getStatus() !== PlayerStatus.BANKING ||
-            this.getPlayer().getInterfaceId() !== 5292;
+        const opening = !Bank.isOpen(this.getPlayer());
 
         // Update player status
         this.getPlayer().setStatus(PlayerStatus.BANKING);
         this.getPlayer().setEnteredSyntaxAction(null);
 
-        // Sort and refresh items in the container
-        this.sortItems().refreshItems();
+        this.sortItems();
 
         if (this.getPlayer().getSession().isClientProtocol?.()) {
-            this.getPlayer().getPacketSender().sendInterface(12);
+            const player = this.getPlayer();
+            const sender = player.getPacketSender();
+            player.setInterfaceId(Bank.MAIN_INTERFACE_ID);
+            sender.sendConfig(548, 1)
+                .sendVarbit(4150, player.getCurrentBankTab())
+                .sendVarbit(3755, player.isPlaceholders() ? 1 : 0)
+                .sendVarbit(3958, player.withdrawAsNote() ? 1 : 0)
+                .sendVarbit(3959, player.insertModeReturn() ? 1 : 0)
+                .sendVarbit(3960, player.getBankCustomQuantity())
+                .sendVarbit(5450, 1)
+                .sendVarbit(6590, player.getBankQuantityMode())
+                .sendInterfaceScript(917, [-1, -2])
+                .sendSubInterface((161 << 16) | 16, Bank.MAIN_INTERFACE_ID, 0)
+                .sendSubInterface((161 << 16) | 74, Bank.SIDE_INTERFACE_ID, 3)
+                .sendInterfaceFlagsRange((Bank.MAIN_INTERFACE_ID << 16) | 12, 0, 1409, 3409919)
+                .sendInterfaceFlagsRange((Bank.SIDE_INTERFACE_ID << 16) | 3, 0, 27, 3278846)
+                .sendString(`Bank of ${GameConstants.NAME}`, (Bank.MAIN_INTERFACE_ID << 16) | 3);
+            this.refreshItems();
             if (opening) Sounds.sendSound(this.getPlayer(), Sound.CONTAINER_OPEN);
             return this;
         }
@@ -614,6 +728,7 @@ export class Bank extends ItemContainer {
                 .sendConfig(304, this.getPlayer().insertModeReturn() ? 1 : 0)
                 .sendConfig(117, this.getPlayer().isSearchingBank() ? 1 : 0)
                 .sendConfig(118, this.getPlayer().isPlaceholders() ? 1 : 0).sendConfiguredInterface("bank");
+        this.refreshItems();
 
         // Resets the scroll bar in the interface
         this.getPlayer().getPacketSender().sendInterfaceScrollReset(Bank.BANK_SCROLL_BAR_INTERFACE_ID);
@@ -631,8 +746,12 @@ export class Bank extends ItemContainer {
         }
 
         if (this.getPlayer().getSession().isClientProtocol?.()) {
-            this.getPlayer().getPacketSender().sendBankSnapshot()
-                .sendItemContainer(this.getPlayer().getInventory(), Bank.INVENTORY_INTERFACE_ID);
+            const sender = this.getPlayer().getPacketSender();
+            sender.sendVarbit(4150, this.getPlayer().getCurrentBankTab());
+            for (let tab = 1; tab <= 9; tab++) {
+                sender.sendVarbit(4170 + tab, this.getPlayer().getBank(tab).getValidItems().length);
+            }
+            sender.sendBankSnapshot().sendItemContainer(this.getPlayer().getInventory(), Bank.INVENTORY_INTERFACE_ID);
             return this;
         }
 
@@ -671,7 +790,7 @@ export class Bank extends ItemContainer {
 
     public switchsItem(to: ItemContainer, item: Item, slot: number, sort: boolean, refresh: boolean): Bank {
     // Make sure we're actually banking!
-    if (this.getPlayer().getStatus() != PlayerStatus.BANKING || this.getPlayer().getInterfaceId() != 5292) {
+    if (!Bank.isOpen(this.getPlayer())) {
     return this;
     }
         // Make sure we have the item!
@@ -679,15 +798,14 @@ export class Bank extends ItemContainer {
             return this;
         }
 
-        // Get the item definition for the item which is being withdrawn
-        let def = ItemDefinition.forId(item.getId() + 1);
-        if (def == null) {
-            return this;
-        }
+        const noteId = item.getDefinition().getNoteId();
+        const noteDefinition = noteId >= 0 ? ItemDefinition.forId(noteId) : null;
+        const canWithdrawAsNote = noteDefinition?.isNoted() === true &&
+            noteDefinition.getName().toLowerCase() === item.getDefinition().getName().toLowerCase();
 
         // Make sure we have enough space in the other container
         if (to.getFreeSlots() <= 0 && (!(to.contains(item.getId()) && item.getDefinition().isStackable()))
-                && !(this.getPlayer().withdrawAsNote() && def != null && def.isNoted() && to.contains(def.getId()))) {
+                && !(this.getPlayer().withdrawAsNote() && canWithdrawAsNote && to.contains(noteId))) {
             to.full();
             return this;
         }
@@ -697,7 +815,7 @@ export class Bank extends ItemContainer {
         if (item.getAmount() > to.getFreeSlots() && !item.getDefinition().isStackable()) {
             if (to instanceof Inventory) {
                 if (this.getPlayer().withdrawAsNote()) {
-                    if (def == null || !def.isNoted())
+                    if (!canWithdrawAsNote)
                         item.setAmount(to.getFreeSlots());
                 } else
                     item.setAmount(to.getFreeSlots());
@@ -710,9 +828,8 @@ export class Bank extends ItemContainer {
         }
 
         if (to instanceof Inventory) {
-            let withdrawAsNote = this.getPlayer().withdrawAsNote() && def != null && def.isNoted()
-                    && item.getDefinition() != null && def.getName().toLowerCase() == item.getDefinition().getName().toLowerCase();
-            let checkId = withdrawAsNote ? item.getId() + 1 : item.getId();
+            const withdrawAsNote = this.getPlayer().withdrawAsNote() && canWithdrawAsNote;
+            const checkId = withdrawAsNote ? noteId : item.getId();
             if (to.getAmount(checkId) + item.getAmount() > Number.MAX_SAFE_INTEGER
                     || to.getAmount(checkId) + item.getAmount() <= 0) {
                 item.setAmount(Number.MAX_SAFE_INTEGER - (to.getAmount(item.getId())));
@@ -734,12 +851,8 @@ export class Bank extends ItemContainer {
 
         // Check if we can actually withdraw the item as a note.
         if (this.getPlayer().withdrawAsNote()) {
-            let def = ItemDefinition.forId(item.getId() + 1);
-            if (def != null && def.isNoted() && item.getDefinition() != null
-                    && def.getName().toLowerCase() == item.getDefinition().getName().toLowerCase()
-                    && !def.getName().includes("Torva") && !def.getName().includes("Virtus")
-                    && !def.getName().includes("Pernix") && !def.getName().includes("Torva"))
-                item.setId(item.getId() + 1);
+            if (canWithdrawAsNote)
+                item.setId(noteId);
             else
                 this.getPlayer().getPacketSender().sendMessage("This item cannot be withdrawn as a note.");
         }
