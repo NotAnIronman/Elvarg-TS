@@ -1,7 +1,5 @@
 // import { Player } from "../../../game/entity/impl/player/Player";
 import { Packet } from "../Packet";
-import { Sound } from "../../../game/Sound";
-import { Sounds } from "../../../game/Sounds";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { ShopManager } from "../../../game/model/container/shop/ShopManager";
 // import { Bank } from "../../../game/model/container/impl/Bank";
@@ -28,24 +26,6 @@ const getInventoryCtor = () =>
 const getEquipmentCtor = () =>
   require("../../../game/model/container/impl/Equipment")
     .Equipment as typeof import("../../../game/model/container/impl/Equipment").Equipment;
-const getItemCtor = () =>
-  require("../../../game/model/Item")
-    .Item as typeof import("../../../game/model/Item").Item;
-const getFlagEnum = () =>
-  require("../../../game/model/Flag")
-    .Flag as typeof import("../../../game/model/Flag").Flag;
-const getBonusManager = () =>
-  require("../../../game/model/equipment/BonusManager")
-    .BonusManager as typeof import("../../../game/model/equipment/BonusManager").BonusManager;
-const getWeaponInterfaces = () =>
-  require("../../../game/content/combat/WeaponInterfaces")
-    .WeaponInterfaces as typeof import("../../../game/content/combat/WeaponInterfaces").WeaponInterfaces;
-const getCombatSpecial = () =>
-  require("../../../game/content/combat/CombatSpecial")
-    .CombatSpecial as typeof import("../../../game/content/combat/CombatSpecial").CombatSpecial;
-const getAutocasting = () =>
-  require("../../../game/content/combat/magic/Autocasting")
-    .Autocasting as typeof import("../../../game/content/combat/magic/Autocasting").Autocasting;
 const getEquipPacketListener = () =>
   require("./EquipPacketListener")
     .EquipPacketListener as typeof import("./EquipPacketListener").EquipPacketListener;
@@ -104,53 +84,8 @@ export class ItemContainerActionPacketListener {
 
     const Equipment = getEquipmentCtor();
     if (containerId === Equipment.INVENTORY_INTERFACE_ID) {
-      const equipment = player.getEquipment();
-      if (slot < 0 || slot >= equipment.capacity()) {
-        return;
-      }
-
-      const item = equipment.getItems()[slot];
-      if (!item || item.getId() !== id) {
-        return;
-      }
-
-      if (player.getArea() && !player.getArea().canUnequipItem(player, slot, item)) {
-        return;
-      }
-
-      const inventory = player.getInventory();
-      const stackIntoExisting =
-        item.getDefinition().isStackable() && inventory.getAmount(item.getId()) > 0;
-      const inventorySlot = inventory.getEmptySlot();
-      if (!stackIntoExisting && inventorySlot === -1) {
-        inventory.full();
-        return;
-      }
-
-      const Item = getItemCtor();
-      equipment.setItem(slot, new Item(-1, 0));
-
-      if (stackIntoExisting) {
-        inventory.adds(item.getId(), item.getAmount());
-      } else {
-        inventory.setItem(inventorySlot, item);
-      }
-
-      getBonusManager().update(player);
-      if (slot === Equipment.WEAPON_SLOT) {
-        getWeaponInterfaces().assign(player);
-        player.setSpecialActivated(false);
-        getCombatSpecial().updateBar(player);
-        if (player.getCombat().getAutocastSpell() != null) {
-          getAutocasting().setAutocast(player, null);
-          player.getPacketSender().sendMessage("Autocast spell cleared.");
-        }
-      }
-
-      equipment.refreshItems();
-      inventory.refreshItems();
-      player.getUpdateFlag().flag(getFlagEnum().APPEARANCE);
-      Sounds.sendSound(player, Sound.EQUIPMENT_OFF);
+      const item = player.getEquipment().getItems()[slot];
+      if (item?.getId() === id) getEquipPacketListener().unequip(player, slot);
       return;
     }
 

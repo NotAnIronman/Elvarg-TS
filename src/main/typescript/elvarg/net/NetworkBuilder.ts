@@ -45,6 +45,7 @@ import { ChangeAppearancePacketListener } from "./packet/impl/ChangeAppearancePa
 import { NpcDefinition } from "../game/definition/NpcDefinition";
 import { ObjectDefinition } from "../game/definition/ObjectDefinition";
 import { Emotes } from "../game/content/Emotes";
+import { BonusManager } from "../game/model/equipment/BonusManager";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -235,7 +236,12 @@ class ClientConnection {
         }
         case "widget_action":
           if (this.player) {
-            if (packet.itemId != null && packet.slot != null &&
+            const equipmentSlot = EquipPacketListener.resolveModernEquipmentSlot(packet.groupId, packet.childId);
+            if (equipmentSlot >= 0) {
+              EquipPacketListener.unequip(this.player, equipmentSlot);
+            } else if (packet.groupId === 387 && packet.childId === 1) {
+              BonusManager.open(this.player);
+            } else if (packet.itemId != null && packet.slot != null &&
                 this.player.getInventory().getItems()[packet.slot]?.getId() === packet.itemId) {
               this.inventoryAction({
                 type: "inventory_action", widgetId: packet.widgetId, slot: packet.slot,

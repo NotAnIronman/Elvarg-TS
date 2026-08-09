@@ -1246,10 +1246,11 @@ export class PacketSender {
     this.player.setSearchingBank?.(false);
     this.player.setTeleportInterfaceOpen?.(false);
     this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
-    const subTarget = this.subInterfaceTargets.get(interfaceId);
-    if (subTarget !== undefined) {
-      this.subInterfaceTargets.delete(interfaceId);
-      this.player.getSession().sendClientPacket(encodeWidgetCloseSub(subTarget));
+    if (this.subInterfaceTargets.size > 0) {
+      for (const target of new Set(this.subInterfaceTargets.values())) {
+        this.player.getSession().sendClientPacket(encodeWidgetCloseSub(target));
+      }
+      this.subInterfaceTargets.clear();
       return this;
     }
     if (interfaceId >= 0 && this.player.getSession().sendClientPacket(encodeWidgetClose(interfaceId))) return this;

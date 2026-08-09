@@ -27,8 +27,23 @@ const getFlagEnum = () =>
 const getBonusManager = () =>
   require("../../../game/model/equipment/BonusManager")
     .BonusManager as typeof import("../../../game/model/equipment/BonusManager").BonusManager;
+const getCombatSpecial = () =>
+  require("../../../game/content/combat/CombatSpecial")
+    .CombatSpecial as typeof import("../../../game/content/combat/CombatSpecial").CombatSpecial;
+const getAutocasting = () =>
+  require("../../../game/content/combat/magic/Autocasting")
+    .Autocasting as typeof import("../../../game/content/combat/magic/Autocasting").Autocasting;
 
 export class EquipPacketListener implements PacketExecutor {
+  private static readonly MODERN_EQUIPMENT_SLOTS = [0, 1, 2, 3, 4, 5, 7, 9, 10, 12, 13];
+
+  public static resolveModernEquipmentSlot(groupId: number, childId: number): number {
+    const firstChild = groupId === 387 ? 15 : groupId === 84 ? 10 : -1;
+    return firstChild < 0
+      ? -1
+      : EquipPacketListener.MODERN_EQUIPMENT_SLOTS[childId - firstChild] ?? -1;
+  }
+
   public static resetWeapon(player: any, deactivateSpecialAttack: boolean) {
     if (deactivateSpecialAttack) {
       player.setSpecialActivated(false);
@@ -213,5 +228,47 @@ export class EquipPacketListener implements PacketExecutor {
     inventory.refreshItems();
     player.getUpdateFlag().flag(Flag.APPEARANCE);
     Sounds.sendSound(player, Sound.EQUIPMENT_ON);
+  }
+
+  public static unequip(player: any, slot: number): boolean {
+    if (!player || player.getHitpoints() <= 0) return false;
+
+    const Equipment = getEquipmentCtor();
+    const Item = getItemCtor();
+    const equipment = player.getEquipment();
+    if (slot < 0 || slot >= equipment.capacity()) return false;
+
+    const item = equipment.getItems()[slot];
+    if (!item || item.getId() < 0) return false;
+    if (player.getArea() && !player.getArea().canUnequipItem(player, slot, item)) return false;
+
+    const inventory = player.getInventory();
+    const stackIntoExisting =
+      item.getDefinition().isStackable() && inventory.getAmount(item.getId()) > 0;
+    const inventorySlot = inventory.getEmptySlot();
+    if (!stackIntoExisting && inventorySlot === -1) {
+      inventory.full();
+      return false;
+    }
+
+    equipment.setItem(slot, new Item(-1, 0));
+    if (stackIntoExisting) inventory.adds(item.getId(), item.getAmount());
+    else inventory.setItem(inventorySlot, item);
+
+    getBonusManager().update(player);
+    if (slot === Equipment.WEAPON_SLOT) {
+      EquipPacketListener.resetWeapon(player, true);
+      getCombatSpecial().updateBar(player);
+      if (player.getCombat().getAutocastSpell() != null) {
+        getAutocasting().setAutocast(player, null);
+        player.getPacketSender().sendMessage("Autocast spell cleared.");
+      }
+    }
+
+    equipment.refreshItems();
+    inventory.refreshItems();
+    player.getUpdateFlag().flag(getFlagEnum().APPEARANCE);
+    Sounds.sendSound(player, Sound.EQUIPMENT_OFF);
+    return true;
   }
 }
