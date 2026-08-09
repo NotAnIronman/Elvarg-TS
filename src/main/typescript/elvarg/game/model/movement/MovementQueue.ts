@@ -461,6 +461,18 @@ export class MovementQueue {
     }
 
     public canWalkTo(next: Location) {
+        if (
+            next.getZ() !== this.character.getLocation().getZ() ||
+            !RegionManager.canMovestart(
+                this.character.getLocation(),
+                next,
+                this.character.getSize(),
+                this.character.getSize(),
+                this.character.getPrivateArea()
+            )
+        ) {
+            return false;
+        }
         if (this.character.isNpc() && !(this.character as NPC).canWalkThroughNPCs()) {
             if (World.isNpcOccupyingTile(next, this.character as NPC)) {
                 return false;
@@ -1231,41 +1243,30 @@ export class MovementQueue {
             return;
         }
 
-        let destX = pos.getX();
-        let destY = pos.getY();
-
         this.reset();
 
         this.walkToReset();
 
-        PathFinder.calculateWalkRoute(this.player, destX, destY);
+        PathFinder.calculateGroundItemRoute(this.player, pos);
+        let lastRouteCycle = World.getProcessCycle();
 
-        let stage = 0;
         TaskManager.submit(new MovementTask(this.player.getIndex(), (task: MovementTask) => {
-            if (stage !== 0) {
+            if (PathFinder.reachedGroundItem(this.player, pos)) {
+                action?.();
                 this.player.getMovementQueue().reset();
-                TaskManager.cancelTasks(this.player);
-                this.player.getPacketSender().sendMessage("You can't reach that!");
                 task.stop();
                 return;
             }
 
-            if (this.player.getMovementQueue().points.length) {
+            const cycle = World.getProcessCycle();
+            const hasPath = this.player.getMovementQueue().points.length > 0;
+            if ((hasPath && cycle - lastRouteCycle < 2) || (!hasPath && cycle === lastRouteCycle)) {
                 return;
-            }
-
-            const currentLoc = this.player.getLocation();
-            if (!this.player.getMovementQueue().hasRoute() || currentLoc.getX() !== destX || currentLoc.getY() !== destY) {
-                stage = -1;
-                return;
-            }
-
-            if (action !== null) {
-                action();
             }
 
             this.player.getMovementQueue().reset();
-            task.stop();
+            lastRouteCycle = cycle;
+            PathFinder.calculateGroundItemRoute(this.player, pos);
         }));
     }
 
@@ -1353,7 +1354,6 @@ export class MovementQueue {
 
         let currentX = entity.getLocation().getX();
         let currentY = entity.getLocation().getY();
-        let reachStage = 0;
         TaskManager.submit(new MovementTask(this.player.getIndex(), (task: MovementTask) => {
             this.player.setMobileInteraction(entity);
             if (currentX != entity.getLocation().getX() || currentY != entity.getLocation().getY()) {
@@ -1363,35 +1363,19 @@ export class MovementQueue {
                 PathFinder.calculateEntityRoute(this.player, entity);
             }
 
-            if (runnable && this.player.getMovementQueue().isWithinEntityInteractionDistance(entity.getLocation())) {
-                // Executes the runnable and stops the task. However, It will still path to the destination.
-                runnable();
-                task.stop();
-                return;
-            }
-
-            if (reachStage !== 0) {
-                if (reachStage === 1) {
-                    this.player.getMovementQueue().reset();
-                    task.stop();
-                    return;
-                }
-                this.player.getMovementQueue().reset();
-                task.stop();
-                this.player.getPacketSender().sendMessage("I can't reach that!");
-                return;
-            }
-
             if (PathFinder.reachedEntity(this.player, entity)) {
-                reachStage = 1;
+                this.player.getMovementQueue().reset();
+                runnable?.();
+                task.stop();
                 return;
             }
 
             if (this.player.getMovementQueue().points.length) {
                 return;
             }
-
-            reachStage = -1;
+            this.player.getMovementQueue().reset();
+            task.stop();
+            this.player.getPacketSender().sendMessage("I can't reach that!");
         }));
     }
 

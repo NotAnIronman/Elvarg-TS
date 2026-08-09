@@ -683,6 +683,16 @@ export class Player extends Mobile {
     }
 
 
+    closeInterruptibleInterfaces(): void {
+        if (
+            this.status !== PlayerStatus.TRADING &&
+            this.status !== PlayerStatus.DUELING &&
+            (this.status !== PlayerStatus.NONE || this.interfaceId >= 0 || this.dialogueManager.isActive())
+        ) {
+            this.packetSender.sendInterfaceRemoval();
+        }
+    }
+
     busy(): boolean {
         if (this.interfaceId > 0) {
             return true;

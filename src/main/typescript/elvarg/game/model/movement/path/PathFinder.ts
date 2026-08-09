@@ -205,7 +205,7 @@ export class PathFinder {
             locShape: options.locShape ?? -1,
             moveNear: options.moveNear ?? true,
             blockAccessFlags: options.blockAccessFlags ?? 0,
-            maxWaypoints: options.maxWaypoints ?? 25,
+            maxWaypoints: options.maxWaypoints ?? 100,
             privateArea: entity.getPrivateArea(),
         });
 
@@ -315,6 +315,17 @@ export class PathFinder {
             locShape: -1,
             moveNear: true,
         });
+    }
+
+    static calculateGroundItemRoute(entity: Mobile, destination: Location) {
+        return PathFinder.applyRsmodRoute(entity, destination.getX(), destination.getY(), {
+            locShape: -1,
+            moveNear: false,
+        });
+    }
+
+    static reachedGroundItem(entity: Mobile, destination: Location): boolean {
+        return entity.getLocation().equals(destination);
     }
 
     static calculateObjectRoute(entity: Mobile, size: number, destX: number, destY: number, xLength: number, yLength: number, direction: number, blockingMask: number) {

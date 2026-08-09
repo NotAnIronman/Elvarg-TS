@@ -60,8 +60,10 @@ export class RegionManager {
     }
 
     public static getRegion(x: number, y: number): Region | undefined {
-        RegionManager.loadMapFiles(x, y);
-        let regionId = RegionManager.regionIdForTile(x, y);
+        const regionId = RegionManager.regionIdForTile(x, y);
+        if (RegionManager.loadingRegions.size === 0) {
+            RegionManager.loadMapFiles(x, y);
+        }
         return RegionManager.getRegionid(regionId);
     }
     private static addClippingForVariableObject(x: number, y: number, height: number, type: number, direction: number, tall: boolean, privateArea: PrivateArea) {
@@ -82,7 +84,7 @@ export class RegionManager {
         } else if (type == 1 || type == 3) {
             if (direction == 0) {
                 this.addClipping(x, y, height, 1, privateArea);
-                this.addClipping(x - 1, y, height, 16, privateArea);
+                this.addClipping(x - 1, y + 1, height, 16, privateArea);
             } else if (direction == 1) {
                 this.addClipping(x, y, height, 4, privateArea);
                 this.addClipping(x + 1, y + 1, height, 64, privateArea);
@@ -137,7 +139,7 @@ export class RegionManager {
                     this.addClipping(x + 1, y + 1, height, 32768, privateArea);
                 } else if (direction == 2) {
                     this.addClipping(x, y, height, 8192, privateArea);
-                    this.addClipping(x + 1, y + 1, height, 512, privateArea);
+                    this.addClipping(x + 1, y - 1, height, 512, privateArea);
                 } else if (direction == 3) {
                     this.addClipping(x, y, height, 32768, privateArea);
                     this.addClipping(x - 1, y - 1, height, 2048, privateArea);
@@ -181,7 +183,7 @@ export class RegionManager {
         } else if (type == 1 || type == 3) {
             if (direction == 0) {
                 RegionManager.removeClipping(x, y, height, 1, privateArea);
-                RegionManager.removeClipping(x - 1, y, height, 16, privateArea);
+                RegionManager.removeClipping(x - 1, y + 1, height, 16, privateArea);
             } else if (direction == 1) {
                 RegionManager.removeClipping(x, y, height, 4, privateArea);
                 RegionManager.removeClipping(x + 1, y + 1, height, 64, privateArea);
@@ -239,7 +241,7 @@ export class RegionManager {
                 RegionManager.removeClipping(x + 1, y + 1, height, 32768, privateArea);
             } else if (direction == 2) {
                 RegionManager.removeClipping(x, y, height, 8192, privateArea);
-                RegionManager.removeClipping(x + 1, y + 1, height, 512, privateArea);
+                RegionManager.removeClipping(x + 1, y - 1, height, 512, privateArea);
             } else if (direction == 3) {
                 RegionManager.removeClipping(x, y, height, 32768, privateArea);
                 RegionManager.removeClipping(x - 1, y - 1, height, 2048, privateArea);
@@ -291,18 +293,6 @@ export class RegionManager {
 
     public static addObject(objectId: number, x: number, y: number, height: number, type: number, direction: number) {
         const position = new Location(x, y, height);
-
-        if (height === 0) {
-            if (x >= 3092 && x <= 3094 && (y === 3513 || y === 3514 || y === 3507 || y === 3506)) {
-                objectId = -1;
-            }
-        }
-
-        switch (objectId) {
-            case 14233:
-            case 14235:
-                return;
-        }
 
         if (objectId === -1) {
             MapObjects.clear(position, type);
@@ -752,7 +742,7 @@ export class RegionManager {
         return region.isLoaded();
     }
 
-    public static loadMapFiles(x: number, y: number) {
+    public static loadMapFiles(x: number, y: number, loadSurroundings = true) {
         try {
             const regionId = RegionManager.regionIdForTile(x, y);
             const r: Region = RegionManager.getRegionid(regionId);
@@ -865,6 +855,21 @@ export class RegionManager {
                 absY,
             });
             RegionManager.loadingRegions.delete(regionId);
+            if (loadSurroundings) {
+                const mapX = regionId >> 8;
+                const mapY = regionId & 0xff;
+                for (let deltaX = -1; deltaX <= 1; deltaX++) {
+                    for (let deltaY = -1; deltaY <= 1; deltaY++) {
+                        if (deltaX !== 0 || deltaY !== 0) {
+                            RegionManager.loadMapFiles(
+                                (mapX + deltaX) * 64,
+                                (mapY + deltaY) * 64,
+                                false
+                            );
+                        }
+                    }
+                }
+            }
         } catch (e) {
             console.error(e);
             RegionManager.loadingRegions.delete(RegionManager.regionIdForTile(x, y));

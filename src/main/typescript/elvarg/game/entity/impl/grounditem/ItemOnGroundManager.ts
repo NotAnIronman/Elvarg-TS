@@ -62,7 +62,7 @@ export class ItemOnGroundManager {
         if (!World.isPlayerSessionConnected(player)) {
             return;
         }
-        if (!this.canSee(player, item))
+        if (!this.canSee(player, item, type === OperationType.DELETE))
             return;
         switch (type) {
             case OperationType.ALTER:
@@ -190,8 +190,8 @@ export class ItemOnGroundManager {
         return item.getOwner() === username;
     }
 
-    private static canSee(player: Player, item: ItemOnGround): boolean {
-        if (!item || item.isPendingRemoval() || item.getPosition().getZ() !== player.getLocation().getZ()) return false;
+    private static canSee(player: Player, item: ItemOnGround, includePendingRemoval = false): boolean {
+        if (!item || (!includePendingRemoval && item.isPendingRemoval()) || item.getPosition().getZ() !== player.getLocation().getZ()) return false;
         if (player.getPrivateArea() !== item.getPrivateArea() || item.getPosition().getDistance(player.getLocation()) > 64) return false;
         if (item.getState() === State.SEEN_BY_PLAYER) return this.isOwner(player.getUsername(), item);
         return this.isOwner(player.getUsername(), item)

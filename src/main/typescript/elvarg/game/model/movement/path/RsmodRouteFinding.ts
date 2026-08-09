@@ -143,7 +143,7 @@ export class RsmodRouteFinding {
       locShape = -1,
       moveNear = true,
       blockAccessFlags = 0,
-      maxWaypoints = 25,
+      maxWaypoints = 100,
     } = options;
 
     this.reset();
@@ -215,37 +215,27 @@ export class RsmodRouteFinding {
 
     const endLocalX = this.currLocalX;
     const endLocalY = this.currLocalY;
-    let nextDir = this.directionAt(this.currLocalX, this.currLocalY);
-    let currDir = -1;
-    const waypoints: RsmodWaypoint[] = [];
+    const reversedSteps: RsmodWaypoint[] = [];
 
-    for (;;) {
-      if (this.currLocalX === localSrcX && this.currLocalY === localSrcY) {
-        break;
-      }
-      if (currDir !== nextDir) {
-        currDir = nextDir;
-        if (waypoints.length >= maxWaypoints) {
-          waypoints.pop();
-        }
-        waypoints.unshift({
-          x: baseX + this.currLocalX,
-          y: baseY + this.currLocalY,
-          z: level,
-        });
-      }
-      if ((currDir & DIR_EAST) !== 0) {
+    while (this.currLocalX !== localSrcX || this.currLocalY !== localSrcY) {
+      reversedSteps.push({
+        x: baseX + this.currLocalX,
+        y: baseY + this.currLocalY,
+        z: level,
+      });
+      const direction = this.directionAt(this.currLocalX, this.currLocalY);
+      if ((direction & DIR_EAST) !== 0) {
         this.currLocalX++;
-      } else if ((currDir & DIR_WEST) !== 0) {
+      } else if ((direction & DIR_WEST) !== 0) {
         this.currLocalX--;
       }
-      if ((currDir & DIR_NORTH) !== 0) {
+      if ((direction & DIR_NORTH) !== 0) {
         this.currLocalY++;
-      } else if ((currDir & DIR_SOUTH) !== 0) {
+      } else if ((direction & DIR_SOUTH) !== 0) {
         this.currLocalY--;
       }
-      nextDir = this.directionAt(this.currLocalX, this.currLocalY);
     }
+    const waypoints = reversedSteps.reverse().slice(0, maxWaypoints);
 
     return {
       waypoints,

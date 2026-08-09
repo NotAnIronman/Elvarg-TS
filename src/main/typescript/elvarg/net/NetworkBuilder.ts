@@ -49,6 +49,17 @@ import { Emotes } from "../game/content/Emotes";
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
 const MAGIC_ITEMS = new MagicOnItemPacketListener();
+const WORLD_INTERACTIONS = new Set([
+  "move",
+  "npc_option",
+  "object_option",
+  "player_option",
+  "ground_item_action",
+  "item_on_player",
+  "spell_on_player",
+  "item_on_ground",
+  "spell_on_ground",
+]);
 
 type PendingLogin = {
   username: string;
@@ -117,6 +128,9 @@ class ClientConnection {
     }
 
     for (const packet of packets) {
+      if (this.player && WORLD_INTERACTIONS.has(packet.type)) {
+        this.player.closeInterruptibleInterfaces();
+      }
       switch (packet.type) {
         case "move":
           this.walk(packet.worldX, packet.worldY, packet.modifierFlags);
