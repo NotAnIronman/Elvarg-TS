@@ -46,17 +46,16 @@ const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
 const NPC_SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
-  path.join(process.cwd(), "data", "npc_spawns.json"),
 ];
 const NPC_FACING_BY_NAME = Object.freeze({
-  NORTH_WEST: 0,
-  NORTH: 1,
-  NORTH_EAST: 2,
+  NORTH_WEST: 5,
+  NORTH: 6,
+  NORTH_EAST: 7,
   WEST: 3,
   EAST: 4,
-  SOUTH_WEST: 5,
-  SOUTH: 6,
-  SOUTH_EAST: 7,
+  SOUTH_WEST: 0,
+  SOUTH: 1,
+  SOUTH_EAST: 2,
 });
 const NPC_FACING_ALIASES = Object.freeze({
   N: "NORTH",
@@ -656,13 +655,11 @@ module.exports = {
       const location = player.getLocation();
       const spawnEntry = {
         id,
-        position: {
-          x: location.getX(),
-          y: location.getY(),
-          z: location.getZ(),
-        },
-        radius: radiusArg == null ? 0 : radiusArg,
-        facing: facing?.id ?? -1,
+        x: location.getX(),
+        y: location.getY(),
+        level: location.getZ(),
+        wanderRadius: radiusArg == null ? 0 : radiusArg,
+        ...(facing?.id == null || facing.id < 0 ? {} : { direction: facing.id }),
       };
 
       let file;
@@ -678,7 +675,7 @@ module.exports = {
       player
         .getPacketSender()
         .sendMessage(
-          `Spawned ${spawned} NPC (id=${id}) and appended to ${file} at ${location.getX()},${location.getY()},${location.getZ()} (radius=${spawnEntry.radius}, facing=${facing?.label ?? "default"}).`
+          `Spawned ${spawned} NPC (id=${id}) and appended to ${file} at ${location.getX()},${location.getY()},${location.getZ()} (radius=${spawnEntry.wanderRadius}, facing=${facing?.label ?? "default"}).`
         );
       return true;
     });

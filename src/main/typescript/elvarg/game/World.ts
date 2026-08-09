@@ -25,6 +25,7 @@ const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
 
 export class World {
     private static readonly MAX_PLAYERS = 1024;
+    private static readonly MAX_NPCS = 32768;
     private static readonly IDLE_BOT_PROCESS_STRIDE = 2;
     private static readonly BOT_PROCESS_LOD_CHUNK_SIZE_TILES = 32;
     private static readonly BOT_PROCESS_LOD_NEAR_DISTANCE_TILES = 15;
@@ -36,7 +37,7 @@ export class World {
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
-    private static npcs: MobileList<NPC> = new MobileList<NPC>(5000);
+    private static npcs: MobileList<NPC> = new MobileList<NPC>(World.MAX_NPCS);
     private static items: ItemOnGround[] = [];
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];

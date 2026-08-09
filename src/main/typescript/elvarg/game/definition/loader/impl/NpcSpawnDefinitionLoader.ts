@@ -9,23 +9,26 @@ import { CacheDefinitions } from "../../../cache/CacheDefinitions";
 
 interface RawNpcSpawnDefinition {
     id: number;
+    name?: string;
     x: number;
     y: number;
-    z: number;
-    radius?: number | null;
-    facing?: number;
-    description?: string;
+    level: number;
+    wanderRadius?: number;
+    direction?: number;
 }
 
 export class NpcSpawnDefinitionLoader extends DefinitionLoader {
     public static readonly DEFINITION_TYPE = "npc_spawns";
+    private static readonly DEFAULT_WANDER_RADIUS = 5;
+    private static readonly DEFAULT_CLIENT_DIRECTION = 6;
+    private static readonly CLIENT_TO_SERVER_DIRECTION = [5, 6, 7, 3, 4, 0, 1, 2];
     private static readonly spawnedNpcs = new Set<NPC>();
 
     public load(): boolean {
         const loaded = this.loadSources<RawNpcSpawnDefinition>(
             NpcSpawnDefinitionLoader.DEFINITION_TYPE
         );
-        const definitionsByKey = new Map<string, NpcSpawnDefinition>();
+        const definitions: NpcSpawnDefinition[] = [];
         let totalCandidates = 0;
         let invalid = 0;
         let unsupported = 0;
@@ -38,18 +41,14 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
                     invalid++;
                     continue;
                 }
-                if (
-                    source.name !== "elvarg" &&
-                    definition.getId() >= CacheDefinitions.getCounts().npcs
-                ) {
+                if (definition.getId() >= CacheDefinitions.getCounts().npcs) {
                     unsupported++;
                     continue;
                 }
-                definitionsByKey.set(this.key(definition), definition);
+                definitions.push(definition);
             }
         }
 
-        const definitions = Array.from(definitionsByKey.values());
         NpcSpawnDefinition.replace(definitions);
         const applied = this.applyToWorld(definitions);
         console.info(
@@ -72,7 +71,7 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
         const id = Math.trunc(Number(raw?.id));
         const x = Math.trunc(Number(raw?.x));
         const y = Math.trunc(Number(raw?.y));
-        const z = Math.trunc(Number(raw?.z));
+        const z = Math.trunc(Number(raw?.level));
         if (
             !Number.isFinite(id) ||
             id < 0 ||
@@ -83,25 +82,23 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
             return null;
         }
 
-        const facingId = Number.isFinite(raw.facing)
-            ? Math.trunc(raw.facing as number)
-            : -1;
-        const radius = Number.isFinite(raw.radius)
-            ? Math.max(0, Math.trunc(raw.radius as number))
-            : null;
+        const clientDirection = Number.isFinite(raw.direction)
+            ? Math.trunc(raw.direction as number) & 7
+            : id < CacheDefinitions.getCounts().npcs
+              ? CacheDefinitions.getNpc(id).spawnDirection & 7
+              : NpcSpawnDefinitionLoader.DEFAULT_CLIENT_DIRECTION;
+        const facingId = NpcSpawnDefinitionLoader.CLIENT_TO_SERVER_DIRECTION[clientDirection];
+        const radius = Number.isFinite(raw.wanderRadius)
+            ? Math.max(0, Math.trunc(raw.wanderRadius as number))
+            : NpcSpawnDefinitionLoader.DEFAULT_WANDER_RADIUS;
         return new NpcSpawnDefinition(
             id,
             new Location(x, y, z),
             Direction.valueOf(facingId),
             radius,
-            String(raw.description ?? ""),
+            String(raw.name ?? ""),
             source
         );
-    }
-
-    private key(definition: NpcSpawnDefinition): string {
-        const position = definition.getPosition();
-        return `${definition.getId()}:${position.getX()}:${position.getY()}:${position.getZ()}`;
     }
 
     private applyToWorld(definitions: NpcSpawnDefinition[]): number {
@@ -114,7 +111,7 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
         for (const definition of definitions.slice(0, availableCapacity)) {
             const npc = NPC.create(definition.getId(), definition.getPosition());
             npc.getMovementCoordinator().setRadius(
-                this.resolveRadius(npc, definition.getRadius())
+                definition.getRadius() ?? NpcSpawnDefinitionLoader.DEFAULT_WANDER_RADIUS
             );
             npc.setFace(definition.getFacing());
 
@@ -125,6 +122,7 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
                 describedNpc.setDescription(definition.getDescription());
             }
             if (World.getNpcs().add(npc)) {
+                World.registerNpcPosition(npc);
                 NpcSpawnDefinitionLoader.spawnedNpcs.add(npc);
                 applied++;
             }
@@ -154,23 +152,10 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
                 removeQueue.splice(index, 1);
             }
             if (npc.isRegistered()) {
+                World.unregisterNpcPosition(npc);
                 World.getNpcs().remove(npc);
             }
         }
         NpcSpawnDefinitionLoader.spawnedNpcs.clear();
-    }
-
-    private resolveRadius(npc: NPC, explicitRadius: number | null): number {
-        if (explicitRadius != null) {
-            return explicitRadius;
-        }
-        const definitionRadius = Number(npc.getDefinition()?.getWalkRadius?.());
-        if (Number.isFinite(definitionRadius) && definitionRadius > 0) {
-            return Math.max(0, Math.trunc(definitionRadius));
-        }
-        const size = Number(npc.getSize());
-        return Number.isFinite(size) && size > 0
-            ? Math.max(0, Math.trunc(size) + 5)
-            : 0;
     }
 }

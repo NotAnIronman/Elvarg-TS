@@ -7,8 +7,6 @@ import { PlayerRights } from "./model/rights/PlayerRights"
 export class GameConstants {
     public static readonly NAME: string = "RspsApp";
     public static readonly NPC_BITS: number = 18;
-    // Keep optional OSRS spawns disabled by default; legacy 317 data is the baseline.
-    //public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = false;
     // Process NPC AI only near active player regions to avoid spending tick time
     // on distant NPCs that no active client can currently observe.
     public static readonly PROCESS_NPCS_BY_ACTIVE_REGIONS: boolean = true;
@@ -18,8 +16,6 @@ export class GameConstants {
     public static readonly CONCURRENCY: boolean = false;
     // Disable regional NPC processing optimization to avoid visibility churn during login/debug.
     public static readonly ENABLE_REGION_BASED_NPC_PROCESSING: boolean = true;
-    // Keep OSRS spawn source opt-in until client cache parity is confirmed for those ids.
-    public static readonly ENABLE_OSRS_NPC_SPAWNS: boolean = false;
     // Tick rate for the main game loop in milliseconds.
     // Java server runs at ~600ms per cycle; mirror that here.
     public static readonly GAME_ENGINE_PROCESSING_CYCLE_RATE: number = 600;
