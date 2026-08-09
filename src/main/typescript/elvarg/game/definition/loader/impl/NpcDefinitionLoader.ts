@@ -30,6 +30,7 @@ type CombatStats = {
 
 type CombatAnimation = {
     anims?: { attack?: number; block?: number; death?: number };
+    sounds?: { death?: number };
 };
 
 type CombatAnimationRole = keyof NonNullable<CombatAnimation["anims"]>;
@@ -98,7 +99,7 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                     guessedAnimations++;
                 }
             }
-            if (Object.keys(resolved).length > 0) animations[npcId] = { anims: resolved };
+            if (Object.keys(resolved).length > 0) animations[npcId] = { ...animations[npcId], anims: resolved };
         }
 
         const ids = new Set([
@@ -146,6 +147,7 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                     attackAnim: animation.anims?.attack ?? definition.getAttackAnim(),
                     defenceAnim: animation.anims?.block ?? definition.getDefenceAnim(),
                     deathAnim: animation.anims?.death ?? definition.getDeathAnim(),
+                    deathSound: animation.sounds?.death ?? definition.getDeathSound(),
                 });
             }
             if (typeof aggression[key]?.aggressive === "boolean") {

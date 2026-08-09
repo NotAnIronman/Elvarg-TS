@@ -1208,7 +1208,7 @@ export function encodeSound(
   } = {}
 ): Buffer {
   const positioned = options.x !== undefined;
-  const payload = Buffer.alloc(positioned ? 13 : 7);
+  const payload = Buffer.alloc(positioned ? 13 : 8);
   let offset = 0;
   payload.writeUInt16BE(soundId & 0xffff, offset);
   offset += 2;

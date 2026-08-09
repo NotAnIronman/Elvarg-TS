@@ -18,8 +18,30 @@ export class MagicCombatMethod extends CombatMethod {
     private static readonly MAGIC_CAST_DEBUG =
         process.env.MAGIC_CAST_DEBUG === "1" ||
         process.env.MAGIC_CAST_DEBUG === "true";
-    private static readonly BLOOD_BLITZ_SPELL_ID = 12911;
-    private static readonly ICE_BLITZ_SPELL_ID = 12871;
+    private static readonly CAST_SOUNDS: Readonly<Record<number, number>> = {
+        1: 2540,
+        1152: 220, 1153: 119, 1154: 211, 1156: 132, 1157: 3011, 1158: 160,
+        1160: 218, 1161: 127, 1163: 209, 1166: 130, 1169: 157, 1171: 122,
+        1172: 216, 1175: 207, 1177: 128, 1181: 155, 1183: 222, 1185: 213,
+        1188: 134, 1189: 162, 1542: 3009, 1543: 148, 1562: 3004, 1572: 101,
+        1582: 3003, 1592: 151, 12037: 1718,
+        12861: 6589, 12871: 6589, 12881: 6589, 12891: 171,
+        12901: 6589, 12911: 6589, 12919: 6589, 12929: 6589, 12939: 6589,
+        12951: 6589, 12963: 6589, 12975: 6589, 12987: 6589, 12999: 6589,
+        13011: 6589, 13023: 6589,
+    };
+    private static readonly IMPACT_SOUNDS: Readonly<Record<number, number>> = {
+        1: 1460,
+        1152: 221, 1153: 121, 1154: 212, 1156: 133, 1157: 3010, 1158: 161,
+        1160: 219, 1161: 126, 1163: 210, 1166: 131, 1169: 158, 1171: 124,
+        1172: 217, 1175: 208, 1177: 129, 1181: 156, 1183: 223, 1185: 214,
+        1188: 135, 1189: 163, 1542: 3008, 1543: 150, 1562: 3005, 1572: 99,
+        1582: 3002, 1592: 153, 12037: 174,
+        12861: 173, 12871: 169, 12881: 170, 12891: 168,
+        12901: 110, 12911: 104, 12919: 105, 12929: 102, 12939: 185,
+        12951: 181, 12963: 182, 12975: 180, 12987: 179, 12999: 176,
+        13011: 177, 13023: 175,
+    };
 
     public type(): CombatType {
         return CombatType.MAGIC;
@@ -117,14 +139,8 @@ export class MagicCombatMethod extends CombatMethod {
     }
 
     private static resolveCastSound(spellId: number): Sound | null {
-        switch (spellId) {
-            case MagicCombatMethod.BLOOD_BLITZ_SPELL_ID:
-                return Sound.BLOOD_BLITZ_CAST;
-            case MagicCombatMethod.ICE_BLITZ_SPELL_ID:
-                return Sound.ICE_BLITZ_CAST;
-            default:
-                return null;
-        }
+        const soundId = MagicCombatMethod.CAST_SOUNDS[spellId];
+        return soundId === undefined ? null : new Sound(soundId, 1, 0, 0);
     }
 
     public attackSpeed(character: Mobile): number {
@@ -169,7 +185,9 @@ export class MagicCombatMethod extends CombatMethod {
             if (accurate) {
                 const endGraphic = previousSpell.endGraphic();
                 target.performGraphic(endGraphic);
-                Sounds.sendSound(target, previousSpell.impactSound());
+                const impactSound = previousSpell.impactSound()
+                    ?? MagicCombatMethod.resolveImpactSound(previousSpell.spellId());
+                Sounds.sendSound(target, impactSound);
               } else {
                 // Send splash graphics for the spell because it wasn't accurate
                 target.performGraphic(MagicCombatMethod.SPLASH_GRAPHIC);
@@ -177,5 +195,10 @@ export class MagicCombatMethod extends CombatMethod {
             }
             previousSpell.finishCast(attacker, target, accurate, damage);
         }
+    }
+
+    private static resolveImpactSound(spellId: number): Sound | null {
+        const soundId = MagicCombatMethod.IMPACT_SOUNDS[spellId];
+        return soundId === undefined ? null : new Sound(soundId, 1, 0, 0);
     }
 }

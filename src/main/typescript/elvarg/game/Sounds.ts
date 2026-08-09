@@ -64,14 +64,30 @@ export class Sounds {
     }
 
     public static sendSound(entity: unknown, sound: Sound) {
+        if (!sound) {
+            return;
+        }
         const player = Sounds.resolvePlayer(entity);
-        if (!player || !sound || player.isPlayerBot()) {
+        if (player) {
+            if (!player.isPlayerBot()) {
+                player
+                    .getPacketSender()
+                    .sendSoundEffect(sound.getId(), sound.getLoopType(), sound.getDelay(), sound.getClientVolume());
+            }
             return;
         }
 
-        player
-            .getPacketSender()
-            .sendSoundEffect(sound.getId(), sound.getLoopType(), sound.getDelay(), sound.getClientVolume());
+        const location = (entity as any)?.getLocation?.();
+        if (location) {
+            Sounds.playAreaSound({
+                soundId: sound.getId(),
+                x: location.getX(),
+                y: location.getY(),
+                level: location.getZ(),
+                loops: sound.getLoopType(),
+                delay: sound.getDelay(),
+            });
+        }
     }
 
     public static sendSoundEffect(player: Player, soundId: number, loopType: number, delay: number, volume: number) {

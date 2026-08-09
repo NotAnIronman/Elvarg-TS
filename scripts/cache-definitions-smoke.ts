@@ -24,6 +24,7 @@ async function main() {
     new NpcDefinitionLoader().load();
     assert.equal(NpcDefinition.forId(100).getName(), CacheDefinitions.getNpc(100).name);
     assert.equal(NpcDefinition.forId(100).getAttackAnim(), 1312);
+    assert.equal(NpcDefinition.forId(100).getDeathSound(), 719);
     assert.equal(NpcDefinition.forId(73).getAttackAnim(), 5485);
     assert.equal(NpcDefinition.forId(73).getDefenceAnim(), 5489);
     assert.equal(NpcDefinition.forId(73).getDeathAnim(), 5491);

@@ -12,6 +12,8 @@ import { GameObject } from "../../entity/impl/object/GameObject";
 import { EnteredAmountAction } from "../../model/EnteredAmountAction";
 import { Wilderness } from "../wilderness/Wilderness";
 import { PluginManager } from "../../../plugins/PluginManager";
+import { Sound } from "../../Sound";
+import { Sounds } from "../../Sounds";
 
 
 class SkillEntered implements EnteredAmountAction {
@@ -185,6 +187,7 @@ export class SkillManager {
             this.player.getPacketSender().sendString("Click here to continue.", 358);
             this.player.getPacketSender().sendChatboxInterface(skill.getChatboxInterface());
             this.player.performGraphic(SkillManager.LEVEL_UP_GRAPHIC);
+            Sounds.sendSound(this.player, Sound.LEVEL_UP);
             this.player.getPacketSender().sendMessage("You've just advanced " + skillName + " level! You have reached level " + newLevel);
             if (this.skills.maxLevel[skill.getIndex()] == SkillManager.getMaxAchievingLevel(skill)) {
                 this.player.getPacketSender().sendMessage("Well done! You've achieved the highest possible level in this skill!");

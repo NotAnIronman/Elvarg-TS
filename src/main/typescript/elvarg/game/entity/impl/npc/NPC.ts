@@ -346,8 +346,7 @@ export class NPC extends Mobile {
     }
 
     public getAttackSound(): Sound {
-        // TODO: need to put proper sounds
-        return Sound.IMP_ATTACKING;
+        return Sound.NPC_ATTACKING;
     }
 
     public getBlockAnim(): number {

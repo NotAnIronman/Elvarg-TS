@@ -45,6 +45,9 @@ import { Music } from "../src/main/typescript/elvarg/game/Music";
 import { NPC } from "../src/main/typescript/elvarg/game/entity/impl/npc/NPC";
 import { Direction } from "../src/main/typescript/elvarg/game/model/Direction";
 import { Location } from "../src/main/typescript/elvarg/game/model/Location";
+import { Sound } from "../src/main/typescript/elvarg/game/Sound";
+import { FightType } from "../src/main/typescript/elvarg/game/content/combat/FightType";
+import { MagicCombatMethod } from "../src/main/typescript/elvarg/game/content/combat/method/impl/MagicCombatMethod";
 
 for (let id = 0; id < 8; id++) {
   const npc = new NPC(-1, new Location(0, 0));
@@ -150,6 +153,13 @@ assert.strictEqual(encodeHandshake(1, "Toby", true)[0], 2);
 assert.deepStrictEqual([...encodeSound(2395, { x: 3090, y: 3524, radius: 5 })], [
   131, 13, 9, 91, 1, 12, 18, 13, 196, 0, 1, 0, 0, 5, 0,
 ]);
+assert.deepStrictEqual([...encodeSound(2738)], [131, 8, 10, 178, 0, 1, 0, 0, 0, 0]);
+assert.strictEqual(Sound.PICK_UP_ITEM.getId(), 2582);
+assert.strictEqual(Sound.SHOOT_CROSSBOW.getId(), 2695);
+assert.strictEqual(Sound.PRAYER_PROTECT_MELEE.getId(), 2676);
+assert.strictEqual(FightType.UNARMED_KICK.getAttackSound().getId(), 2565);
+assert.strictEqual((MagicCombatMethod as any).resolveCastSound(1152).getId(), 220);
+assert.strictEqual((MagicCombatMethod as any).resolveImpactSound(12891).getId(), 168);
 assert.deepStrictEqual([...encodePlayJingle(42, 0x010203)], [132, 0, 42, 1, 3, 2]);
 assert.deepStrictEqual([...encodePlaySong(76)], [133, 0, 76, 0, 0, 0, 100, 0, 100, 0, 0]);
 assert.strictEqual(Music.forRegion(12850), 76);

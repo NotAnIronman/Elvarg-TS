@@ -23,6 +23,7 @@ export class NpcDefinition {
     private attackAnim: number = 422;
     private defenceAnim: number = 424;
     private deathAnim: number = 836;
+    private deathSound: number = -1;
     private combatLevel: number = 0;
     private stats: number[] = [...NpcDefinition.DEFAULT_STATS];
     private slayerLevel: number = 0;
@@ -147,7 +148,11 @@ export class NpcDefinition {
     public getDeathAnim(): number {
         return this.deathAnim;
     }
-    
+
+    public getDeathSound(): number {
+        return this.deathSound;
+    }
+
     public getCombatLevel(): number {
         return this.combatLevel;
     }
