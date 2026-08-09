@@ -7,6 +7,16 @@ import { FightStyle } from "./FightStyle";
 
 export class WeaponInterfaces {
 
+    public static changeModernCombatStyle(player: Player, slot: number): boolean {
+        if (!Number.isInteger(slot) || slot < 0 || slot > 3) return false;
+        const fightType = Object.values(player.getWeapon()?.getFightType?.() ?? {})
+            .find((type): type is FightType => type instanceof FightType && type.getChildId() === slot);
+        if (!fightType) return false;
+        player.setFightType(fightType);
+        player.getPacketSender().sendConfig(fightType.getParentId(), fightType.getChildId());
+        return true;
+    }
+
     /**
      * Assigns an interface to the combat sidebar based on the argued weapon.
      *

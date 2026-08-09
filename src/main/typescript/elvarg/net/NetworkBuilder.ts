@@ -47,6 +47,10 @@ import { ObjectDefinition } from "../game/definition/ObjectDefinition";
 import { Emotes } from "../game/content/Emotes";
 import { BonusManager } from "../game/model/equipment/BonusManager";
 import { ShopManager } from "../game/model/container/shop/ShopManager";
+import { CombatSpecial } from "../game/content/combat/CombatSpecial";
+import { WeaponInterfaces } from "../game/content/combat/WeaponInterfaces";
+import { PrayerHandler } from "../game/content/PrayerHandler";
+import { Autocasting } from "../game/content/combat/magic/Autocasting";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -248,6 +252,12 @@ class ClientConnection {
               // Bank owns its cache-native widgets while the bank modal is open.
             } else if (ShopManager.handleModernWidgetAction(this.player, packet)) {
               // Shop owns its stock and sell-inventory widgets while open.
+            } else if (packet.groupId === 541 && PrayerHandler.toggleModernPrayer(this.player, packet.childId)) {
+              // Prayer widgets map directly onto the existing prayer engine.
+            } else if (Autocasting.handleModernWidgetAction(
+              this.player, packet.groupId, packet.childId, packet.slot
+            )) {
+              // Cache-native combat autocast controls reuse the existing spell state.
             } else if (packet.itemId != null && packet.slot != null &&
                 this.player.getInventory().getItems()[packet.slot]?.getId() === packet.itemId) {
               this.inventoryAction({
@@ -265,6 +275,22 @@ class ClientConnection {
             }
             if (this.player.getDialogueManager().isActive() && packet.buttonNum > 0 && packet.buttonNum <= 5) {
               this.player.getDialogueManager().handleOption(packet.buttonNum - 1 as DialogueOption);
+            }
+          }
+          continue;
+        case "varp_transmit":
+          if (this.player) {
+            if (packet.varpId === 43) {
+              WeaponInterfaces.changeModernCombatStyle(this.player, packet.value);
+              BonusManager.update(this.player);
+            } else if (packet.varpId === 172) {
+              this.player.setAutoRetaliate(packet.value === 0);
+              this.player.getPacketSender().sendConfig(172, this.player.autoRetaliateReturn() ? 0 : 1);
+            } else if (packet.varpId === 173) {
+              this.player.setRunning(packet.value !== 0 && this.player.getRunEnergy() > 0);
+              this.player.getPacketSender().sendRunStatus();
+            } else if (packet.varpId === 301 && (packet.value !== 0) !== this.player.isSpecialActivated()) {
+              CombatSpecial.activate(this.player);
             }
           }
           continue;

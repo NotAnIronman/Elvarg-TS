@@ -181,6 +181,7 @@ export type ClientMessage =
   | { type: "dialogue_continue"; widgetId: number; childIndex: number }
   | { type: "dialogue_amount"; amount: number }
   | { type: "dialogue_input"; value: string }
+  | { type: "varp_transmit"; varpId: number; value: number }
   | { type: "raw"; opcode: number; payload: Buffer }
   | { type: "face"; rotation?: number; x?: number; y?: number }
   | { type: "hello" }
@@ -563,6 +564,8 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
         messageType: reader.byte() === 1 ? "game" : "public",
         text: reader.string(),
       };
+    case HighClientPacket.VARP_TRANSMIT:
+      return { type: "varp_transmit", varpId: reader.short(), value: reader.int() };
     case HighClientPacket.INTERACT:
       return { type: "player_option", option: reader.byte() === 0 ? 3 : 2, index: reader.short() };
     case HighClientPacket.INTERACT_STOP:

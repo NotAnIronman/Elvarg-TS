@@ -13,6 +13,25 @@ import { Misc } from "../../util/Misc";
 
 export class PrayerHandler {
 
+    private static readonly MODERN_PRAYER_BY_CHILD = new Map<number, number>([
+        [9, 0], [10, 1], [11, 2], [27, 3], [30, 4], [12, 5], [13, 6], [14, 7],
+        [15, 8], [16, 9], [17, 10], [28, 11], [31, 12], [18, 13], [19, 14],
+        [20, 15], [21, 16], [22, 17], [23, 18], [29, 19], [32, 20], [24, 21],
+        [25, 22], [26, 23], [37, 24], [34, 25], [35, 26], [33, 27], [36, 28],
+    ]);
+
+    public static modernPrayerId(childId: number): number | null {
+        return this.MODERN_PRAYER_BY_CHILD.get(childId) ?? null;
+    }
+
+    public static toggleModernPrayer(player: Player, childId: number): boolean {
+        const prayerId = this.modernPrayerId(childId);
+        if (prayerId === null) return false;
+        if (player.getPrayerActive()[prayerId]) this.deactivatePrayer(player, prayerId);
+        else this.activatePrayerPrayerId(player, prayerId);
+        return true;
+    }
+
     public static THICK_SKIN = 0;
     public static BURST_OF_STRENGTH = 1;
     public static CLARITY_OF_THOUGHT = 2;
@@ -139,7 +158,7 @@ export class PrayerHandler {
         if (character.isPlayer()) {
             const player = character.getAsPlayer();
             if (player.getSkillManager().getCurrentLevel(Skill.PRAYER) <= 0) {
-                player.getPacketSender().sendConfig(pd.configId, 0);
+                player.getPacketSender().sendVarbit(pd.configId, 0);
                 player.getPacketSender().sendMessage("You do not have enough Prayer points.");
                 Sounds.sendSound(player, Sound.PRAYER_INSUFFICIENT);
                 return;
@@ -206,7 +225,7 @@ export class PrayerHandler {
 
         if (character.isPlayer()) {
             const player = character.getAsPlayer();
-            player.getPacketSender().sendConfig(pd.configId, 1);
+            player.getPacketSender().sendVarbit(pd.configId, 1);
             const activationSound = PrayerHandler.getActivationSound(prayerId);
             if (activationSound != null) {
                 Sounds.sendSound(player, activationSound);
@@ -234,28 +253,28 @@ export class PrayerHandler {
     public static canUse(player: Player, prayer: PrayerData, msg: boolean): boolean {
         if (player.getSkillManager().getMaxLevel(Skill.PRAYER) < (prayer.requirement)) {
             if (msg) {
-                player.getPacketSender().sendConfig(prayer.configId, 0);
+                player.getPacketSender().sendVarbit(prayer.configId, 0);
                 player.getPacketSender().sendMessage("You need a Prayer level of at least" + prayer.requirement + " to use" + PrayerData.getPrayerName() + ".");
             }
             return false;
         }
         if (prayer === PrayerData.CHIVALRY && player.getSkillManager().getMaxLevel(Skill.DEFENCE) < 60) {
             if (msg) {
-                player.getPacketSender().sendConfig(prayer.configId, 0);
+                player.getPacketSender().sendVarbit(prayer.configId, 0);
                 player.getPacketSender().sendMessage("You need a Defence level of at least 60 to use Chivalry.");
             }
             return false;
         }
         if (prayer === PrayerData.PIETY && player.getSkillManager().getMaxLevel(Skill.DEFENCE) < 70) {
             if (msg) {
-                player.getPacketSender().sendConfig(prayer.configId, 0);
+                player.getPacketSender().sendVarbit(prayer.configId, 0);
                 player.getPacketSender().sendMessage("You need a Defence level of at least 70 to use Piety.");
             }
             return false;
         }
         if ((prayer === PrayerData.RIGOUR || prayer === PrayerData.AUGURY) && player.getSkillManager().getMaxLevel(Skill.DEFENCE) < 70) {
             if (msg) {
-                player.getPacketSender().sendConfig(prayer.configId, 0);
+                player.getPacketSender().sendVarbit(prayer.configId, 0);
                 player.getPacketSender().sendMessage("You need a Defence level of at least 70 to use that prayer.");
             }
             return false;
@@ -263,7 +282,7 @@ export class PrayerHandler {
         if (prayer === PrayerData.PROTECT_ITEM) {
             if (player.isSkulled() && player.getSkullType() === SkullType.RED_SKULL) {
                 if (msg) {
-                    player.getPacketSender().sendConfig(prayer.configId, 0);
+                    player.getPacketSender().sendVarbit(prayer.configId, 0);
                     // DialogueManager.sendStatement(player, "You cannot use the Protect Item prayer with a red skull!");
                 }
                 return false;
@@ -273,7 +292,7 @@ export class PrayerHandler {
             if (prayer == PrayerData.PROTECT_FROM_MELEE || prayer == PrayerData.PROTECT_FROM_MISSILES
                 || prayer == PrayerData.PROTECT_FROM_MAGIC) {
                 if (msg) {
-                    player.getPacketSender().sendConfig(prayer.configId, 0);
+                    player.getPacketSender().sendVarbit(prayer.configId, 0);
                     player.getPacketSender()
                         .sendMessage("You have been disabled and can no longer use protection prayers.");
                 }
@@ -303,7 +322,7 @@ export class PrayerHandler {
         if (player.getDueling().inDuel() && player.getDueling().getRules()[DuelRule.NO_PRAYER.getButtonId()]) {
             if (msg) {
                 //   DialogueManager.sendStatement(player, "Prayer has been disabled in this duel!");
-                player.getPacketSender().sendConfig(prayer.configId, 0);
+                player.getPacketSender().sendVarbit(prayer.configId, 0);
             }
             return false;
         }
@@ -318,7 +337,7 @@ export class PrayerHandler {
         c.getPrayerActive()[prayerId] = false;
         if (c.isPlayer()) {
             const player = c.getAsPlayer();
-            player.getPacketSender().sendConfig(pd.configId, 0);
+            player.getPacketSender().sendVarbit(pd.configId, 0);
             Sounds.sendSound(player, Sound.PRAYER_TURN_OFF);
             if (pd.hint !== -1) {
                 const hintId = this.getHeadHint(c);
@@ -356,7 +375,7 @@ export class PrayerHandler {
             const pd = PrayerData.prayerData.get(i);
             if (!pd) continue;
             player.getPrayerActive()[i] = false;
-            player.getPacketSender().sendConfig(pd.configId, 0);
+            player.getPacketSender().sendVarbit(pd.configId, 0);
             if (pd.hint !== -1) {
                 const hintId = this.getHeadHint(player);
                 player.getAppearance().setHeadHint(hintId);
@@ -490,35 +509,35 @@ export class PrayerHandler {
 
 export class PrayerData {
 
-    public static readonly THICK_SKIN = new PrayerData(1, 5, 5609, 83);
-    public static readonly BURST_OF_STRENGTH =  new PrayerData(4, 5, 5610, 84);
-    public static readonly CLARITY_OF_THOUGHT = new PrayerData(7, 5, 5611, 85);
-    public static readonly SHARP_EYE = new PrayerData(8, 5, 19812, 700);
-    public static readonly MYSTIC_WILL = new PrayerData(9, 5, 19814, 701);
-    public static readonly ROCK_SKIN = new PrayerData (10, 10, 5612, 86);
-    public static readonly SUPERHUMAN_STRENGTH = new PrayerData (13, 10, 5613, 87);
-    public static readonly IMPROVED_REFLEXES = new PrayerData (16, 10, 5614, 88);
-    public static readonly RAPID_RESTORE = new PrayerData (19, 2.3, 5615, 89);
-    public static readonly RAPID_HEAL = new PrayerData (22, 3, 5616, 90);
-    public static readonly PROTECT_ITEM = new PrayerData (25, 3, 5617, 91);
-    public static readonly HAWK_EYE = new PrayerData (26, 10, 19816, 702);
-    public static readonly MYSTIC_LORE = new PrayerData (27, 10, 19818, 703);
-    public static readonly STEEL_SKIN = new PrayerData (28, 20, 5618, 92);
-    public static readonly ULTIMATE_STRENGTH = new PrayerData (31, 20, 5619, 93);
-    public static readonly INCREDIBLE_REFLEXES = new PrayerData (34, 20, 5620, 94);
-    public static readonly PROTECT_FROM_MAGIC = new PrayerData (37, 20, 5621, 95, [2]);
-    public static readonly PROTECT_FROM_MISSILES = new PrayerData (40, 20, 5622, 96, [1]);
-    public static readonly PROTECT_FROM_MELEE = new PrayerData (43, 20, 5623, 97, [0]);
-    public static readonly EAGLE_EYE = new PrayerData(44, 20, 19821, 704);
-    public static readonly MYSTIC_MIGHT = new PrayerData (45, 20, 19823, 705);
-    public static readonly RETRIBUTION = new PrayerData (46, 5, 683, 98, [4]);
-    public static readonly REDEMPTION = new PrayerData (49, 10, 684, 99, [5]);
-    public static readonly SMITE = new PrayerData (52, 32.0, 685, 100, [6]);
-    public static readonly PRESERVE = new PrayerData (55, 3, 28001, 708);
-    public static readonly CHIVALRY = new PrayerData (60, 38.5, 19825, 706);
-    public static readonly PIETY = new PrayerData (70, 38.5, 19827, 707);
-    public static readonly RIGOUR = new PrayerData (74, 38.5, 28004, 710);
-    public static readonly AUGURY = new PrayerData (77, 38.5, 28007, 712);
+    public static readonly THICK_SKIN = new PrayerData(1, 5, 5609, 4104);
+    public static readonly BURST_OF_STRENGTH =  new PrayerData(4, 5, 5610, 4105);
+    public static readonly CLARITY_OF_THOUGHT = new PrayerData(7, 5, 5611, 4106);
+    public static readonly SHARP_EYE = new PrayerData(8, 5, 19812, 4122);
+    public static readonly MYSTIC_WILL = new PrayerData(9, 5, 19814, 4123);
+    public static readonly ROCK_SKIN = new PrayerData (10, 10, 5612, 4107);
+    public static readonly SUPERHUMAN_STRENGTH = new PrayerData (13, 10, 5613, 4108);
+    public static readonly IMPROVED_REFLEXES = new PrayerData (16, 10, 5614, 4109);
+    public static readonly RAPID_RESTORE = new PrayerData (19, 2.3, 5615, 4110);
+    public static readonly RAPID_HEAL = new PrayerData (22, 3, 5616, 4111);
+    public static readonly PROTECT_ITEM = new PrayerData (25, 3, 5617, 4112);
+    public static readonly HAWK_EYE = new PrayerData (26, 10, 19816, 4124);
+    public static readonly MYSTIC_LORE = new PrayerData (27, 10, 19818, 4125);
+    public static readonly STEEL_SKIN = new PrayerData (28, 20, 5618, 4113);
+    public static readonly ULTIMATE_STRENGTH = new PrayerData (31, 20, 5619, 4114);
+    public static readonly INCREDIBLE_REFLEXES = new PrayerData (34, 20, 5620, 4115);
+    public static readonly PROTECT_FROM_MAGIC = new PrayerData (37, 20, 5621, 4116, [2]);
+    public static readonly PROTECT_FROM_MISSILES = new PrayerData (40, 20, 5622, 4117, [1]);
+    public static readonly PROTECT_FROM_MELEE = new PrayerData (43, 20, 5623, 4118, [0]);
+    public static readonly EAGLE_EYE = new PrayerData(44, 20, 19821, 4126);
+    public static readonly MYSTIC_MIGHT = new PrayerData (45, 20, 19823, 4127);
+    public static readonly RETRIBUTION = new PrayerData (46, 5, 683, 4119, [4]);
+    public static readonly REDEMPTION = new PrayerData (49, 10, 684, 4120, [5]);
+    public static readonly SMITE = new PrayerData (52, 32.0, 685, 4121, [6]);
+    public static readonly PRESERVE = new PrayerData (55, 3, 28001, 5466);
+    public static readonly CHIVALRY = new PrayerData (60, 38.5, 19825, 4128);
+    public static readonly PIETY = new PrayerData (70, 38.5, 19827, 4129);
+    public static readonly RIGOUR = new PrayerData (74, 38.5, 28004, 5464);
+    public static readonly AUGURY = new PrayerData (77, 38.5, 28007, 5465);
 
     /**
        * Contains the PrayerData with their corresponding prayerId.

@@ -51,6 +51,9 @@ import { MagicCombatMethod } from "../src/main/typescript/elvarg/game/content/co
 import { EquipPacketListener } from "../src/main/typescript/elvarg/net/packet/impl/EquipPacketListener";
 import { Bank } from "../src/main/typescript/elvarg/game/model/container/impl/Bank";
 import { ShopManager } from "../src/main/typescript/elvarg/game/model/container/shop/ShopManager";
+import { PrayerHandler } from "../src/main/typescript/elvarg/game/content/PrayerHandler";
+import { Autocasting } from "../src/main/typescript/elvarg/game/content/combat/magic/Autocasting";
+import { CombatSpells } from "../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells";
 
 assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(387, 15), 0);
 assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(387, 25), 13);
@@ -63,6 +66,12 @@ assert.strictEqual(Bank.modernActionAmount("deposit", 8, undefined, 100), 100);
 assert.strictEqual(ShopManager.modernActionAmount(3), 5);
 assert.strictEqual(ShopManager.modernActionAmount(1, "Buy 50"), 50);
 assert.strictEqual(ShopManager.modernActionAmount(1, "Value"), null);
+assert.strictEqual(PrayerHandler.modernPrayerId(9), PrayerHandler.THICK_SKIN);
+assert.strictEqual(PrayerHandler.modernPrayerId(33), PrayerHandler.RIGOUR);
+assert.strictEqual(PrayerHandler.modernPrayerId(38), null);
+assert.strictEqual(Autocasting.modernAutocastSpell(1), CombatSpells.WIND_STRIKE);
+assert.strictEqual(Autocasting.modernAutocastSpell(46), CombatSpells.ICE_BARRAGE);
+assert.strictEqual(Autocasting.modernAutocastSpell(59), null);
 
 for (let id = 0; id < 8; id++) {
   const npc = new NPC(-1, new Location(0, 0));
@@ -111,6 +120,9 @@ assert.deepStrictEqual(decodeClientPacket(chat), {
   type: "chat", text: "hello", messageType: "public",
 });
 assert.deepStrictEqual(decodeClientPacket(Buffer.from([55])), { type: "interface_close" });
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([191, 0, 43, 0, 0, 0, 2])), {
+  type: "varp_transmit", varpId: 43, value: 2,
+});
 assert.deepStrictEqual(decodeClientPackets(Buffer.concat([chat, Buffer.from([55])])).map(({ type }) => type), [
   "chat", "interface_close",
 ]);

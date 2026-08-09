@@ -164,6 +164,7 @@ export class PacketSender {
   // }
 
   sendSpecialAttackState(active: boolean): this {
+    if (this.player.getSession().sendClientPacket(encodeVarp(301, active ? 1 : 0))) return this;
     const out = new PacketBuilder(186);
     out.put(active ? 1 : 0);
     this.player.getSession().write(out);
@@ -319,6 +320,7 @@ export class PacketSender {
   }
 
   sendQuickPrayersState(activated: boolean): this {
+    if (this.player.getSession().sendClientPacket(encodeVarbit(4103, activated ? 1 : 0))) return this;
     const out = new PacketBuilder(111);
     out.put(activated ? 1 : 0);
     this.player.getSession().write(out);
@@ -326,6 +328,7 @@ export class PacketSender {
   }
 
   updateSpecialAttackOrb(): this {
+    if (this.player.getSession().sendClientPacket(encodeVarp(300, this.player.getSpecialPercentage() * 10))) return this;
     const out = new PacketBuilder(137);
     out.put(this.player.getSpecialPercentage());
     this.player.getSession().write(out);
@@ -505,6 +508,27 @@ export class PacketSender {
   }
 
   public sendTabInterface(tabId: number, interfaceId: number) {
+    if (this.player.getSession().isClientProtocol()) {
+      if (tabId === 0) {
+        const groupId = interfaceId === 1829 || interfaceId === 1689 ? 201 : 593;
+        this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 76, groupId));
+        if (groupId === 201) this.sendInterfaceFlagsRange((201 << 16) | 1, 0, 64, 1 << 1);
+        return this;
+      }
+      if (tabId === 5) {
+        this.player.getSession().sendClientPacket(encodeWidgetOpenSub(
+          (161 << 16) | 81,
+          interfaceId === 17200 ? 77 : 541
+        ));
+        return this;
+      }
+      if (tabId === 6) {
+        const spellbook = interfaceId === 12855 ? 1 : interfaceId === 29999 ? 2 : 0;
+        this.player.getSession().sendClientPacket(encodeVarbit(4070, spellbook));
+        this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 82, 218));
+        return this;
+      }
+    }
     if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | tabId, interfaceId))) return this;
     const out = new PacketBuilder(71);
     out.putShort(interfaceId);

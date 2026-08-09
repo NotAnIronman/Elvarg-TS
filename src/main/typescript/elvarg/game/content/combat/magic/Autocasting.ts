@@ -67,6 +67,52 @@ export class Autocasting {
         [13136, CombatSpells.ICE_BARRAGE],
     ]);
 
+    private static readonly MODERN_AUTOCAST_SPELLS = new Map<number, CombatSpell>([
+        [1, CombatSpells.WIND_STRIKE], [2, CombatSpells.WATER_STRIKE],
+        [3, CombatSpells.EARTH_STRIKE], [4, CombatSpells.FIRE_STRIKE],
+        [5, CombatSpells.WIND_BOLT], [6, CombatSpells.WATER_BOLT],
+        [7, CombatSpells.EARTH_BOLT], [8, CombatSpells.FIRE_BOLT],
+        [9, CombatSpells.WIND_BLAST], [10, CombatSpells.WATER_BLAST],
+        [11, CombatSpells.EARTH_BLAST], [12, CombatSpells.FIRE_BLAST],
+        [13, CombatSpells.WIND_WAVE], [14, CombatSpells.WATER_WAVE],
+        [15, CombatSpells.EARTH_WAVE], [16, CombatSpells.FIRE_WAVE],
+        [31, CombatSpells.SMOKE_RUSH], [32, CombatSpells.SHADOW_RUSH],
+        [33, CombatSpells.BLOOD_RUSH], [34, CombatSpells.ICE_RUSH],
+        [35, CombatSpells.SMOKE_BURST], [36, CombatSpells.SHADOW_BURST],
+        [37, CombatSpells.BLOOD_BURST], [38, CombatSpells.ICE_BURST],
+        [39, CombatSpells.SMOKE_BLITZ], [40, CombatSpells.SHADOW_BLITZ],
+        [41, CombatSpells.BLOOD_BLITZ], [42, CombatSpells.ICE_BLITZ],
+        [43, CombatSpells.SMOKE_BARRAGE], [44, CombatSpells.SHADOW_BARRAGE],
+        [45, CombatSpells.BLOOD_BARRAGE], [46, CombatSpells.ICE_BARRAGE],
+    ]);
+
+    public static modernAutocastSpell(index: number): CombatSpell | null {
+        return this.MODERN_AUTOCAST_SPELLS.get(index) ?? null;
+    }
+
+    public static handleModernWidgetAction(player: Player, groupId: number, childId: number, slot?: number): boolean {
+        if (groupId === 593 && childId === 26) {
+            this.setAutocast(player, null);
+            return true;
+        }
+        if (groupId === 593 && (childId === 23 || childId === 28)) {
+            return this.handleWeaponInterface(
+                player,
+                childId === 23 ? this.DEFENSIVE_AUTOCAST_BUTTON : this.REGULAR_AUTOCAST_BUTTON
+            );
+        }
+        if (groupId !== 201 || childId !== 1 || slot === undefined) return false;
+        if (slot === 0) {
+            player.getPacketSender().sendTabInterface(0, player.getWeapon().getInterfaceId());
+            return true;
+        }
+        const spell = this.modernAutocastSpell(slot);
+        if (!spell) return true;
+        this.setAutocast(player, spell);
+        player.getPacketSender().sendTabInterface(0, player.getWeapon().getInterfaceId());
+        return true;
+    }
+
     public static handleAutocastTab(player: Player, actionButtonId: number) {
         if (Autocasting.AUTOCAST_SPELLS.has(actionButtonId)) {
             Autocasting.setAutocast(player, Autocasting.AUTOCAST_SPELLS.get(actionButtonId) ?? null);
@@ -96,6 +142,13 @@ export class Autocasting {
         if (!player.getEquipment().hasStaffEquipped()) {
             return true;
         }
+
+        player.getPacketSender().sendConfig(
+            664,
+            player.getSpellbook() === MagicSpellbook.ANCIENT
+                ? player.getEquipment().getWeapon().getId()
+                : -1
+        );
 
         // Track autocast mode via staff fight style.
         // Defensive autocast maps to STAFF_FOCUS, regular autocast maps to STAFF_POUND.
@@ -159,7 +212,7 @@ export class Autocasting {
         return true;
     }
 
-    public static setAutocast(player: Player, spell: CombatSpell) {
+    public static setAutocast(player: Player, spell: CombatSpell | null) {
         // First, set the Player's preferred autocast spell
         player.getCombat().setAutocastSpell(spell);
 
@@ -170,7 +223,13 @@ export class Autocasting {
 
         const defensiveAutocast = player.getFightType()?.getStyle?.() == FightStyle.DEFENSIVE;
 
-        if (spell == null) {
+        if (player.getSession().isClientProtocol()) {
+            const index = spell == null ? 0 : this.resolveModernAutocastIndex(spell);
+            player.getPacketSender()
+                .sendVarbit(275, spell == null ? 0 : 1)
+                .sendVarbit(276, index)
+                .sendVarbit(2668, spell != null && defensiveAutocast ? 1 : 0);
+        } else if (spell == null) {
             // No autocast selected: clear both regular/defensive mode bits.
             player.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
         } else {
@@ -186,6 +245,13 @@ export class Autocasting {
 
         getBonusManager().update(player);
         Autocasting.updateConfigsOnAutocast(player, spell != null);
+    }
+
+    private static resolveModernAutocastIndex(spell: CombatSpell): number {
+        for (const [index, mappedSpell] of this.MODERN_AUTOCAST_SPELLS) {
+            if (mappedSpell === spell) return index;
+        }
+        return 0;
     }
 
     private static updateConfigsOnAutocast(player: Player, autocast: boolean) {
