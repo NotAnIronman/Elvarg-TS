@@ -26,6 +26,7 @@ import { Misc } from "../../util/Misc";
 import {
   encodeBankSnapshot,
   encodeChatMessage,
+  encodeContentData,
   encodeDestination,
   encodeGroundItems,
   encodeGroundItemsDelta,
@@ -71,6 +72,7 @@ import {
 
 export class PacketSender {
   private groundItemSerial = 0;
+  private subInterfaceTargets = new Map<number, number>();
   // private player: Player;
   // constructor(player: Player) {
   //     this.player = player;
@@ -1244,6 +1246,12 @@ export class PacketSender {
     this.player.setSearchingBank?.(false);
     this.player.setTeleportInterfaceOpen?.(false);
     this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
+    const subTarget = this.subInterfaceTargets.get(interfaceId);
+    if (subTarget !== undefined) {
+      this.subInterfaceTargets.delete(interfaceId);
+      this.player.getSession().sendClientPacket(encodeWidgetCloseSub(subTarget));
+      return this;
+    }
     if (interfaceId >= 0 && this.player.getSession().sendClientPacket(encodeWidgetClose(interfaceId))) return this;
     // Java parity: close interfaces with opcode 219 only.
     this.player.getSession().write(new PacketBuilder(219, PacketType.FIXED));
@@ -1701,12 +1709,26 @@ export class PacketSender {
     return this;
   }
 
-  sendSubInterface(targetUid: number, groupId: number, type = 1): this {
-    this.player.getSession().sendClientPacket(encodeWidgetOpenSub(targetUid, groupId, type));
+  sendSubInterface(
+    targetUid: number,
+    groupId: number,
+    type = 1,
+    options: Parameters<typeof encodeWidgetOpenSub>[3] = {}
+  ): this {
+    this.subInterfaceTargets.set(groupId, targetUid);
+    this.player.getSession().sendClientPacket(encodeWidgetOpenSub(targetUid, groupId, type, options));
+    return this;
+  }
+
+  sendContentData(source: string, datasets: Array<{ key: string; rows: unknown[] }>): this {
+    this.player.getSession().sendClientPacket(encodeContentData(source, datasets));
     return this;
   }
 
   closeSubInterface(targetUid: number): this {
+    for (const [groupId, target] of this.subInterfaceTargets) {
+      if (target === targetUid) this.subInterfaceTargets.delete(groupId);
+    }
     this.player.getSession().sendClientPacket(encodeWidgetCloseSub(targetUid));
     return this;
   }

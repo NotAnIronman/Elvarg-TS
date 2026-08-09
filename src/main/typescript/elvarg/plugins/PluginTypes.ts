@@ -315,6 +315,9 @@ export interface PluginInterfaceActionClickEvent {
   player: any;
   buttonId: number;
   action: number;
+  itemId?: number;
+  slot?: number;
+  option?: string;
   handled: boolean;
 }
 

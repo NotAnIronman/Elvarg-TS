@@ -244,7 +244,11 @@ class ClientConnection {
             } else if (packet.simple) {
               ButtonClickPacketListener.handle(this.player, packet.childId);
             } else {
-              InterfaceActionClickOpcode.handle(this.player, packet.widgetId, packet.buttonNum);
+              InterfaceActionClickOpcode.handle(this.player, packet.widgetId, packet.buttonNum, {
+                itemId: packet.itemId,
+                slot: packet.slot,
+                option: packet.option,
+              });
             }
             if (this.player.getDialogueManager().isActive() && packet.buttonNum > 0 && packet.buttonNum <= 5) {
               this.player.getDialogueManager().handleOption(packet.buttonNum - 1 as DialogueOption);

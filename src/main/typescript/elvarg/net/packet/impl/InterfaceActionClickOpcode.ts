@@ -11,7 +11,12 @@ export class InterfaceActionClickOpcode implements PacketExecutor {
     InterfaceActionClickOpcode.handle(player, packet.readInt(), packet.readByte());
   }
 
-  public static handle(player: any, interfaceId: number, action: number): void {
+  public static handle(
+    player: any,
+    interfaceId: number,
+    action: number,
+    metadata: { itemId?: number; slot?: number; option?: string } = {}
+  ): void {
 
     if (
       player == null ||
@@ -96,6 +101,7 @@ export class InterfaceActionClickOpcode implements PacketExecutor {
         player,
         buttonId: interfaceId,
         action,
+        ...metadata,
         handled: false,
       })
     ) {

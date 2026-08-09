@@ -2,6 +2,7 @@ import { BitWriter } from "./BitWriter";
 import { CLIENT_PACKET_LENGTHS as CLIENT_PACKET_LENGTHS, ClientPacketId as HighClientPacket } from "./ClientPackets";
 import { CLIENT_PACKET_LENGTHS as NATIVE_CLIENT_PACKET_LENGTHS, ClientPacketId as NativeClientPacket } from "./NativeClientPackets";
 import { SERVER_PACKET_LENGTHS, ServerPacketId } from "./ServerPackets";
+import { deflateSync } from "zlib";
 
 export const enum ClientPacket {
   NPC_OPTION_2 = 12,
@@ -690,6 +691,19 @@ export function encodeServerPacket(opcode: ServerPacketId, payload: Buffer): Buf
   }
   if (payload.length > 65535) throw new Error(`Server packet ${opcode} exceeds short length`);
   return Buffer.concat([Buffer.from([opcode, payload.length >> 8, payload.length & 0xff]), payload]);
+}
+
+export function encodeContentData(
+  source: string,
+  datasets: Array<{ key: string; rows: unknown[] }>
+): Buffer {
+  const json = Buffer.from(JSON.stringify({ gamemodeId: source, datasets }));
+  const compressed = deflateSync(json);
+  const payload = Buffer.alloc(5 + compressed.length);
+  payload[0] = 1;
+  payload.writeUInt32BE(json.length, 1);
+  compressed.copy(payload, 5);
+  return encodeServerPacket(ServerPacketId.GAMEMODE_DATA, payload);
 }
 
 function packet(opcode: ServerPacket, payload: Buffer, lengthBytes: 0 | 1 | 2 = 1): Buffer {

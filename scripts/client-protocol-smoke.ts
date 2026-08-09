@@ -1,9 +1,11 @@
 import assert = require("assert");
+import { inflateSync } from "zlib";
 import { parseCacheTarget } from "../src/main/typescript/elvarg/game/cache/CachePipeline";
 import {
   decodeClientPacket,
   decodeClientPackets,
   encodeChatMessage,
+  encodeContentData,
   createNpcSyncState,
   createPlayerSyncState,
   encodeGameframeBootstrap,
@@ -107,6 +109,12 @@ assert.deepStrictEqual([...encodeChatMessage("game", "Hi")], [
   120, 8, 72, 105, 0, 0, 0, 0, 255, 255,
 ]);
 assert.deepStrictEqual([...encodeServerPacket(ServerPacketId.SHOP_CLOSE, Buffer.alloc(0))], [152]);
+const content = encodeContentData("test", [{ key: "widgets", rows: [{ id: 1 }] }]);
+assert.strictEqual(content[0], ServerPacketId.GAMEMODE_DATA);
+assert.deepStrictEqual(JSON.parse(inflateSync(content.subarray(8)).toString()), {
+  gamemodeId: "test",
+  datasets: [{ key: "widgets", rows: [{ id: 1 }] }],
+});
 assert.throws(() => encodeServerPacket(ServerPacketId.RUN_ENERGY, Buffer.alloc(1)));
 assert.deepStrictEqual([...encodeVarp(12, 3)], [40, 0, 12, 3]);
 assert.deepStrictEqual([...encodeVarbit(12, 300)], [42, 0, 12, 0, 0, 1, 44]);
