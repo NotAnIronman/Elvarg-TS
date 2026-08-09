@@ -1254,6 +1254,9 @@ export class PacketSender {
         this.player.getSession().sendClientPacket(encodeWidgetCloseSub(target));
       }
       this.subInterfaceTargets.clear();
+      if (interfaceId === 300 || interfaceId === 334 || interfaceId === 335) {
+        this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 79, 149, 1));
+      }
       return this;
     }
     if (interfaceId >= 0 && this.player.getSession().sendClientPacket(encodeWidgetClose(interfaceId))) return this;

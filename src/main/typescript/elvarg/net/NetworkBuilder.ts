@@ -46,6 +46,7 @@ import { NpcDefinition } from "../game/definition/NpcDefinition";
 import { ObjectDefinition } from "../game/definition/ObjectDefinition";
 import { Emotes } from "../game/content/Emotes";
 import { BonusManager } from "../game/model/equipment/BonusManager";
+import { ShopManager } from "../game/model/container/shop/ShopManager";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -245,6 +246,8 @@ class ClientConnection {
               BonusManager.open(this.player);
             } else if (Bank.handleModernWidgetAction(this.player, packet)) {
               // Bank owns its cache-native widgets while the bank modal is open.
+            } else if (ShopManager.handleModernWidgetAction(this.player, packet)) {
+              // Shop owns its stock and sell-inventory widgets while open.
             } else if (packet.itemId != null && packet.slot != null &&
                 this.player.getInventory().getItems()[packet.slot]?.getId() === packet.itemId) {
               this.inventoryAction({

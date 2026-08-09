@@ -52,6 +52,8 @@ export class ShopManager {
     public static readonly SHOP_INTERFACE_ID = 3824;
     public static readonly INVENTORY_INTERFACE_ID = 3823;
     public static readonly ITEMS_INTERFACE_ID = 3900;
+    public static readonly MAIN_INTERFACE_ID = 300;
+    public static readonly SIDE_INTERFACE_ID = 301;
 
     private static readonly NAME_INTERFACE_ID = 3901;
     private static readonly SCROLL_INTERFACE_ID = 29995;
@@ -123,8 +125,7 @@ export class ShopManager {
             return;
         }
         if (
-            player.getStatus?.() !== PlayerStatus.SHOPPING ||
-            player.getInterfaceId?.() !== this.SHOP_INTERFACE_ID
+            !this.isOpen(player)
         ) {
             this.close(player);
         }
@@ -197,6 +198,65 @@ export class ShopManager {
         return true;
     }
 
+    public static handleModernWidgetAction(player: any, packet: {
+        groupId: number;
+        childId: number;
+        buttonNum: number;
+        option?: string;
+        slot?: number;
+        itemId?: number;
+    }): boolean {
+        if (!this.isOpen(player) || packet.slot == null) return false;
+        const option = packet.option?.trim().toLowerCase() ?? "";
+        const amount = this.modernActionAmount(packet.buttonNum, option);
+        const examine = packet.buttonNum === 10 || option === "examine";
+
+        if (packet.groupId === this.MAIN_INTERFACE_ID && packet.childId === 16) {
+            const slot = packet.slot - 1;
+            const shop = this.currentShop(player);
+            const item = shop ? this.itemAtDisplaySlot(shop, slot) : null;
+            if (!item) return true;
+            if (examine) {
+                const definition = ItemDefinition.forId(item.itemId);
+                player.getPacketSender().sendMessage(definition.getExamine() || definition.getName());
+            } else {
+                this.handleItemContainerAction(player, {
+                    kind: amount != null ? "buy_sell" : "value",
+                    containerId: this.ITEMS_INTERFACE_ID,
+                    slot,
+                    itemId: item.itemId,
+                    amount: amount ?? 0,
+                });
+            }
+            return true;
+        }
+
+        if (packet.groupId === this.SIDE_INTERFACE_ID && packet.childId === 0) {
+            const item = player.getInventory().getItems()[packet.slot];
+            if (!item || item.getId() < 0) return true;
+            if (examine) {
+                const definition = ItemDefinition.forId(item.getId());
+                player.getPacketSender().sendMessage(definition.getExamine() || definition.getName());
+            } else {
+                this.handleItemContainerAction(player, {
+                    kind: amount != null ? "buy_sell" : "value",
+                    containerId: this.INVENTORY_INTERFACE_ID,
+                    slot: packet.slot,
+                    itemId: item.getId(),
+                    amount: amount ?? 0,
+                });
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static modernActionAmount(button: number, option?: string): number | null {
+        const named = /(?:buy|sell)[ -](1|5|10|50)$/i.exec(option?.trim() ?? "");
+        if (named) return Number(named[1]);
+        return ({ 2: 1, 3: 5, 4: 10, 5: 50 } as Record<number, number>)[button] ?? null;
+    }
+
     public static restockAll(): boolean {
         let pending = false;
         for (const shop of this.shopsById.values()) {
@@ -249,10 +309,7 @@ export class ShopManager {
     }
 
     private static currentShop(player: any): RuntimeShop | null {
-        if (
-            player?.getStatus?.() !== PlayerStatus.SHOPPING ||
-            player?.getInterfaceId?.() !== this.SHOP_INTERFACE_ID
-        ) {
+        if (!this.isOpen(player)) {
             this.close(player);
             return null;
         }
@@ -260,6 +317,12 @@ export class ShopManager {
         return Number.isInteger(shopId)
             ? this.shopsById.get(shopId!) ?? null
             : null;
+    }
+
+    private static isOpen(player: any): boolean {
+        return player?.getStatus?.() === PlayerStatus.SHOPPING &&
+            (player?.getInterfaceId?.() === this.SHOP_INTERFACE_ID ||
+                player?.getInterfaceId?.() === this.MAIN_INTERFACE_ID);
     }
 
     private static setActiveShop(player: any, shopId: number): void {
@@ -280,8 +343,7 @@ export class ShopManager {
             (entry) => new Item(entry.itemId, entry.amount)
         );
         const opening =
-            player.getStatus?.() !== PlayerStatus.SHOPPING ||
-            player.getInterfaceId?.() !== this.SHOP_INTERFACE_ID;
+            !this.isOpen(player);
 
         if (player.getSession().isClientProtocol?.()) {
             const stock = this.displayEntries(shop).map((entry, slot) => {
@@ -293,8 +355,15 @@ export class ShopManager {
                     priceEach: price, sellPrice: Math.max(1, Math.floor(price * this.SALES_TAX)),
                 };
             });
-            player.setInterfaceId(this.SHOP_INTERFACE_ID);
+            player.setInterfaceId(this.MAIN_INTERFACE_ID);
             player.setStatus(PlayerStatus.SHOPPING);
+            sender.sendSubInterface((161 << 16) | 16, this.MAIN_INTERFACE_ID, 0)
+                .sendSubInterface((161 << 16) | 79, this.SIDE_INTERFACE_ID, 1)
+                .sendInterfaceScript(1074, [516, shop.definition.getName(), this.currencyItemId(shop.definition.getCurrency()), 0, 1])
+                .sendInterfaceFlagsRange((this.MAIN_INTERFACE_ID << 16) | 16, 0, 39, 1662)
+                .sendInterfaceScript(149, [this.SIDE_INTERFACE_ID << 16, 93, 4, 7, 0, -1, "Value", "Sell 1", "Sell 5", "Sell 10", "Sell 50"])
+                .sendInterfaceFlagsRange(this.SIDE_INTERFACE_ID << 16, 0, 27, 1086)
+                .sendItemContainer(player.getInventory(), this.INVENTORY_INTERFACE_ID);
             player.getSession().sendClientPacket(encodeShopOpen(
                 String(shop.definition.getId()), shop.definition.getName(),
                 this.currencyItemId(shop.definition.getCurrency()), this.isGeneralStore(shop), 1, 1, stock
@@ -336,8 +405,7 @@ export class ShopManager {
         }
         for (const player of Array.from(viewers)) {
             if (
-                player?.getStatus?.() !== PlayerStatus.SHOPPING ||
-                player?.getInterfaceId?.() !== this.SHOP_INTERFACE_ID ||
+                !this.isOpen(player) ||
                 this.activeShopByPlayer.get(player) !== shopId
             ) {
                 this.close(player);

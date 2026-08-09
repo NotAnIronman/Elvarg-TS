@@ -49,6 +49,9 @@ export class Trading {
     private static readonly ITEM_LIST_2_FRAME: number = 3558;
     private static readonly ITEM_VALUE_1_FRAME: number = 24209;
     private static readonly ITEM_VALUE_2_FRAME: number = 24210;
+    private static readonly MODERN_OFFER_INTERFACE = 335;
+    private static readonly MODERN_CONFIRM_INTERFACE = 334;
+    private static readonly MODERN_INVENTORY_INTERFACE = 336;
 
     // Nonstatic
     private player: Player;
@@ -63,6 +66,12 @@ export class Trading {
     constructor(player: Player) {
         this.player = player;
         this.container = new PlayerItemContainer(player, ()=> {
+                if (player.getSession().isClientProtocol?.()) {
+                    player.getPacketSender().sendItemContainer(player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
+                    this.sendState(false);
+                    this.interact?.getTrading().sendState(false);
+                    return this;
+                }
                 player.getPacketSender().sendConfiguredInterface("trade-offer");
                 player.getPacketSender().sendItemContainer(this.container, Trading.CONTAINER_INTERFACE_ID);
                 player.getPacketSender().sendItemContainer(player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
@@ -196,7 +205,19 @@ export class Trading {
             .sendString("0 bm", Trading.ITEM_VALUE_1_FRAME).sendString( "0 bm", Trading.ITEM_VALUE_2_FRAME);
         this.container.resetItems();
         this.container.refreshItems();
-        this.player.setInterfaceId(Trading.INTERFACE);
+        if (this.player.getSession().isClientProtocol?.()) {
+            const sender = this.player.getPacketSender();
+            this.player.setInterfaceId(Trading.MODERN_OFFER_INTERFACE);
+            sender.sendSubInterface((161 << 16) | 16, Trading.MODERN_OFFER_INTERFACE, 0)
+                .sendSubInterface((161 << 16) | 79, Trading.MODERN_INVENTORY_INTERFACE, 1)
+                .sendInterfaceScript(3617, [Trading.MODERN_INVENTORY_INTERFACE << 16])
+                .sendInterfaceFlagsRange(Trading.MODERN_INVENTORY_INTERFACE << 16, 0, 27, 1181694)
+                .sendInterfaceFlagsRange((Trading.MODERN_OFFER_INTERFACE << 16) | 25, 0, 27, 1181694)
+                .sendInterfaceFlagsRange((Trading.MODERN_OFFER_INTERFACE << 16) | 28, 0, 27, 1 << 10)
+                .sendItemContainer(this.player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
+        } else {
+            this.player.setInterfaceId(Trading.INTERFACE);
+        }
         this.sendState(true);
         if (this.player.isPlayerBot && this.player.isPlayerBot()) {
             (this.player as any).getTradingInteraction?.().addItemsToTrade?.(this.container, this.interact);
@@ -312,9 +333,15 @@ export class Trading {
         this.state = TradeState.CONFIRM_SCREEN;
         this.sendState(true);
 
-        // Send new interface
-        this.player.getPacketSender().sendConfiguredInterface("trade-confirm");
-        this.player.getPacketSender().sendItemContainer(this.player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
+        if (this.player.getSession().isClientProtocol?.()) {
+            this.player.setInterfaceId(Trading.MODERN_CONFIRM_INTERFACE);
+            this.player.getPacketSender()
+                .sendSubInterface((161 << 16) | 16, Trading.MODERN_CONFIRM_INTERFACE, 0)
+                .sendSubInterface((161 << 16) | 79, 149, 1);
+        } else {
+            this.player.getPacketSender().sendConfiguredInterface("trade-confirm");
+            this.player.getPacketSender().sendItemContainer(this.player.getInventory(), Trading.INVENTORY_CONTAINER_INTERFACE);
+        }
 
         // Send new interface frames
         let thisItems = Trading.listItems(this.container);
@@ -324,7 +351,8 @@ export class Trading {
     }
 
     handleItem(id: number, amount: number, slot: number, from: ItemContainer, to: ItemContainer) {
-        if (this.player.getInterfaceId() === Trading.INTERFACE) {
+        if (this.player.getInterfaceId() === Trading.INTERFACE ||
+            this.player.getInterfaceId() === Trading.MODERN_OFFER_INTERFACE) {
 
             // Validate this trade action..
             if (!Trading.validate(this.player, this.interact, PlayerStatus.TRADING,
