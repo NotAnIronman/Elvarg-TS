@@ -6,6 +6,7 @@ import { CombatSpecial } from "../../../content/combat/CombatSpecial";
 import { CombatType } from "../../../content/combat/CombatType";
 import { FightType } from "../../../content/combat/FightType";
 import { WeaponInterfaces } from "../../../content/combat/WeaponInterfaces";
+import { WeaponProfiles } from "../../../content/combat/WeaponProfile";
 import { PendingHit } from "../../../content/combat/hit/PendingHit";
 import { Autocasting } from "../../../content/combat/magic/Autocasting";
 import { Presetable } from "../../../content/presets/Presetable";
@@ -283,12 +284,12 @@ export class Player extends Mobile {
 
     public getAttackAnim(): number {
         const fightType = FightType.resolve(this.getFightType()) ?? FightType.UNARMED_KICK;
-        return fightType.getAnimation();
+        return WeaponProfiles.attackAnimation(this, fightType.getAnimation());
     }
 
     public getAttackSound(): Sound {
         const fightType = FightType.resolve(this.getFightType()) ?? FightType.UNARMED_KICK;
-        return fightType.getAttackSound();
+        return WeaponProfiles.get(this)?.attackSound ?? fightType.getAttackSound();
     }
 
     public getBlockAnim(): number {
@@ -346,8 +347,10 @@ export class Player extends Mobile {
         // Calculated in the MagicCombatMethod class.
 
         const weapon = this.getWeapon() ?? WeaponInterfaces.UNARMED;
-        const baseSpeed =
-            weapon && typeof weapon.getSpeed === "function" ? weapon.getSpeed() : 4;
+        const baseSpeed = WeaponProfiles.attackSpeed(
+            this,
+            weapon && typeof weapon.getSpeed === "function" ? weapon.getSpeed() : 4
+        );
         let speed = Math.max(baseSpeed, 1);
         const fightType = FightType.resolve(this.getFightType());
 

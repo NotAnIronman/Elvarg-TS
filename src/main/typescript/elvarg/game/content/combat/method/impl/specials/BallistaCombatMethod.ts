@@ -4,11 +4,12 @@ import { Priority } from "../../../../../model/Priority";
 import { PendingHit } from "../../../hit/PendingHit";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
-import { RangedData, RangedWeapon } from "../../../ranged/RangedData";
+import { RangedWeapon } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
 import { Sound } from "../../../../../Sound";
 import { Sounds } from "../../../../../Sounds";
+import { WeaponProfiles } from "../../../WeaponProfile";
 
 export class BallistaCombatMethod extends RangedCombatMethod {
 
@@ -16,7 +17,7 @@ export class BallistaCombatMethod extends RangedCombatMethod {
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
         const distance = character.getLocation().getDistance(target.getLocation());
-        const delay = RangedData.hitDelay(distance, character.getCombat().getRangedWeapon());
+        const delay = WeaponProfiles.hitDelays(character.getAsPlayer(), distance)[0];
         return [new PendingHit(character, target, this, delay)];
     }
 

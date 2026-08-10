@@ -3,7 +3,7 @@ import { Animation } from "../../../../../model/Animation";
 import { Priority } from "../../../../../model/Priority";
 import { PendingHit } from "../../../hit/PendingHit";
 import { CombatSpecial } from "../../../CombatSpecial";
-import { RangedData, RangedWeapon, Ammunition } from "../../../ranged/RangedData";
+import { RangedWeapon, Ammunition } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
 import { Graphic } from "../../../../../model/Graphic";
@@ -11,6 +11,7 @@ import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { Sound } from "../../../../../Sound";
 import { Sounds } from "../../../../../Sounds";
+import { WeaponProfiles } from "../../../WeaponProfile";
 
 export class DarkBowCombatMethod extends RangedCombatMethod {
 
@@ -19,10 +20,10 @@ export class DarkBowCombatMethod extends RangedCombatMethod {
 
     public hits(character: Mobile, target: Mobile): PendingHit[] {
         const distance = character.getLocation().getDistance(target.getLocation());
-        const delay = RangedData.hitDelay(distance, character.getCombat().getRangedWeapon());
+        const delays = WeaponProfiles.hitDelays(character.getAsPlayer(), distance);
         return [
-            new PendingHit(character, target, this, delay, false),
-            new PendingHit(character, target, this, RangedData.dbowArrowDelay(distance), false),
+            new PendingHit(character, target, this, delays[0], false),
+            new PendingHit(character, target, this, delays[1], false),
         ];
     }
 

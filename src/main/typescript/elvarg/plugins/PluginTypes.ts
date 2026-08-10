@@ -1,5 +1,6 @@
 import type { Packet } from "../net/packet/Packet";
 import type { PacketExecutor } from "../net/packet/PacketExecutor";
+import type { WeaponCombatProfile } from "../game/content/combat/WeaponProfile";
 import type { PlayerPersistence } from "../game/entity/impl/player/persistence/PlayerPersistence";
 import type { ActiveRegionSnapshot } from "../game/ActiveRegionIndex";
 import type { ServerDataProvider } from "../game/data/ServerDataRegistry";
@@ -546,6 +547,7 @@ export interface PluginApi {
   registerRangedAmmoResolver(resolver: PluginRangedAmmoResolver): void;
   registerRangedAmmoHandler(handler: PluginRangedAmmoHandler): void;
   registerRangedCombatModifier(modifier: PluginRangedCombatModifier): void;
+  registerWeaponProfile(profile: WeaponCombatProfile): void;
   registerCombatMethodResolver(resolver: PluginCombatMethodResolver): void;
   /**
    * Registers a combat method provider for one or more NPC IDs.

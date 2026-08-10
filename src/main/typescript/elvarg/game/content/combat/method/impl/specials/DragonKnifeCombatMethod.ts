@@ -3,13 +3,13 @@ import { Animation } from "../../../../../model/Animation";
 import { PendingHit } from "../../../hit/PendingHit";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { CombatSpecial } from "../../../CombatSpecial";
-import { RangedData } from "../../../ranged/RangedData";
 import { Projectile } from "../../../../../model/Projectile";
 import { ItemIdentifiers } from "../../../../../../util/ItemIdentifiers";
 import { Equipment } from "../../../../../model/container/impl/Equipment";
 import { Sound } from "../../../../../Sound";
 import { Sounds } from "../../../../../Sounds";
 import { CombatFactory } from "../../../CombatFactory";
+import { WeaponProfiles } from "../../../WeaponProfile";
 
 export class DragonKnifeCombatMethod extends RangedCombatMethod {
     private static readonly ANIMATION = new Animation(8292);
@@ -17,7 +17,7 @@ export class DragonKnifeCombatMethod extends RangedCombatMethod {
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
         const distance = character.getLocation().getDistance(target.getLocation());
-        const hitDelay = RangedData.hitDelay(distance, character.getCombat().getRangedWeapon());
+        const hitDelay = WeaponProfiles.hitDelays(character.getAsPlayer(), distance)[0];
         return [
             new PendingHit(character, target, this, hitDelay),
             new PendingHit(character, target, this, hitDelay)

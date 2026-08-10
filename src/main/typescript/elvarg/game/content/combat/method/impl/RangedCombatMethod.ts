@@ -2,69 +2,21 @@ import { CombatMethod } from "../CombatMethod";
 import { CombatType } from "../../CombatType";
 import { CombatFactory } from "../../CombatFactory";
 import { PendingHit } from "../../hit/PendingHit";
-import { Ammunition, RangedData, RangedWeapon, RangedWeaponType } from "../../ranged/RangedData";
 import { Mobile } from "../../../../entity/impl/Mobile";
 import { Animation } from "../../../../model/Animation";
 import { Projectile } from "../../../../model/Projectile";
-import { WeaponInterfaces } from "../../WeaponInterfaces";
 import { Sound } from "../../../../Sound";
 import { Sounds } from "../../../../Sounds";
+import { WeaponProfiles } from "../../WeaponProfile";
 export class RangedCombatMethod extends CombatMethod {
-    private static getRangedFireSound(character: Mobile, rangedWeapon: RangedWeapon): Sound {
-        if (!rangedWeapon) {
-            return Sound.SHOOT_ARROW;
-        }
-
-        if (character.isPlayer()) {
-            const player = character.getAsPlayer();
-            const weaponInterface = player.getWeapon();
-            if (
-                weaponInterface === WeaponInterfaces.CROSSBOW ||
-                weaponInterface === WeaponInterfaces.KARILS_CROSSBOW
-            ) {
-                return Sound.SHOOT_CROSSBOW;
-            }
-            if (
-                weaponInterface === WeaponInterfaces.KNIFE ||
-                weaponInterface === WeaponInterfaces.THROWNAXE ||
-                weaponInterface === WeaponInterfaces.DART ||
-                weaponInterface === WeaponInterfaces.JAVELIN ||
-                weaponInterface === WeaponInterfaces.OBBY_RINGS
-            ) {
-                return Sound.THROW_DART;
-            }
-        }
-
-        if (rangedWeapon === RangedWeapon.TOXIC_BLOWPIPE) {
-            return Sound.THROW_DART;
-        }
-
-        if (character.isPlayer()) {
-            const weaponInterface = character.getAsPlayer().getWeapon();
-            if (weaponInterface === WeaponInterfaces.LONGBOW || weaponInterface === WeaponInterfaces.DARK_BOW) {
-                return Sound.SHOOT_BOW_QUIET;
-            }
-        }
-        return Sound.SHOOT_ARROW;
-    }
-
     type(): CombatType {
         return CombatType.RANGED;
     }
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
         const distance = character.getLocation().getDistance(target.getLocation());
-        const rangedWeapon = character.getCombat().getRangedWeapon();
-        const delay = RangedData.hitDelay(distance, rangedWeapon);
-
-        if (character.getCombat().getRangedWeapon() === RangedWeapon.DARK_BOW) {
-            return [
-                new PendingHit(character, target, this, delay),
-                new PendingHit(character, target, this, RangedData.dbowArrowDelay(distance)),
-            ];
-        }
-
-        return [new PendingHit(character, target, this, delay)];
+        const delays = character.isPlayer() ? WeaponProfiles.hitDelays(character.getAsPlayer(), distance) : [1];
+        return delays.map((delay) => new PendingHit(character, target, this, delay));
     }
 
     canAttack(character: Mobile, target: Mobile): boolean {
@@ -74,11 +26,7 @@ export class RangedCombatMethod extends CombatMethod {
 
         const p = character.getAsPlayer();
 
-        let ammoRequired = 1;
-        if (p.getCombat().getRangedWeapon() === RangedWeapon.DARK_BOW) {
-            ammoRequired = 2;
-        }
-        if (!CombatFactory.checkAmmo(p, ammoRequired)) {
+        if (!CombatFactory.checkAmmo(p, WeaponProfiles.ranged(p).ammoRequired ?? 1)) {
             return false;
         }
         return true;
@@ -93,16 +41,8 @@ export class RangedCombatMethod extends CombatMethod {
             character.performAnimation(new Animation(animation));
         }
 
-        if (ammo && ammo.getStartGraphic()) {
-
-            // Check toxic blowpipe, it shouldn't have any start gfx.
-            if (character.getCombat().getRangedWeapon()) {
-                if (character.getCombat().getRangedWeapon() === RangedWeapon.TOXIC_BLOWPIPE) {
-                    return;
-                }
-            }
-
-            // Perform start gfx for ammo
+        const profile = character.isPlayer() ? WeaponProfiles.ranged(character.getAsPlayer()) : null;
+        if (ammo?.getStartGraphic() && profile?.startGraphic !== false) {
             character.performGraphic(ammo.getStartGraphic());
         }
 
@@ -110,63 +50,19 @@ export class RangedCombatMethod extends CombatMethod {
             return;
         }
 
-        let projectileId = ammo.getProjectileId();
-        let delay = 40;
-        let speed = 57;
-        let heightEnd = 31;
-        let heightStart = 43;
-
-        if (rangedWeapon.getType() === RangedWeaponType.CROSSBOW) {
-            delay = 46;
-            speed = 62;
-            heightStart = 44;
-            heightEnd = 35;
-        } else if (rangedWeapon.getType() === RangedWeaponType.LONGBOW) {
-            speed = 70;
-        } else if (rangedWeapon.getType() === RangedWeaponType.BLOWPIPE) {
-            speed = 60;
-            heightStart = 40;
-            heightEnd = 35;
+        const projectiles = profile?.projectiles ?? [{ delay: 40, speed: 57, startHeight: 43, endHeight: 31 }];
+        for (const projectile of projectiles) {
+            Projectile.createProjectile(character, target, ammo.getProjectileId(), projectile.delay, projectile.speed, projectile.startHeight, projectile.endHeight).sendProjectile();
         }
-        if (ammo === Ammunition.TOKTZ_XIL_UL) {
-            delay = 30;
-            speed = 55;
-        }
+        Sounds.sendSound(character, profile?.fireSound ?? Sound.SHOOT_ARROW);
 
-        // Fire projectile
-        Projectile.createProjectile(character, target, projectileId, delay, speed, heightStart, heightEnd).sendProjectile();
-
-        // Send sound
-        Sounds.sendSound(character, RangedCombatMethod.getRangedFireSound(character, rangedWeapon));
-
-        // Dark bow sends two arrows, so send another projectile and delete another
-        // arrow.
-        if (rangedWeapon === RangedWeapon.DARK_BOW) {
-            Projectile.createProjectile(character, target, ammo.getProjectileId(), delay - 7, speed + 4, heightStart + 5, heightEnd).sendProjectile();
-
-            // Decrement 2 ammo if d bow
-            if (character.isPlayer()) {
-                CombatFactory.decrementAmmo(character.getAsPlayer(), target.getLocation(), 2);
-            }
-
-        } else {
-
-            // Decrement 1 ammo
-            if (character.isPlayer()) {
-                CombatFactory.decrementAmmo(character.getAsPlayer(), target.getLocation(), 1);
-            }
+        if (character.isPlayer()) {
+            CombatFactory.decrementAmmo(character.getAsPlayer(), target.getLocation(), profile?.ammoRequired ?? 1);
         }
     }
 
     attackDistance(character: Mobile): number {
-        const bow = character.getCombat().getRangedWeapon();
-        if (bow) {
-            if (character.isNpc() || (character.isPlayer() && character.getAsPlayer().getFightType() === bow.getType().getLongRangeFightType())) {
-                return bow.getType().getLongRangeDistance();
-            }
-            return bow.getType().getDefaultDistance();
-        }
-        return 6;
+        return character.isPlayer() ? WeaponProfiles.attackDistance(character.getAsPlayer(), 6) : 6;
     }
 
 }

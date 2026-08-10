@@ -50,6 +50,7 @@ import { ZaryteCrossbowCombatMethod } from "./method/impl/specials/ZaryteCrossbo
 import { PluginManager } from "../../../plugins/PluginManager";
 import { ServerPerf } from "../../../util/ServerPerf";
 import { World } from "../../World";
+import { WeaponProfiles } from "./WeaponProfile";
 import {
     CRYSTAL_BOW_SHOTS_PER_STAGE,
     getNextCrystalBowItemId,
@@ -187,17 +188,14 @@ export class CombatFactory {
 
                 let player = entity.getAsPlayer();
 
-                // Check if player is using dark bow and set damage to minimum 8, maxmimum 48 if
-                // that's the case...
-                const special = getPlayerCombatSpecial(player);
-                if (player.isSpecialActivated() && special === CombatSpecial.DARK_BOW) {
-                    if (damage < 8) {
-                        damage = 8;
-                    } else if (damage > 48) {
-                        damage = 48;
-                    }
+                const profile = WeaponProfiles.get(player);
+                const damageRange = player.isSpecialActivated() && getPlayerCombatSpecial(player)
+                    ? profile?.specialDamage
+                    : undefined;
+                if (damageRange) {
+                    damage = Math.max(damageRange.minimum, Math.min(damageRange.maximum, damage));
                 }
-                if (player.getWeapon() == WeaponInterfaces.CROSSBOW && Misc.getRandom(10) == 1) {
+                if (profile?.boltEffects && Misc.getRandom(10) == 1) {
                     let multiplier = RangedData.getSpecialEffectsMultiplier(player, victim, damage);
                     damage *= multiplier;
                 }
@@ -262,7 +260,7 @@ export class CombatFactory {
 
         if (combatType == CombatType.RANGED
             && attacker.isPlayer()
-            && attacker.getAsPlayer().getWeapon() == WeaponInterfaces.CROSSBOW
+            && WeaponProfiles.get(attacker.getAsPlayer())?.boltEffects
             && (guaranteedCrossbowEffect || Misc.getRandom(10) == 1)) {
             const multiplier = RangedData.getSpecialEffectsMultiplier(attacker.getAsPlayer(), target, damage.getDamage());
             if (multiplier !== 1.0) {

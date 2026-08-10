@@ -4,6 +4,7 @@ import { GameConstants } from "../game/GameConstants";
 import { MapRegionReplacementManager } from "../game/collision/MapRegionReplacementManager";
 import { ServerDataRegistry } from "../game/data/ServerDataRegistry";
 import { DefinitionLoader } from "../game/definition/loader/DefinitionLoader";
+import { WeaponProfiles } from "../game/content/combat/WeaponProfile";
 import { NpcInteractionDefinitionLoader } from "../game/definition/loader/impl/NpcInteractionDefinitionLoader";
 import { NpcInteractionManager } from "../game/entity/impl/npc/NpcInteractionManager";
 import { MultiChatboxPrompt } from "../game/model/menu/MultiChatboxPrompt";
@@ -2657,6 +2658,13 @@ export class PluginManager {
           return;
         }
         PluginManager.registerRangedCombatModifierInternal(pluginName, modifier);
+      },
+      registerWeaponProfile: (profile) => {
+        if (!Array.isArray(profile?.itemIds) || !profile.itemIds.every((id) => Number.isInteger(id) && id > 0)) {
+          console.warn(`[plugins] ${pluginName} attempted invalid weapon profile registration`);
+          return;
+        }
+        WeaponProfiles.register(profile);
       },
       registerCombatMethodResolver: (resolver) => {
         if (!resolver || typeof resolver.resolve !== "function") {

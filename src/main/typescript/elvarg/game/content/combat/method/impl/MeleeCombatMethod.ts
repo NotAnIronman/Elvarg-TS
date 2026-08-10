@@ -4,7 +4,7 @@ import { Sounds } from "../../../../Sounds";
 import { CombatType } from "../../CombatType";
 import { PendingHit } from "../../hit/PendingHit";
 import { Animation } from "../../../../model/Animation";
-import { WeaponInterfaces } from "../../WeaponInterfaces"
+import { WeaponProfiles } from "../../WeaponProfile";
 export class MeleeCombatMethod extends CombatMethod {
     start(character: Mobile, target: Mobile) {
         const animation = character.getAttackAnim();
@@ -23,9 +23,6 @@ export class MeleeCombatMethod extends CombatMethod {
     }
 
     attackDistance(character: Mobile): number {
-        if (character.isPlayer() && character.getAsPlayer().getWeapon() === WeaponInterfaces.HALBERD) {
-            return 2;
-        }
-        return 1;
+        return character.isPlayer() ? WeaponProfiles.attackDistance(character.getAsPlayer(), 1) : 1;
     }
 }

@@ -3,7 +3,7 @@ import { Animation } from "../../../../../model/Animation";
 import { Priority } from "../../../../../model/Priority";
 import { PendingHit } from "../../../hit/PendingHit";
 import { CombatSpecial } from "../../../CombatSpecial";
-import { RangedData, RangedWeapon } from "../../../ranged/RangedData";
+import { RangedWeapon } from "../../../ranged/RangedData";
 import { CombatFactory } from "../../../CombatFactory";
 import { Projectile } from "../../../../../model/Projectile";
 import { Graphic } from "../../../../../model/Graphic";
@@ -11,6 +11,7 @@ import { GraphicHeight } from "../../../../../model/GraphicHeight";
 import { Mobile } from "../../../../../entity/impl/Mobile";
 import { Sound } from "../../../../../Sound";
 import { Sounds } from "../../../../../Sounds";
+import { WeaponProfiles } from "../../../WeaponProfile";
 
 export class MagicShortbowCombatMethod extends RangedCombatMethod {
     private static ANIMATION = new Animation(1074);
@@ -18,7 +19,7 @@ export class MagicShortbowCombatMethod extends RangedCombatMethod {
 
     hits(character: Mobile, target: Mobile): PendingHit[] {
         const distance = character.getLocation().getDistance(target.getLocation());
-        const delay = RangedData.hitDelay(distance, character.getCombat().getRangedWeapon());
+        const delay = WeaponProfiles.hitDelays(character.getAsPlayer(), distance)[0];
         return [new PendingHit(character, target, this, delay), new PendingHit(character, target, this, delay)];
     }
 
