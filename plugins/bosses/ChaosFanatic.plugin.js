@@ -11,7 +11,6 @@ const { HitMask } = require("../../src/main/typescript/elvarg/game/content/comba
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
-const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
@@ -145,7 +144,7 @@ class ChaosFanaticCombatMethod extends CombatMethod {
           false
         )
       );
-      character.getTimers().registers(TimerKey.COMBAT_ATTACK, 5);
+      character.getCombat().setAttackDelay(5);
     }
   }
 

@@ -13,19 +13,19 @@ import { Misc } from "../../util/Misc";
 
 export class PrayerHandler {
 
-    private static readonly MODERN_PRAYER_BY_CHILD = new Map<number, number>([
+    private static readonly PRAYER_BY_CHILD = new Map<number, number>([
         [9, 0], [10, 1], [11, 2], [27, 3], [30, 4], [12, 5], [13, 6], [14, 7],
         [15, 8], [16, 9], [17, 10], [28, 11], [31, 12], [18, 13], [19, 14],
         [20, 15], [21, 16], [22, 17], [23, 18], [29, 19], [32, 20], [24, 21],
         [25, 22], [26, 23], [37, 24], [34, 25], [35, 26], [33, 27], [36, 28],
     ]);
 
-    public static modernPrayerId(childId: number): number | null {
-        return this.MODERN_PRAYER_BY_CHILD.get(childId) ?? null;
+    public static prayerIdForChild(childId: number): number | null {
+        return this.PRAYER_BY_CHILD.get(childId) ?? null;
     }
 
-    public static toggleModernPrayer(player: Player, childId: number): boolean {
-        const prayerId = this.modernPrayerId(childId);
+    public static togglePrayer(player: Player, childId: number): boolean {
+        const prayerId = this.prayerIdForChild(childId);
         if (prayerId === null) return false;
         if (player.getPrayerActive()[prayerId]) this.deactivatePrayer(player, prayerId);
         else this.activatePrayerPrayerId(player, prayerId);
@@ -104,29 +104,6 @@ export class PrayerHandler {
 
     public static isActivated(c: Mobile, prayer: number): boolean {
         return c.getPrayerActive()[prayer];
-    }
-
-    /**
-     * Activates a prayer with specified <code>buttonId</code>.
-     *
-     * @param player   The player clicking on prayer button.
-     * @param buttonId The button the player is clicking.
-     */
-    public static togglePrayer(player: Player, buttonId: number): boolean {
-        const prayerData = PrayerData.actionButton.get(buttonId);
-        if (prayerData == null) {
-            return false;
-        }
-        const prayerId = prayerData.prayerId;
-        if (prayerId < 0) {
-            return false;
-        }
-        if (!player.getPrayerActive()[prayerId]) {
-            PrayerHandler.activatePrayerPrayerId(player, prayerId);
-        } else {
-            PrayerHandler.deactivatePrayer(player, prayerId);
-        }
-        return true;
     }
 
     public static activatePrayerPrayerId(character: Mobile, prayerId: number) {

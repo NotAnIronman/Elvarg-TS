@@ -1,6 +1,5 @@
 import { Sound } from "../../Sound";
 import { Sounds } from "../../Sounds";
-import { RegionManager } from "../../collision/RegionManager";
 import { PrayerHandler } from "../PrayerHandler";
 import { Dueling } from "../Duelling";
 import { WeaponInterfaces } from "./WeaponInterfaces";
@@ -16,7 +15,7 @@ import { RangedCombatMethod } from "./method/impl/RangedCombatMethod";
 import { Ammunition, RangedData, RangedWeapon } from "./ranged/RangedData";
 import { Mobile } from "../../entity/impl/Mobile";
 import type { NPC } from "../../entity/impl/npc/NPC";
-import { CoordinateState, NPCMovementCoordinator } from "../../entity/impl/npc/NPCMovementCoordinator";
+import { CoordinateState } from "../../entity/impl/npc/NPCMovementCoordinator";
 import type { Player } from "../../entity/impl/player/Player";
 import { Animation } from "../../model/Animation";
 import { EffectTimer } from "../../model/EffectTimer"
@@ -30,8 +29,6 @@ import { SkullType } from "../../model/SkullType"
 import { AreaManager } from "../../model/areas/AreaManager";
 import { BasicAttackResponse } from "../../model/areas/Area";
 import { Equipment } from "../../model/container/impl/Equipment";
-import { MovementQueue } from "../../model/movement/MovementQueue";
-import { PathFinder } from "../../model/movement/path/PathFinder";
 import { BonusManager } from "../../model/equipment/BonusManager";
 import { PlayerRights } from "../../model/rights/PlayerRights";
 import { Task } from "../../task/Task";
@@ -52,6 +49,7 @@ import { Wilderness } from "../wilderness/Wilderness";
 import { ZaryteCrossbowCombatMethod } from "./method/impl/specials/ZaryteCrossbowCombatMethod";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { ServerPerf } from "../../../util/ServerPerf";
+import { World } from "../../World";
 import {
     CRYSTAL_BOW_SHOTS_PER_STAGE,
     getNextCrystalBowItemId,
@@ -282,7 +280,10 @@ export class CombatFactory {
             return false;
         }
 
-        if (attacker.getLocation().getDistance(target.getLocation()) >= 40) {
+        if (
+            attacker.getPrivateArea() !== target.getPrivateArea() ||
+            attacker.getLocation().getDistance(target.getLocation()) >= 40
+        ) {
             return false;
         }
 
@@ -295,83 +296,6 @@ export class CombatFactory {
                 attacker.getAsPlayer().getPacketSender().sendMessage("This npc was not spawned for you.");
                 return false;
             }
-        }
-
-        return true;
-    }
-
-    static canReach(attacker: Mobile, method: CombatMethod, target: Mobile, skipTargetValidation: boolean = false) {
-        if (!skipTargetValidation && !CombatFactory.validTarget(attacker, target)) {
-            attacker.getCombat().reset();
-            return true;
-        }
-
-        const isMoving = target.getMovementQueue().isMovings();
-
-        // Walk back if npc is too far away from spawn position.
-        if (attacker.isNpc()) {
-            const npc = attacker.getAsNpc();
-            if (npc.getCurrentDefinition().doesRetreat()) {
-                if (npc.getMovementCoordinator().getCoordinateState() == CoordinateState.RETREATING) {
-                    npc.getCombat().reset();
-                    return false;
-                }
-                if (npc.getLocation().getDistance(npc.getSpawnPosition()) >= npc.getCurrentDefinition().getCombatFollowDistance()) {
-                    npc.getCombat().reset();
-                    npc.getMovementCoordinator().setCoordinateState(CoordinateState.RETREATING);
-                    return false;
-                }
-            }
-        }
-
-        const attackerPosition = attacker.getLocation();
-        const targetPosition = target.getLocation();
-
-        if (attackerPosition.equals(targetPosition)) {
-            if (!attacker.getTimers().has(TimerKey.STEPPING_OUT)) {
-                MovementQueue.clippedStep(attacker);
-                attacker.getTimers().registers(TimerKey.STEPPING_OUT, 2);
-            }
-            return false;
-        }
-
-        let requiredDistance = method.attackDistance(attacker);
-        const distance = attacker.calculateDistance(target);
-
-        // Standing under the target
-        if (distance == 0) {
-            if (attacker.isPlayer()) {
-                return false;
-            }
-            if (attacker.isNpc() && attacker.getSize() == 0) {
-                return false;
-            }
-        }
-
-        if (method.type() == CombatType.MELEE && isMoving && attacker.getMovementQueue().isMovings()) {
-            // If we're using Melee and either player is moving, increase required distance
-            requiredDistance++;
-        }
-
-        // Too far away from the target
-        if (distance > requiredDistance) {
-            return false;
-        }
-
-        // Don't allow diagonal attacks for smaller entities
-        if (method.type() == CombatType.MELEE && attacker.getSize() == 1 && target.getSize() == 1 && !isMoving && !target.getMovementQueue().isMovings()) {
-            if (PathFinder.isDiagonalLocation(attacker, target)) {
-                if (!attacker.getTimers().has(TimerKey.STEPPING_OUT)) {
-                    CombatFactory.stepOut(attacker, target);
-                    attacker.getTimers().registers(TimerKey.STEPPING_OUT, 2);
-                }
-                return false;
-            }
-        }
-
-        // Make sure we the path is clear for projectiles..
-        if (attacker.useProjectileClipping() && !RegionManager.canProjectileAttackReturn(attacker.getLocation(), target.getLocation(), attacker.getSize(), attacker.getPrivateArea())) {
-            return false;
         }
 
         return true;
@@ -446,30 +370,6 @@ export class CombatFactory {
             return (otherCombatLevel - combatLevel);
         } else {
             return 0;
-        }
-    }
-
-    private static stepOut(attacker: Mobile, target: Mobile) {
-        let tiles = [
-            new Location(target.getLocation().getX() - 1, target.getLocation().getY()),
-            new Location(target.getLocation().getX() + 1, target.getLocation().getY()),
-            new Location(target.getLocation().getX(), target.getLocation().getY() + 1),
-            new Location(target.getLocation().getX(), target.getLocation().getY() - 1)
-        ];
-        let bestTile: Location | null = null;
-        let bestDistance = Number.POSITIVE_INFINITY;
-        for (const tile of tiles) {
-            if (RegionManager.blocked(tile, attacker.getPrivateArea())) {
-                continue;
-            }
-            const distance = attacker.getLocation().getDistance(tile);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                bestTile = tile;
-            }
-        }
-        if (bestTile != null) {
-            PathFinder.calculateWalkRoute(attacker, bestTile.getX(), bestTile.getY());
         }
     }
 
@@ -656,7 +556,10 @@ export class CombatFactory {
         }
 
         // Add this hit to the target's hitQueue.
-        target.getCombat().getHitQueue().addPendingHit(qHit);
+        target.getCombat().getHitQueue().addPendingHit(
+            qHit,
+            World.getProcessCycle() + qHit.getDelay(),
+        );
     }
 
     public static executeHit(qHit: PendingHit) {

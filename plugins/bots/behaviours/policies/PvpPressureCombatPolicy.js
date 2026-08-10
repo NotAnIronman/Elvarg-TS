@@ -57,11 +57,7 @@ function getTargetHpRatio(target) {
 }
 
 function isAttackWindowOpen(player) {
-  const timers = player?.getTimers?.();
-  return (
-    timers?.willEndIn?.(TimerKey.COMBAT_ATTACK, PRESSURE_WINDOW_TICKS) === true ||
-    timers?.has?.(TimerKey.COMBAT_ATTACK) !== true
-  );
+  return player?.getCombat?.()?.willAttackBeReadyIn?.(PRESSURE_WINDOW_TICKS) === true;
 }
 
 function equipInventoryItem(player, slot, itemId) {

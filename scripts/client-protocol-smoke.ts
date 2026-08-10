@@ -54,24 +54,68 @@ import { ShopManager } from "../src/main/typescript/elvarg/game/model/container/
 import { PrayerHandler } from "../src/main/typescript/elvarg/game/content/PrayerHandler";
 import { Autocasting } from "../src/main/typescript/elvarg/game/content/combat/magic/Autocasting";
 import { CombatSpells } from "../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells";
+import { WeaponInterfaces } from "../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces";
+import { PacketSender } from "../src/main/typescript/elvarg/net/packet/PacketSender";
+import { packWorldMapCoord } from "../src/main/typescript/elvarg/net/protocol/WorldMapProtocol";
+import { CombatFactory } from "../src/main/typescript/elvarg/game/content/combat/CombatFactory";
+import { HitQueue } from "../src/main/typescript/elvarg/game/content/combat/hit/HitQueue";
+import { TeleportHandler } from "../src/main/typescript/elvarg/game/model/teleportation/TeleportHandler";
 
-assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(387, 15), 0);
-assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(387, 25), 13);
-assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(84, 16), 7);
-assert.strictEqual(EquipPacketListener.resolveModernEquipmentSlot(12, 15), -1);
-assert.strictEqual(Bank.modernActionAmount("withdraw", 3, undefined, 100), 5);
-assert.strictEqual(Bank.modernActionAmount("withdraw", 1, undefined, 100, 0, 2), 10);
-assert.strictEqual(Bank.modernActionAmount("withdraw", 1, "Withdraw-All-but-1", 100), 99);
-assert.strictEqual(Bank.modernActionAmount("deposit", 8, undefined, 100), 100);
-assert.strictEqual(ShopManager.modernActionAmount(3), 5);
-assert.strictEqual(ShopManager.modernActionAmount(1, "Buy 50"), 50);
-assert.strictEqual(ShopManager.modernActionAmount(1, "Value"), null);
-assert.strictEqual(PrayerHandler.modernPrayerId(9), PrayerHandler.THICK_SKIN);
-assert.strictEqual(PrayerHandler.modernPrayerId(33), PrayerHandler.RIGOUR);
-assert.strictEqual(PrayerHandler.modernPrayerId(38), null);
-assert.strictEqual(Autocasting.modernAutocastSpell(1), CombatSpells.WIND_STRIKE);
-assert.strictEqual(Autocasting.modernAutocastSpell(46), CombatSpells.ICE_BARRAGE);
-assert.strictEqual(Autocasting.modernAutocastSpell(59), null);
+assert.strictEqual(EquipPacketListener.resolveEquipmentSlot(387, 15), 0);
+assert.strictEqual(EquipPacketListener.resolveEquipmentSlot(387, 25), 13);
+assert.strictEqual(EquipPacketListener.resolveEquipmentSlot(84, 16), 7);
+assert.strictEqual(EquipPacketListener.resolveEquipmentSlot(12, 15), -1);
+assert.strictEqual(Bank.actionAmount("withdraw", 3, undefined, 100), 5);
+assert.strictEqual(Bank.actionAmount("withdraw", 1, undefined, 100, 0, 2), 10);
+assert.strictEqual(Bank.actionAmount("withdraw", 1, "Withdraw-All-but-1", 100), 99);
+assert.strictEqual(Bank.actionAmount("deposit", 8, undefined, 100), 100);
+assert.strictEqual(ShopManager.actionAmount(3), 5);
+assert.strictEqual(ShopManager.actionAmount(1, "Buy 50"), 50);
+assert.strictEqual(ShopManager.actionAmount(1, "Value"), null);
+assert.strictEqual(PrayerHandler.prayerIdForChild(9), PrayerHandler.THICK_SKIN);
+assert.strictEqual(PrayerHandler.prayerIdForChild(33), PrayerHandler.RIGOUR);
+assert.strictEqual(PrayerHandler.prayerIdForChild(38), null);
+assert.strictEqual(Autocasting.autocastSpell(1), CombatSpells.WIND_STRIKE);
+assert.strictEqual(Autocasting.autocastSpell(17), CombatSpells.CRUMBLE_UNDEAD);
+assert.strictEqual(Autocasting.autocastSpell(46), CombatSpells.ICE_BARRAGE);
+assert.strictEqual(Autocasting.autocastSpell(59), null);
+assert.strictEqual(WeaponInterfaces.WHIP.getCategory(), 20);
+assert.strictEqual(WeaponInterfaces.STAFF.getCategory(), 18);
+assert.strictEqual(WeaponInterfaces.BLOWPIPE.getCategory(), 19);
+
+let hitTargetHp = 10;
+let hitAttackerHp = 10;
+const hitTarget: any = {
+  getHitpoints: () => hitTargetHp,
+  isRegistered: () => true,
+  isUntargetable: () => false,
+  getUpdateFlag: () => ({ flagged: () => false, flag: () => undefined }),
+};
+const hitAttacker: any = { getHitpoints: () => hitAttackerHp, isRegistered: () => true };
+const hitQueue = new HitQueue(hitTarget);
+const originalExecuteHit = CombatFactory.executeHit;
+let appliedHits = 0;
+(CombatFactory as any).executeHit = () => { appliedHits++; };
+hitQueue.addPendingHit({ getTarget: () => hitTarget, getAttacker: () => hitAttacker } as any, 7);
+HitQueue.processAll(6);
+assert.strictEqual(appliedHits, 0);
+HitQueue.processAll(7);
+assert.strictEqual(appliedHits, 1);
+hitAttackerHp = 0;
+hitQueue.addPendingHit({ getTarget: () => hitTarget, getAttacker: () => hitAttacker } as any, 8);
+HitQueue.processAll(8);
+assert.strictEqual(appliedHits, 1);
+(CombatFactory as any).executeHit = originalExecuteHit;
+
+let stoppedSkill = 0;
+let closedInterface = 0;
+let resetCombat = 0;
+TeleportHandler.onTeleporting({
+  getSkillManager: () => ({ stopSkillable: () => stoppedSkill++ }),
+  getPacketSender: () => ({ sendInterfaceRemoval: () => closedInterface++ }),
+  getCombat: () => ({ reset: () => resetCombat++ }),
+} as any, false);
+assert.deepStrictEqual([stoppedSkill, closedInterface, resetCombat], [1, 0, 1]);
 
 for (let id = 0; id < 8; id++) {
   const npc = new NPC(-1, new Location(0, 0));
@@ -102,6 +146,14 @@ const objectClick = Buffer.from([96, 0x93, 0x0c, 0xc4, 0x0d, 0, 3, 0x68]);
 assert.deepStrictEqual(decodeClientPacket(npcClick), {
   type: "npc_option", index: 7, clickType: 1,
 });
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([
+  75, 0, 7, 9, 0, 218, 0, 0, 9, 73, 12, 128,
+])), {
+  type: "spell_on_npc", targetIndex: 7, spellWidget: (218 << 16) | 9,
+  spellChild: 9, spellItemId: 3273,
+});
+assert.strictEqual(CombatSpells.getCombatSpellByName("Wind Strike"), CombatSpells.WIND_STRIKE);
+assert.strictEqual(CombatSpells.getCombatSpellByName("Ice barrage"), CombatSpells.ICE_BARRAGE);
 assert.deepStrictEqual(decodeClientPacket(objectClick), {
   type: "object_option", id: 1000, x: 3091, y: 3524, clickType: 1,
 });
@@ -120,6 +172,39 @@ assert.deepStrictEqual(decodeClientPacket(chat), {
   type: "chat", text: "hello", messageType: "public",
 });
 assert.deepStrictEqual(decodeClientPacket(Buffer.from([55])), { type: "interface_close" });
+const worldMapCoord = (2 << 28) | (3200 << 14) | 3201;
+assert.strictEqual(packWorldMapCoord(3200, 3201, 2), worldMapCoord);
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([
+  105,
+  (worldMapCoord >>> 16) & 0xff,
+  (worldMapCoord >>> 24) & 0xff,
+  worldMapCoord & 0xff,
+  (worldMapCoord >>> 8) & 0xff,
+])), { type: "world_map_click", level: 2, x: 3200, y: 3201 });
+const worldMapPackets: Buffer[] = [];
+const worldMapSender = new PacketSender({
+  getLocation: () => new Location(3200, 3201, 2),
+  getSession: () => ({
+    sendClientPacket: (packet: Buffer) => {
+      worldMapPackets.push(packet);
+      return true;
+    },
+  }),
+});
+worldMapSender.toggleWorldMap();
+assert.deepStrictEqual(worldMapPackets.map((packet) => packet[0]), [110, 103, 109]);
+worldMapSender.toggleWorldMap();
+assert.strictEqual(worldMapPackets[3][0], 104);
+const combatTabPackets: Buffer[] = [];
+new PacketSender({
+  getSession: () => ({
+    sendClientPacket: (packet: Buffer) => {
+      combatTabPackets.push(packet);
+      return true;
+    },
+  }),
+}).sendTabInterface(0, 593);
+assert.deepStrictEqual(combatTabPackets.map((packet) => packet[0]), [104, 103, 106, 106]);
 assert.deepStrictEqual(decodeClientPacket(Buffer.from([191, 0, 43, 0, 0, 0, 2])), {
   type: "varp_transmit", varpId: 43, value: 2,
 });

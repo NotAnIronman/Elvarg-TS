@@ -14,6 +14,9 @@ import type { ObjType } from "./codec/rs/config/objtype/ObjType";
 import { CachePipeline } from "./CachePipeline";
 
 export class CacheDefinitions {
+    private static readonly SPELL_WIDGET_PARAM_ID = 596;
+    private static readonly SPELL_NAME_PARAM_ID = 601;
+    private static spellNamesByWidget?: Map<number, string>;
     private static state?: {
         npcs: ArchiveNpcTypeLoader;
         items: PostProcessedObjTypeLoader;
@@ -66,5 +69,24 @@ export class CacheDefinitions {
             items: state.items.getCount(),
             objects: state.objects.getCount(),
         };
+    }
+
+    static getSpellName(widgetId: number, itemId: number): string | undefined {
+        if (itemId > 0 && itemId < this.getState().items.getCount()) {
+            const name = this.getItem(itemId).params?.get(this.SPELL_NAME_PARAM_ID);
+            if (typeof name === "string") return name;
+        }
+        if (!this.spellNamesByWidget) {
+            this.spellNamesByWidget = new Map();
+            for (let id = 0; id < this.getState().items.getCount(); id++) {
+                const params = this.getItem(id).params;
+                const widget = params?.get(this.SPELL_WIDGET_PARAM_ID);
+                const name = params?.get(this.SPELL_NAME_PARAM_ID);
+                if (typeof widget === "number" && typeof name === "string") {
+                    this.spellNamesByWidget.set(widget, name);
+                }
+            }
+        }
+        return this.spellNamesByWidget.get(widgetId);
     }
 }

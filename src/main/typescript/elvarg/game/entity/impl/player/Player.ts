@@ -668,13 +668,11 @@ export class Player extends Mobile {
         WeaponInterfaces.assign(this);
         const autocastSpell = this.getCombat().getAutocastSpell();
         if (autocastSpell != null && autocastSpell.getSpellbook?.() !== this.getSpellbook()) {
-            this.getCombat().setAutocastSpell(null);
-            this.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
+            Autocasting.setAutocast(this, null);
         } else if (autocastSpell != null && this.getEquipment().hasStaffEquipped()) {
             Autocasting.setAutocast(this, autocastSpell);
         } else {
-            // No autocast selected on login: clear regular/defensive autocast mode bits.
-            this.getPacketSender().sendAutocastId(-1).sendConfig(108, 0);
+            Autocasting.setAutocast(this, null);
         }
         this.getPacketSender().sendTabInterface(6, this.getSpellbook().getInterfaceId());
         CombatSpecial.ensureRestoreTask(this);

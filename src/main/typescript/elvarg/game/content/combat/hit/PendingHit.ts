@@ -22,7 +22,7 @@ export class PendingHit {
     private combatType: CombatType;
     private hits: HitDamage[];
     private totalDamage = 0;
-    private delay: number;
+    private readonly delay: number;
     private accurate: boolean;
     private handleAfterHitEffects: boolean;
 
@@ -78,11 +78,7 @@ export class PendingHit {
         return this.hits;
     }
 
-    public getAndDecrementDelay(): number {
-        return this.delay--;
-    }
-
-    public getExecutedInTicks(): number {
+    public getDelay(): number {
         return this.delay;
     }
 

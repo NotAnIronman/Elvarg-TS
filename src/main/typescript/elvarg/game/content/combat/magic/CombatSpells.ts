@@ -1821,5 +1821,15 @@ Gets the spell with a {@link CombatSpell#spellId()} of {@code id}.
         return CombatSpells.getCombatSpells(spellId);
     }
 
+    public static getCombatSpellByName(name: string): CombatSpell | null {
+        const normalized = name.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        for (const [property, value] of Object.entries(CombatSpells) as Array<[string, any]>) {
+            if (property.replace(/_/g, "") !== normalized) continue;
+            const spell = typeof value?.spellId === "function" ? value : value?.getSpell?.();
+            return spell && typeof spell.spellId === "function" ? spell as CombatSpell : null;
+        }
+        return null;
+    }
+
 
 }

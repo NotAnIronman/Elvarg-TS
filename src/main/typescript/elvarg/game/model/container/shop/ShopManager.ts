@@ -198,7 +198,7 @@ export class ShopManager {
         return true;
     }
 
-    public static handleModernWidgetAction(player: any, packet: {
+    public static handleWidgetAction(player: any, packet: {
         groupId: number;
         childId: number;
         buttonNum: number;
@@ -208,7 +208,7 @@ export class ShopManager {
     }): boolean {
         if (!this.isOpen(player) || packet.slot == null) return false;
         const option = packet.option?.trim().toLowerCase() ?? "";
-        const amount = this.modernActionAmount(packet.buttonNum, option);
+        const amount = this.actionAmount(packet.buttonNum, option);
         const examine = packet.buttonNum === 10 || option === "examine";
 
         if (packet.groupId === this.MAIN_INTERFACE_ID && packet.childId === 16) {
@@ -251,7 +251,7 @@ export class ShopManager {
         return false;
     }
 
-    public static modernActionAmount(button: number, option?: string): number | null {
+    public static actionAmount(button: number, option?: string): number | null {
         const named = /(?:buy|sell)[ -](1|5|10|50)$/i.exec(option?.trim() ?? "");
         if (named) return Number(named[1]);
         return ({ 2: 1, 3: 5, 4: 10, 5: 50 } as Record<number, number>)[button] ?? null;
@@ -336,64 +336,35 @@ export class ShopManager {
     private static openInterface(
         player: any,
         shop: RuntimeShop,
-        resetScroll: boolean
+        _resetScroll: boolean
     ): boolean {
         const sender = player.getPacketSender();
-        const items = this.displayEntries(shop).map(
-            (entry) => new Item(entry.itemId, entry.amount)
-        );
         const opening =
             !this.isOpen(player);
 
-        if (player.getSession().isClientProtocol?.()) {
-            const stock = this.displayEntries(shop).map((entry, slot) => {
-                const definition = ItemDefinition.forId(entry.itemId);
-                const price = definition ? this.itemPrice(shop, definition) : 0;
-                return {
-                    slot, itemId: entry.itemId, quantity: entry.amount,
-                    defaultQuantity: shop.originalAmounts.get(entry.itemId) ?? 0,
-                    priceEach: price, sellPrice: Math.max(1, Math.floor(price * this.SALES_TAX)),
-                };
-            });
-            player.setInterfaceId(this.MAIN_INTERFACE_ID);
-            player.setStatus(PlayerStatus.SHOPPING);
-            sender.sendSubInterface((161 << 16) | 16, this.MAIN_INTERFACE_ID, 0)
-                .sendSubInterface((161 << 16) | 79, this.SIDE_INTERFACE_ID, 1)
-                .sendInterfaceScript(1074, [516, shop.definition.getName(), this.currencyItemId(shop.definition.getCurrency()), 0, 1])
-                .sendInterfaceFlagsRange((this.MAIN_INTERFACE_ID << 16) | 16, 0, 39, 1662)
-                .sendInterfaceScript(149, [this.SIDE_INTERFACE_ID << 16, 93, 4, 7, 0, -1, "Value", "Sell 1", "Sell 5", "Sell 10", "Sell 50"])
-                .sendInterfaceFlagsRange(this.SIDE_INTERFACE_ID << 16, 0, 27, 1086)
-                .sendItemContainer(player.getInventory(), this.INVENTORY_INTERFACE_ID);
-            player.getSession().sendClientPacket(encodeShopOpen(
-                String(shop.definition.getId()), shop.definition.getName(),
-                this.currencyItemId(shop.definition.getCurrency()), this.isGeneralStore(shop), 1, 1, stock
-            ));
-            if (opening) Sounds.sendSound(player, Sound.CONTAINER_OPEN);
-            return true;
-        }
-
-        sender.sendItemContainer(player.getInventory(), this.INVENTORY_INTERFACE_ID);
-        sender.sendInterfaceItems(this.ITEMS_INTERFACE_ID, items);
-        sender.sendString(shop.definition.getName(), this.NAME_INTERFACE_ID);
-        if (!player.getEnteredAmountAction?.()) {
-            sender.sendInterfaceSet(
-                this.SHOP_INTERFACE_ID,
-                this.INVENTORY_INTERFACE_ID - 1
-            );
-        }
-        if (resetScroll) {
-            sender.sendInterfaceScrollReset(this.SCROLL_INTERFACE_ID);
-        }
-        sender.sendScrollbarHeight(
-            this.SCROLL_INTERFACE_ID,
-            shop.originalSlotCount < 37
-                ? 0
-                : Math.ceil(shop.originalSlotCount / 9) * 56
-        );
+        const stock = this.displayEntries(shop).map((entry, slot) => {
+            const definition = ItemDefinition.forId(entry.itemId);
+            const price = definition ? this.itemPrice(shop, definition) : 0;
+            return {
+                slot, itemId: entry.itemId, quantity: entry.amount,
+                defaultQuantity: shop.originalAmounts.get(entry.itemId) ?? 0,
+                priceEach: price, sellPrice: Math.max(1, Math.floor(price * this.SALES_TAX)),
+            };
+        });
+        player.setInterfaceId(this.MAIN_INTERFACE_ID);
         player.setStatus(PlayerStatus.SHOPPING);
-        if (opening) {
-            Sounds.sendSound(player, Sound.CONTAINER_OPEN);
-        }
+        sender.sendSubInterface((161 << 16) | 16, this.MAIN_INTERFACE_ID, 0)
+            .sendSubInterface((161 << 16) | 79, this.SIDE_INTERFACE_ID, 1)
+            .sendInterfaceScript(1074, [516, shop.definition.getName(), this.currencyItemId(shop.definition.getCurrency()), 0, 1])
+            .sendInterfaceFlagsRange((this.MAIN_INTERFACE_ID << 16) | 16, 0, 39, 1662)
+            .sendInterfaceScript(149, [this.SIDE_INTERFACE_ID << 16, 93, 4, 7, 0, -1, "Value", "Sell 1", "Sell 5", "Sell 10", "Sell 50"])
+            .sendInterfaceFlagsRange(this.SIDE_INTERFACE_ID << 16, 0, 27, 1086)
+            .sendItemContainer(player.getInventory(), this.INVENTORY_INTERFACE_ID);
+        player.getSession().sendClientPacket(encodeShopOpen(
+            String(shop.definition.getId()), shop.definition.getName(),
+            this.currencyItemId(shop.definition.getCurrency()), this.isGeneralStore(shop), 1, 1, stock
+        ));
+        if (opening) Sounds.sendSound(player, Sound.CONTAINER_OPEN);
         return true;
     }
 

@@ -119,7 +119,7 @@ module.exports = {
       }
 
       timers.extendOrRegister(TimerKey.FOOD, 3);
-      timers.extendOrRegister(TimerKey.COMBAT_ATTACK, 5);
+      player.getCombat().extendAttackDelay(5);
       if (food.karambwan) {
         timers.registers(TimerKey.KARAMBWAN, 3);
         timers.registers(TimerKey.POTION, 3);

@@ -3,7 +3,6 @@
 const { CombatSpecial } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
-const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { ItemIdentifiers } = require("../../../../src/main/typescript/elvarg/util/ItemIdentifiers");
 const { EquipPacketListener } = require("../../../../src/main/typescript/elvarg/net/packet/impl/EquipPacketListener");
 const { getPvpProfile } = require("../pvp/PvpAssignment");
@@ -354,10 +353,7 @@ function maybeSwitchBackToPrimaryWeapon(context) {
     pvp.nextSwitchbackCheckAt = earliestSwitchbackAt;
     return false;
   }
-  const timers = player.getTimers?.();
-  const attackWindowOpen =
-    timers?.willEndIn?.(TimerKey.COMBAT_ATTACK, 1) === true ||
-    timers?.has?.(TimerKey.COMBAT_ATTACK) !== true;
+  const attackWindowOpen = player?.getCombat?.()?.willAttackBeReadyIn?.(1) === true;
   if (!attackWindowOpen) {
     pvp.nextSwitchbackCheckAt = nowMs + SWITCHBACK_RETRY_COOLDOWN_MS;
     return false;
@@ -404,10 +400,8 @@ function maybeUseOneTickAttack(context, profile) {
   if (nowMs < Number(pvp.lastOneTickAt ?? 0) + cooldownMs) {
     return false;
   }
-  const timers = player.getTimers?.();
   const attackWindowOpen =
-    timers?.willEndIn?.(TimerKey.COMBAT_ATTACK, ONE_TICK_ATTACK_WINDOW_TICKS) === true ||
-    timers?.has?.(TimerKey.COMBAT_ATTACK) !== true;
+    player?.getCombat?.()?.willAttackBeReadyIn?.(ONE_TICK_ATTACK_WINDOW_TICKS) === true;
   if (!attackWindowOpen) {
     if (nowMs >= Number(pvp.nextOneTickCheckAt ?? 0)) {
       pvp.nextOneTickCheckAt = nowMs + ONE_TICK_FAST_CHECK_COOLDOWN_MS;

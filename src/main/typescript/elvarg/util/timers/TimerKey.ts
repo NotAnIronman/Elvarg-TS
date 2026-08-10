@@ -4,7 +4,6 @@ export class TimerKey {
 	public static readonly FOOD = new TimerKey();
 	public static readonly KARAMBWAN = new TimerKey();
 	public static readonly POTION = new TimerKey();
-	public static readonly COMBAT_ATTACK= new TimerKey();
 	public static readonly FREEZE = new TimerKey();
 	public static readonly FREEZE_IMMUNITY = new TimerKey(); 
 	public static readonly STUN =  new TimerKey();
@@ -24,7 +23,6 @@ export class TimerKey {
 		return this.ticks;
 	}
 }
-
 
 
 

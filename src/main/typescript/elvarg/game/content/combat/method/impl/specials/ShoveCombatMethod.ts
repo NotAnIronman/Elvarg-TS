@@ -76,7 +76,7 @@ export class ShoveCombatMethod extends CombatMethod {
             }
         }
 
-        character.getTimers().registers(TimerKey.COMBAT_ATTACK, character.getBaseAttackSpeed());
+        character.getCombat().setAttackDelay(character.getBaseAttackSpeed());
         character.setSpecialActivated(false);
         if (character.isPlayer()) {
             CombatSpecial.updateBar(character.getAsPlayer());

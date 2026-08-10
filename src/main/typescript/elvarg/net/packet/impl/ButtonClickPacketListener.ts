@@ -1,10 +1,5 @@
 import { PacketExecutor } from "../PacketExecutor";
-import { WeaponInterfaces } from "../../../game/content/combat/WeaponInterfaces";
 import { EffectSpells } from "../../../game/content/combat/magic/EffectSpells";
-import { Autocasting } from "../../../game/content/combat/magic/Autocasting";
-import { BonusManager } from "../../../game/model/equipment/BonusManager";
-import { FightType } from "../../../game/content/combat/FightType";
-import { PrayerHandler } from "../../../game/content/PrayerHandler";
 import { Packet } from "../Packet";
 import { PluginManager } from "../../../plugins/PluginManager";
 
@@ -62,36 +57,7 @@ export class ButtonClickPacketListener implements PacketExecutor {
       return;
     }
 
-    if (button === 5860 || button === 5861 || button === 5862) {
-      const fightType =
-        button === 5860
-          ? FightType.UNARMED_PUNCH
-          : button === 5861
-            ? FightType.UNARMED_BLOCK
-            : FightType.UNARMED_KICK;
-      player.setFightType(fightType);
-      player.getPacketSender().sendConfig(fightType.getParentId(), fightType.getChildId());
-      BonusManager.update(player);
-      return;
-    }
-
-    if (PrayerHandler.togglePrayer(player, button)) {
-      return;
-    }
-
     if (player.getQuickPrayers?.()?.handleButton?.(button)) {
-      return;
-    }
-
-    if (
-      Autocasting.handleWeaponInterface(player, button) ||
-      Autocasting.handleAutocastTab(player, button)
-    ) {
-      return;
-    }
-
-    if (WeaponInterfaces.changeCombatSettings(player, button)) {
-      BonusManager.update(player);
       return;
     }
 

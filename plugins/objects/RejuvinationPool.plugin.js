@@ -4,7 +4,6 @@ const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
-const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 
 const POOL_IDS = [
   ObjectIds.FANCY_REJUVENATION_POOL,
@@ -17,7 +16,6 @@ function isRecentPvpCombat(player) {
     return false;
   }
   const combat = player.getCombat?.();
-  const playerTimers = player.getTimers?.();
   const participants = [combat?.getTarget?.(), combat?.getAttacker?.()];
   return participants.some((other) => {
     if (
@@ -27,10 +25,9 @@ function isRecentPvpCombat(player) {
     ) {
       return false;
     }
-    const otherTimers = other.getTimers?.();
     return (
-      playerTimers?.has?.(TimerKey.COMBAT_ATTACK) === true ||
-      otherTimers?.has?.(TimerKey.COMBAT_ATTACK) === true
+      combat?.getAttackDelay?.() > 0 ||
+      other.getCombat?.()?.getAttackDelay?.() > 0
     );
   });
 }

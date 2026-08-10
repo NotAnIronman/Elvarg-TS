@@ -64,6 +64,11 @@ import {
   GroundItemView,
   BankSlotView,
 } from "../protocol/ClientProtocol";
+import {
+  packWorldMapCoord,
+  WORLD_MAP_GROUP_ID,
+  WORLD_MAP_TARGET_UID,
+} from "../protocol/WorldMapProtocol";
 // import { Animation } from "../../game/model/Animation";
 // import { Item } from "../../game/model/Item";
 // import { Mobile } from "../../game/entity/impl/Mobile";
@@ -105,22 +110,15 @@ export class PacketSender {
     } catch (_err) {
       // Region replacement refresh is best-effort; map-region sync must still proceed.
     }
-    if (this.player.getSession().isClientProtocol?.()) {
-      const regionX = this.player.getLocation().getRegionX() + 6;
-      const regionY = this.player.getLocation().getRegionY() + 6;
-      const regionIds: number[] = [];
-      for (let x = ((regionX - 6) / 8) | 0; x <= (((regionX + 6) / 8) | 0); x++) {
-        for (let y = ((regionY - 6) / 8) | 0; y <= (((regionY + 6) / 8) | 0); y++) regionIds.push((x << 8) | y);
-      }
-      this.player.getSession().sendClientPacket(encodeRebuildNormal(
-        regionX, regionY, true, regionIds.map((regionId) => CachePipeline.getXtea(regionId))
-      ));
-      return this;
+    const regionX = this.player.getLocation().getRegionX() + 6;
+    const regionY = this.player.getLocation().getRegionY() + 6;
+    const regionIds: number[] = [];
+    for (let x = ((regionX - 6) / 8) | 0; x <= (((regionX + 6) / 8) | 0); x++) {
+      for (let y = ((regionY - 6) / 8) | 0; y <= (((regionY + 6) / 8) | 0); y++) regionIds.push((x << 8) | y);
     }
-    let out = new PacketBuilder(73);
-    out.putShort(this.player.getLocation().getRegionX() + 6, ValueType.A);
-    out.putShort(this.player.getLocation().getRegionY() + 6);
-    this.player.getSession().write(out);
+    this.player.getSession().sendClientPacket(encodeRebuildNormal(
+      regionX, regionY, true, regionIds.map((regionId) => CachePipeline.getXtea(regionId))
+    ));
     return this;
   }
 
@@ -222,13 +220,6 @@ export class PacketSender {
     this.player.getSession().sendClientPacket(encodeSound(soundId, {
       x, y, level, loops, delay, radius, attenuation,
     }));
-    return this;
-  }
-
-  sendAutocastId(id: number): this {
-    const out = new PacketBuilder(38);
-    out.putShort(id);
-    this.player.getSession().write(out);
     return this;
   }
 
@@ -508,32 +499,28 @@ export class PacketSender {
   }
 
   public sendTabInterface(tabId: number, interfaceId: number) {
-    if (this.player.getSession().isClientProtocol()) {
-      if (tabId === 0) {
-        const groupId = interfaceId === 1829 || interfaceId === 1689 ? 201 : 593;
-        this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 76, groupId));
-        if (groupId === 201) this.sendInterfaceFlagsRange((201 << 16) | 1, 0, 64, 1 << 1);
-        return this;
-      }
-      if (tabId === 5) {
-        this.player.getSession().sendClientPacket(encodeWidgetOpenSub(
-          (161 << 16) | 81,
-          interfaceId === 17200 ? 77 : 541
-        ));
-        return this;
-      }
-      if (tabId === 6) {
-        const spellbook = interfaceId === 12855 ? 1 : interfaceId === 29999 ? 2 : 0;
-        this.player.getSession().sendClientPacket(encodeVarbit(4070, spellbook));
-        this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 82, 218));
-        return this;
-      }
+    if (tabId === 0) {
+      const targetUid = (161 << 16) | 76;
+      return this
+        .closeSubInterface(targetUid)
+        .sendSubInterface(targetUid, 593)
+        .sendInterfaceDisplayState((593 << 16) | 23, false)
+        .sendInterfaceDisplayState((593 << 16) | 28, false);
     }
-    if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | tabId, interfaceId))) return this;
-    const out = new PacketBuilder(71);
-    out.putShort(interfaceId);
-    out.puts(tabId, ValueType.A);
-    this.player.getSession().write(out);
+    if (tabId === 5) {
+      this.player.getSession().sendClientPacket(encodeWidgetOpenSub(
+        (161 << 16) | 81,
+        interfaceId === 17200 ? 77 : 541
+      ));
+      return this;
+    }
+    if (tabId === 6) {
+      const spellbook = interfaceId === 12855 ? 1 : interfaceId === 29999 ? 2 : 0;
+      this.player.getSession().sendClientPacket(encodeVarbit(4070, spellbook));
+      this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 82, 218));
+      return this;
+    }
+    this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | tabId, interfaceId));
     return this;
   }
 
@@ -690,16 +677,8 @@ export class PacketSender {
   }
 
   public sendInterfaceSet(interfaceId: number, sidebarInterfaceId: number) {
-    if (this.player.getSession().isClientProtocol?.()) {
-      this.sendInterface(interfaceId);
-      this.sendSidebarInterface(sidebarInterfaceId);
-      return this;
-    }
-    let out = new PacketBuilder(248);
-    out.putShort(interfaceId, ValueType.A);
-    out.putShort(sidebarInterfaceId);
-    this.player.getSession().write(out);
-    this.player.setInterfaceId(interfaceId);
+    this.sendInterface(interfaceId);
+    this.sendSidebarInterface(sidebarInterfaceId);
     return this;
   }
 
@@ -1253,7 +1232,7 @@ export class PacketSender {
 
   sendInterfaceRemoval(): this {
     const interfaceId = this.player.getInterfaceId?.() ?? -1;
-    if (interfaceId === 12 && this.player.getSession().isClientProtocol?.()) {
+    if (interfaceId === 12) {
       this.sendConfig(548, 0);
     }
     const { ShopManager } = require(
@@ -1311,31 +1290,13 @@ export class PacketSender {
         itemId: items?.[slot]?.getId?.() ?? -1,
         quantity: items?.[slot]?.getAmount?.() ?? 0,
       }));
-      if (this.player.getSession().sendClientPacket(encodeInventorySnapshot(slots))) return this;
+      this.player.getSession().sendClientPacket(encodeInventorySnapshot(slots));
+      return this;
     }
     if (container?.constructor?.name === "Equipment") {
       this.player.getUpdateFlag().flag(Flag.APPEARANCE);
-      if (this.player.getSession().isClientProtocol?.()) return this;
+      return this;
     }
-    const includeZeroAmount = container?.constructor?.name === "Bank";
-
-    const out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
-    out.putInt(interfaceId);
-    out.putShort(capacity);
-
-    for (let slot = 0; slot < capacity; slot++) {
-      const item = items?.[slot];
-      const id = item?.getId?.() ?? -1;
-      const amount = item?.getAmount?.() ?? 0;
-      if (id <= 0 || (amount <= 0 && !includeZeroAmount)) {
-        out.putInt(-1);
-        continue;
-      }
-      out.putInt(amount);
-      out.putShort(id + 1);
-    }
-
-    this.player.getSession().write(out);
     return this;
   }
 
@@ -1488,20 +1449,9 @@ export class PacketSender {
     }
 
     const location = object.getLocation();
-    if (this.player.getSession().isClientProtocol?.()) {
-      this.player.getSession().sendClientPacket(encodeLocAddChange(
-        object.getId(), location.getX(), location.getY(), location.getZ(), object.getType(), object.getFace()
-      ));
-      return this;
-    }
-    if (!this.sendPositionIfVisible(location)) {
-      return this;
-    }
-    const out = new PacketBuilder(151);
-    out.puts(location.getZ(), ValueType.A);
-    out.putShorts(object.getId(), ByteOrder.LITTLE);
-    out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.S);
-    this.player.getSession().write(out);
+    this.player.getSession().sendClientPacket(encodeLocAddChange(
+      object.getId(), location.getX(), location.getY(), location.getZ(), object.getType(), object.getFace()
+    ));
     return this;
   }
 
@@ -1522,24 +1472,14 @@ export class PacketSender {
     }
 
     const location = object.getLocation();
-    if (this.player.getSession().isClientProtocol?.()) {
-      this.player.getSession().sendClientPacket(encodeLocDel(
-        location.getX(), location.getY(), location.getZ(), object.getType(), object.getFace()
-      ));
-      return this;
-    }
-    if (!this.sendPositionIfVisible(location)) {
-      return this;
-    }
-    const out = new PacketBuilder(101);
-    out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.C);
-    out.put(location.getZ());
-    this.player.getSession().write(out);
+    this.player.getSession().sendClientPacket(encodeLocDel(
+      location.getX(), location.getY(), location.getZ(), object.getType(), object.getFace()
+    ));
     return this;
   }
 
   sendObjectAnimation(object: any, animation: any): this {
-    if (object?.getLocation && this.player.getSession().isClientProtocol?.()) {
+    if (object?.getLocation) {
       const location = object.getLocation();
       this.player.getSession().sendClientPacket(encodeLocAnim(
         object.getId(), location.getX(), location.getY(), location.getZ(),
@@ -1749,6 +1689,22 @@ export class PacketSender {
     this.subInterfaceTargets.set(groupId, targetUid);
     this.player.getSession().sendClientPacket(encodeWidgetOpenSub(targetUid, groupId, type, options));
     return this;
+  }
+
+  toggleWorldMap(): this {
+    if (this.subInterfaceTargets.has(WORLD_MAP_GROUP_ID)) {
+      return this.closeSubInterface(WORLD_MAP_TARGET_UID);
+    }
+    const location = this.player.getLocation();
+    const packed = packWorldMapCoord(location.getX(), location.getY(), location.getZ());
+    return this
+      .sendInterfaceScript(1749, [packed, -1, -1])
+      .sendSubInterface(WORLD_MAP_TARGET_UID, WORLD_MAP_GROUP_ID)
+      .sendInterfaceFlagsRange((WORLD_MAP_GROUP_ID << 16) | 21, 0, 4, 1 << 1);
+  }
+
+  closeWorldMap(): this {
+    return this.closeSubInterface(WORLD_MAP_TARGET_UID);
   }
 
   sendContentData(source: string, datasets: Array<{ key: string; rows: unknown[] }>): this {

@@ -35,13 +35,13 @@ const getAutocasting = () =>
     .Autocasting as typeof import("../../../game/content/combat/magic/Autocasting").Autocasting;
 
 export class EquipPacketListener implements PacketExecutor {
-  private static readonly MODERN_EQUIPMENT_SLOTS = [0, 1, 2, 3, 4, 5, 7, 9, 10, 12, 13];
+  private static readonly EQUIPMENT_SLOTS = [0, 1, 2, 3, 4, 5, 7, 9, 10, 12, 13];
 
-  public static resolveModernEquipmentSlot(groupId: number, childId: number): number {
+  public static resolveEquipmentSlot(groupId: number, childId: number): number {
     const firstChild = groupId === 387 ? 15 : groupId === 84 ? 10 : -1;
     return firstChild < 0
       ? -1
-      : EquipPacketListener.MODERN_EQUIPMENT_SLOTS[childId - firstChild] ?? -1;
+      : EquipPacketListener.EQUIPMENT_SLOTS[childId - firstChild] ?? -1;
   }
 
   public static resetWeapon(player: any, deactivateSpecialAttack: boolean) {
@@ -49,6 +49,9 @@ export class EquipPacketListener implements PacketExecutor {
       player.setSpecialActivated(false);
     }
     player.getPacketSender().sendSpecialAttackState(false);
+    if (player.getCombat().getAutocastSpell() != null) {
+      getAutocasting().setAutocast(player, null);
+    }
     getWeaponInterfaces().assign(player);
   }
 
@@ -259,10 +262,6 @@ export class EquipPacketListener implements PacketExecutor {
     if (slot === Equipment.WEAPON_SLOT) {
       EquipPacketListener.resetWeapon(player, true);
       getCombatSpecial().updateBar(player);
-      if (player.getCombat().getAutocastSpell() != null) {
-        getAutocasting().setAutocast(player, null);
-        player.getPacketSender().sendMessage("Autocast spell cleared.");
-      }
     }
 
     equipment.refreshItems();

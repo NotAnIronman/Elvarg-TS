@@ -161,6 +161,7 @@ export type ClientMessage =
   | { type: "player_option"; index: number; option: number }
   | { type: "item_on_player"; targetIndex: number; itemId: number; slot: number; widgetId: number }
   | { type: "spell_on_player"; targetIndex: number; spellWidget: number; spellChild: number; spellItemId: number }
+  | { type: "spell_on_npc"; targetIndex: number; spellWidget: number; spellChild: number; spellItemId: number }
   | { type: "inventory_action"; slot: number; itemId: number; widgetId: number; option?: string; optionIndex?: number }
   | { type: "inventory_use_on"; slot: number; itemId: number; target: { kind: "npc" | "loc" | "ground" | "player"; id: number; x?: number; y?: number; level?: number } | { kind: "inventory"; slot: number; itemId: number } }
   | { type: "inventory_move"; from: number; to: number; widgetId?: number }
@@ -400,6 +401,14 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
         spellWidget: reader.intIME(),
         targetIndex: reader.shortLE(),
       };
+    case NativeClientPacket.OPNPC_T: {
+      const targetIndex = reader.short();
+      const spellWidget = reader.intLE();
+      const spellChild = reader.short();
+      const spellItemId = reader.shortAdd();
+      reader.byteAdd();
+      return { type: "spell_on_npc", targetIndex, spellWidget, spellChild, spellItemId };
+    }
     case NativeClientPacket.OPOBJ1:
       reader.byteSub();
       return { type: "ground_item_action", y: reader.shortLE(), itemId: reader.shortAdd(), x: reader.shortAdd(), optionIndex: 1 };

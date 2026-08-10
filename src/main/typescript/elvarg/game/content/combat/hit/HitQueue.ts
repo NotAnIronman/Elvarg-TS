@@ -1,135 +1,84 @@
-import { HitDamage } from "./HitDamage"
-import { PendingHit } from "./PendingHit";
-import { Mobile } from "../../../entity/impl/Mobile";
+import { CombatFactory } from "../CombatFactory";
+import type { Mobile } from "../../../entity/impl/Mobile";
 import { Flag } from "../../../model/Flag";
-import { CombatFactory } from "../../../content/combat/CombatFactory";
+import { World } from "../../../World";
+import { HitDamage } from "./HitDamage";
+import { PendingHit } from "./PendingHit";
 
+type ScheduledHit = { hit: PendingHit; revealCycle: number };
 
+/** Schedules combat impacts against an absolute world tick. */
 export class HitQueue {
-    private pendingHits: PendingHit[] = [];
-    private pendingDamage: HitDamage[] = [];
-    private pendingDamageOffset = 0;
+    private static readonly active = new Set<HitQueue>();
+    private readonly pendingHits: ScheduledHit[] = [];
+    private readonly pendingDamage: HitDamage[] = [];
 
-    public process(character: Mobile) {
-        if (character.getHitpoints() <= 0) {
-            this.pendingHits = [];
-            this.pendingDamage = [];
-            this.pendingDamageOffset = 0;
+    constructor(private readonly character: Mobile) {}
+
+    static processAll(currentCycle: number): void {
+        for (const queue of this.active) queue.process(currentCycle);
+    }
+
+    private process(currentCycle: number): void {
+        const character = this.character;
+        if (!character.isRegistered() || character.getHitpoints() <= 0) {
+            this.pendingHits.length = 0;
+            this.pendingDamage.length = 0;
+            HitQueue.active.delete(this);
             return;
         }
 
-        if (this.pendingHits.length > 0) {
-            let writeIndex = 0;
-            for (let i = 0; i < this.pendingHits.length; i++) {
-                const hit = this.pendingHits[i];
-                if (
-                    hit == null ||
-                    hit.getTarget() == null ||
-                    hit.getAttacker() == null ||
-                    hit.getTarget().isUntargetable() ||
-                    hit.getAttacker().getHitpoints() <= 0
-                ) {
-                    continue;
-                }
-
-                if (hit.getAndDecrementDelay() <= 0) {
-                    CombatFactory.executeHit(hit);
-                    continue;
-                }
-
-                this.pendingHits[writeIndex++] = hit;
-            }
-            this.pendingHits.length = writeIndex;
-        }
-
-        if (this.pendingDamageOffset < this.pendingDamage.length) {
-            if (!character.getUpdateFlag().flagged(Flag.SINGLE_HIT)) {
-                const firstHit = this.pendingDamage[this.pendingDamageOffset++];
-
-                // Check if it's present
-                if (firstHit != null) {
-
-                    // Update entity hit data and deal the actual damage.
-                    character.setPrimaryHit(character.decrementHealth(firstHit));
-                    character.getUpdateFlag().flag(Flag.SINGLE_HIT);
-                }
-            }
-
-            // Update the secondary hit for this entity.
-            if (!character.getUpdateFlag().flagged(Flag.DOUBLE_HIT)) {
-
-                // Attempt to fetch a second hit.
-                const secondHit = this.pendingDamage[this.pendingDamageOffset++];
-
-                // Check if it's present
-                if (secondHit != null){
-                
-
-                    // Update entity hit data and deal the actual damage.
-                    character.setSecondaryHit(character.decrementHealth(secondHit));
-                    character.getUpdateFlag().flag(Flag.DOUBLE_HIT);
-                }
-            }
-            if (this.pendingDamageOffset >= this.pendingDamage.length) {
-                this.pendingDamage.length = 0;
-                this.pendingDamageOffset = 0;
-            } else if (this.pendingDamageOffset >= 32 && this.pendingDamageOffset * 2 >= this.pendingDamage.length) {
-                let writeIndex = 0;
-                for (let i = this.pendingDamageOffset; i < this.pendingDamage.length; i++) {
-                    this.pendingDamage[writeIndex++] = this.pendingDamage[i];
-                }
-                this.pendingDamage.length = writeIndex;
-                this.pendingDamageOffset = 0;
+        while (this.pendingHits.length > 0 && this.pendingHits[0].revealCycle <= currentCycle) {
+            const { hit } = this.pendingHits.shift()!;
+            if (
+                hit.getTarget() === character &&
+                hit.getAttacker()?.isRegistered() &&
+                hit.getAttacker()?.getHitpoints() > 0 &&
+                !character.isUntargetable()
+            ) {
+                CombatFactory.executeHit(hit);
             }
         }
+
+        if (!character.getUpdateFlag().flagged(Flag.SINGLE_HIT) && this.pendingDamage.length > 0) {
+            character.setPrimaryHit(character.decrementHealth(this.pendingDamage.shift()!));
+            character.getUpdateFlag().flag(Flag.SINGLE_HIT);
+        }
+        if (!character.getUpdateFlag().flagged(Flag.DOUBLE_HIT) && this.pendingDamage.length > 0) {
+            character.setSecondaryHit(character.decrementHealth(this.pendingDamage.shift()!));
+            character.getUpdateFlag().flag(Flag.DOUBLE_HIT);
+        }
+        if (!this.hasPendingWork()) HitQueue.active.delete(this);
     }
 
-    public addPendingHit(c_h: PendingHit) {
-        this.pendingHits.push(c_h);
+    addPendingHit(hit: PendingHit, revealCycle: number): void {
+        const scheduled = { hit, revealCycle: Math.max(0, revealCycle | 0) };
+        let index = this.pendingHits.length;
+        while (index > 0 && this.pendingHits[index - 1].revealCycle > scheduled.revealCycle) index--;
+        this.pendingHits.splice(index, 0, scheduled);
+        HitQueue.active.add(this);
     }
 
-    public addPendingDamage(hits: HitDamage[]) {
-        for (let i = 0; i < hits.length; i++) {
-            const hit = hits[i];
-            if (hit != null) {
-                this.pendingDamage.push(hit);
-            }
-        }
+    addPendingDamage(hits: HitDamage[]): void {
+        for (const hit of hits) if (hit != null) this.pendingDamage.push(hit);
+        if (hits.length > 0) HitQueue.active.add(this);
     }
 
-    public hasPendingWork(): boolean {
-        return this.pendingHits.length > 0 || this.pendingDamageOffset < this.pendingDamage.length;
+    hasPendingWork(): boolean {
+        return this.pendingHits.length > 0 || this.pendingDamage.length > 0;
     }
 
-    public getAccumulatedDamage(): number {
-        let hitDmg = 0;
-        for (let i = 0; i < this.pendingHits.length; i++) {
-            const pendingHit = this.pendingHits[i];
-            if (pendingHit != null && pendingHit.getExecutedInTicks() < 2) {
-                hitDmg += pendingHit.getTotalDamage();
-            }
+    getAccumulatedDamage(): number {
+        let damage = 0;
+        const imminentCycle = World.getProcessCycle() + 2;
+        for (const { hit, revealCycle } of this.pendingHits) {
+            if (revealCycle <= imminentCycle) damage += hit.getTotalDamage();
         }
-        let dmg = 0;
-        for (let i = this.pendingDamageOffset; i < this.pendingDamage.length; i++) {
-            const hit = this.pendingDamage[i];
-            if (hit != null) {
-                dmg += hit.getDamage();
-            }
-        }
-        return hitDmg + dmg;
+        for (const hit of this.pendingDamage) damage += hit.getDamage();
+        return damage;
     }
 
-    public isEmpty(exception: Mobile): boolean {
-        for (let hit of this.pendingHits) {
-          if (hit == null) {
-            continue;
-          }
-          if (hit.getAttacker() != null) {
-            if (hit.getAttacker() !== exception) {
-              return false;
-            }
-          }
-        }
-        return true;
-      }
+    isEmpty(exception: Mobile): boolean {
+        return this.pendingHits.every(({ hit }) => hit.getAttacker() === exception);
+    }
 }

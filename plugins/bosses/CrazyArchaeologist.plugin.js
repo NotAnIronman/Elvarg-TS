@@ -11,7 +11,6 @@ const { CombatType } = require("../../src/main/typescript/elvarg/game/content/co
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
-const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
 const RANGED_END_GFX = new Graphic(305, GraphicHeight.HIGH);
@@ -154,7 +153,7 @@ class CrazyArchaeologistCombatMethod extends CombatMethod {
           false
         )
       );
-      character.getTimers().registers(TimerKey.COMBAT_ATTACK, 5);
+      character.getCombat().setAttackDelay(5);
     } else if (this.attack === Attack.DEFAULT_MELEE_ATTACK) {
       character.performAnimation(MELEE_ATTACK_ANIM);
     }

@@ -15,12 +15,13 @@ async function main() {
     assert(!fs.existsSync("data/definitions/items.json"));
     assert(!fs.existsSync("data/definitions/npc_defs.json"));
     const counts = CacheDefinitions.getCounts();
-    assert(counts.npcs > 7_748, `expected modern NPC definitions, got ${counts.npcs}`);
-    assert(counts.items > 26_562, `expected modern item definitions, got ${counts.items}`);
-    assert(counts.objects > 30_000, `expected modern object definitions, got ${counts.objects}`);
+    assert(counts.npcs > 7_748, `expected cache NPC definitions, got ${counts.npcs}`);
+    assert(counts.items > 26_562, `expected cache item definitions, got ${counts.items}`);
+    assert(counts.objects > 30_000, `expected cache object definitions, got ${counts.objects}`);
     assert.notEqual(CacheDefinitions.getNpc(100).name, "null");
     assert.notEqual(CacheDefinitions.getItem(4151).name, "null");
     assert.notEqual(CacheDefinitions.getObject(2213).name, "null");
+    assert.equal(CacheDefinitions.getSpellName((218 << 16) | 9, 0xffff), "Wind Strike");
     new NpcDefinitionLoader().load();
     assert.equal(NpcDefinition.forId(100).getName(), CacheDefinitions.getNpc(100).name);
     assert.equal(NpcDefinition.forId(100).getAttackAnim(), 1312);

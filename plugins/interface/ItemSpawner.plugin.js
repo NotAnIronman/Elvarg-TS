@@ -25,11 +25,6 @@ module.exports = {
         player.getPacketSender().sendMessage("You do not have permission to use this command.");
         return true;
       }
-      if (!player.getSession().isClientProtocol?.()) {
-        player.getPacketSender().sendMessage("The item browser requires the web client.");
-        return true;
-      }
-
       const sender = player.getPacketSender();
       sender.sendContentData("core.items", [{ key: "customWidgets", rows: [WIDGET_GROUP] }]);
       player.setInterfaceId(GROUP_ID);

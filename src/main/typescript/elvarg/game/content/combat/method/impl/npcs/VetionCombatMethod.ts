@@ -8,7 +8,6 @@ import { Projectile } from "../../../../../model/Projectile";
 import { Misc } from "../../../../../../util/Misc";
 import { TaskManager } from "../../../../../task/TaskManager";
 import { HitMask } from "../../../hit/HitMask";
-import {TimerKey} from '../../../../../../util/timers/TimerKey';
 import { Task } from "../../../../../task/Task";
 import { HitDamage } from "../../../hit/HitDamage";
 import { Location } from "../../../../../model/Location";
@@ -83,7 +82,7 @@ export class VetionCombatMethod implements CombatMethod {
                 }
             }
             this.finished(character, target)}));
-            character.getTimers().registers(TimerKey.COMBAT_ATTACK, 5);
+            character.getCombat().setAttackDelay(5);
         }
     }
 

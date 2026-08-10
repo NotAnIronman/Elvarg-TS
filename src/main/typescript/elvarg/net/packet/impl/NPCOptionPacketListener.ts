@@ -136,4 +136,19 @@ export class NPCOptionPacketListener implements PacketExecutor {
       }
     });
   }
+
+  public static castSpell(player: any, index: number, spellId: number): boolean {
+    if (!player || player.getHitpoints?.() <= 0 || player.busy?.()) return false;
+    if (index < 0 || index >= World.getNpcs().capacityReturn()) return false;
+    const npc = World.getNpcs().get(index);
+    const spell = CombatSpells.getCombatSpell(spellId);
+    if (!npc || !spell || !player.getLocation().isWithinDistance(npc.getLocation(), 24) ||
+        !npc.getCurrentDefinition?.()?.isAttackable?.() || npc.getHitpoints?.() <= 0) {
+      player.getMovementQueue().reset();
+      return false;
+    }
+    player.setPositionToFace(npc.getLocation());
+    player.getCombat().castSpellOn(npc, spell);
+    return true;
+  }
 }

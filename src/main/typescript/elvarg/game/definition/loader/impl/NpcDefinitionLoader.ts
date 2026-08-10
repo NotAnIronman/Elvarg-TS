@@ -155,7 +155,7 @@ export class NpcDefinitionLoader extends DefinitionLoader {
             }
         }
         console.info(
-            `[npc-definitions] cache-backed; XRSPS stats applied=${applied}, mismatched=${mismatched}, ` +
+            `[npc-definitions] cache-backed; configured stats applied=${applied}, mismatched=${mismatched}, ` +
             `service animations inferred=${inferredAnimations}, guessed=${guessedAnimations}`
         );
         return true;

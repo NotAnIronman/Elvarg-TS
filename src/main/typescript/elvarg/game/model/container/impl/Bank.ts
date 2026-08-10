@@ -298,7 +298,7 @@ export class Bank extends ItemContainer {
         }
     }
 
-    public static resolveModernClientSlot(player: Player, clientSlot: number): { tab: number; slot: number; item: Item } | null {
+    public static resolveDisplaySlot(player: Player, clientSlot: number): { tab: number; slot: number; item: Item } | null {
         if (!Number.isInteger(clientSlot) || clientSlot < 0) return null;
         let current = 0;
         for (let tab = 0; tab < 10; tab++) {
@@ -312,7 +312,7 @@ export class Bank extends ItemContainer {
         return null;
     }
 
-    public static modernActionAmount(
+    public static actionAmount(
         kind: "withdraw" | "deposit",
         button: number,
         option: string | undefined,
@@ -340,7 +340,7 @@ export class Bank extends ItemContainer {
         return Math.min(total, ({ 1: 1, 3: 1, 4: 5, 5: 10, 6: custom, 7: custom, 8: total } as Record<number, number>)[button] ?? 0);
     }
 
-    public static handleModernWidgetAction(player: Player, packet: {
+    public static handleWidgetAction(player: Player, packet: {
         groupId: number;
         childId: number;
         buttonNum: number;
@@ -351,9 +351,9 @@ export class Bank extends ItemContainer {
         if (!Bank.isOpen(player)) return false;
 
         if (packet.groupId === Bank.MAIN_INTERFACE_ID && packet.childId === 12 && packet.slot != null) {
-            const entry = Bank.resolveModernClientSlot(player, packet.slot);
+            const entry = Bank.resolveDisplaySlot(player, packet.slot);
             if (!entry || (packet.itemId != null && packet.itemId !== entry.item.getId())) return true;
-            const amount = Bank.modernActionAmount(
+            const amount = Bank.actionAmount(
                 "withdraw", packet.buttonNum, packet.option, entry.item.getAmount(),
                 player.getBankCustomQuantity(), player.getBankQuantityMode(),
             );
@@ -365,7 +365,7 @@ export class Bank extends ItemContainer {
             (packet.childId === 3 || packet.childId >= 0x8000) && packet.slot != null) {
             const item = player.getInventory().getItems()[packet.slot];
             if (!item || item.getId() < 0 || (packet.itemId != null && packet.itemId !== item.getId())) return true;
-            const amount = Bank.modernActionAmount(
+            const amount = Bank.actionAmount(
                 "deposit", packet.buttonNum, packet.option, item.getAmount(),
                 player.getBankCustomQuantity(), player.getBankQuantityMode(),
             );
@@ -700,41 +700,25 @@ export class Bank extends ItemContainer {
 
         this.sortItems();
 
-        if (this.getPlayer().getSession().isClientProtocol?.()) {
-            const player = this.getPlayer();
-            const sender = player.getPacketSender();
-            player.setInterfaceId(Bank.MAIN_INTERFACE_ID);
-            sender.sendConfig(548, 1)
-                .sendVarbit(4150, player.getCurrentBankTab())
-                .sendVarbit(3755, player.isPlaceholders() ? 1 : 0)
-                .sendVarbit(3958, player.withdrawAsNote() ? 1 : 0)
-                .sendVarbit(3959, player.insertModeReturn() ? 1 : 0)
-                .sendVarbit(3960, player.getBankCustomQuantity())
-                .sendVarbit(5450, 1)
-                .sendVarbit(6590, player.getBankQuantityMode())
-                .sendInterfaceScript(917, [-1, -2])
-                .sendSubInterface((161 << 16) | 16, Bank.MAIN_INTERFACE_ID, 0)
-                .sendSubInterface((161 << 16) | 74, Bank.SIDE_INTERFACE_ID, 3)
-                .sendInterfaceFlagsRange((Bank.MAIN_INTERFACE_ID << 16) | 12, 0, 1409, 3409919)
-                .sendInterfaceFlagsRange((Bank.SIDE_INTERFACE_ID << 16) | 3, 0, 27, 3278846)
-                .sendString(`Bank of ${GameConstants.NAME}`, (Bank.MAIN_INTERFACE_ID << 16) | 3);
-            this.refreshItems();
-            if (opening) Sounds.sendSound(this.getPlayer(), Sound.CONTAINER_OPEN);
-            return this;
-        }
-
-        // Send configs
-        this.getPlayer().getPacketSender().sendConfig(115, this.getPlayer().withdrawAsNote() ? 1 : 0)
-                .sendConfig(304, this.getPlayer().insertModeReturn() ? 1 : 0)
-                .sendConfig(117, this.getPlayer().isSearchingBank() ? 1 : 0)
-                .sendConfig(118, this.getPlayer().isPlaceholders() ? 1 : 0).sendConfiguredInterface("bank");
+        const player = this.getPlayer();
+        const sender = player.getPacketSender();
+        player.setInterfaceId(Bank.MAIN_INTERFACE_ID);
+        sender.sendConfig(548, 1)
+            .sendVarbit(4150, player.getCurrentBankTab())
+            .sendVarbit(3755, player.isPlaceholders() ? 1 : 0)
+            .sendVarbit(3958, player.withdrawAsNote() ? 1 : 0)
+            .sendVarbit(3959, player.insertModeReturn() ? 1 : 0)
+            .sendVarbit(3960, player.getBankCustomQuantity())
+            .sendVarbit(5450, 1)
+            .sendVarbit(6590, player.getBankQuantityMode())
+            .sendInterfaceScript(917, [-1, -2])
+            .sendSubInterface((161 << 16) | 16, Bank.MAIN_INTERFACE_ID, 0)
+            .sendSubInterface((161 << 16) | 74, Bank.SIDE_INTERFACE_ID, 3)
+            .sendInterfaceFlagsRange((Bank.MAIN_INTERFACE_ID << 16) | 12, 0, 1409, 3409919)
+            .sendInterfaceFlagsRange((Bank.SIDE_INTERFACE_ID << 16) | 3, 0, 27, 3278846)
+            .sendString(`Bank of ${GameConstants.NAME}`, (Bank.MAIN_INTERFACE_ID << 16) | 3);
         this.refreshItems();
-
-        // Resets the scroll bar in the interface
-        this.getPlayer().getPacketSender().sendInterfaceScrollReset(Bank.BANK_SCROLL_BAR_INTERFACE_ID);
-        if (opening) {
-            Sounds.sendSound(this.getPlayer(), Sound.CONTAINER_OPEN);
-        }
+        if (opening) Sounds.sendSound(this.getPlayer(), Sound.CONTAINER_OPEN);
 
         return this;
     }
@@ -745,39 +729,12 @@ export class Bank extends ItemContainer {
             return this;
         }
 
-        if (this.getPlayer().getSession().isClientProtocol?.()) {
-            const sender = this.getPlayer().getPacketSender();
-            sender.sendVarbit(4150, this.getPlayer().getCurrentBankTab());
-            for (let tab = 1; tab <= 9; tab++) {
-                sender.sendVarbit(4170 + tab, this.getPlayer().getBank(tab).getValidItems().length);
-            }
-            sender.sendBankSnapshot().sendItemContainer(this.getPlayer().getInventory(), Bank.INVENTORY_INTERFACE_ID);
-            return this;
+        const sender = this.getPlayer().getPacketSender();
+        sender.sendVarbit(4150, this.getPlayer().getCurrentBankTab());
+        for (let tab = 1; tab <= 9; tab++) {
+            sender.sendVarbit(4170 + tab, this.getPlayer().getBank(tab).getValidItems().length);
         }
-
-        // Send capacity information about the current bank we're in
-        this.getPlayer().getPacketSender().sendString("" + this.getValidItems().length, 50053);
-        this.getPlayer().getPacketSender().sendString("" +this.capacity(), 50054);
-
-        // Send all bank tabs and their contents
-        for (let i = 0; i < Bank.TOTAL_BANK_TABS; i++) {
-            this.getPlayer().getPacketSender().sendItemContainers(this.getPlayer().getBank(i), Bank.CONTAINER_START + i);
-        }
-
-        // Send inventory
-        this.getPlayer().getPacketSender().sendItemContainer(this.getPlayer().getInventory(), Bank.INVENTORY_INTERFACE_ID);
-
-        // Update bank title
-        if (this.getPlayer().isSearchingBank()) {
-            this.getPlayer().getPacketSender().sendString("Results for " + this.getPlayer().getSearchSyntax() + "..", 5383)
-                    .sendConfig(117, 1);
-        } else {
-            this.getPlayer().getPacketSender().sendString("Bank of " + GameConstants.NAME, 5383).sendConfig(117, 0);
-        }
-
-        // Send current bank tab being viewed and total tabs!
-        let current_tab = this.getPlayer().isSearchingBank() ? Bank.BANK_SEARCH_TAB_INDEX : this.getPlayer().getCurrentBankTab();
-        this.getPlayer().getPacketSender().sendCurrentBankTab(current_tab);
+        sender.sendBankSnapshot().sendItemContainer(this.getPlayer().getInventory(), Bank.INVENTORY_INTERFACE_ID);
 
         return this;
     }

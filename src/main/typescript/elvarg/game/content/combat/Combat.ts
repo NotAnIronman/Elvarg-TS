@@ -1,237 +1,77 @@
-import { Server } from "../../../Server"
-import { HitDamageCache } from "../../content/combat/hit/HitDamageCache"
-import { HitQueue } from "../../content/combat/hit/HitQueue"
-import { PendingHit } from "./hit/PendingHit";
-import { CombatSpell } from "./magic/CombatSpell";
-import { CombatMethod } from "./method/CombatMethod";
-import { GraniteMaulCombatMethod } from "./method/impl/specials/GraniteMaulCombatMethod";
-import { RangedData, RangedWeapon, Ammunition } from "./ranged/RangedData";
+import { HitDamageCache } from "../../content/combat/hit/HitDamageCache";
+import { HitQueue } from "../../content/combat/hit/HitQueue";
 import type { Mobile } from "../../entity/impl/Mobile";
 import type { Player } from "../../entity/impl/player/Player";
+import { CoordinateState } from "../../entity/impl/npc/NPCMovementCoordinator";
 import { SecondsTimer } from "../../model/SecondsTimer";
 import { StatementDialogue } from "../../model/dialogues/entries/impl/StatementDialogue";
 import { Stopwatch } from "../../../util/Stopwatch";
-import { TimerKey } from "../../../util/timers/TimerKey";
-import { CombatFactory, CanAttackResponse } from "./CombatFactory";
-import { CombatSpecial } from "./CombatSpecial";
-import { CombatConstants } from "./CombatConstants";
 import { ServerPerf } from "../../../util/ServerPerf";
 import { World } from "../../World";
+import { CombatConstants } from "./CombatConstants";
+import { CombatFactory, CanAttackResponse } from "./CombatFactory";
+import { CombatRange } from "./CombatRange";
+import { CombatSpecial } from "./CombatSpecial";
+import type { CombatSpell } from "./magic/CombatSpell";
+import type { CombatMethod } from "./method/CombatMethod";
+import { GraniteMaulCombatMethod } from "./method/impl/specials/GraniteMaulCombatMethod";
+import { Ammunition, RangedData, RangedWeapon } from "./ranged/RangedData";
+
+type RouteState = {
+    target: Mobile;
+    x: number;
+    y: number;
+    z: number;
+    range: number;
+    method: CombatMethod;
+};
+
+/** Owns one character's target, attack deadline, approach route, and delayed hits. */
 export class Combat {
-    private character: Mobile;
-    private hitQueue: HitQueue;
-    private damageMap: Map<Player, HitDamageCache> = new Map<Player, HitDamageCache>();
-    private lastAttack = new Stopwatch();
-    private poisonImmunityTimer = new SecondsTimer();
-    private fireImmunityTimer = new SecondsTimer();
-    private teleblockTimer = new SecondsTimer();
-    private prayerBlockTimer = new SecondsTimer();
-    public rangedWeapon: RangedWeapon;
-    public ammunition: Ammunition;
-    private target: Mobile;
-    private attacker: Mobile;
+    private readonly hitQueue = new HitQueue(this.character);
+    private readonly damageMap = new Map<Player, HitDamageCache>();
+    private readonly lastAttack = new Stopwatch();
+    private readonly poisonImmunityTimer = new SecondsTimer();
+    private readonly fireImmunityTimer = new SecondsTimer();
+    private readonly teleblockTimer = new SecondsTimer();
+    private readonly prayerBlockTimer = new SecondsTimer();
+    private nextAttackCycle = 0;
+    private route: RouteState | null = null;
+    private target: Mobile | null = null;
+    private attacker: Mobile | null = null;
     private graniteMaulSpecialQueued = false;
-    private method: CombatMethod;
-    private cachedResolvedMethod: CombatMethod | null = null;
-    private cachedResolvedMethodCycle = -1;
-    private cachedCanReachResult = false;
-    private cachedCanReachCycle = -1;
-    private cachedCanReachMethod: CombatMethod | null = null;
-    private cachedCanReachTarget: Mobile | null = null;
-    private cachedCanReachSkipTargetValidation = false;
-    private cachedCanReachAttackerX = -1;
-    private cachedCanReachAttackerY = -1;
-    private cachedCanReachAttackerZ = -1;
-    private cachedCanReachTargetX = -1;
-    private cachedCanReachTargetY = -1;
-    private cachedCanReachTargetZ = -1;
-    private cachedCanReachAttackerMoving = false;
-    private cachedCanReachTargetMoving = false;
-    private cachedValidTargetResult = false;
-    private cachedValidTargetCycle = -1;
-    private cachedValidTargetTarget: Mobile | null = null;
-    private cachedValidTargetAttackerX = -1;
-    private cachedValidTargetAttackerY = -1;
-    private cachedValidTargetAttackerZ = -1;
-    private cachedValidTargetTargetX = -1;
-    private cachedValidTargetTargetY = -1;
-    private cachedValidTargetTargetZ = -1;
-    private cachedValidTargetAttackerHp = -1;
-    private cachedValidTargetTargetHp = -1;
-    private cachedValidTargetAttackerRegistered = false;
-    private cachedValidTargetTargetRegistered = false;
-    private cachedValidTargetAttackerUntargetable = false;
-    private castSpell: CombatSpell;
-    private autoCastSpell: CombatSpell;
-    private previousCast: CombatSpell;
-    constructor(character: Mobile) {
-        this.character = character;
-        this.hitQueue = new HitQueue();
-    }
+    private method: CombatMethod | null = null;
+    private castSpell: CombatSpell | null = null;
+    private autoCastSpell: CombatSpell | null = null;
+    private previousCast: CombatSpell | null = null;
+    public rangedWeapon: RangedWeapon | null = null;
+    public ammunition: Ammunition | null = null;
 
-    private invalidateResolvedMethodCache() {
-        this.cachedResolvedMethod = null;
-        this.cachedResolvedMethodCycle = -1;
-    }
+    constructor(private readonly character: Mobile) {}
 
-    private invalidateCanReachCache() {
-        this.cachedCanReachCycle = -1;
-        this.cachedCanReachMethod = null;
-        this.cachedCanReachTarget = null;
-        this.cachedCanReachSkipTargetValidation = false;
-    }
-
-    private invalidateValidTargetCache() {
-        this.cachedValidTargetCycle = -1;
-        this.cachedValidTargetTarget = null;
-    }
-
-    public resolveMethodForCurrentCycle(): CombatMethod {
-        const cycle = World.getProcessCycle();
-        if (this.cachedResolvedMethod && this.cachedResolvedMethodCycle === cycle) {
-            return this.cachedResolvedMethod;
-        }
-        const resolved = CombatFactory.getMethod(this.character);
-        this.cachedResolvedMethod = resolved;
-        this.cachedResolvedMethodCycle = cycle;
-        return resolved;
-    }
-
-    public resolveValidTargetForCurrentCycle(target: Mobile): boolean {
-        const cycle = World.getProcessCycle();
-        const attackerLocation = this.character.getLocation();
-        const targetLocation = target?.getLocation();
-        const attackerHitpoints = this.character.getHitpoints();
-        const targetHitpoints = target?.getHitpoints?.() ?? -1;
-        const attackerRegistered = this.character.isRegistered();
-        const targetRegistered = target?.isRegistered?.() ?? false;
-        const attackerUntargetable = this.character.isUntargetable();
-
-        if (
-            this.cachedValidTargetCycle === cycle &&
-            this.cachedValidTargetTarget === target &&
-            this.cachedValidTargetAttackerX === (attackerLocation?.getX() ?? -1) &&
-            this.cachedValidTargetAttackerY === (attackerLocation?.getY() ?? -1) &&
-            this.cachedValidTargetAttackerZ === (attackerLocation?.getZ() ?? -1) &&
-            this.cachedValidTargetTargetX === (targetLocation?.getX() ?? -1) &&
-            this.cachedValidTargetTargetY === (targetLocation?.getY() ?? -1) &&
-            this.cachedValidTargetTargetZ === (targetLocation?.getZ() ?? -1) &&
-            this.cachedValidTargetAttackerHp === attackerHitpoints &&
-            this.cachedValidTargetTargetHp === targetHitpoints &&
-            this.cachedValidTargetAttackerRegistered === attackerRegistered &&
-            this.cachedValidTargetTargetRegistered === targetRegistered &&
-            this.cachedValidTargetAttackerUntargetable === attackerUntargetable
-        ) {
-            return this.cachedValidTargetResult;
-        }
-
-        const result = CombatFactory.validTarget(this.character, target);
-        this.cachedValidTargetCycle = cycle;
-        this.cachedValidTargetTarget = target;
-        this.cachedValidTargetAttackerX = attackerLocation?.getX() ?? -1;
-        this.cachedValidTargetAttackerY = attackerLocation?.getY() ?? -1;
-        this.cachedValidTargetAttackerZ = attackerLocation?.getZ() ?? -1;
-        this.cachedValidTargetTargetX = targetLocation?.getX() ?? -1;
-        this.cachedValidTargetTargetY = targetLocation?.getY() ?? -1;
-        this.cachedValidTargetTargetZ = targetLocation?.getZ() ?? -1;
-        this.cachedValidTargetAttackerHp = attackerHitpoints;
-        this.cachedValidTargetTargetHp = targetHitpoints;
-        this.cachedValidTargetAttackerRegistered = attackerRegistered;
-        this.cachedValidTargetTargetRegistered = targetRegistered;
-        this.cachedValidTargetAttackerUntargetable = attackerUntargetable;
-        this.cachedValidTargetResult = result;
-        return result;
-    }
-
-    public resolveCanReachForCurrentCycle(method: CombatMethod, target: Mobile, skipTargetValidation: boolean = false): boolean {
-        const cycle = World.getProcessCycle();
-        const attackerLocation = this.character.getLocation();
-        const targetLocation = target?.getLocation();
-        const attackerMoving = this.character.getMovementQueue().isMovings();
-        const targetMoving = target?.getMovementQueue().isMovings() ?? false;
-
-        if (
-            this.cachedCanReachCycle === cycle &&
-            this.cachedCanReachMethod === method &&
-            this.cachedCanReachTarget === target &&
-            this.cachedCanReachSkipTargetValidation === skipTargetValidation &&
-            this.cachedCanReachAttackerX === (attackerLocation?.getX() ?? -1) &&
-            this.cachedCanReachAttackerY === (attackerLocation?.getY() ?? -1) &&
-            this.cachedCanReachAttackerZ === (attackerLocation?.getZ() ?? -1) &&
-            this.cachedCanReachTargetX === (targetLocation?.getX() ?? -1) &&
-            this.cachedCanReachTargetY === (targetLocation?.getY() ?? -1) &&
-            this.cachedCanReachTargetZ === (targetLocation?.getZ() ?? -1) &&
-            this.cachedCanReachAttackerMoving === attackerMoving &&
-            this.cachedCanReachTargetMoving === targetMoving
-        ) {
-            return this.cachedCanReachResult;
-        }
-
-        const result = CombatFactory.canReach(this.character, method, target, skipTargetValidation);
-        this.cachedCanReachCycle = cycle;
-        this.cachedCanReachMethod = method;
-        this.cachedCanReachTarget = target;
-        this.cachedCanReachSkipTargetValidation = skipTargetValidation;
-        this.cachedCanReachAttackerX = attackerLocation?.getX() ?? -1;
-        this.cachedCanReachAttackerY = attackerLocation?.getY() ?? -1;
-        this.cachedCanReachAttackerZ = attackerLocation?.getZ() ?? -1;
-        this.cachedCanReachTargetX = targetLocation?.getX() ?? -1;
-        this.cachedCanReachTargetY = targetLocation?.getY() ?? -1;
-        this.cachedCanReachTargetZ = targetLocation?.getZ() ?? -1;
-        this.cachedCanReachAttackerMoving = attackerMoving;
-        this.cachedCanReachTargetMoving = targetMoving;
-        this.cachedCanReachResult = result;
-        return result;
-    }
-
-    public attack(target: Mobile) {
-        // Update the target
+    public attack(target: Mobile): void {
         this.setTarget(target);
-        if (this.character != null && this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack()) {
-            // Don't follow or face enemy if NPC doesn't fight back
-            return;
-        }
-
-        // Start facing the target
+        if (this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack()) return;
         this.character.setMobileInteraction(target);
-
-        // Perform the first attack now (in same tick)
         this.performNewAttack(false);
     }
 
-    public castSpellOn(target: Mobile, spell: CombatSpell) {
-        if (!target || !spell) {
-            return;
-        }
-        this.character.setFollowing(target);
+    public castSpellOn(target: Mobile, spell: CombatSpell): void {
+        if (!target || !spell) return;
         this.character.setMobileInteraction(target);
         this.character.setPositionToFace(target.getLocation());
         this.setCastSpell(spell);
         this.attack(target);
     }
 
-    /**
-     * Processes combat.
-     */
-    public process() {
-        if (!this.hasPendingWork()) {
-            return;
-        }
-        // Process the hit queue
-        ServerPerf.measurePhase("combat.process.hit_queue", () => this.hitQueue.process(this.character));
+    public process(): void {
+        if (!this.target && !this.attacker) return;
 
-        // Reset attacker if we haven't been attacked in 6 seconds.
         if (this.lastAttack.elapsedTime(6000)) {
             this.setUnderAttack(null);
-            // Keep processing our own target even when we're no longer under attack,
-            // otherwise PvP facing/pressure can drop until a new hit lands on us.
-            if (this.target == null) {
-                return;
-            }
+            if (!this.target) return;
         }
-
-        // Handle attacking
-        ServerPerf.measurePhase("combat.process.attack_cycle", () => this.performNewAttack(false));
+        this.performNewAttack(false);
     }
 
     public hasPendingWork(): boolean {
@@ -239,428 +79,244 @@ export class Combat {
     }
 
     public performNewAttack(instant: boolean): boolean {
-        if (this.target == null || (this.character != null && this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack())) {
-            // Don't process attacks for NPC's who don't fight back
-            return false;
-        }
-        this.character.setCombatFollowing(this.target);
-
-        // Primary combat lock-on comes from entity interaction.
-        this.character.setMobileInteraction(this.target);
-        // Keep combat-facing updated every tick; Mobile now dedupes identical
-        // face positions so this no longer needlessly re-flags unchanged values.
-        const targetLocation = this.target.getLocation();
-        this.character.setPositionToFaceCoordinates(
-            targetLocation.getX(),
-            targetLocation.getY(),
-            targetLocation.getZ()
-        );
-
-        if (!instant && this.character.getTimers().has(TimerKey.COMBAT_ATTACK)) {
-            if (!this.character.isPlayer()) {
-                return false;
-            }
-            const player = this.character.getAsPlayer();
-            if (!player.isSpecialActivated() || player.getCombatSpecial() !== CombatSpecial.GRANITE_MAUL) {
-                return false;
-            }
-        }
-
-        // Fetch the combat method the character will be attacking with
-        this.method = ServerPerf.measurePhase(
-            "combat.process.get_method",
-            () => this.resolveMethodForCurrentCycle()
-        );
-
-        // Granite maul special attack, make sure we disregard delay
-        // and that we do not reset the attack timer.
-        let graniteMaulSpecial = (this.method instanceof GraniteMaulCombatMethod);
-        if (graniteMaulSpecial) {
-            instant = true;
-        }
-
         const target = this.target;
-        if (!ServerPerf.measurePhase(
-            "combat.process.can_attack.valid_target",
-            () => this.resolveValidTargetForCurrentCycle(target)
-        )) {
+        if (!target || (this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack())) {
             return false;
         }
 
-        if (!ServerPerf.measurePhase(
-            "combat.process.can_reach",
-            () => this.resolveCanReachForCurrentCycle(this.method, target, true)
-        )) {
-            // Make sure the character is within reach before processing combat
-            return false;
-        }
-        if (this.target !== target || target == null) {
+        this.character.setMobileInteraction(target);
+        const targetLocation = target.getLocation();
+        this.character.setPositionToFaceCoordinates(targetLocation.getX(), targetLocation.getY(), targetLocation.getZ());
+
+        const method = this.resolveMethodForCurrentCycle();
+        this.method = method;
+        const bypassDelay = instant || method instanceof GraniteMaulCombatMethod;
+        const cycle = World.getProcessCycle();
+        if (!bypassDelay && cycle < this.nextAttackCycle) return false;
+
+        if (!CombatFactory.validTarget(this.character, target)) {
+            this.reset();
             return false;
         }
 
-        switch (ServerPerf.measurePhase(
-            "combat.process.can_attack",
-            () => CombatFactory.canAttack(this.character, this.method, target, true)
-        )) {
+        if (this.character.isNpc()) {
+            const npc = this.character.getAsNpc();
+            if (
+                npc.getCurrentDefinition().doesRetreat() &&
+                (npc.getMovementCoordinator().getCoordinateState() === CoordinateState.RETREATING ||
+                    npc.getLocation().getDistance(npc.getSpawnPosition()) >= npc.getCurrentDefinition().getCombatFollowDistance())
+            ) {
+                npc.getMovementCoordinator().setCoordinateState(CoordinateState.RETREATING);
+                this.reset();
+                return false;
+            }
+        }
+
+        if (!CombatRange.canReach(this.character, method, target)) {
+            this.routeToward(method, target);
+            return false;
+        }
+
+        this.character.getMovementQueue().reset();
+        this.route = null;
+        if (this.target !== target) return false;
+
+        switch (CombatFactory.canAttack(this.character, method, target, true)) {
             case CanAttackResponse.CAN_ATTACK: {
-                if (this.character.getCombat().getAttacker() == null) {
-                    // Call the onCombatBegan hook once when combat begins
-                    this.method.onCombatBegan(this.character, this.attacker);
+                if (this.attacker == null) method.onCombatBegan(this.character, target);
+                if (target.getCombat().getAttacker() == null) {
+                    CombatFactory.getMethod(target).onCombatBegan(target, this.character);
                 }
-                if (this.target.getCombat().getAttacker() == null) {
-                    // Call the onCombatBegan hook once when combat begins
-                    let targetMethod = CombatFactory.getMethod(this.target);
-                    targetMethod.onCombatBegan(this.target, this.character);
-                }
-                ServerPerf.measurePhase("combat.process.method_start", () =>
-                    this.method.start(this.character, this.target)
-                );
-                let hits = ServerPerf.measurePhase("combat.process.method_hits", () =>
-                    this.method.hits(this.character, this.target)
-                );
-                if (hits == null)
-                    return false;
-                for (let hit of hits) {
-                    CombatFactory.addPendingHit(hit);
-                }
-                ServerPerf.measurePhase("combat.process.method_finished", () =>
-                    this.method.finished(this.character, this.target)
-                );
+                // A combat method may extend this in start() for a special attack.
+                if (!bypassDelay) this.nextAttackCycle = cycle + Math.max(1, method.attackSpeed(this.character) | 0);
+                method.start(this.character, target);
+                const hits = method.hits(this.character, target);
+                if (hits == null) return false;
+                for (const hit of hits) CombatFactory.addPendingHit(hit);
+                method.finished(this.character, target);
 
-                // Reset attack timer
-                if (!graniteMaulSpecial) {
-                    let speed = this.method.attackSpeed(this.character);
-                    this.character.getTimers().registers(TimerKey.COMBAT_ATTACK, speed);
-                }
-                instant = false;
+                this.graniteMaulSpecialQueued = false;
                 if (this.character.isSpecialActivated()) {
                     this.character.setSpecialActivated(false);
-                    if (this.character.isPlayer()) {
-                        let p = this.character.getAsPlayer();
-                        CombatSpecial.updateBar(p);
-                    }
+                    if (this.character.isPlayer()) CombatSpecial.updateBar(this.character.getAsPlayer());
                 }
-                this.setGraniteMaulSpecialQueued(false);
                 return true;
             }
-            case CanAttackResponse.ALREADY_UNDER_ATTACK: {
-                if (this.character.isPlayer()) {
-                    this.character.getAsPlayer().getPacketSender().sendMessage("You are already under attack!");
-                }
-                this.character.getCombat().reset();
+            case CanAttackResponse.ALREADY_UNDER_ATTACK:
+                if (this.character.isPlayer()) this.character.getAsPlayer().getPacketSender().sendMessage("You are already under attack!");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.CANT_ATTACK_IN_AREA: {
-                this.character.getCombat().reset();
+            case CanAttackResponse.CANT_ATTACK_IN_AREA:
+            case CanAttackResponse.INVALID_TARGET:
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED: {
+            case CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED:
                 return false;
-            }
-            case CanAttackResponse.LEVEL_DIFFERENCE_TOO_GREAT: {
+            case CanAttackResponse.LEVEL_DIFFERENCE_TOO_GREAT:
                 this.character.getAsPlayer().getPacketSender().sendMessage("Your level difference is too great.");
                 this.character.getAsPlayer().getPacketSender().sendMessage("You need to move deeper into the Wilderness.");
-                this.character.getCombat().reset();
+                this.reset();
                 return false;
-            }
             case CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY: {
-                let p = this.character.getAsPlayer();
-                p.getPacketSender().sendMessage("You do not have enough special attack energy left!");
-                p.setSpecialActivated(false);
-                CombatSpecial.updateBar(this.character.getAsPlayer());
-                p.getCombat().reset();
+                const player = this.character.getAsPlayer();
+                player.getPacketSender().sendMessage("You do not have enough special attack energy left!");
+                player.setSpecialActivated(false);
+                CombatSpecial.updateBar(player);
+                this.reset();
                 return false;
             }
-            case CanAttackResponse.STUNNED: {
-                let p = this.character.getAsPlayer();
-                p.getPacketSender().sendMessage("You're currently stunned and cannot attack.");
-                p.getCombat().reset();
+            case CanAttackResponse.STUNNED:
+                this.character.getAsPlayer().getPacketSender().sendMessage("You're currently stunned and cannot attack.");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.DUEL_NOT_STARTED_YET: {
-                let p = this.character.getAsPlayer();
-                p.getPacketSender().sendMessage("The duel has not started yet!");
-                p.getCombat().reset();
+            case CanAttackResponse.DUEL_NOT_STARTED_YET:
+                this.character.getAsPlayer().getPacketSender().sendMessage("The duel has not started yet!");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.DUEL_WRONG_OPPONENT: {
-                let p = this.character.getAsPlayer();
-                p.getPacketSender().sendMessage("This is not your opponent!");
-                p.getCombat().reset();
+            case CanAttackResponse.DUEL_WRONG_OPPONENT:
+                this.character.getAsPlayer().getPacketSender().sendMessage("This is not your opponent!");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.DUEL_MELEE_DISABLED: {
-                let p = this.character.getAsPlayer();
-                StatementDialogue.send(p, "Melee has been disabled in this duel!");
-                p.getCombat().reset();
+            case CanAttackResponse.DUEL_MELEE_DISABLED:
+                StatementDialogue.send(this.character.getAsPlayer(), "Melee has been disabled in this duel!");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.DUEL_RANGED_DISABLED: {
-                let p = this.character.getAsPlayer();
-                StatementDialogue.send(p, "Ranged has been disabled in this duel!");
-                p.getCombat().reset();
+            case CanAttackResponse.DUEL_RANGED_DISABLED:
+                StatementDialogue.send(this.character.getAsPlayer(), "Ranged has been disabled in this duel!");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.DUEL_MAGIC_DISABLED: {
-                let p = this.character.getAsPlayer();
-                StatementDialogue.send(p, "Magic has been disabled in this duel!");
-                p.getCombat().reset();
+            case CanAttackResponse.DUEL_MAGIC_DISABLED:
+                StatementDialogue.send(this.character.getAsPlayer(), "Magic has been disabled in this duel!");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.TARGET_IS_IMMUNE: {
-                if (this.character.isPlayer()) {
-    (this.character as Player).getPacketSender().sendMessage("This npc is currently immune to attacks.");
-}
-                this.character.getCombat().reset();
+            case CanAttackResponse.TARGET_IS_IMMUNE:
+                if (this.character.isPlayer()) this.character.getAsPlayer().getPacketSender().sendMessage("This npc is currently immune to attacks.");
+                this.reset();
                 return false;
-            }
-            case CanAttackResponse.INVALID_TARGET: {
-                this.character.getCombat().reset();
-                return false;
-            }
         }
-        return false;
     }
 
-    public reset() {
-        this.setTarget(null);
-        this.character.setCombatFollowing(null);
+    public resolveMethodForCurrentCycle(): CombatMethod {
+        return CombatFactory.getMethod(this.character);
+    }
+
+    public resolveValidTargetForCurrentCycle(target: Mobile): boolean {
+        return CombatFactory.validTarget(this.character, target);
+    }
+
+    public resolveCanReachForCurrentCycle(method: CombatMethod, target: Mobile, _skipTargetValidation = false): boolean {
+        return CombatRange.canReach(this.character, method, target);
+    }
+
+    public setAttackDelay(ticks: number): void {
+        this.nextAttackCycle = World.getProcessCycle() + Math.max(0, ticks | 0);
+    }
+
+    public extendAttackDelay(ticks: number): void {
+        this.nextAttackCycle = Math.max(this.nextAttackCycle, World.getProcessCycle() + Math.max(0, ticks | 0));
+    }
+
+    public getAttackDelay(): number {
+        return Math.max(0, this.nextAttackCycle - World.getProcessCycle());
+    }
+
+    public willAttackBeReadyIn(ticks: number): boolean {
+        return this.getAttackDelay() <= Math.max(0, ticks | 0);
+    }
+
+    public reset(): void {
+        const previousTarget = this.target;
+        this.target = null;
+        if (previousTarget && this.method) this.method.onCombatEnded(this.character, previousTarget);
+        this.character.getMovementQueue().reset();
         this.character.setMobileInteraction(null);
-        this.setGraniteMaulSpecialQueued(false);
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-        this.invalidateValidTargetCache();
+        this.route = null;
+        this.graniteMaulSpecialQueued = false;
     }
 
-    public isGraniteMaulSpecialQueued(): boolean {
-        return this.graniteMaulSpecialQueued;
+    public isGraniteMaulSpecialQueued(): boolean { return this.graniteMaulSpecialQueued; }
+    public setGraniteMaulSpecialQueued(queued: boolean): void { this.graniteMaulSpecialQueued = queued; }
+
+    public addDamage(entity: Mobile, amount: number): void {
+        if (amount <= 0 || entity.isNpc()) return;
+        const player = entity as Player;
+        const cached = this.damageMap.get(player);
+        if (cached) cached.incrementDamage(amount);
+        else this.damageMap.set(player, new HitDamageCache(amount));
     }
 
-    public setGraniteMaulSpecialQueued(queued: boolean): void {
-        this.graniteMaulSpecialQueued = queued;
-    }
-    /**
-* Adds damage to the damage map, as long as the argued amount of damage is
-* above 0 and the argued entity is a player.
-*
-* @param entity the entity to add damage for.
-* @param amount the amount of damage to add for the argued entity.
-*/
-    public addDamage(entity: Mobile, amount: number) {
-        if (amount <= 0 || entity.isNpc()) {
-            return;
-        }
-
-        let player = entity as Player;
-        if (this.damageMap.has(player)) {
-            this.damageMap.get(player).incrementDamage(amount);
-            return;
-        }
-
-        this.damageMap.set(player, new HitDamageCache(amount));
-    }
-
-    public getKiller(clearMap: boolean) {
-        // Return null if no players killed this entity.
-        if (this.damageMap.size == 0) {
-            return null;
-        }
-
-        // The damage and killer placeholders.
+    public getKiller(clearMap: boolean): Player | null {
         let damage = 0;
-        let killer: any | null | undefined = null;
-
-        for (let entry of this.damageMap.entries()) {
-
-            // Check if this entry is valid.
-            if (entry == null) {
-                continue;
-            }
-
-            // Check if the cached time is valid.
-            let timeout = entry[1].getStopwatch().valueOf();
-            if (timeout > CombatConstants.DAMAGE_CACHE_TIMEOUT) {
-                continue;
-            }
-
-            // Check if the key for this entry has logged out.
-            let player = entry[0];
-            if (!player.isRegistered()) {
-                continue;
-            }
-
-            // If their damage is above the placeholder value, they become the
-            // new 'placeholder'.
-            if (entry[1].getDamage() > damage) {
-                damage = entry[1].getDamage();
-                killer = entry[0];
+        let killer: Player | null = null;
+        for (const [player, cached] of this.damageMap) {
+            if (!player.isRegistered() || cached.getStopwatch() > CombatConstants.DAMAGE_CACHE_TIMEOUT) continue;
+            if (cached.getDamage() > damage) {
+                damage = cached.getDamage();
+                killer = player;
             }
         }
-
-        // Clear the damage map if needed.
-        if (clearMap)
-            this.damageMap.clear();
-
-        // Return the killer placeholder.
+        if (clearMap) this.damageMap.clear();
         return killer;
     }
 
     public damageMapContains(player: Player): boolean {
-        let damageCache:HitDamageCache = this.damageMap.get(player);
-        if (damageCache == null) {
-            return false;
-        }
-        return damageCache.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT;
+        const cached = this.damageMap.get(player);
+        return cached != null && cached.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT;
     }
 
     public getRecentDamagers(): Player[] {
-        const recentDamagers: Player[] = [];
-        for (const [player, damageCache] of this.damageMap.entries()) {
-            if (
-                player != null &&
-                player.isRegistered() &&
-                damageCache != null &&
-                damageCache.getDamage() > 0 &&
-                damageCache.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT
-            ) {
-                recentDamagers.push(player);
-            }
-        }
-        return recentDamagers;
+        return [...this.damageMap].flatMap(([player, cached]) =>
+            player.isRegistered() && cached.getDamage() > 0 && cached.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT
+                ? [player] : []
+        );
     }
 
     public getRecentDamagerEntries(): Array<{ player: Player; damage: number }> {
-        const recentDamagers: Array<{ player: Player; damage: number }> = [];
-        for (const [player, damageCache] of this.damageMap.entries()) {
-            if (
-                player != null &&
-                player.isRegistered() &&
-                damageCache != null &&
-                damageCache.getDamage() > 0 &&
-                damageCache.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT
-            ) {
-                recentDamagers.push({ player, damage: damageCache.getDamage() });
-            }
+        return [...this.damageMap].flatMap(([player, cached]) =>
+            player.isRegistered() && cached.getDamage() > 0 && cached.getStopwatch() < CombatConstants.DAMAGE_CACHE_TIMEOUT
+                ? [{ player, damage: cached.getDamage() }] : []
+        );
+    }
+
+    public getCharacter(): Mobile { return this.character; }
+    public getTarget(): Mobile | null { return this.target; }
+    public setTarget(target: Mobile | null): void { this.target = target; this.route = null; }
+    public getHitQueue(): HitQueue { return this.hitQueue; }
+    public getAttacker(): Mobile | null { return this.attacker; }
+    public setUnderAttack(attacker: Mobile | null): void { this.attacker = attacker; this.lastAttack.reset(); }
+    public getCastSpell(): CombatSpell | null { return this.castSpell; }
+    public setCastSpell(spell: CombatSpell | null): void { this.castSpell = spell; }
+    public getAutocastSpell(): CombatSpell | null { return this.autoCastSpell; }
+    public setAutocastSpell(spell: CombatSpell | null): void { this.autoCastSpell = spell; }
+    public getSelectedSpell(): CombatSpell | null { return this.castSpell ?? this.autoCastSpell; }
+    public getPreviousCast(): CombatSpell | null { return this.previousCast; }
+    public setPreviousCast(spell: CombatSpell | null): void { this.previousCast = spell; }
+    public getRangedWeapon(): RangedWeapon | null { return this.rangedWeapon; }
+    public setRangedWeapon(weapon: RangedWeapon | null): void { this.rangedWeapon = weapon; }
+    public getAmmunition(): Ammunition | null { return this.ammunition; }
+    public setAmmunition(ammunition: Ammunition | null): void { this.ammunition = ammunition; }
+    public getRangeAmmoData(): RangedData { return this.ammunition as unknown as RangedData; }
+    public setRangeAmmoData(data: RangedData): void { this.ammunition = data as unknown as Ammunition; }
+    public getPoisonImmunityTimer(): SecondsTimer { return this.poisonImmunityTimer; }
+    public getFireImmunityTimer(): SecondsTimer { return this.fireImmunityTimer; }
+    public getTeleblockTimer(): SecondsTimer { return this.teleblockTimer; }
+    public getPrayerBlockTimer(): SecondsTimer { return this.prayerBlockTimer; }
+    public getLastAttack(): Stopwatch { return this.lastAttack; }
+
+    private routeToward(method: CombatMethod, target: Mobile): void {
+        const location = target.getLocation();
+        const range = Math.max(1, method.attackDistance(this.character) | 0);
+        if (
+            this.route?.target === target &&
+            this.route.x === location.getX() && this.route.y === location.getY() && this.route.z === location.getZ() &&
+            this.route.range === range && this.route.method === method &&
+            this.character.getMovementQueue().hasPendingWork()
+        ) return;
+
+        if (ServerPerf.measurePhase("combat.route", () => CombatRange.route(this.character, method, target))) {
+            this.route = { target, x: location.getX(), y: location.getY(), z: location.getZ(), range, method };
+        } else {
+            this.route = null;
         }
-        return recentDamagers;
-    }
-
-    public getCharacter(): Mobile {
-        return this.character;
-    }
-
-    public getTarget(): Mobile {
-        return this.target;
-    }
-
-    public setTarget(target: Mobile) {
-        if (this.target != null && target == null && this.method != null) {
-            // Target has changed to null, this means combat has ended. Call the relevant hook inside the combat method.
-            this.method.onCombatEnded(this.character, this.attacker);
-        }
-
-        this.target = target;
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-    }
-
-    public getHitQueue(): HitQueue {
-        return this.hitQueue;
-    }
-
-    public getAttacker(): Mobile {
-        return this.attacker;
-    }
-
-    public setUnderAttack(attacker: Mobile) {
-        this.attacker = attacker;
-        this.lastAttack.reset();
-    }
-
-    public getCastSpell(): CombatSpell {
-        return this.castSpell;
-    }
-    public setCastSpell(castSpell: CombatSpell) {
-        this.castSpell = castSpell;
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-    }
-
-    public getAutocastSpell(): CombatSpell {
-        return this.autoCastSpell;
-    }
-
-    public setAutocastSpell(autoCastSpell: CombatSpell) {
-        this.autoCastSpell = autoCastSpell;
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-    }
-
-    public getSelectedSpell(): CombatSpell {
-        let spell = this.getCastSpell();
-        if (spell != null) {
-            return spell;
-        }
-        return this.getAutocastSpell();
-    }
-
-    public getPreviousCast(): CombatSpell {
-        return this.previousCast;
-    }
-
-    public setPreviousCast(previousCast: CombatSpell) {
-        this.previousCast = previousCast;
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-    }
-
-    public getRangedWeapon(): RangedWeapon {
-        return this.rangedWeapon;
-    }
-
-    public setRangedWeapon(rangedWeapon: RangedWeapon) {
-        this.rangedWeapon = rangedWeapon;
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-    }
-
-    public getAmmunition(): Ammunition {
-        return this.ammunition;
-    }
-
-    public setAmmunition(ammunition: Ammunition) {
-        this.ammunition = ammunition;
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-    }
-
-    public getRangeAmmoData(): RangedData {
-        return this.ammunition as unknown as RangedData;
-    }
-
-    public setRangeAmmoData(rangeAmmoData: RangedData) {
-        this.ammunition = rangeAmmoData as unknown as Ammunition;
-        this.invalidateResolvedMethodCache();
-        this.invalidateCanReachCache();
-    }
-
-    public getPoisonImmunityTimer(): SecondsTimer {
-        return this.poisonImmunityTimer;
-    }
-
-    public getFireImmunityTimer(): SecondsTimer {
-        return this.fireImmunityTimer;
-    }
-
-    public getTeleblockTimer(): SecondsTimer {
-        return this.teleblockTimer;
-    }
-
-    public getPrayerBlockTimer(): SecondsTimer {
-        return this.prayerBlockTimer;
-    }
-
-    public getLastAttack(): Stopwatch {
-        return this.lastAttack;
     }
 }

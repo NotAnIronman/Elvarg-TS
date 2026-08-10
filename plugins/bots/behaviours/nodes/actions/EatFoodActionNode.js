@@ -99,7 +99,7 @@ class EatFoodActionNode {
     }
 
     timers.extendOrRegister?.(TimerKey.FOOD, 3);
-    timers.extendOrRegister?.(TimerKey.COMBAT_ATTACK, 5);
+    player.getCombat?.().extendAttackDelay?.(5);
     player.getPacketSender?.().sendInterfaceRemoval?.();
     skillManager.stopSkillable?.();
     player.performAnimation?.(EAT_ANIMATION);

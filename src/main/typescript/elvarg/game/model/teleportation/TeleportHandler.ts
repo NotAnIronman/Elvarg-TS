@@ -95,9 +95,9 @@ export class TeleportHandler {
         player.getClickDelay().reset();
     }
 
-    public static onTeleporting(player: Player): void {
+    public static onTeleporting(player: Player, closeInterfaces: boolean = true): void {
         player.getSkillManager().stopSkillable();
-        player.getPacketSender().sendInterfaceRemoval();
+        if (closeInterfaces) player.getPacketSender().sendInterfaceRemoval();
         player.getCombat().reset();
     }
 

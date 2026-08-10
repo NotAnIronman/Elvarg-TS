@@ -49,19 +49,14 @@ export class BonusManager {
     private otherBonus: number[] = new Array(4).fill(0);
 
     public static open(player: Player) {
-        if (player.getSession().isClientProtocol?.()) {
-            const sender = player.getPacketSender();
-            player.setInterfaceId(84);
-            sender.sendVarbit(12393, 1)
-                .sendSubInterface((161 << 16) | 16, 84, 0)
-                .sendSubInterface((161 << 16) | 74, 85, 3)
-                .sendInterfaceFlagsRange(85 << 16, 0, 27, 1180674)
-                .sendInterfaceScript(149, [85 << 16, 93, 4, 7, 1, -1, "Equip", "", "", "", ""])
-                .sendInterfaceScript(151, [85 << 16, 93, 4, 7, 1, -1, "Equip", "", "", "", "", "", "", "", ""]);
-            BonusManager.update(player);
-            return;
-        }
-        player.getPacketSender().sendConfiguredInterface("equipment-bonuses");
+        const sender = player.getPacketSender();
+        player.setInterfaceId(84);
+        sender.sendVarbit(12393, 1)
+            .sendSubInterface((161 << 16) | 16, 84, 0)
+            .sendSubInterface((161 << 16) | 74, 85, 3)
+            .sendInterfaceFlagsRange(85 << 16, 0, 27, 1180674)
+            .sendInterfaceScript(149, [85 << 16, 93, 4, 7, 1, -1, "Equip", "", "", "", ""])
+            .sendInterfaceScript(151, [85 << 16, 93, 4, 7, 1, -1, "Equip", "", "", "", "", "", "", "", ""]);
         BonusManager.update(player);
     }
 
