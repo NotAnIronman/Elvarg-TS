@@ -1,17 +1,8 @@
-import type { Packet } from "../net/packet/Packet";
-import type { PacketExecutor } from "../net/packet/PacketExecutor";
 import type { WeaponCombatProfile } from "../game/content/combat/WeaponProfile";
 import type { PlayerPersistence } from "../game/entity/impl/player/persistence/PlayerPersistence";
 import type { ActiveRegionSnapshot } from "../game/ActiveRegionIndex";
 import type { ServerDataProvider } from "../game/data/ServerDataRegistry";
 import type { DefinitionSource } from "../game/definition/loader/DefinitionLoader";
-
-export interface PluginPacketEvent {
-  opcode: number;
-  packet: Packet;
-  player: any;
-  stage: string;
-}
 
 export interface PluginPlayerLoginEvent {
   player: any;
@@ -162,6 +153,25 @@ export interface PluginCanTradeEvent {
   allow: boolean | null;
 }
 
+/** Fires after a trade request passes basic validation (target alive/registered/in range), before the normal walk-and-request flow. Set handled=true to replace the default trade-request behavior entirely. */
+export interface PluginTradeRequestEvent {
+  player: any;
+  target: any;
+  handled: boolean;
+}
+
+/** Fires after a player successfully starts following another player (right-click Follow). Observer only - the follow itself already happened. */
+export interface PluginPlayerFollowEvent {
+  player: any;
+  leader: any;
+}
+
+/** Fires when a player initiates a player-vs-player attack (right-click Attack), after basic validation. Observer only. */
+export interface PluginPlayerAttackEvent {
+  player: any;
+  target: any;
+}
+
 export interface PluginCanBankEvent {
   player: any;
   allow: boolean | null;
@@ -260,6 +270,29 @@ export interface PluginItemOnPlayerEvent {
   handled: boolean;
 }
 
+export interface PluginItemOnNpcEvent {
+  player: any;
+  target: any;
+  targetIndex: number;
+  item: any;
+  itemId: number;
+  slot: number;
+  interfaceId: number;
+  handled: boolean;
+}
+
+export interface PluginSpellOnObjectEvent {
+  player: any;
+  object: any;
+  objectId: number;
+  spellWidget: number;
+  spellChild: number;
+  spellItemId: number;
+  spellId: number;
+  location: { x: number; y: number; z: number };
+  handled: boolean;
+}
+
 export interface PluginItemOnGroundItemEvent {
   player: any;
   inventoryItem: any;
@@ -316,9 +349,19 @@ export interface PluginInterfaceActionClickEvent {
   player: any;
   buttonId: number;
   action: number;
+  opId?: number;
+  groupId?: number;
+  childId?: number;
   itemId?: number;
   slot?: number;
   option?: string;
+  targetWidgetId?: number;
+  targetSlot?: number;
+  targetItemId?: number;
+  sourceWidgetId?: number;
+  sourceSlot?: number;
+  sourceItemId?: number;
+  argsData?: Buffer;
   handled: boolean;
 }
 
@@ -387,8 +430,6 @@ export interface PluginRangedCombatModifier {
 }
 
 export interface PluginApi {
-  onPacketReceived(handler: (event: PluginPacketEvent) => void): void;
-  onEstablishedPacket(handler: (event: PluginPacketEvent) => void): void;
   onPlayerLogin(handler: (event: PluginPlayerLoginEvent) => void): void;
   onPlayerDisconnect(handler: (event: PluginPlayerDisconnectEvent) => void): void;
   onPlayerLogout(handler: (event: PluginPlayerLogoutEvent) => void): void;
@@ -417,6 +458,9 @@ export interface PluginApi {
   ): void;
   onCanDrink(handler: (event: PluginCanDrinkEvent) => void): void;
   onCanTrade(handler: (event: PluginCanTradeEvent) => void): void;
+  onTradeRequest(handler: (event: PluginTradeRequestEvent) => void): void;
+  onPlayerFollow(handler: (event: PluginPlayerFollowEvent) => void): void;
+  onPlayerAttack(handler: (event: PluginPlayerAttackEvent) => void): void;
   onCanBank(handler: (event: PluginCanBankEvent) => void): void;
   onCanShop(handler: (event: PluginCanShopEvent) => void): void;
   onShouldDropItemsOnDeath(
@@ -469,7 +513,9 @@ export interface PluginApi {
   onItemOnObject(handler: (event: PluginItemOnObjectEvent) => void): void;
   onItemOnItem(handler: (event: PluginItemOnItemEvent) => void): void;
   onItemOnPlayer(handler: (event: PluginItemOnPlayerEvent) => void): void;
+  onItemOnNpc(handler: (event: PluginItemOnNpcEvent) => void): void;
   onItemOnGroundItem(handler: (event: PluginItemOnGroundItemEvent) => void): void;
+  onSpellOnObject(handler: (event: PluginSpellOnObjectEvent) => void): void;
   onItemAction(handler: (event: PluginItemActionEvent) => void): void;
   onItemDropPolicy(handler: (event: PluginItemDropEvent) => void): void;
   onItemFirstAction(
@@ -528,8 +574,6 @@ export interface PluginApi {
     regionId: number,
     source: string | [string, string]
   ): void;
-  registerPacketListener(opcode: number, listener: PacketExecutor): void;
-  registerAlivePacketListener(opcode: number, listener: PacketExecutor): void;
   registerServerDataResource(
     name: string,
     provider: ServerDataProvider
@@ -541,6 +585,62 @@ export interface PluginApi {
   setPlayerPersistence(persistence: PlayerPersistence): void;
   getActiveRegionSnapshot(): PluginActiveRegionsEvent;
   log(message: string, extra?: Record<string, unknown>): void;
+  /**
+   * Core singleton accessors. These exist so plugins don't reach into
+   * `src/main/typescript/elvarg/...` with relative requires. They return the
+   * same static classes those requires would have, so this is a coupling
+   * fix, not a capability change - see PluginApi doc comment for the
+   * narrower-API follow-up.
+   */
+  getWorld(): any;
+  getTaskManager(): any;
+  getRegionManager(): any;
+  getCombatFactory(): any;
+  getAreaManager(): any;
+  getPrayerHandler(): any;
+  getBonusManager(): any;
+  getItemOnGroundManager(): any;
+  getObjectManager(): any;
+  getServerPerf(): any;
+  getSkillManager(): any;
+  getPlayerPunishment(): any;
+  /**
+   * Cross-plugin hook queries: lets one plugin ask whether any other plugin's
+   * registered hook (onCanEat, onObjectInteraction, etc.) would veto/handle an
+   * action, without reaching into PluginManager directly.
+   */
+  emitCanEat(player: any, itemId: number): boolean | null;
+  emitCanDrink(player: any, itemId: number): boolean | null;
+  emitCanBank(player: any): boolean | null;
+  emitShouldKeepItemOnDeath(player: any, item: any): boolean | null;
+  emitFiremakingBlocked(event: PluginFiremakingBlockedEvent): boolean;
+  emitObjectInteraction(event: PluginObjectInteractionEvent): boolean;
+  emitPlayerLogin(event: PluginPlayerLoginEvent): void;
+  getPluginPerformanceSnapshot(limit?: number): any[];
+  resetPluginPerformanceStats(): void;
+  setPluginPerformanceProfilingEnabled(enabled: boolean): void;
+  isPluginPerformanceProfilingEnabled(): boolean;
+  registerMeleeHitModifier(
+    modifier: (entity: any, baseHit: number) => number
+  ): void;
+  registerRangedHitModifier(
+    modifier: (entity: any, baseHit: number) => number
+  ): void;
+  registerMagicHitModifier(
+    modifier: (entity: any, baseHit: number) => number
+  ): void;
+  registerMeleeAttackAccuracyModifier(
+    modifier: (entity: any, baseHit: number) => number
+  ): void;
+  registerMeleeDefenseModifier(
+    modifier: (entity: any, baseHit: number) => number
+  ): void;
+  registerRangedAttackAccuracyModifier(
+    modifier: (entity: any, baseHit: number) => number
+  ): void;
+  registerMagicAttackAccuracyModifier(
+    modifier: (entity: any, baseHit: number) => number
+  ): void;
   setCombatEngine(engine: PluginCombatEngine): void;
   setCombatDamageProvider(provider: PluginCombatDamageProvider): void;
   registerBonusProvider(provider: PluginBonusProvider): void;

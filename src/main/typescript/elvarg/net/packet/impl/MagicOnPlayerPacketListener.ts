@@ -1,15 +1,7 @@
 import { World } from "../../../game/World";
-import { Packet } from "../Packet";
-import { PacketExecutor } from "../PacketExecutor";
 import { CombatSpells } from "../../../game/content/combat/magic/CombatSpells";
 
-export class MagicOnPlayerPacketListener implements PacketExecutor {
-  execute(player: any, packet: Packet) {
-    const playerIndex = packet.readShortA();
-    const spellId = packet.readLEShort();
-    MagicOnPlayerPacketListener.cast(player, playerIndex, spellId);
-  }
-
+export class MagicOnPlayerPacketListener {
   public static cast(player: any, playerIndex: number, spellId: number): boolean {
     if (!player || player.getHitpoints() <= 0) {
       return false;

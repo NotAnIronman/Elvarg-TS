@@ -13,8 +13,6 @@ import { Sound } from "../../../game/Sound";
 import { Sounds } from "../../../game/Sounds";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 import { World } from "../../../game/World";
-import { Packet } from "../Packet";
-import { PacketConstants } from "../PacketConstants";
 
 export class MagicOnItemPacketListener {
   private static readonly LOW_ALCH_SPELL_ID = 1162;
@@ -31,6 +29,19 @@ export class MagicOnItemPacketListener {
   private static readonly TELEKINETIC_GRAB_RANGE = 15;
   private static readonly AIR_STAVES = new Set<number>([1381, 1397, 1405, 6562, 6563, 3053, 3054]);
   private static readonly FIRE_STAVES = new Set<number>([1387, 1393, 1401, 3053, 3054]);
+
+  public resolveSpellId(name: string | undefined): number {
+    switch (name?.trim().toLowerCase()) {
+      case "low level alchemy":
+        return MagicOnItemPacketListener.LOW_ALCH_SPELL_ID;
+      case "high level alchemy":
+        return MagicOnItemPacketListener.HIGH_ALCH_SPELL_ID;
+      case "telekinetic grab":
+        return MagicOnItemPacketListener.TELEKINETIC_GRAB_SPELL_ID;
+      default:
+        return -1;
+    }
+  }
 
   private hasInfiniteAirRune(player: any): boolean {
     const weapon = player?.getEquipment?.()?.getWeapon?.();
@@ -230,30 +241,21 @@ export class MagicOnItemPacketListener {
     return null;
   }
 
-  public execute(player: any, packet: Packet) {
-    switch (packet.getOpcode()) {
-      case PacketConstants.MAGIC_ON_ITEM_OPCODE:
-        let slot = packet.readShort();
-        let itemId = packet.readShortA();
-        let childId = packet.readShort();
-        let spellId = packet.readShortA();
-        if (!player.getClickDelay().elapsedTime(1300)) return;
-        if (slot < 0 || slot >= player.getInventory().capacity()) return;
-        if (player.getInventory().getItems()[slot].getId() != itemId) return;
-
-        if (!this.isAlchSpell(spellId)) {
-          return;
-        }
-
-        let item = player.getInventory().getItems()[slot];
-        this.castAlchemy(player, spellId, item, itemId);
-        break;
-      case PacketConstants.MAGIC_ON_GROUND_ITEM_OPCODE:
-        const y = packet.readLEShort();
-        const groundItemId = packet.readShort();
-        const x = packet.readLEShort();
-        this.castGroundItem(player, groundItemId, x, y, packet.readShortA());
-        break;
+  public castOnItem(player: any, spellId: number, itemId: number, slot: number): boolean {
+    if (
+      !player ||
+      slot < 0 ||
+      slot >= player.getInventory().capacity() ||
+      !this.isAlchSpell(spellId)
+    ) {
+      return false;
     }
+    const item = player.getInventory().getItems()[slot];
+    if (!item || item.getId() !== itemId) {
+      return false;
+    }
+    this.castAlchemy(player, spellId, item, itemId);
+    return true;
   }
+
 }

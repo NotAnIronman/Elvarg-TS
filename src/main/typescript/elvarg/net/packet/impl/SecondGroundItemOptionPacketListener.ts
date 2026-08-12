@@ -1,17 +1,8 @@
 import { ItemOnGroundManager } from "../../../game/entity/impl/grounditem/ItemOnGroundManager";
 import { Location } from "../../../game/model/Location";
 import { PluginManager } from "../../../plugins/PluginManager";
-import { Packet } from "../Packet";
-import { PacketExecutor } from "../PacketExecutor";
 
-export class SecondGroundItemOptionPacketListener implements PacketExecutor {
-  execute(player: any, packet: Packet) {
-    const y = packet.readLEShort();
-    const itemId = packet.readShort();
-    const x = packet.readLEShort();
-    SecondGroundItemOptionPacketListener.interact(player, itemId, x, y, 2);
-  }
-
+export class SecondGroundItemOptionPacketListener {
   public static interact(player: any, itemId: number, x: number, y: number, clickType: number): void {
     if (!player || player.getHitpoints() <= 0) {
       return;

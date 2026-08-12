@@ -75,9 +75,12 @@ import {
 // import { EffectTimer } from "../../game/model/EffectTimer";
 // import { DonatorRights } from "../../game/model/rights/DonatorRights";
 
+const CHATBOX_MODAL_TARGET_UID = (162 << 16) | 567;
+
 export class PacketSender {
   private groundItemSerial = 0;
-  private subInterfaceTargets = new Map<number, number>();
+  private subInterfaceTargets = new Map<number, { targetUid: number; type: number }>();
+  private chatboxGroupId = -1;
   // private player: Player;
   // constructor(player: Player) {
   //     this.player = player;
@@ -560,7 +563,17 @@ export class PacketSender {
   }
 
   public sendChatboxInterface(id: number): PacketSender {
-    if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 9, id))) return this;
+    // 161:96 is the whole chatbox panel (519x165) and is permanently occupied
+    // by group 162 itself via the gameframe bootstrap - targeting it directly
+    // replaces the entire chat frame (tabs, scrollback, report button), not
+    // just the content area. Modal chatbox content (dialogues, this
+    // smelting/crafting interface, etc.) actually mounts one level deeper,
+    // into group 162's own child 567 (479x96, the "CHATMODAL" container that
+    // chat_onsubchange/script 113 resizes to fit dialogs) - confirmed by
+    // decoding group 162 directly from the cache. Child 9 of 161 is an
+    // unrelated 0x0 icon-cluster anchor nested under the sidebar tree.
+    this.chatboxGroupId = id;
+    if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub(CHATBOX_MODAL_TARGET_UID, id))) return this;
     let out = new PacketBuilder(164);
     out.putShorts(id, ByteOrder.LITTLE);
     this.player.getSession().write(out);
@@ -628,35 +641,6 @@ export class PacketSender {
     this.player.getSession().write(out);
     return this;
   }
-
-  // public sendInterfaceRemoval(): PacketSender {
-  //     if (this.player.getStatus() === PlayerStatus.BANKING) {
-  //         if (this.player.isSearchingBank()) {
-  //             Bank.exitSearch(this.player, false);
-  //         }
-  //     } else if (this.player.getStatus() === PlayerStatus.PRICE_CHECKING) {
-  //         this.player.getPriceChecker().withdrawAll();
-  //     } else if (this.player.getStatus() === PlayerStatus.TRADING) {
-  //         this.player.getTrading().closeTrade();
-  //     } else if (this.player.getStatus() === PlayerStatus.DUELING) {
-  //         if (!this.player.getDueling().inDuel()) {
-  //             this.player.getDueling().closeDuel();
-  //         }
-  //     }
-
-  //     this.player.setStatus(PlayerStatus.NONE);
-  //     this.player.setEnteredAmountAction(null);
-  //     this.player.setEnteredSyntaxAction(null);
-  //     this.player.getDialogueManager().reset();
-  //     this.player.setShop(null);
-  //     this.player.setDestroyItem(-1);
-  //     this.player.setInterfaceId(-1);
-  //     this.player.setSearchingBank(false);
-  //     this.player.setTeleportInterfaceOpen(false);
-  //     this.player.getAppearance().setCanChangeAppearance(false);
-  //     this.player.getSession().write(new PacketBuilder(219, PacketType.FIXED));
-  //     return this;
-  // }
 
   public sendInterfaceScrollReset(interfaceId: number): PacketSender {
     let out = new PacketBuilder(9);
@@ -1230,10 +1214,10 @@ export class PacketSender {
     return this;
   }
 
-  sendInterfaceRemoval(): this {
+  private resetInterfaceState(): number {
     const interfaceId = this.player.getInterfaceId?.() ?? -1;
     if (interfaceId === 12) {
-      this.sendConfig(548, 0);
+      this.sendConfig(548, 0).sendVarbit(12393, 0);
     }
     const { ShopManager } = require(
       "../../game/model/container/shop/ShopManager"
@@ -1252,11 +1236,59 @@ export class PacketSender {
     this.player.setSearchingBank?.(false);
     this.player.setTeleportInterfaceOpen?.(false);
     this.player.getAppearance?.()?.setCanChangeAppearance?.(false);
-    if (this.subInterfaceTargets.size > 0) {
-      for (const target of new Set(this.subInterfaceTargets.values())) {
-        this.player.getSession().sendClientPacket(encodeWidgetCloseSub(target));
-      }
-      this.subInterfaceTargets.clear();
+    return interfaceId;
+  }
+
+  private closeTrackedInterfaces(): boolean {
+    const closable = [...this.subInterfaceTargets.entries()]
+      .filter(([, entry]) => entry.type === 0 || entry.type === 3);
+    const targets = new Set(closable.map(([, entry]) => entry.targetUid));
+    if (this.chatboxGroupId >= 0) {
+      targets.add(CHATBOX_MODAL_TARGET_UID);
+      this.chatboxGroupId = -1;
+    }
+    if (targets.size === 0) return false;
+    for (const target of targets) this.player.getSession().sendClientPacket(encodeWidgetCloseSub(target));
+    for (const [groupId] of closable) this.subInterfaceTargets.delete(groupId);
+    return true;
+  }
+
+  public isChatboxInterface(groupId: number): boolean {
+    return groupId === this.chatboxGroupId;
+  }
+
+  public hasInterruptibleInterface(): boolean {
+    return this.chatboxGroupId >= 0 || [...this.subInterfaceTargets.values()]
+      .some((entry) => entry.type === 0 || entry.type === 3);
+  }
+
+  closeInterruptibleInterfaces(): this {
+    const interfaceId = this.resetInterfaceState();
+    if (this.closeTrackedInterfaces()) return this;
+    if (interfaceId >= 0) this.player.getSession().sendClientPacket(encodeWidgetClose(interfaceId));
+    return this;
+  }
+
+  closeInterface(groupId: number): this {
+    if (!Number.isInteger(groupId) || groupId < 0) return this;
+    if (groupId === this.player.getInterfaceId?.()) return this.sendInterfaceRemoval();
+    if (groupId === this.chatboxGroupId) {
+      this.chatboxGroupId = -1;
+      this.player.getDialogueManager?.()?.reset?.();
+      this.player.getSession().sendClientPacket(encodeWidgetCloseSub(CHATBOX_MODAL_TARGET_UID));
+      return this;
+    }
+    const target = this.subInterfaceTargets.get(groupId);
+    if (target) {
+      this.subInterfaceTargets.delete(groupId);
+      this.player.getSession().sendClientPacket(encodeWidgetCloseSub(target.targetUid));
+    }
+    return this;
+  }
+
+  sendInterfaceRemoval(): this {
+    const interfaceId = this.resetInterfaceState();
+    if (this.closeTrackedInterfaces()) {
       if (interfaceId === 300 || interfaceId === 334 || interfaceId === 335) {
         this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 79, 149, 1));
       }
@@ -1686,7 +1718,7 @@ export class PacketSender {
     type = 1,
     options: Parameters<typeof encodeWidgetOpenSub>[3] = {}
   ): this {
-    this.subInterfaceTargets.set(groupId, targetUid);
+    this.subInterfaceTargets.set(groupId, { targetUid, type });
     this.player.getSession().sendClientPacket(encodeWidgetOpenSub(targetUid, groupId, type, options));
     return this;
   }
@@ -1713,8 +1745,8 @@ export class PacketSender {
   }
 
   closeSubInterface(targetUid: number): this {
-    for (const [groupId, target] of this.subInterfaceTargets) {
-      if (target === targetUid) this.subInterfaceTargets.delete(groupId);
+    for (const [groupId, entry] of this.subInterfaceTargets) {
+      if (entry.targetUid === targetUid) this.subInterfaceTargets.delete(groupId);
     }
     this.player.getSession().sendClientPacket(encodeWidgetCloseSub(targetUid));
     return this;

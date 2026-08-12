@@ -1,13 +1,8 @@
-import { Packet } from "../Packet";
-import { PacketExecutor } from "../PacketExecutor";
 import { World } from "../../../game/World";
 import { TaskManager } from "../../../game/task/TaskManager";
+import { PluginManager } from "../../../plugins/PluginManager";
 
-export class FollowPlayerPacketListener implements PacketExecutor {
-  execute(player: any, packet: Packet): void {
-    FollowPlayerPacketListener.request(player, packet.readLEShort());
-  }
-
+export class FollowPlayerPacketListener {
   public static request(player: any, otherPlayersIndex: number): void {
     if (player.busy()) {
       return;
@@ -29,6 +24,7 @@ export class FollowPlayerPacketListener implements PacketExecutor {
     }
 
     FollowPlayerPacketListener.follow(player, leader);
+    PluginManager.emitPlayerFollow({ player, leader });
   }
 
   public static follow(player: any, leader: any) {

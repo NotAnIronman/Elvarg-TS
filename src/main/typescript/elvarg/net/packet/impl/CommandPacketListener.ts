@@ -2,18 +2,12 @@
 // import { Command } from "../../../game/model/commands/Command";
 // import { CommandManager } from "../../../game/model/commands/CommandManager";
 import { PluginManager } from "../../../plugins/PluginManager";
-import { Packet } from "../Packet";
-import { PacketExecutor } from "../PacketExecutor";
 
-export class CommandPacketListener implements PacketExecutor {
-  public static readonly OP_CODE = 103;
-
-  // execute(player: Player, packet: Packet) {
-  execute(player: any, packet: Packet) {
+export class CommandPacketListener {
+  public static execute(player: any, rawCommand: string): void {
     if (player.getHitpoints() <= 0) {
       return;
     }
-    const rawCommand = packet.readString();
     const sanitizedCommand = rawCommand.replace(/\u0000/g, " ").trim();
     if (!sanitizedCommand.length) {
       return;

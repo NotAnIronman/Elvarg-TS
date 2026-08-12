@@ -1,6 +1,3 @@
-import { PacketExecutor } from "../PacketExecutor";
-import { Packet } from "../Packet";
-
 const getBankCtor = () =>
   require("../../../game/model/container/impl/Bank")
     .Bank as typeof import("../../../game/model/container/impl/Bank").Bank;
@@ -11,16 +8,7 @@ const getEquipmentCtor = () =>
   require("../../../game/model/container/impl/Equipment")
     .Equipment as typeof import("../../../game/model/container/impl/Equipment").Equipment;
 
-export class SwitchItemSlotPacketListener implements PacketExecutor {
-  execute(player: any, packet: Packet) {
-    if (player.getHitpoints() <= 0) return;
-    const interfaceId = packet.readInt();
-    packet.readByteC();
-    const fromSlot = packet.readLEShortA();
-    const toSlot = packet.readLEShort();
-    SwitchItemSlotPacketListener.move(player, interfaceId, fromSlot, toSlot);
-  }
-
+export class SwitchItemSlotPacketListener {
   public static move(player: any, interfaceId: number, fromSlot: number, toSlot: number): void {
     if (player == null || player.getHitpoints() <= 0) {
       return;

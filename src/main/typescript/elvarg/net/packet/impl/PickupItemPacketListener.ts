@@ -1,19 +1,10 @@
-import { Packet } from "../Packet";
-import { PacketExecutor } from "../PacketExecutor";
 import { ItemDefinition } from "../../../game/definition/ItemDefinition";
 import { ItemOnGroundManager, OperationType } from "../../../game/entity/impl/grounditem/ItemOnGroundManager";
 import { Location } from "../../../game/model/Location";
 import { Sounds } from "../../../game/Sounds";
 import { Sound } from "../../../game/Sound";
 
-export class PickupItemPacketListener implements PacketExecutor {
-  execute(player: any, packet: Packet) {
-    const y = packet.readLEShort();
-    const itemId = packet.readShort();
-    const x = packet.readLEShort();
-    PickupItemPacketListener.pickup(player, itemId, x, y);
-  }
-
+export class PickupItemPacketListener {
   public static pickup(player: any, itemId: number, x: number, y: number): void {
     const position = new Location(x, y, player.getLocation().getZ());
 

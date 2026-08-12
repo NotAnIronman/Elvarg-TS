@@ -93,6 +93,7 @@ export type PlayerSyncState = {
   regions: Int32Array;
   lastTiles: Map<number, Tile>;
   movementTypes: Map<number, 1 | 2>;
+  interactionIndices: Map<number, number>;
 };
 
 export type NpcView = Tile & ActorUpdateView & {
@@ -152,16 +153,19 @@ export type ClientMessage =
   | { type: "npc_option"; index: number; clickType: number }
   | { type: "object_option"; id: number; x: number; y: number; clickType?: number; action?: string }
   | { type: "chat"; text: string; messageType: "public" | "game" }
-  | { type: "widget_action"; widgetId: number; groupId: number; childId: number; buttonNum: number; option?: string; target?: string; slot?: number; itemId?: number; subOpId?: number; simple?: boolean }
+  | { type: "widget_action"; widgetId: number; groupId: number; childId: number; buttonNum?: number; opId?: number; option?: string; target?: string; slot?: number; itemId?: number; subOpId?: number; simple?: boolean }
   | { type: "widget"; action: "open" | "close"; groupId: number; modal?: boolean }
   | { type: "widget_target"; targetWidgetId: number; targetSlot: number; targetItemId: number; sourceWidgetId: number; sourceSlot: number; sourceItemId: number }
   | { type: "widget_drag"; targetItemId: number; targetWidgetId: number; sourceItemId: number; sourceSlot: number; sourceWidgetId: number; targetSlot: number }
   | { type: "interface_close" }
-  | { type: "local_trigger"; widgetId: number; childIndex: number; itemId: number; opcodeParam: number }
+  | { type: "local_trigger"; widgetId: number; childIndex: number; itemId: number; opcodeParam: number; argsData: Buffer }
   | { type: "player_option"; index: number; option: number }
   | { type: "item_on_player"; targetIndex: number; itemId: number; slot: number; widgetId: number }
+  | { type: "item_on_npc"; targetIndex: number; itemId: number; slot: number; widgetId: number }
+  | { type: "item_on_object"; objectId: number; x: number; y: number; itemId: number; slot: number; widgetId: number }
   | { type: "spell_on_player"; targetIndex: number; spellWidget: number; spellChild: number; spellItemId: number }
   | { type: "spell_on_npc"; targetIndex: number; spellWidget: number; spellChild: number; spellItemId: number }
+  | { type: "spell_on_object"; objectId: number; x: number; y: number; spellWidget: number; spellChild: number; spellItemId: number }
   | { type: "inventory_action"; slot: number; itemId: number; widgetId: number; option?: string; optionIndex?: number }
   | { type: "inventory_use_on"; slot: number; itemId: number; target: { kind: "npc" | "loc" | "ground" | "player"; id: number; x?: number; y?: number; level?: number } | { kind: "inventory"; slot: number; itemId: number } }
   | { type: "inventory_move"; from: number; to: number; widgetId?: number }
@@ -182,6 +186,7 @@ export type ClientMessage =
   | { type: "dialogue_continue"; widgetId: number; childIndex: number }
   | { type: "dialogue_amount"; amount: number }
   | { type: "dialogue_input"; value: string }
+  | { type: "item_spawner_search"; query: string }
   | { type: "varp_transmit"; varpId: number; value: number }
   | { type: "raw"; opcode: number; payload: Buffer }
   | { type: "face"; rotation?: number; x?: number; y?: number }
@@ -272,6 +277,15 @@ class Reader {
     return value;
   }
 
+  public bytes(length: number): Buffer {
+    if (!Number.isInteger(length) || length < 0 || this.offset + length > this.data.length) {
+      throw new Error("Unexpected end of packet");
+    }
+    const value = this.data.subarray(this.offset, this.offset + length);
+    this.offset += length;
+    return value;
+  }
+
   public get remaining(): number {
     return this.data.length - this.offset;
   }
@@ -330,14 +344,26 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
         sourceWidgetId: reader.intLE(), sourceSlot: reader.shortLE(),
         sourceItemId: reader.signedShort(), targetItemId: reader.shortAddLE(),
       };
-    case NativeClientPacket.IF_TRIGGEROPLOCAL:
-      reader.short();
+    case NativeClientPacket.IF_TRIGGEROPLOCAL: {
+      const blockLength = reader.short();
+      if (blockLength < 12 || blockLength !== reader.remaining) {
+        throw new Error("Invalid IF_TRIGGEROPLOCAL payload length");
+      }
+      const opcodeParam = reader.intLE();
+      const childRaw = reader.shortLE();
+      const widgetId = reader.intLE();
+      const itemRaw = reader.shortLE();
       return {
-        type: "local_trigger", opcodeParam: reader.intLE(), childIndex: reader.shortLE(),
-        widgetId: reader.intLE(), itemId: reader.shortLE(),
+        type: "local_trigger", opcodeParam,
+        childIndex: childRaw > 0x7fff ? childRaw - 0x10000 : childRaw,
+        widgetId, itemId: itemRaw > 0x7fff ? itemRaw - 0x10000 : itemRaw,
+        argsData: reader.bytes(blockLength - 12),
       };
+    }
     case NativeClientPacket.IF_CLOSE:
       return { type: "interface_close" };
+    case NativeClientPacket.RESUME_PAUSEBUTTON:
+      return { type: "dialogue_continue", childIndex: reader.shortAddLE(), widgetId: reader.int() };
     case NativeClientPacket.EXAMINE_NPC:
       return { type: "examine_npc", id: reader.shortAdd() };
     case NativeClientPacket.EXAMINE_LOC:
@@ -408,6 +434,34 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
       const spellItemId = reader.shortAdd();
       reader.byteAdd();
       return { type: "spell_on_npc", targetIndex, spellWidget, spellChild, spellItemId };
+    }
+    case NativeClientPacket.OPNPC_U: {
+      const slot = reader.shortAddLE();
+      reader.byte();
+      const widgetId = reader.intME();
+      const itemId = reader.shortLE();
+      const targetIndex = reader.shortAddLE();
+      return { type: "item_on_npc", targetIndex, itemId, slot, widgetId };
+    }
+    case NativeClientPacket.OPLOCU: {
+      const slot = reader.shortAddLE();
+      const objectId = reader.shortAdd();
+      const widgetId = reader.intLE();
+      reader.byteSub();
+      const x = reader.shortLE();
+      const y = reader.short();
+      const itemId = reader.shortAddLE();
+      return { type: "item_on_object", objectId, x, y, itemId, slot, widgetId };
+    }
+    case NativeClientPacket.OPLOC_T: {
+      const y = reader.shortAddLE();
+      const objectId = reader.shortAdd();
+      const spellChild = reader.shortAdd();
+      const spellWidget = reader.intLE();
+      const x = reader.short();
+      const spellItemId = reader.shortLE();
+      reader.byteNeg();
+      return { type: "spell_on_object", objectId, x, y, spellWidget, spellChild, spellItemId };
     }
     case NativeClientPacket.OPOBJ1:
       reader.byteSub();
@@ -626,13 +680,13 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
       const childId = reader.short();
       const option = reader.string() || undefined;
       const target = reader.string() || undefined;
-      const opId = reader.byte();
-      const buttonNum = reader.byte() || opId;
+      const opId = reader.byte() || undefined;
+      const buttonNum = reader.byte() || undefined;
       reader.short();
       reader.short();
       reader.byte();
       const slot = reader.signedShort(), itemId = reader.signedShort();
-      return { type: "widget_action", widgetId, groupId, childId, buttonNum, option, target, slot: slot >= 0 ? slot : undefined, itemId: itemId >= 0 ? itemId : undefined };
+      return { type: "widget_action", widgetId, groupId, childId, opId, buttonNum, option, target, slot: slot >= 0 ? slot : undefined, itemId: itemId >= 0 ? itemId : undefined };
     }
     case HighClientPacket.IF_BUTTOND:
       return {
@@ -648,7 +702,9 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
       const slot = reader.short(), quantity = reader.int(), itemId = reader.signedShort();
       return { type: "trade_action", action, slot, quantity, itemId: itemId >= 0 ? itemId : undefined };
     }
-    case 252:
+    case HighClientPacket.ITEM_SPAWNER_SEARCH:
+      return { type: "item_spawner_search", query: reader.string() };
+    case HighClientPacket.RESUME_PAUSEBUTTON:
       return { type: "dialogue_continue", widgetId: reader.int(), childIndex: reader.short() };
     case 192:
       return { type: "dialogue_amount", amount: reader.int() };
@@ -1367,6 +1423,7 @@ export function createPlayerSyncState(
     regions: new Int32Array(2048),
     lastTiles: new Map([[localIndex, { ...tile }]]),
     movementTypes: new Map([[localIndex, 1]]),
+    interactionIndices: new Map(),
   };
 }
 
@@ -1549,14 +1606,15 @@ function writeHits(bytes: number[], view: ActorUpdateView, npc: boolean): void {
 function playerUpdateMask(
   view: PlayerView,
   writeMovementType: boolean,
-  writeAppearance: boolean
+  writeAppearance: boolean,
+  writeInteraction: boolean
 ): number {
   return (view.forcedChat !== undefined ? PLAYER_MASK.FORCED_CHAT : 0) |
     (view.faceDirection !== undefined ? PLAYER_MASK.FACE_DIR : 0) |
     (writeAppearance ? PLAYER_MASK.APPEARANCE : 0) |
     (view.animation ? PLAYER_MASK.ANIMATION : 0) |
     (view.hits ? PLAYER_MASK.HIT : 0) |
-    (view.interactionIndex !== undefined ? PLAYER_MASK.FACE_ENTITY : 0) |
+    (writeInteraction ? PLAYER_MASK.FACE_ENTITY : 0) |
     (view.forcedMovement ? PLAYER_MASK.FORCE_MOVEMENT : 0) |
     (writeMovementType ? PLAYER_MASK.MOVEMENT_TYPE : 0) |
     (view.graphic ? PLAYER_MASK.SPOT_ANIM : 0);
@@ -1574,15 +1632,16 @@ function writePlayerUpdateBlock(
   view: PlayerView,
   writeMovementType: boolean,
   movementType: 1 | 2 | undefined,
-  writeAppearance: boolean
+  writeAppearance: boolean,
+  writeInteraction: boolean
 ): Buffer {
   const bytes: number[] = [];
-  const mask = playerUpdateMask(view, writeMovementType, writeAppearance);
+  const mask = playerUpdateMask(view, writeMovementType, writeAppearance, writeInteraction);
   writeMask(bytes, mask);
   if (view.forcedChat !== undefined) writeText(bytes, view.forcedChat);
   if (view.faceDirection !== undefined) shortLE(bytes, view.faceDirection & 2047);
-  if (view.interactionIndex !== undefined) {
-    const target = view.interactionIndex < 0 ? 0xffffff : view.interactionIndex & 0xffffff;
+  if (writeInteraction) {
+    const target = (view.interactionIndex ?? -1) < 0 ? 0xffffff : view.interactionIndex! & 0xffffff;
     shortBE(bytes, target & 0xffff);
     bytes.push((target >>> 16) & 0xff);
   }
@@ -1677,12 +1736,20 @@ export function encodePlayerSync(
       : undefined;
     return { changed: dx !== 0 || dy !== 0 || planeDelta !== 0, dx, dy, planeDelta, movementType };
   };
+  const wantsInteractionWrite = (index: number, view: PlayerView): boolean =>
+    state.interactionIndices.get(index) !== (view.interactionIndex ?? -1);
+
   const needsBlock = (index: number): boolean => {
     const view = viewByIndex.get(index);
     if (!view) return false;
     const nextType = movement(index).movementType;
     const writeMovementType = nextType !== undefined && state.movementTypes.get(index) !== nextType;
-    return playerUpdateMask(view, writeMovementType, view.appearanceDirty === true) !== 0;
+    return playerUpdateMask(
+      view,
+      writeMovementType,
+      view.appearanceDirty === true,
+      wantsInteractionWrite(index, view)
+    ) !== 0;
   };
   const shouldUpdatePlayer = (index: number): boolean =>
     !viewByIndex.has(index) || movement(index).changed || needsBlock(index);
@@ -1693,7 +1760,10 @@ export function encodePlayerSync(
     const nextType = movement(index).movementType;
     const writeMovementType = nextType !== undefined && state.movementTypes.get(index) !== nextType;
     const writeAppearance = forceAppearance || view.appearanceDirty === true;
-    updateBlocks.push(writePlayerUpdateBlock(view, writeMovementType, nextType, writeAppearance));
+    const writeInteraction = wantsInteractionWrite(index, view);
+    updateBlocks.push(
+      writePlayerUpdateBlock(view, writeMovementType, nextType, writeAppearance, writeInteraction)
+    );
   };
 
   const writePlayerUpdate = (index: number): void => {
@@ -1805,11 +1875,13 @@ export function encodePlayerSync(
   state.empty = [];
   for (let index = 1; index < 2048; index++) if (!activeNow.has(index)) state.empty.push(index);
   for (const [index] of state.lastTiles) if (!activeNow.has(index)) state.lastTiles.delete(index);
+  for (const [index] of state.interactionIndices) if (!activeNow.has(index)) state.interactionIndices.delete(index);
   for (const view of viewByIndex.values()) {
     const nextType = movement(view.index).movementType;
     const tile = view.forcedMovementEnd ?? view;
     state.lastTiles.set(view.index, { x: tile.x, y: tile.y, level: tile.level });
     if (nextType !== undefined) state.movementTypes.set(view.index, nextType);
+    state.interactionIndices.set(view.index, view.interactionIndex ?? -1);
   }
 
   const sync = Buffer.concat([writer.toBuffer(), ...updateBlocks]);

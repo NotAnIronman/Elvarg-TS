@@ -1,5 +1,3 @@
-import { PacketExecutor } from "../PacketExecutor";
-import { Packet } from "../Packet";
 import { Item } from "../../../game/model/Item";
 import { Sound } from "../../../game/Sound";
 import { Inventory } from "../../../game/model/container/impl/Inventory";
@@ -10,7 +8,7 @@ import { Wilderness } from "../../../game/content/wilderness/Wilderness";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { PluginItemDropEvent } from "../../../plugins/PluginTypes";
 
-export class DropItemPacketListener implements PacketExecutor {
+export class DropItemPacketListener {
   public static destroyItemInterface(player: any, item: any) {
     player.setDestroyItem(item.getId());
     let info: { [key: string]: string }[] = [
@@ -26,12 +24,6 @@ export class DropItemPacketListener implements PacketExecutor {
     for (let i = 0; i < info.length; i++)
       player.getPacketSender().sendString(info[i][0], parseInt(info[i][1]));
     player.getPacketSender().sendChatboxInterface(14170);
-  }
-
-  public execute(player: any, packet: Packet) {
-    DropItemPacketListener.drop(
-      player, packet.readUnsignedShortA(), packet.readUnsignedShort(), packet.readUnsignedShortA()
-    );
   }
 
   public static drop(player: any, id: number, interfaceId: number, itemSlot: number): void {

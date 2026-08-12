@@ -1,11 +1,6 @@
-// import { Player } from '../../../game/entity/impl/player/Player';
-// import { Appearance } from '../../../game/model/Appearance';
-// import { Flag } from '../../../game/model/Flag';
-import { Packet } from "../Packet";
-import { PacketExecutor } from "../PacketExecutor";
 import { Appearance } from "../../../game/model/Appearance";
 
-export class ChangeAppearancePacketListener implements PacketExecutor {
+export class ChangeAppearancePacketListener {
   private static readonly ALLOWED_COLORS: number[][] = [
     [0, 11], // hair color
     [0, 15], // torso color
@@ -32,25 +27,27 @@ export class ChangeAppearancePacketListener implements PacketExecutor {
     [42, 43], // feet
   ];
 
-  // public execute(player: Player, packet: Packet) {
-  public execute(player: any, packet: Packet) {
-    const gender = packet.readByte();
-    const kits = Array.from({ length: 7 }, () => packet.readByte());
-    const colors = Array.from({ length: 5 }, () => packet.readByte());
-    ChangeAppearancePacketListener.apply(player, gender, kits, colors);
-  }
-
   public static apply(player: any, gender: number, kits: number[], colors: number[]): void {
     if (!player?.getAppearance?.().getCanChangeAppearance() || player.getInterfaceId() <= 0) return;
     if ((gender !== 0 && gender !== 1) || kits.length !== 7 || colors.length !== 5) return;
+    const kitRanges = gender === 0 ? ChangeAppearancePacketListener.MALE_VALUES : ChangeAppearancePacketListener.FEMALE_VALUES;
+    const clampedKits = kits.map((value, i) => {
+      if (value === 255) return -1; // 255 = no kit for this slot (e.g. no beard), always legal.
+      const [min, max] = kitRanges[i];
+      return value < min || value > max ? min : value;
+    });
+    const clampedColors = colors.map((value, i) => {
+      const [min, max] = ChangeAppearancePacketListener.ALLOWED_COLORS[i];
+      return value < min || value > max ? min : value;
+    });
     const look = [...player.getAppearance().getLook()];
     look[Appearance.GENDER] = gender;
     [Appearance.HEAD, Appearance.BEARD, Appearance.CHEST, Appearance.ARMS,
       Appearance.HANDS, Appearance.LEGS, Appearance.FEET]
-      .forEach((index, i) => look[index] = kits[i] === 255 ? -1 : kits[i]);
+      .forEach((index, i) => look[index] = clampedKits[i]);
     [Appearance.HAIR_COLOUR, Appearance.TORSO_COLOUR, Appearance.LEG_COLOUR,
       Appearance.FEET_COLOUR, Appearance.SKIN_COLOUR]
-      .forEach((index, i) => look[index] = colors[i]);
+      .forEach((index, i) => look[index] = clampedColors[i]);
     player.getAppearance().setLookArray(look);
     player.getPacketSender().sendInterfaceRemoval();
     player.getAppearance().setCanChangeAppearance(false);

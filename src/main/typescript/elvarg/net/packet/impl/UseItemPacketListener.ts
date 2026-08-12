@@ -2,11 +2,8 @@ import { MapObjects } from "../../../game/entity/impl/object/MapObjects";
 import { World } from "../../../game/World";
 import { Location } from "../../../game/model/Location";
 import { PluginManager } from "../../../plugins/PluginManager";
-import { Packet } from "../Packet";
-import { PacketConstants } from "../PacketConstants";
-import { PacketExecutor } from "../PacketExecutor";
 
-export class UseItemPacketListener implements PacketExecutor {
+export class UseItemPacketListener {
   public static itemOnItem(player: any, usedItemSlot: number, usedWithSlot: number): void {
     if (
       usedWithSlot < 0 ||
@@ -35,14 +32,15 @@ export class UseItemPacketListener implements PacketExecutor {
     });
   }
 
-  private static itemOnObject(player: any, packet: Packet): void {
-    const interfaceType = packet.readShort();
-    const objectId = packet.readShort();
-    const objectY = packet.readLEShortA();
-    const itemSlot = packet.readLEShort();
-    const objectX = packet.readLEShortA();
-    const itemId = packet.readShort();
-
+  public static itemOnObject(
+    player: any,
+    interfaceType: number,
+    objectId: number,
+    itemId: number,
+    itemSlot: number,
+    objectX: number,
+    objectY: number
+  ): void {
     if (itemSlot < 0 || itemSlot >= player.getInventory().capacity()) {
       return;
     }
@@ -139,37 +137,67 @@ export class UseItemPacketListener implements PacketExecutor {
     });
   }
 
-  public execute(player: any, packet: Packet) {
-    if (!player || player.getHitpoints?.() <= 0) {
+  public static itemOnNpc(player: any, interfaceId: number, targetIndex: number, itemId: number, slot: number): void {
+    if (slot < 0 || slot >= player.getInventory().capacity()) {
       return;
     }
-
-    switch (packet.getOpcode()) {
-      case PacketConstants.ITEM_ON_ITEM: {
-        const usedWithSlot = packet.readUnsignedShort();
-        const usedItemSlot = packet.readUnsignedShortA();
-        UseItemPacketListener.itemOnItem(player, usedItemSlot, usedWithSlot);
-        break;
-      }
-      case PacketConstants.ITEM_ON_OBJECT:
-        UseItemPacketListener.itemOnObject(player, packet);
-        break;
-      case PacketConstants.ITEM_ON_GROUND_ITEM:
-        packet.readLEShort();
-        const inventoryItemId = packet.readShortA();
-        const groundItemId = packet.readShort();
-        const y = packet.readShortA();
-        const inventorySlot = packet.readLEShortA();
-        UseItemPacketListener.itemOnGroundItem(player, inventoryItemId, groundItemId, packet.readShort(), y, inventorySlot);
-        break;
-      case PacketConstants.ITEM_ON_PLAYER:
-        UseItemPacketListener.itemOnPlayer(
-          player, packet.readUnsignedShortA(), packet.readUnsignedShort(),
-          packet.readUnsignedShort(), packet.readLEShort()
-        );
-        break;
-      default:
-        break;
+    const target = World.getNpcs().get(targetIndex);
+    const item = player.getInventory().getItems()[slot];
+    if (!target || !item || item.getId() !== itemId) {
+      return;
     }
+    player.getMovementQueue().walkToEntity(target, () => {
+      player.setPositionToFace(target.getLocation());
+      PluginManager.emitItemOnNpc({
+        player,
+        target,
+        targetIndex,
+        interfaceId,
+        item,
+        itemId,
+        slot,
+        handled: false,
+      });
+    });
   }
+
+  public static spellOnObject(
+    player: any,
+    objectId: number,
+    x: number,
+    y: number,
+    spellWidget: number,
+    spellChild: number,
+    spellItemId: number,
+    spellId: number,
+  ): void {
+    const location = new Location(x, y, player.getLocation().getZ());
+    const object = MapObjects.getPrivateArea(player, objectId, location);
+    if (!object) {
+      return;
+    }
+    player.getMovementQueue().walkToObject(object, {
+      execute: () => {
+        player.getMovementQueue().reset();
+        player.getMovementQueue().walkToReset();
+        player.setPositionToFace(object.getLocation());
+        PluginManager.emitSpellOnObject({
+          player,
+          object,
+          objectId,
+          spellWidget,
+          spellChild,
+          spellItemId,
+          spellId,
+          location: {
+            x: object.getLocation().getX(),
+            y: object.getLocation().getY(),
+            z: object.getLocation().getZ(),
+          },
+          handled: false,
+        });
+      },
+    });
+  }
+
 }

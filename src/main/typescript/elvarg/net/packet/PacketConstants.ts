@@ -1,39 +1,3 @@
-import { PacketExecutor } from "./PacketExecutor";
-import { SpecialAttackPacketListener } from "../packet/impl/SpecialAttackPacketListener";
-import { ButtonClickPacketListener } from "../packet/impl/ButtonClickPacketListener";
-import { InterfaceActionClickOpcode } from "../packet/impl/InterfaceActionClickOpcode";
-import { ChatPacketListener } from "../packet/impl/ChatPacketListener";
-import { DropItemPacketListener } from "../packet/impl/DropItemPacketListener";
-import { FinalizedMapRegionChangePacketListener } from "../packet/impl/FinalizedMapRegionChangePacketListener";
-import { RegionChangePacketListener } from "../packet/impl/RegionChangePacketListener";
-import { CloseInterfacePacketListener } from "../packet/impl/CloseInterfacePacketListener";
-import { ExamineItemPacketListener } from "../packet/impl/ExamineItemPacketListener";
-import { ExamineNpcPacketListener } from "../packet/impl/ExamineNpcPacketListener";
-import { ChangeAppearancePacketListener } from "../packet/impl/ChangeAppearancePacketListener";
-import { EnterInputPacketListener } from "../packet/impl/EnterInputPacketListener";
-import { EquipPacketListener } from "../packet/impl/EquipPacketListener";
-import { DialoguePacketListener } from "../packet/impl/DialoguePacketListener";
-import { PlayerInactivePacketListener } from "../packet/impl/PlayerInactivePacketListener";
-import { ChatSettingsPacketListener } from "../packet/impl/ChatSettingsPacketListener";
-import { CommandPacketListener } from "../packet/impl/CommandPacketListener";
-import { PickupItemPacketListener } from "../packet/impl/PickupItemPacketListener";
-import { SecondGroundItemOptionPacketListener } from "../packet/impl/SecondGroundItemOptionPacketListener";
-import { SwitchItemSlotPacketListener } from "../packet/impl/SwitchItemSlotPacketListener";
-import { FollowPlayerPacketListener } from "../packet/impl/FollowPlayerPacketListener";
-import { MagicOnPlayerPacketListener } from "../packet/impl/MagicOnPlayerPacketListener";
-import { MagicOnItemPacketListener } from "../packet/impl/MagicOnItemPacketListener";
-import { BankTabCreationPacketListener } from "../packet/impl/BankTabCreationPacketListener";
-import { SpawnItemPacketListener } from "../packet/impl/SpawnItemPacketListener";
-import { PlayerOptionPacketListener } from "../packet/impl/PlayerOptionPacketListener";
-import { ObjectActionPacketListener } from "../../net/packet/impl/ObjectActionPacketListener";
-import { NPCOptionPacketListener } from "../../net/packet/impl/NPCOptionPacketListener";
-import { ItemActionPacketListener } from "../../net/packet/impl/ItemActionPacketListener";
-import { UseItemPacketListener } from "../../net/packet/impl/UseItemPacketListener";
-import { TradeRequestPacketListener } from "../../net/packet/impl/TradeRequestPacketListener";
-import { CreationMenuPacketListener } from "../../net/packet/impl/CreationMenuPacketListener";
-import { ItemContainerActionPacketListener } from "../../net/packet/impl/ItemContainerActionPacketListener";
-import { NOPPacketListener } from "../../net/packet/impl/NOPPacketListener";
-
 export class PacketConstants {
   public static readonly SPECIAL_ATTACK_OPCODE = 184;
   public static readonly BUTTON_CLICK_OPCODE = 185;
@@ -104,89 +68,13 @@ export class PacketConstants {
   public static readonly ITEM_ON_OBJECT = 192;
   public static readonly ITEM_ON_GROUND_ITEM = 25;
   public static readonly ITEM_ON_PLAYER = 14;
-  public static PACKETS = new Map<number, any>([
-    [PacketConstants.SPECIAL_ATTACK_OPCODE, new SpecialAttackPacketListener()],
-    [PacketConstants.BUTTON_CLICK_OPCODE, new ButtonClickPacketListener()],
-    [PacketConstants.INTERFACE_ACTION_CLICK_OPCODE, new InterfaceActionClickOpcode()],
-    [PacketConstants.SPAWN_TAB_ACTION_OPCODE, new SpawnItemPacketListener()],
-    [PacketConstants.REGULAR_CHAT_OPCODE, new ChatPacketListener()],
-    [PacketConstants.CLAN_CHAT_OPCODE, new ChatPacketListener()],
-    [PacketConstants.DROP_ITEM_OPCODE, new DropItemPacketListener()],
-    [PacketConstants.FINALIZED_MAP_REGION_OPCODE, new FinalizedMapRegionChangePacketListener()],
-    [PacketConstants.CHANGE_MAP_REGION_OPCODE, new RegionChangePacketListener()],
-    [PacketConstants.CLOSE_INTERFACE_OPCODE, new CloseInterfacePacketListener()],
-    [PacketConstants.EXAMINE_ITEM_OPCODE, new ExamineItemPacketListener()],
-    [PacketConstants.EXAMINE_NPC_OPCODE, new ExamineNpcPacketListener()],
-    [PacketConstants.CHANGE_APPEARANCE, new ChangeAppearancePacketListener()],
-    [PacketConstants.DIALOGUE_OPCODE, new DialoguePacketListener()],
-    [PacketConstants.ENTER_AMOUNT_OPCODE, new EnterInputPacketListener()],
-    [PacketConstants.ENTER_SYNTAX_OPCODE, new EnterInputPacketListener()],
-    [PacketConstants.EQUIP_ITEM_OPCODE, new EquipPacketListener()],
-    [PacketConstants.PLAYER_INACTIVE_OPCODE, new PlayerInactivePacketListener()],
-    [PacketConstants.CHAT_SETTINGS_OPCODE, new ChatSettingsPacketListener()],
-    [PacketConstants.COMMAND_OPCODE, new CommandPacketListener()],
-    [PacketConstants.MAP_STATE_OPCODE, new NOPPacketListener()],
-    [PacketConstants.PICKUP_ITEM_OPCODE, new PickupItemPacketListener()],
-    [PacketConstants.SECOND_GROUNDITEM_OPTION_OPCODE, new SecondGroundItemOptionPacketListener()],
-    [PacketConstants.SWITCH_ITEM_SLOT_OPCODE, new SwitchItemSlotPacketListener()],
-    [PacketConstants.FOLLOW_PLAYER_OPCODE, new FollowPlayerPacketListener()],
-    [PacketConstants.MAGIC_ON_PLAYER_OPCODE, new MagicOnPlayerPacketListener()],
-    [PacketConstants.MAGIC_ON_ITEM_OPCODE, new MagicOnItemPacketListener()],
-    [PacketConstants.MAGIC_ON_GROUND_ITEM_OPCODE, new MagicOnItemPacketListener()],
-    [PacketConstants.BANK_TAB_CREATION_OPCODE, new BankTabCreationPacketListener()],
-    [PacketConstants.INTERFACE_TAB_ID_OPCODE, new NOPPacketListener()],
-    [PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
-    [PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
-    [PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
-    [PacketConstants.FOURTH_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
-    [PacketConstants.FIFTH_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
-    [PacketConstants.SIXTH_ITEM_CONTAINER_ACTION_OPCODE, new ItemContainerActionPacketListener()],
-    [PacketConstants.ATTACK_PLAYER_OPCODE, new PlayerOptionPacketListener()],
-    [PacketConstants.PLAYER_OPTION_1_OPCODE, new PlayerOptionPacketListener()],
-    [PacketConstants.PLAYER_OPTION_2_OPCODE, new PlayerOptionPacketListener()],
-    [PacketConstants.PLAYER_OPTION_3_OPCODE, new PlayerOptionPacketListener()],
-    [PacketConstants.OBJECT_FIRST_CLICK_OPCODE, new ObjectActionPacketListener()],
-    [PacketConstants.OBJECT_SECOND_CLICK_OPCODE, new ObjectActionPacketListener()],
-    [PacketConstants.OBJECT_THIRD_CLICK_OPCODE, new ObjectActionPacketListener()],
-    [PacketConstants.OBJECT_FOURTH_CLICK_OPCODE, new ObjectActionPacketListener()],
-    [PacketConstants.OBJECT_FIFTH_CLICK_OPCODE, new ObjectActionPacketListener()],
-    [PacketConstants.ATTACK_NPC_OPCODE, new NPCOptionPacketListener()],
-    [PacketConstants.FIRST_CLICK_NPC_OPCODE, new NPCOptionPacketListener()],
-    [PacketConstants.MAGE_NPC_OPCODE, new NPCOptionPacketListener()],
-    [PacketConstants.SECOND_CLICK_NPC_OPCODE, new NPCOptionPacketListener()],
-    [PacketConstants.THIRD_CLICK_NPC_OPCODE, new NPCOptionPacketListener()],
-    [PacketConstants.FOURTH_CLICK_NPC_OPCODE, new NPCOptionPacketListener()],
-    [PacketConstants.FIRST_ITEM_ACTION_OPCODE, new ItemActionPacketListener()],
-    [PacketConstants.SECOND_ITEM_ACTION_OPCODE, new ItemActionPacketListener()],
-    [PacketConstants.THIRD_ITEM_ACTION_OPCODE, new ItemActionPacketListener()],
-    [PacketConstants.ITEM_ON_NPC, new UseItemPacketListener()],
-    [PacketConstants.ITEM_ON_ITEM, new UseItemPacketListener()],
-    [PacketConstants.ITEM_ON_OBJECT, new UseItemPacketListener()],
-    [PacketConstants.ITEM_ON_GROUND_ITEM, new UseItemPacketListener()],
-    [PacketConstants.ITEM_ON_PLAYER, new UseItemPacketListener()],
-    [PacketConstants.TRADE_REQUEST_OPCODE, new TradeRequestPacketListener()],
-    [PacketConstants.CREATION_MENU_OPCODE, new CreationMenuPacketListener()],
-    // Stubs for remaining opcodes we see from the client but have no gameplay hooked yet.
-    [3, new NOPPacketListener()], // idle
-    [57, new UseItemPacketListener()], // item on npc (already mapped)
-    [64, new NOPPacketListener()],
-    [65, new NOPPacketListener()],
-    [80, new NOPPacketListener()],
-    [93, new NOPPacketListener()],
-    [94, new NOPPacketListener()],
-    [100, new NOPPacketListener()],
-    [101, new NOPPacketListener()],
-    [115, new NOPPacketListener()],
-    [139, new TradeRequestPacketListener()],
-    [144, new UseItemPacketListener()],
-    [155, new NPCOptionPacketListener()],
-    [162, new NOPPacketListener()],
-    [174, new NOPPacketListener()],
-    [177, new NOPPacketListener()],
-    [181, new MagicOnItemPacketListener()],
-    [182, new NOPPacketListener()],
-    [200, new NOPPacketListener()],
-    [209, new NOPPacketListener()],
-    [210, new RegionChangePacketListener()],
-  ]);
+  // NOTE: this used to also export a numeric opcode dispatch map.
+  // for a raw-opcode dispatch system modeled on the real Jagex OSRS wire protocol.
+  // elvarg now speaks xrsps-typescript's own protocol instead, dispatched by
+  // NetworkBuilder.ts's message-type switch - nothing feeds that map anymore, so
+  // it was removed. These constants remain in use for other purposes (e.g. some
+  // PacketListener impl classes reference their own opcode for the specific
+  // raw-byte-layout variant to decode). See docs/networking-protocol-gaps.md for
+  // the small number of features that lost their only handler when the old
+  // dispatch was confirmed dead, and what happened to each.
 }

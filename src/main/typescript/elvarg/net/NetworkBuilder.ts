@@ -6,6 +6,7 @@ import { Player } from "../game/entity/impl/player/Player";
 import { Appearance } from "../game/model/Appearance";
 import { Flag } from "../game/model/Flag";
 import { Location } from "../game/model/Location";
+import { PlayerStatus } from "../game/model/PlayerStatus";
 import { PlayerRights } from "../game/model/rights/PlayerRights";
 import { PluginManager } from "../plugins/PluginManager";
 import { Misc } from "../util/Misc";
@@ -44,7 +45,6 @@ import { PickupItemPacketListener } from "./packet/impl/PickupItemPacketListener
 import { SecondGroundItemOptionPacketListener } from "./packet/impl/SecondGroundItemOptionPacketListener";
 import { ItemDefinition } from "../game/definition/ItemDefinition";
 import { Bank } from "../game/model/container/impl/Bank";
-import { ButtonClickPacketListener } from "./packet/impl/ButtonClickPacketListener";
 import { InterfaceActionClickOpcode } from "./packet/impl/InterfaceActionClickOpcode";
 import { ChangeAppearancePacketListener } from "./packet/impl/ChangeAppearancePacketListener";
 import { NpcDefinition } from "../game/definition/NpcDefinition";
@@ -64,13 +64,20 @@ const NPC_ACTIONS = new NPCOptionPacketListener();
 const MAGIC_ITEMS = new MagicOnItemPacketListener();
 const WORLD_INTERACTIONS = new Set([
   "move",
+  "teleport",
+  "world_map_click",
   "npc_option",
   "object_option",
   "player_option",
   "ground_item_action",
+  "inventory_action",
+  "inventory_use_on",
   "item_on_player",
+  "item_on_npc",
+  "item_on_object",
   "spell_on_npc",
   "spell_on_player",
+  "spell_on_object",
   "item_on_ground",
   "spell_on_ground",
 ]);
@@ -143,7 +150,10 @@ class ClientConnection {
 
     for (const packet of packets) {
       if (this.player && WORLD_INTERACTIONS.has(packet.type)) {
-        this.player.closeInterruptibleInterfaces();
+        if (this.player.getStatus() === PlayerStatus.TRADING) continue;
+        if (packet.type !== "move" || this.player.getMovementQueue().getMobility().canMove()) {
+          this.player.closeInterruptibleInterfaces();
+        }
       }
       switch (packet.type) {
         case "move":
@@ -165,6 +175,16 @@ class ClientConnection {
             this.player, packet.widgetId, packet.targetIndex, packet.itemId, packet.slot
           );
           continue;
+        case "item_on_npc":
+          if (this.player) UseItemPacketListener.itemOnNpc(
+            this.player, packet.widgetId, packet.targetIndex, packet.itemId, packet.slot
+          );
+          continue;
+        case "item_on_object":
+          if (this.player) UseItemPacketListener.itemOnObject(
+            this.player, packet.widgetId, packet.objectId, packet.itemId, packet.slot, packet.x, packet.y
+          );
+          continue;
         case "spell_on_player":
           if (this.player) {
             MagicOnPlayerPacketListener.cast(
@@ -181,6 +201,18 @@ class ClientConnection {
             this.resolveClientCombatSpellId(packet.spellWidget, packet.spellChild, packet.spellItemId)
           );
           continue;
+        case "spell_on_object":
+          if (this.player) UseItemPacketListener.spellOnObject(
+            this.player,
+            packet.objectId,
+            packet.x,
+            packet.y,
+            packet.spellWidget,
+            packet.spellChild,
+            packet.spellItemId,
+            this.resolveClientCombatSpellId(packet.spellWidget, packet.spellChild, packet.spellItemId)
+          );
+          continue;
         case "inventory_action":
           if (this.player) this.inventoryAction(packet);
           continue;
@@ -189,11 +221,17 @@ class ClientConnection {
             const target = packet.target;
             if (target.kind === "inventory") {
               UseItemPacketListener.itemOnItem(this.player, packet.slot, target.slot);
+            } else if (target.kind === "npc") {
+              UseItemPacketListener.itemOnNpc(this.player, 3214, target.id, packet.itemId, packet.slot);
             } else if (target.kind === "player") {
               UseItemPacketListener.itemOnPlayer(this.player, 3214, target.id, packet.itemId, packet.slot);
             } else if (target.kind === "ground" && target.x != null && target.y != null) {
               UseItemPacketListener.itemOnGroundItem(
                 this.player, packet.itemId, target.id, target.x, target.y, packet.slot
+              );
+            } else if (target.kind === "loc" && target.x != null && target.y != null) {
+              UseItemPacketListener.itemOnObject(
+                this.player, 3214, target.id, packet.itemId, packet.slot, target.x, target.y
               );
             }
           }
@@ -240,7 +278,19 @@ class ClientConnection {
           }
           continue;
         case "dialogue_continue":
-          this.player?.getDialogueManager().advance();
+          if (this.player && PluginManager.emitInterfaceActionClick({
+            player: this.player,
+            buttonId: packet.widgetId,
+            action: packet.childIndex,
+            groupId: packet.widgetId >>> 16,
+            childId: packet.widgetId & 0xffff,
+            handled: false,
+          })) {
+            continue;
+          }
+          if (this.player?.getDialogueManager().canContinue(packet.widgetId)) {
+            this.player.getDialogueManager().advance();
+          }
           continue;
         case "dialogue_amount": {
           const action = this.player?.getEnteredAmountAction();
@@ -260,44 +310,53 @@ class ClientConnection {
         }
         case "widget_action":
           if (this.player) {
-            const equipmentSlot = EquipPacketListener.resolveEquipmentSlot(packet.groupId, packet.childId);
-            if (WORLD_MAP_ORB_WIDGET_IDS.includes(packet.widgetId) && packet.buttonNum === 2) {
+            const actionPacket = { ...packet, buttonNum: packet.buttonNum ?? 0 };
+            const equipmentSlot = EquipPacketListener.resolveEquipmentSlot(actionPacket.groupId, actionPacket.childId);
+            if (WORLD_MAP_ORB_WIDGET_IDS.includes(actionPacket.widgetId) && actionPacket.buttonNum === 2) {
               this.player.getPacketSender().toggleWorldMap();
-            } else if (packet.widgetId === WORLD_MAP_CLOSE_WIDGET_ID) {
+            } else if (actionPacket.widgetId === WORLD_MAP_CLOSE_WIDGET_ID) {
               this.player.getPacketSender().closeWorldMap();
             } else if (equipmentSlot >= 0) {
               EquipPacketListener.unequip(this.player, equipmentSlot);
-            } else if (packet.groupId === 387 && packet.childId === 1) {
+            } else if (actionPacket.groupId === 387 && actionPacket.childId === 1) {
               BonusManager.open(this.player);
-            } else if (Bank.handleWidgetAction(this.player, packet)) {
+            } else if (Bank.handleWidgetAction(this.player, actionPacket)) {
               // Bank owns its cache-native widgets while the bank modal is open.
-            } else if (ShopManager.handleWidgetAction(this.player, packet)) {
+            } else if (ShopManager.handleWidgetAction(this.player, actionPacket)) {
               // Shop owns its stock and sell-inventory widgets while open.
-            } else if (packet.groupId === 541 && PrayerHandler.togglePrayer(this.player, packet.childId)) {
+            } else if (actionPacket.groupId === 541 && PrayerHandler.togglePrayer(this.player, actionPacket.childId)) {
               // Prayer widgets map directly onto the existing prayer engine.
-            } else if (packet.groupId === 593 && packet.childId === 39) {
+            } else if (actionPacket.groupId === 593 && actionPacket.childId === 39) {
               CombatSpecial.activate(this.player);
             } else if (Autocasting.handleWidgetAction(
-              this.player, packet.groupId, packet.childId, packet.slot
+              this.player, actionPacket.groupId, actionPacket.childId, actionPacket.slot
             )) {
               // Cache-native combat autocast controls reuse the existing spell state.
-            } else if (packet.itemId != null && packet.slot != null &&
-                this.player.getInventory().getItems()[packet.slot]?.getId() === packet.itemId) {
+            } else if (actionPacket.itemId != null && actionPacket.slot != null &&
+                this.player.getInventory().getItems()[actionPacket.slot]?.getId() === actionPacket.itemId) {
               this.inventoryAction({
-                type: "inventory_action", widgetId: packet.widgetId, slot: packet.slot,
-                itemId: packet.itemId, option: packet.option, optionIndex: packet.buttonNum,
+                type: "inventory_action", widgetId: actionPacket.widgetId, slot: actionPacket.slot,
+                itemId: actionPacket.itemId, option: actionPacket.option, optionIndex: actionPacket.buttonNum,
               });
-            } else if (packet.simple) {
-              ButtonClickPacketListener.handle(this.player, packet.childId);
             } else {
-              InterfaceActionClickOpcode.handle(this.player, packet.widgetId, packet.buttonNum, {
-                itemId: packet.itemId,
-                slot: packet.slot,
-                option: packet.option,
+              const handled = InterfaceActionClickOpcode.handle(this.player, actionPacket.widgetId, actionPacket.buttonNum, {
+                groupId: actionPacket.groupId,
+                childId: actionPacket.childId,
+                opId: actionPacket.opId,
+                itemId: actionPacket.itemId,
+                slot: actionPacket.slot,
+                option: actionPacket.option,
               });
+              if (!handled && actionPacket.simple) {
+                PluginManager.emitButtonClick({
+                  player: this.player,
+                  buttonId: actionPacket.childId,
+                  handled: false,
+                });
+              }
             }
-            if (this.player.getDialogueManager().isActive() && packet.buttonNum > 0 && packet.buttonNum <= 5) {
-              this.player.getDialogueManager().handleOption(packet.buttonNum - 1 as DialogueOption);
+            if (this.player.getDialogueManager().isActive() && actionPacket.buttonNum > 0 && actionPacket.buttonNum <= 5) {
+              this.player.getDialogueManager().handleOption(actionPacket.buttonNum - 1 as DialogueOption);
             }
           }
           continue;
@@ -318,10 +377,28 @@ class ClientConnection {
           }
           continue;
         case "widget":
-          if (this.player && packet.action === "close") this.player.getPacketSender().sendInterfaceRemoval();
+          if (this.player && packet.action === "close") this.player.getPacketSender().closeInterface(packet.groupId);
           continue;
         case "widget_target":
-          if (this.player) InterfaceActionClickOpcode.handle(this.player, packet.targetWidgetId, packet.sourceSlot);
+          if (this.player && !MAGIC_ITEMS.castOnItem(
+            this.player,
+            this.resolveClientCombatSpellId(
+              packet.sourceWidgetId,
+              packet.sourceWidgetId & 0xffff,
+              packet.sourceItemId
+            ),
+            packet.targetItemId,
+            packet.targetSlot
+          )) {
+            InterfaceActionClickOpcode.handle(this.player, packet.targetWidgetId, packet.sourceSlot, {
+              targetWidgetId: packet.targetWidgetId,
+              targetSlot: packet.targetSlot,
+              targetItemId: packet.targetItemId,
+              sourceWidgetId: packet.sourceWidgetId,
+              sourceSlot: packet.sourceSlot,
+              sourceItemId: packet.sourceItemId,
+            });
+          }
           continue;
         case "widget_drag":
           if (this.player) SwitchItemSlotPacketListener.move(
@@ -329,10 +406,20 @@ class ClientConnection {
           );
           continue;
         case "interface_close":
-          this.player?.getPacketSender().sendInterfaceRemoval();
+          this.player?.closeInterruptibleInterfaces();
           continue;
         case "local_trigger":
-          if (this.player) InterfaceActionClickOpcode.handle(this.player, packet.widgetId, packet.opcodeParam);
+          if (this.player && packet.opcodeParam >= 1 && packet.opcodeParam <= 10) {
+            InterfaceActionClickOpcode.handle(this.player, packet.widgetId, packet.opcodeParam, {
+              groupId: packet.widgetId >>> 16,
+              childId: packet.childIndex,
+              itemId: packet.itemId >= 0 ? packet.itemId : undefined,
+              slot: packet.childIndex >= 0 ? packet.childIndex : undefined,
+              argsData: packet.argsData,
+            });
+          }
+          continue;
+        case "item_spawner_search":
           continue;
         case "examine_npc":
           if (this.player) {
@@ -378,8 +465,18 @@ class ClientConnection {
           }
           continue;
         case "face":
-          if (this.player && packet.x != null && packet.y != null) {
-            this.player.setPositionToFace(new Location(packet.x, packet.y, this.player.getLocation().getZ()));
+          if (this.player) {
+            const location = this.player.getLocation();
+            if (packet.x != null && packet.y != null) {
+              this.player.setPositionToFace(new Location(packet.x, packet.y, location.getZ()));
+            } else if (packet.rotation != null) {
+              const radians = (packet.rotation & 0x7ff) * Math.PI / 1024;
+              this.player.setPositionToFace(new Location(
+                location.getX() + Math.round(Math.sin(radians)),
+                location.getY() + Math.round(Math.cos(radians)),
+                location.getZ()
+              ));
+            }
           }
           continue;
         case "trade_action":
@@ -565,6 +662,7 @@ class ClientConnection {
         CacheDefinitions.getSpellName(widgetId, spellItemId);
       const spell = name ? CombatSpells.getCombatSpellByName(name) : null;
       if (spell) return spell.spellId();
+      return MAGIC_ITEMS.resolveSpellId(name);
     } catch {
       // Invalid cache-backed selections are rejected by the combat listener.
     }

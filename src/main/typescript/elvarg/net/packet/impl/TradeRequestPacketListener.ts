@@ -1,14 +1,8 @@
-import { PacketExecutor } from "../PacketExecutor";
-import { Packet } from "../Packet";
 import { World } from "../../../game/World";
 import { PlayerStatus } from "../../../game/model/PlayerStatus";
 import { PluginManager } from "../../../plugins/PluginManager";
 
-export class TradeRequestPacketListener implements PacketExecutor {
-  execute(player: any, packet: Packet): void {
-    TradeRequestPacketListener.request(player, packet.readLEShort());
-  }
-
+export class TradeRequestPacketListener {
   static request(player: any, index: number): void {
 
     if (index < 0 || index >= World.getPlayers().capacityReturn()) {
@@ -30,6 +24,10 @@ export class TradeRequestPacketListener implements PacketExecutor {
       target.getHitpoints() <= 0 ||
       !target.isRegistered()
     ) {
+      return;
+    }
+
+    if (PluginManager.emitTradeRequest({ player, target, handled: false })) {
       return;
     }
 

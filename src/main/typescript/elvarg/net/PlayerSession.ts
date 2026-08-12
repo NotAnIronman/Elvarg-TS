@@ -1,14 +1,10 @@
 import { LoginDetailsMessage } from "./login/LoginDetailsMessage";
 import { Packet } from "./packet/Packet";
 import { PacketBuilder } from "./packet/PacketBuilder";
-import { PacketConstants } from "./packet/PacketConstants";
 import { NetworkConstants } from "./NetworkConstants";
 import type { Player } from "../game/entity/impl/player/Player";
 import { Appearance } from "../game/model/Appearance";
 import { Flag } from "../game/model/Flag";
-import { FastDeque } from "../util/FastDeque";
-import { PluginManager } from "../plugins/PluginManager";
-import { NOPPacketListener } from "./packet/impl/NOPPacketListener";
 import {
   createNpcSyncState,
   createPlayerSyncState,
@@ -42,14 +38,10 @@ type SessionChannel = {
   isOpen?: (() => boolean) | boolean;
 };
 
-const ESTABLISHED_STAGE = "ESTABLISHED";
-const NOP_PACKET_LISTENER = new NOPPacketListener();
 const OUTBOUND_BACKPRESSURE_LOG_COOLDOWN_MS = 5000;
 const WS_CLOSE_BACKPRESSURE = 1013;
 
 export class PlayerSession {
-  private packetsQueue: FastDeque<Packet> = new FastDeque<Packet>();
-  private lastPacketOpcodeQueue: number[] = [];
   private channel: SessionChannel;
   private player?: Player;
   private lastBackpressureLogAt = 0;
@@ -71,67 +63,6 @@ export class PlayerSession {
     this.channel.on?.("packet", (_data: unknown) => {
       // Legacy socket.io login path is not used by the WebSocket server bootstrap.
     });
-  }
-
-  public queuePacket(msg: Packet) {
-    if (!msg) {
-      return;
-    }
-
-    if (this.packetsQueue.length >= NetworkConstants.PACKET_QUEUE_LIMIT) {
-      return;
-    }
-
-    if (
-      msg.getOpcode() == PacketConstants.EQUIP_ITEM_OPCODE ||
-      msg.getOpcode() == PacketConstants.SPECIAL_ATTACK_OPCODE
-    ) {
-      this.packetsQueue.unshift(msg);
-      return;
-    }
-
-    this.packetsQueue.push(msg);
-  }
-
-  public processPackets() {
-    const player = this.player;
-    if (!player) {
-      this.packetsQueue.clear();
-      return;
-    }
-
-    for (let i = 0; i < NetworkConstants.PACKET_PROCESS_LIMIT; i++) {
-      const packet = this.packetsQueue.shift();
-      if (packet == null) {
-        break;
-      }
-      if (this.lastPacketOpcodeQueue.length > 4) {
-        this.lastPacketOpcodeQueue.shift();
-      }
-      this.lastPacketOpcodeQueue.push(packet.getOpcode());
-
-      const opcode = packet.getOpcode();
-      const exec =
-        PluginManager.getPacketListener(opcode) ??
-        PacketConstants.PACKETS.get(opcode) ??
-        NOP_PACKET_LISTENER;
-
-      try {
-        const hookPacket = new Packet(opcode, packet.getBuffer());
-        PluginManager.emitPacketReceived({
-          opcode,
-          packet: hookPacket,
-          player,
-          stage: ESTABLISHED_STAGE,
-        });
-        exec.execute(player, packet);
-      } catch (e) {
-        console.log("processedPackets: " + this.lastPacketOpcodeQueue);
-        console.error(e);
-      } finally {
-        packet.getBuffer();
-      }
-    }
   }
 
   public write(_builder: PacketBuilder) {
@@ -318,6 +249,12 @@ export class PlayerSession {
     }
     return {
       ...updates,
+      // Always resolve the current interacting target (like npcViews below), instead of
+      // only when Flag.ENTITY_INTERACTION fired this tick - otherwise a player who becomes
+      // newly visible mid-fight (e.g. walks into view of an already-engaged pair) never
+      // receives who their target is facing, since the flag already fired on an earlier
+      // tick they weren't watching.
+      interactionIndex: this.interactionIndex(player.getInteractingMobile()),
       index: player.getIndex(),
       x: location.getX(),
       y: location.getY(),

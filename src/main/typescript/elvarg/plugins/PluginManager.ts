@@ -8,7 +8,6 @@ import { WeaponProfiles } from "../game/content/combat/WeaponProfile";
 import { NpcInteractionDefinitionLoader } from "../game/definition/loader/impl/NpcInteractionDefinitionLoader";
 import { NpcInteractionManager } from "../game/entity/impl/npc/NpcInteractionManager";
 import { MultiChatboxPrompt } from "../game/model/menu/MultiChatboxPrompt";
-import { PacketExecutor } from "../net/packet/PacketExecutor";
 import {
   PluginApi,
   PluginCanAttackEvent,
@@ -22,8 +21,10 @@ import {
   PluginModule,
   PluginItemOnGroundItemEvent,
   PluginItemOnItemEvent,
+  PluginItemOnNpcEvent,
   PluginItemOnPlayerEvent,
   PluginItemOnObjectEvent,
+  PluginSpellOnObjectEvent,
   PluginNpcDeathEvent,
   PluginNpcAggressionToleranceEvent,
   PluginNpcInteractionEvent,
@@ -34,7 +35,6 @@ import {
   PluginPlayerProcessEvent,
   PluginPlayerLevelUpEvent,
   PluginPlayerPathBlockedEvent,
-  PluginPacketEvent,
   PluginCommandEvent,
   PluginActiveRegionsEvent,
   PluginPlayerDisconnectEvent,
@@ -45,6 +45,9 @@ import {
   PluginSpellDisabledEvent,
   PluginSpellRuneBypassEvent,
   PluginCanTradeEvent,
+  PluginTradeRequestEvent,
+  PluginPlayerFollowEvent,
+  PluginPlayerAttackEvent,
   PluginCanBankEvent,
   PluginCanShopEvent,
   PluginShouldDropItemsOnDeathEvent,
@@ -69,11 +72,6 @@ import {
 type PluginHook<T> = {
   pluginName: string;
   handler: (event: T) => void;
-};
-
-type RegisteredPacketListener = {
-  pluginName: string;
-  listener: PacketExecutor;
 };
 
 type PluginLoadCandidate = {
@@ -104,7 +102,6 @@ export class PluginManager {
   private static readonly MAX_PLUGIN_DEPTH = 2;
   private static initialized = false;
   private static loadedPlugins: string[] = [];
-  private static packetHooks: PluginHook<PluginPacketEvent>[] = [];
   private static loginHooks: PluginHook<PluginPlayerLoginEvent>[] = [];
   private static disconnectHooks: PluginHook<PluginPlayerDisconnectEvent>[] = [];
   private static logoutHooks: PluginHook<PluginPlayerLogoutEvent>[] = [];
@@ -126,6 +123,9 @@ export class PluginManager {
   private static firemakingBlockedHooks: PluginHook<PluginFiremakingBlockedEvent>[] = [];
   private static canDrinkHooks: PluginHook<PluginCanDrinkEvent>[] = [];
   private static canTradeHooks: PluginHook<PluginCanTradeEvent>[] = [];
+  private static tradeRequestHooks: PluginHook<PluginTradeRequestEvent>[] = [];
+  private static playerFollowHooks: PluginHook<PluginPlayerFollowEvent>[] = [];
+  private static playerAttackHooks: PluginHook<PluginPlayerAttackEvent>[] = [];
   private static canBankHooks: PluginHook<PluginCanBankEvent>[] = [];
   private static canShopHooks: PluginHook<PluginCanShopEvent>[] = [];
   private static shouldDropItemsOnDeathHooks: PluginHook<PluginShouldDropItemsOnDeathEvent>[] = [];
@@ -138,9 +138,11 @@ export class PluginManager {
   private static playerDefeatedHooks: PluginHook<PluginPlayerDefeatedEvent>[] = [];
   private static itemOnObjectHooks: PluginHook<PluginItemOnObjectEvent>[] = [];
   private static itemOnItemHooks: PluginHook<PluginItemOnItemEvent>[] = [];
+  private static itemOnNpcHooks: PluginHook<PluginItemOnNpcEvent>[] = [];
   private static itemOnPlayerHooks: PluginHook<PluginItemOnPlayerEvent>[] = [];
   private static itemOnGroundItemHooks: PluginHook<PluginItemOnGroundItemEvent>[] =
     [];
+  private static spellOnObjectHooks: PluginHook<PluginSpellOnObjectEvent>[] = [];
   private static groundItemInteractionHooks: PluginHook<PluginGroundItemInteractionEvent>[] =
     [];
   private static itemActionHooks: PluginHook<PluginItemActionEvent>[] = [];
@@ -157,7 +159,6 @@ export class PluginManager {
     pluginName: string;
     handler: (player: any) => boolean;
   }> = [];
-  private static packetListeners = new Map<number, RegisteredPacketListener>();
   private static combatEngine: PluginCombatEngine | null = null;
   private static combatEngineOwner: string | null = null;
   private static combatDamageProvider: PluginCombatDamageProvider | null = null;
@@ -430,19 +431,6 @@ export class PluginManager {
     );
   }
 
-  public static getPacketListener(opcode: number): PacketExecutor | undefined {
-    return PluginManager.packetListeners.get(opcode)?.listener;
-  }
-
-  public static emitPacketReceived(event: PluginPacketEvent): void {
-    if (PluginManager.packetHooks.length === 0) {
-      return;
-    }
-    for (const hook of PluginManager.packetHooks) {
-      PluginManager.executeHook(hook, event, "packet", "packet_received");
-    }
-  }
-
   public static emitPlayerLogin(event: PluginPlayerLoginEvent): void {
     if (PluginManager.loginHooks.length === 0) {
       return;
@@ -706,6 +694,36 @@ export class PluginManager {
     return null;
   }
 
+  /** Returns true if a plugin fully handled the trade request (event.handled), replacing the default walk-and-request flow. */
+  public static emitTradeRequest(event: PluginTradeRequestEvent): boolean {
+    if (!event || event.handled || !event.player || !event.target) {
+      return false;
+    }
+    for (const hook of PluginManager.tradeRequestHooks) {
+      if (event.handled) break;
+      PluginManager.executeHook(hook, event, "trade_request", "trade_request");
+    }
+    return event.handled === true;
+  }
+
+  public static emitPlayerFollow(event: PluginPlayerFollowEvent): void {
+    if (PluginManager.playerFollowHooks.length === 0) {
+      return;
+    }
+    for (const hook of PluginManager.playerFollowHooks) {
+      PluginManager.executeHook(hook, event, "player_follow", "player_follow");
+    }
+  }
+
+  public static emitPlayerAttack(event: PluginPlayerAttackEvent): void {
+    if (PluginManager.playerAttackHooks.length === 0) {
+      return;
+    }
+    for (const hook of PluginManager.playerAttackHooks) {
+      PluginManager.executeHook(hook, event, "player_attack", "player_attack");
+    }
+  }
+
   public static emitCanBank(player: any): boolean | null {
     if (PluginManager.canBankHooks.length === 0) {
       return null;
@@ -924,6 +942,13 @@ export class PluginManager {
     return event.handled === true;
   }
 
+  public static emitItemOnNpc(event: PluginItemOnNpcEvent): boolean {
+    for (const hook of PluginManager.itemOnNpcHooks) {
+      PluginManager.executeHook(hook, event, "item_on_npc", "item_on_npc");
+    }
+    return event.handled === true;
+  }
+
   public static emitItemOnPlayer(event: PluginItemOnPlayerEvent): boolean {
     for (const hook of PluginManager.itemOnPlayerHooks) {
       PluginManager.executeHook(hook, event, "item_on_player", "item_on_player");
@@ -941,6 +966,13 @@ export class PluginManager {
         "item_on_ground_item",
         "item_on_ground_item"
       );
+    }
+    return event.handled === true;
+  }
+
+  public static emitSpellOnObject(event: PluginSpellOnObjectEvent): boolean {
+    for (const hook of PluginManager.spellOnObjectHooks) {
+      PluginManager.executeHook(hook, event, "spell_on_object", "spell_on_object");
     }
     return event.handled === true;
   }
@@ -1055,41 +1087,6 @@ export class PluginManager {
     }
 
     return event.handled;
-  }
-
-  private static validatePacketListenerRegistration(
-    pluginName: string,
-    opcode: number,
-    listener: PacketExecutor
-  ): boolean {
-    if (
-      !Number.isInteger(opcode) ||
-      opcode < 0 ||
-      opcode > 255 ||
-      !listener ||
-      typeof (listener as any).execute !== "function"
-    ) {
-      console.warn(
-        `[plugins] ${pluginName} attempted invalid packet listener registration for opcode=${opcode}`
-      );
-      return false;
-    }
-    return true;
-  }
-
-  private static registerPacketListenerInternal(
-    pluginName: string,
-    opcode: number,
-    listener: PacketExecutor
-  ): void {
-    const existing = PluginManager.packetListeners.get(opcode);
-    if (existing) {
-      console.warn(
-        `[plugins] packet listener opcode ${opcode} overridden: ${existing.pluginName} -> ${pluginName}`
-      );
-    }
-
-    PluginManager.packetListeners.set(opcode, { pluginName, listener });
   }
 
   private static discoverPluginFiles(
@@ -1399,9 +1396,11 @@ export class PluginManager {
       label = "npc"
     ): void => {
       const normalized = Array.isArray(npcIds) ? npcIds : [npcIds];
+      const validIds = normalized.filter(
+        (id) => Number.isInteger(id) && id >= 0
+      ) as number[];
       if (
-        normalized.length === 0 ||
-        normalized.some((npcId) => !Number.isInteger(npcId) || npcId < 0) ||
+        validIds.length === 0 ||
         !Number.isInteger(clickType) ||
         clickType < 1 ||
         clickType > 4 ||
@@ -1413,8 +1412,13 @@ export class PluginManager {
         );
         return;
       }
+      if (validIds.length !== normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} ${label} click hook registration dropped invalid ids ` +
+          `(kept ${validIds.length}/${normalized.length}): npcIds=${JSON.stringify(npcIds)}`
+        );
+      }
 
-      const validIds = normalized as number[];
       const npcIdSet = new Set(validIds);
       NpcInteractionManager.registerPluginInteraction(
         pluginName,
@@ -1448,21 +1452,20 @@ export class PluginManager {
       label = "object"
     ): void => {
       const normalized = Array.isArray(objectIds) ? objectIds : [objectIds];
-      if (!normalized.length) {
-        console.warn(
-          `[plugins] ${pluginName} attempted invalid ${label} click hook registration objectIds=[]`
-        );
-        return;
-      }
-
       const validIds = normalized.filter(
         (id) => Number.isInteger(id) && id >= 0
       ) as number[];
-      if (validIds.length !== normalized.length || typeof handler !== "function") {
+      if (!validIds.length || typeof handler !== "function") {
         console.warn(
           `[plugins] ${pluginName} attempted invalid ${label} click hook registration objectIds=${JSON.stringify(objectIds)}`
         );
         return;
+      }
+      if (validIds.length !== normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} ${label} click hook registration dropped invalid ids ` +
+          `(kept ${validIds.length}/${normalized.length}): objectIds=${JSON.stringify(objectIds)}`
+        );
       }
 
       const objectIdSet = new Set(validIds);
@@ -1492,21 +1495,20 @@ export class PluginManager {
       label = "ground-item"
     ): void => {
       const normalized = Array.isArray(itemIds) ? itemIds : [itemIds];
-      if (!normalized.length) {
-        console.warn(
-          `[plugins] ${pluginName} attempted invalid ${label} click hook registration itemIds=[]`
-        );
-        return;
-      }
-
       const validIds = normalized.filter(
         (id) => Number.isInteger(id) && id >= 0
       ) as number[];
-      if (validIds.length !== normalized.length || typeof handler !== "function") {
+      if (!validIds.length || typeof handler !== "function") {
         console.warn(
           `[plugins] ${pluginName} attempted invalid ${label} click hook registration itemIds=${JSON.stringify(itemIds)}`
         );
         return;
+      }
+      if (validIds.length !== normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} ${label} click hook registration dropped invalid ids ` +
+          `(kept ${validIds.length}/${normalized.length}): itemIds=${JSON.stringify(itemIds)}`
+        );
       }
 
       const itemIdSet = new Set(validIds);
@@ -1535,21 +1537,20 @@ export class PluginManager {
       label = "button"
     ): void => {
       const normalized = Array.isArray(buttonIds) ? buttonIds : [buttonIds];
-      if (!normalized.length) {
-        console.warn(
-          `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=[]`
-        );
-        return;
-      }
-
       const validIds = normalized.filter(
         (id) => Number.isInteger(id) && id >= 0
       ) as number[];
-      if (validIds.length !== normalized.length || typeof handler !== "function") {
+      if (!validIds.length || typeof handler !== "function") {
         console.warn(
           `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=${JSON.stringify(buttonIds)}`
         );
         return;
+      }
+      if (validIds.length !== normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} ${label} hook registration dropped invalid ids ` +
+          `(kept ${validIds.length}/${normalized.length}): buttonIds=${JSON.stringify(buttonIds)}`
+        );
       }
 
       const buttonIdSet = new Set(validIds);
@@ -1575,21 +1576,20 @@ export class PluginManager {
       label = "interface_action_button"
     ): void => {
       const normalized = Array.isArray(buttonIds) ? buttonIds : [buttonIds];
-      if (!normalized.length) {
-        console.warn(
-          `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=[]`
-        );
-        return;
-      }
-
       const validIds = normalized.filter(
         (id) => Number.isInteger(id) && id >= 0
       ) as number[];
-      if (validIds.length !== normalized.length || typeof handler !== "function") {
+      if (!validIds.length || typeof handler !== "function") {
         console.warn(
           `[plugins] ${pluginName} attempted invalid ${label} hook registration buttonIds=${JSON.stringify(buttonIds)}`
         );
         return;
+      }
+      if (validIds.length !== normalized.length) {
+        console.warn(
+          `[plugins] ${pluginName} ${label} hook registration dropped invalid ids ` +
+          `(kept ${validIds.length}/${normalized.length}): buttonIds=${JSON.stringify(buttonIds)}`
+        );
       }
 
       const buttonIdSet = new Set(validIds);
@@ -1610,26 +1610,6 @@ export class PluginManager {
     };
 
     return {
-      onPacketReceived: (handler) => {
-        if (typeof handler !== "function") {
-          return;
-        }
-        PluginManager.packetHooks.push({ pluginName, handler });
-      },
-      onEstablishedPacket: (handler) => {
-        if (typeof handler !== "function") {
-          return;
-        }
-        PluginManager.packetHooks.push({
-          pluginName,
-          handler: (event) => {
-            if (!event || event.stage !== "ESTABLISHED" || !event.player) {
-              return;
-            }
-            handler(event);
-          },
-        });
-      },
       onPlayerLogin: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -1942,6 +1922,48 @@ export class PluginManager {
           },
         });
       },
+      onTradeRequest: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.tradeRequestHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.target) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerFollow: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerFollowHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.leader) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerAttack: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerAttackHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.target) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onCanBank: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -2163,6 +2185,20 @@ export class PluginManager {
           },
         });
       },
+      onItemOnNpc: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.itemOnNpcHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.target || !event.item) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
       onItemOnPlayer: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -2195,6 +2231,20 @@ export class PluginManager {
           pluginName,
           handler: (event) => {
             if (!event || event.handled || !event.player || !event.inventoryItem) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onSpellOnObject: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.spellOnObjectHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !event.object) {
               return;
             }
             handler(event);
@@ -2480,44 +2530,6 @@ export class PluginManager {
           );
         }
       },
-      registerPacketListener: (opcode, listener) => {
-        if (
-          !PluginManager.validatePacketListenerRegistration(
-            pluginName,
-            opcode,
-            listener
-          )
-        ) {
-          return;
-        }
-        PluginManager.registerPacketListenerInternal(pluginName, opcode, listener);
-      },
-      registerAlivePacketListener: (opcode, listener) => {
-        if (
-          !PluginManager.validatePacketListenerRegistration(
-            pluginName,
-            opcode,
-            listener
-          )
-        ) {
-          return;
-        }
-
-        const guardedListener: PacketExecutor = {
-          execute(player, packet) {
-            if (!player || player.getHitpoints?.() <= 0) {
-              return;
-            }
-            listener.execute(player, packet);
-          },
-        };
-
-        PluginManager.registerPacketListenerInternal(
-          pluginName,
-          opcode,
-          guardedListener
-        );
-      },
       registerServerDataResource: (name, provider) => {
         try {
           ServerDataRegistry.register(name, `plugin:${pluginName}`, provider);
@@ -2590,6 +2602,71 @@ export class PluginManager {
           };
         }
       },
+      getWorld: () => require("../game/World").World,
+      getTaskManager: () => require("../game/task/TaskManager").TaskManager,
+      getRegionManager: () =>
+        require("../game/collision/RegionManager").RegionManager,
+      getCombatFactory: () =>
+        require("../game/content/combat/CombatFactory").CombatFactory,
+      getAreaManager: () =>
+        require("../game/model/areas/AreaManager").AreaManager,
+      getPrayerHandler: () =>
+        require("../game/content/PrayerHandler").PrayerHandler,
+      getBonusManager: () =>
+        require("../game/model/equipment/BonusManager").BonusManager,
+      getItemOnGroundManager: () =>
+        require("../game/entity/impl/grounditem/ItemOnGroundManager")
+          .ItemOnGroundManager,
+      getObjectManager: () =>
+        require("../game/entity/impl/object/ObjectManager").ObjectManager,
+      getServerPerf: () => require("../util/ServerPerf").ServerPerf,
+      getSkillManager: () =>
+        require("../game/content/skill/SkillManager").SkillManager,
+      getPlayerPunishment: () =>
+        require("../util/PlayerPunishment").PlayerPunishment,
+      emitCanEat: (player, itemId) => PluginManager.emitCanEat(player, itemId),
+      emitCanDrink: (player, itemId) => PluginManager.emitCanDrink(player, itemId),
+      emitCanBank: (player) => PluginManager.emitCanBank(player),
+      emitShouldKeepItemOnDeath: (player, item) =>
+        PluginManager.emitShouldKeepItemOnDeath(player, item),
+      emitFiremakingBlocked: (event) => PluginManager.emitFiremakingBlocked(event),
+      emitObjectInteraction: (event) => PluginManager.emitObjectInteraction(event),
+      emitPlayerLogin: (event) => PluginManager.emitPlayerLogin(event),
+      getPluginPerformanceSnapshot: (limit) =>
+        PluginManager.getPluginPerformanceSnapshot(limit),
+      resetPluginPerformanceStats: () => PluginManager.resetPluginPerformanceStats(),
+      setPluginPerformanceProfilingEnabled: (enabled) =>
+        PluginManager.setPluginPerformanceProfilingEnabled(enabled),
+      isPluginPerformanceProfilingEnabled: () =>
+        PluginManager.isPluginPerformanceProfilingEnabled(),
+      registerMeleeHitModifier: (modifier) =>
+        require("../game/content/combat/EquipmentEffects").registerMeleeHitModifier(
+          modifier
+        ),
+      registerRangedHitModifier: (modifier) =>
+        require("../game/content/combat/EquipmentEffects").registerRangedHitModifier(
+          modifier
+        ),
+      registerMagicHitModifier: (modifier) =>
+        require("../game/content/combat/EquipmentEffects").registerMagicHitModifier(
+          modifier
+        ),
+      registerMeleeAttackAccuracyModifier: (modifier) =>
+        require("../game/content/combat/EquipmentEffects").registerMeleeAttackAccuracyModifier(
+          modifier
+        ),
+      registerMeleeDefenseModifier: (modifier) =>
+        require("../game/content/combat/EquipmentEffects").registerMeleeDefenseModifier(
+          modifier
+        ),
+      registerRangedAttackAccuracyModifier: (modifier) =>
+        require("../game/content/combat/EquipmentEffects").registerRangedAttackAccuracyModifier(
+          modifier
+        ),
+      registerMagicAttackAccuracyModifier: (modifier) =>
+        require("../game/content/combat/EquipmentEffects").registerMagicAttackAccuracyModifier(
+          modifier
+        ),
       setCombatEngine: (engine) => {
         if (!engine || typeof engine.getMethod !== "function") {
           console.warn(

@@ -1,5 +1,3 @@
-import { PacketExecutor } from "../PacketExecutor";
-import { Packet } from "../Packet";
 import { Misc } from "../../../util/Misc";
 import { Server } from "../../../Server";
 import { PluginManager } from "../../../plugins/PluginManager";
@@ -34,7 +32,7 @@ const getAutocasting = () =>
   require("../../../game/content/combat/magic/Autocasting")
     .Autocasting as typeof import("../../../game/content/combat/magic/Autocasting").Autocasting;
 
-export class EquipPacketListener implements PacketExecutor {
+export class EquipPacketListener {
   private static readonly EQUIPMENT_SLOTS = [0, 1, 2, 3, 4, 5, 7, 9, 10, 12, 13];
 
   public static resolveEquipmentSlot(groupId: number, childId: number): number {
@@ -53,14 +51,6 @@ export class EquipPacketListener implements PacketExecutor {
       getAutocasting().setAutocast(player, null);
     }
     getWeaponInterfaces().assign(player);
-  }
-
-  execute(player: any, packet: Packet) {
-    const id = packet.readShort();
-    const slot = packet.readShortA();
-    const interfaceId = packet.readShortA();
-
-    EquipPacketListener.equip(player, id, slot, interfaceId);
   }
 
   public static equipFromInventory(player: any, itemInSlot: any) {

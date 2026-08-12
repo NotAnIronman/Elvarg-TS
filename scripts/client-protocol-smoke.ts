@@ -152,6 +152,28 @@ assert.deepStrictEqual(decodeClientPacket(Buffer.from([
   type: "spell_on_npc", targetIndex: 7, spellWidget: (218 << 16) | 9,
   spellChild: 9, spellItemId: 3273,
 });
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([
+  36, 0, 131, 0, 12, 142, 0, 0, 227, 3, 0, 135,
+])), {
+  type: "item_on_npc", targetIndex: 7, itemId: 995, slot: 3, widgetId: 3214,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([
+  86, 0, 131, 104, 3, 142, 12, 0, 0, 128, 19, 12, 13, 196, 3, 99,
+])), {
+  type: "item_on_object", objectId: 1000, x: 3091, y: 3524, itemId: 995, slot: 3, widgetId: 3214,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([
+  2, 13, 68, 104, 3, 10, 4, 9, 0, 218, 0, 12, 19, 138, 4, 0,
+])), {
+  type: "spell_on_object", objectId: 1000, x: 3091, y: 3524,
+  spellWidget: (218 << 16) | 9, spellChild: 1162, spellItemId: 1162,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([
+  30, 0, 16, 0, 14, 2, 0, 0, 0, 3, 0, 9, 0, 12, 0, 227, 3, 170, 187,
+])), {
+  type: "local_trigger", opcodeParam: 2, childIndex: 3, widgetId: (12 << 16) | 9,
+  itemId: 995, argsData: Buffer.from([170, 187]),
+});
 assert.strictEqual(CombatSpells.getCombatSpellByName("Wind Strike"), CombatSpells.WIND_STRIKE);
 assert.strictEqual(CombatSpells.getCombatSpellByName("Ice barrage"), CombatSpells.ICE_BARRAGE);
 assert.deepStrictEqual(decodeClientPacket(objectClick), {
@@ -195,6 +217,19 @@ worldMapSender.toggleWorldMap();
 assert.deepStrictEqual(worldMapPackets.map((packet) => packet[0]), [110, 103, 109]);
 worldMapSender.toggleWorldMap();
 assert.strictEqual(worldMapPackets[3][0], 104);
+const chatboxPackets: Buffer[] = [];
+const chatboxSender = new PacketSender({
+  getSession: () => ({
+    sendClientPacket: (packet: Buffer) => {
+      chatboxPackets.push(packet);
+      return true;
+    },
+  }),
+});
+chatboxSender.sendChatboxInterface(2492);
+assert.strictEqual(chatboxSender.isChatboxInterface(2492), true);
+chatboxSender.closeInterface(2492);
+assert.deepStrictEqual(chatboxPackets.map((packet) => packet[0]), [103, 104]);
 const combatTabPackets: Buffer[] = [];
 new PacketSender({
   getSession: () => ({
@@ -211,8 +246,17 @@ assert.deepStrictEqual(decodeClientPacket(Buffer.from([191, 0, 43, 0, 0, 0, 2]))
 assert.deepStrictEqual(decodeClientPackets(Buffer.concat([chat, Buffer.from([55])])).map(({ type }) => type), [
   "chat", "interface_close",
 ]);
-assert.deepStrictEqual(decodeClientPacket(Buffer.from([252, 0, 0, 0, 42, 0, 3])), {
-  type: "dialogue_continue", widgetId: 42, childIndex: 3,
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([252, 0, 0, 0, 42, 0, 131])), {
+  type: "dialogue_continue", widgetId: 42, childIndex: 131,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([
+  251, 21, 0, 12, 0, 12, 0, 12, 0, 12, 0, 0, 7, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255,
+])), {
+  type: "widget_action", widgetId: (12 << 16) | 12, groupId: 12, childId: 12,
+  opId: 7, buttonNum: undefined, option: undefined, target: undefined, slot: undefined, itemId: undefined,
+});
+assert.deepStrictEqual(decodeClientPacket(Buffer.from([62, 0, 143, 1, 14, 0, 15])), {
+  type: "dialogue_continue", widgetId: (270 << 16) | 15, childIndex: 15,
 });
 assert.deepStrictEqual(decodeClientPacket(Buffer.from([192, 0, 0, 0, 10])), {
   type: "dialogue_amount", amount: 10,
