@@ -31,6 +31,677 @@
         "death": 722
       }
     },
+    "655": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "656": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "657": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "658": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6199,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "659": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "660": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "661": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "662": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "663": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "664": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "665": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6199,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "667": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "668": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1020": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1021": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1022": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1061": {
+      "name": "Angry unicorn",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 877
+      }
+    },
+    "1062": {
+      "name": "Angry giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1118": {
+      "name": "Man",
+      "anims": {
+        "attack": 422,
+        "block": 424,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1173": {
+      "name": "Chicken",
+      "anims": {
+        "attack": 5387,
+        "block": 5388,
+        "death": 5389
+      },
+      "sounds": {
+        "death": 356
+      }
+    },
+    "1174": {
+      "name": "Chicken",
+      "anims": {
+        "attack": 5387,
+        "block": 5388,
+        "death": 5389
+      },
+      "sounds": {
+        "death": 356
+      }
+    },
+    "1262": {
+      "name": "Ram",
+      "anims": {
+        "attack": 5338,
+        "block": 5337,
+        "death": 5336
+      },
+      "sounds": {
+        "death": 758
+      }
+    },
+    "1263": {
+      "name": "Ram",
+      "anims": {
+        "attack": 5338,
+        "block": 5337,
+        "death": 5336
+      },
+      "sounds": {
+        "death": 758
+      }
+    },
+    "1264": {
+      "name": "Ram",
+      "anims": {
+        "attack": 5338,
+        "block": 5337,
+        "death": 5336
+      },
+      "sounds": {
+        "death": 758
+      }
+    },
+    "1679": {
+      "name": "Crypt rat",
+      "anims": {
+        "attack": 240,
+        "block": 241,
+        "death": 243
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1680": {
+      "name": "Giant crypt rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1681": {
+      "name": "Giant crypt rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1682": {
+      "name": "Giant crypt rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1683": {
+      "name": "Crypt spider",
+      "anims": {
+        "attack": 5327,
+        "block": 5328,
+        "death": 5329
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1684": {
+      "name": "Giant crypt spider",
+      "anims": {
+        "attack": 5319,
+        "block": 5320,
+        "death": 5321
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "1838": {
+      "name": "Duck",
+      "anims": {
+        "attack": 3467,
+        "block": 424,
+        "death": 3468
+      },
+      "sounds": {
+        "death": 411
+      }
+    },
+    "1839": {
+      "name": "Duck",
+      "anims": {
+        "attack": 3467,
+        "block": 424,
+        "death": 3468
+      },
+      "sounds": {
+        "death": 411
+      }
+    },
+    "2001": {
+      "name": "Duckling",
+      "anims": {
+        "attack": 3467,
+        "block": 424,
+        "death": 3468
+      },
+      "sounds": {
+        "death": 411
+      }
+    },
+    "2205": {
+      "name": "Commander Zilyana",
+      "anims": {
+        "attack": 422,
+        "block": 424,
+        "death": 6968
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2206": {
+      "name": "Starlight",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2207": {
+      "name": "Growler",
+      "anims": {
+        "attack": 7037,
+        "block": 7035,
+        "death": 7034
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2208": {
+      "name": "Bree",
+      "anims": {
+        "attack": 7026,
+        "block": 7027,
+        "death": 7028
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2215": {
+      "name": "General Graardor",
+      "anims": {
+        "attack": 7018,
+        "block": 7019,
+        "death": 7020
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2216": {
+      "name": "Sergeant Strongstack",
+      "anims": {
+        "attack": 6154,
+        "block": 6155,
+        "death": 6156
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2217": {
+      "name": "Sergeant Steelwill",
+      "anims": {
+        "attack": 7071,
+        "block": 6155,
+        "death": 6156
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2218": {
+      "name": "Sergeant Grimspike",
+      "anims": {
+        "attack": 7073,
+        "block": 6155,
+        "death": 6156
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2245": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2246": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2247": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 7042
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2248": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2249": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2477": {
+      "name": "Giant spider",
+      "anims": {
+        "attack": 5319,
+        "block": 5320,
+        "death": 5321
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2478": {
+      "name": "Spider",
+      "anims": {
+        "attack": 5327,
+        "block": 5328,
+        "death": 5329
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2479": {
+      "name": "Scorpion",
+      "anims": {
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2480": {
+      "name": "Scorpion",
+      "anims": {
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2484": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2485": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2486": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2487": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2488": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2489": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2492": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2510": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2511": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2512": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2513": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
     "2693": {
       "name": "Sheep",
       "anims": {
@@ -40,6 +711,116 @@
       },
       "sounds": {
         "death": 763
+      }
+    },
+    "2790": {
+      "name": "Cow",
+      "anims": {
+        "attack": 5849,
+        "block": 5850,
+        "death": 5851
+      },
+      "sounds": {
+        "death": 370
+      }
+    },
+    "2791": {
+      "name": "Cow",
+      "anims": {
+        "attack": 5849,
+        "block": 5850,
+        "death": 5851
+      },
+      "sounds": {
+        "death": 370
+      }
+    },
+    "2792": {
+      "name": "Cow calf",
+      "anims": {
+        "attack": 5849,
+        "block": 5850,
+        "death": 5851
+      },
+      "sounds": {
+        "death": 367
+      }
+    },
+    "2793": {
+      "name": "Cow",
+      "anims": {
+        "attack": 5849,
+        "block": 5850,
+        "death": 5851
+      },
+      "sounds": {
+        "death": 370
+      }
+    },
+    "2794": {
+      "name": "Cow calf",
+      "anims": {
+        "attack": 5849,
+        "block": 5850,
+        "death": 5851
+      },
+      "sounds": {
+        "death": 367
+      }
+    },
+    "2804": {
+      "name": "Chicken",
+      "anims": {
+        "attack": 5387,
+        "block": 5388,
+        "death": 5389
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2805": {
+      "name": "Chicken",
+      "anims": {
+        "attack": 5387,
+        "block": 5388,
+        "death": 5389
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2806": {
+      "name": "Chicken",
+      "anims": {
+        "attack": 5387,
+        "block": 5388,
+        "death": 5389
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "2837": {
+      "name": "Unicorn",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 370
+      }
+    },
+    "2849": {
+      "name": "Black unicorn",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 3835
       }
     },
     "2854": {
@@ -59,278 +840,9 @@
         "attack": 2705,
         "block": 2706,
         "death": 2707
-      }
-    },
-    "1020": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "1021": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "1022": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "2492": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "2513": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4594": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4595": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4610": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4611": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4612": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4613": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4614": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4615": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4616": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4617": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4618": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "4809": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "6224": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "6225": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "6226": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "6227": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "6228": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "6229": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "6793": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "9618": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "10682": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "13624": {
-      "name": "Rat",
-      "anims": {
-        "attack": 2705,
-        "block": 2706,
-        "death": 2707
-      }
-    },
-    "1062": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "1680": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "1681": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "1682": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "2510": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "2511": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "2512": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "2856": {
@@ -339,6 +851,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 711
       }
     },
     "2857": {
@@ -347,6 +862,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "2858": {
@@ -355,6 +873,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "2859": {
@@ -363,6 +884,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 711
       }
     },
     "2860": {
@@ -371,6 +895,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 711
       }
     },
     "2861": {
@@ -379,6 +906,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 711
       }
     },
     "2862": {
@@ -387,6 +917,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "2863": {
@@ -395,6 +928,9 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 711
       }
     },
     "2864": {
@@ -403,382 +939,185 @@
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 711
       }
     },
     "2865": {
-      "name": "Giant rat",
+      "name": "Dungeon rat",
       "anims": {
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "2866": {
-      "name": "Giant rat",
+      "name": "Dungeon rat",
       "anims": {
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "2867": {
-      "name": "Giant rat",
+      "name": "Dungeon rat",
       "anims": {
         "attack": 4933,
         "block": 4934,
         "death": 4935
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "3313": {
-      "name": "Giant rat",
+    "3014": {
+      "name": "Man",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 422,
+        "block": 424,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "3314": {
-      "name": "Giant rat",
+    "3016": {
+      "name": "Shadow spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 5327,
+        "block": 5328,
+        "death": 5329
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "3315": {
-      "name": "Giant rat",
+    "3017": {
+      "name": "Giant spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 5327,
+        "block": 5328,
+        "death": 5329
+      },
+      "sounds": {
+        "death": 538
       }
     },
-    "3607": {
-      "name": "Giant rat",
+    "3018": {
+      "name": "Giant spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 5319,
+        "block": 5320,
+        "death": 5321
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "3608": {
-      "name": "Giant rat",
+    "3019": {
+      "name": "Spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 6249,
+        "block": 6250,
+        "death": 6251
+      },
+      "sounds": {
+        "death": 3608
       }
     },
-    "3609": {
-      "name": "Giant rat",
+    "3020": {
+      "name": "Jungle spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 5327,
+        "block": 5328,
+        "death": 5329
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "3969": {
-      "name": "Giant rat",
+    "3021": {
+      "name": "Deadly red spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 5319,
+        "block": 5320,
+        "death": 5321
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "3970": {
-      "name": "Giant rat",
+    "3022": {
+      "name": "Ice spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 5319,
+        "block": 5320,
+        "death": 5321
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "3971": {
-      "name": "Giant rat",
+    "3023": {
+      "name": "Poison spider",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 5319,
+        "block": 5320,
+        "death": 5321
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "4534": {
-      "name": "Giant rat",
+    "3024": {
+      "name": "Scorpion",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "4535": {
-      "name": "Giant rat",
+    "3025": {
+      "name": "Poison Scorpion",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "4689": {
-      "name": "Giant rat",
+    "3026": {
+      "name": "Pit Scorpion",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
       }
     },
-    "4690": {
-      "name": "Giant rat",
+    "3027": {
+      "name": "King Scorpion",
       "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "7223": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "7225": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "9026": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "9040": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "9483": {
-      "name": "Giant rat",
-      "anims": {
-        "attack": 4933,
-        "block": 4934,
-        "death": 4935
-      }
-    },
-    "1679": {
-      "name": "Rat",
-      "anims": {
-        "attack": 240,
-        "block": 241,
-        "death": 243
-      }
-    },
-    "4000": {
-      "name": "Rat",
-      "anims": {
-        "attack": 240,
-        "block": 241,
-        "death": 243
-      }
-    },
-    "655": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "656": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "657": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "658": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6199,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "659": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "660": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "661": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "662": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "663": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "664": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "665": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6199,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "667": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "668": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "2245": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "2246": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "2247": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 7042
-      }
-    },
-    "2248": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "2249": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "2484": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "2485": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "2486": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "2487": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "2488": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "2489": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3028": {
@@ -886,6 +1225,9 @@
         "attack": 6188,
         "block": 6189,
         "death": 6190
+      },
+      "sounds": {
+        "death": 471
       }
     },
     "3046": {
@@ -894,6 +1236,9 @@
         "attack": 6184,
         "block": 6183,
         "death": 6182
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3051": {
@@ -902,6 +1247,9 @@
         "attack": 6185,
         "block": 6183,
         "death": 6182
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3052": {
@@ -910,6 +1258,9 @@
         "attack": 6185,
         "block": 6183,
         "death": 6182
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3053": {
@@ -918,6 +1269,9 @@
         "attack": 6185,
         "block": 6183,
         "death": 6182
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3054": {
@@ -926,6 +1280,9 @@
         "attack": 6185,
         "block": 6183,
         "death": 6182
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3073": {
@@ -934,6 +1291,9 @@
         "attack": 6188,
         "block": 6189,
         "death": 6190
+      },
+      "sounds": {
+        "death": 471
       }
     },
     "3074": {
@@ -942,6 +1302,9 @@
         "attack": 6188,
         "block": 6189,
         "death": 6190
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3075": {
@@ -950,6 +1313,9 @@
         "attack": 6188,
         "block": 6189,
         "death": 6190
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "3076": {
@@ -958,153 +1324,6 @@
         "attack": 6188,
         "block": 6189,
         "death": 6190
-      }
-    },
-    "5192": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5193": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5195": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5196": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5197": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5198": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5199": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5200": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5201": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5202": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5203": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6184,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5204": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6188,
-        "block": 6189,
-        "death": 6190
-      }
-    },
-    "5205": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5206": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5207": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "5208": {
-      "name": "Goblin",
-      "anims": {
-        "attack": 6185,
-        "block": 6183,
-        "death": 6182
-      }
-    },
-    "1118": {
-      "name": "Man",
-      "anims": {
-        "attack": 422,
-        "block": 424,
-        "death": 836
-      },
-      "sounds": {
-        "death": 512
-      }
-    },
-    "3014": {
-      "name": "Man",
-      "anims": {
-        "attack": 422,
-        "block": 424,
-        "death": 836
       },
       "sounds": {
         "death": 512
@@ -1114,7 +1333,7 @@
       "name": "Man",
       "anims": {
         "attack": 422,
-        "block": 424,
+        "block": 425,
         "death": 836
       },
       "sounds": {
@@ -1125,7 +1344,7 @@
       "name": "Man",
       "anims": {
         "attack": 422,
-        "block": 424,
+        "block": 425,
         "death": 836
       },
       "sounds": {
@@ -1136,7 +1355,7 @@
       "name": "Man",
       "anims": {
         "attack": 422,
-        "block": 424,
+        "block": 425,
         "death": 836
       },
       "sounds": {
@@ -1159,6 +1378,171 @@
       "anims": {
         "attack": 422,
         "block": 424,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3111": {
+      "name": "Woman",
+      "anims": {
+        "attack": 422,
+        "block": 425,
+        "death": 836
+      },
+      "sounds": {
+        "death": 505
+      }
+    },
+    "3112": {
+      "name": "Woman",
+      "anims": {
+        "attack": 422,
+        "block": 425,
+        "death": 836
+      },
+      "sounds": {
+        "death": 505
+      }
+    },
+    "3113": {
+      "name": "Woman",
+      "anims": {
+        "attack": 422,
+        "block": 425,
+        "death": 836
+      },
+      "sounds": {
+        "death": 505
+      }
+    },
+    "3114": {
+      "name": "Farmer",
+      "anims": {
+        "attack": 433,
+        "block": 434,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3129": {
+      "name": "K'ril Tsutsaroth",
+      "anims": {
+        "attack": 422,
+        "block": 424,
+        "death": 6949
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3130": {
+      "name": "Tstanon Karlak",
+      "anims": {
+        "attack": 4644,
+        "block": 65,
+        "death": 68
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3131": {
+      "name": "Zakl'n Gritch",
+      "anims": {
+        "attack": 7077,
+        "block": 65,
+        "death": 67
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3132": {
+      "name": "Balfrug Kreeyath",
+      "anims": {
+        "attack": 4630,
+        "block": 65,
+        "death": 67
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3134": {
+      "name": "Imp",
+      "anims": {
+        "attack": 169,
+        "block": 170,
+        "death": 172
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3162": {
+      "name": "Kree'arra",
+      "anims": {
+        "attack": 422,
+        "block": 424,
+        "death": 6979
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3163": {
+      "name": "Wingman Skree",
+      "anims": {
+        "attack": 6956,
+        "block": 6958,
+        "death": 6959
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3164": {
+      "name": "Flockleader Geerin",
+      "anims": {
+        "attack": 6956,
+        "block": 6958,
+        "death": 6959
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3165": {
+      "name": "Flight Kilisa",
+      "anims": {
+        "attack": 6957,
+        "block": 6958,
+        "death": 6959
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3243": {
+      "name": "Farmer",
+      "anims": {
+        "attack": 433,
+        "block": 434,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3244": {
+      "name": "Farmer",
+      "anims": {
+        "attack": 433,
+        "block": 434,
         "death": 836
       },
       "sounds": {
@@ -1209,12 +1593,155 @@
         "death": 512
       }
     },
+    "3313": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3314": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3315": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3316": {
+      "name": "Chicken",
+      "anims": {
+        "attack": 5387,
+        "block": 5388,
+        "death": 5389
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3607": {
+      "name": "Dungeon rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3608": {
+      "name": "Dungeon rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3609": {
+      "name": "Dungeon rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
     "3652": {
       "name": "Man",
       "anims": {
         "attack": 422,
         "block": 424,
         "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3910": {
+      "name": "Unicorn Foal",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 3835
+      }
+    },
+    "3911": {
+      "name": "Black unicorn Foal",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 3835
+      }
+    },
+    "3969": {
+      "name": "Zombie rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3970": {
+      "name": "Zombie rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "3971": {
+      "name": "Zombie rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4000": {
+      "name": "Mouse",
+      "anims": {
+        "attack": 240,
+        "block": 241,
+        "death": 243
       },
       "sounds": {
         "death": 512
@@ -1242,6 +1769,512 @@
         "death": 512
       }
     },
+    "4534": {
+      "name": "Blessed giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4535": {
+      "name": "Blessed giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4594": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4595": {
+      "name": "King rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4610": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4611": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4612": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4613": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4614": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4615": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4616": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4617": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4618": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4688": {
+      "name": "Angry unicorn",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 877
+      }
+    },
+    "4689": {
+      "name": "Angry giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4690": {
+      "name": "Angry giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "4809": {
+      "name": "Hell-Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5007": {
+      "name": "Imp",
+      "anims": {
+        "attack": 169,
+        "block": 170,
+        "death": 172
+      },
+      "sounds": {
+        "death": 535
+      }
+    },
+    "5192": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5193": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5195": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5196": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5197": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5198": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5199": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5200": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5201": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5202": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5203": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6184,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5204": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6188,
+        "block": 6189,
+        "death": 6190
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5205": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5206": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5207": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5208": {
+      "name": "Goblin",
+      "anims": {
+        "attack": 6185,
+        "block": 6183,
+        "death": 6182
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5211": {
+      "name": "null",
+      "anims": {
+        "attack": 390,
+        "block": 383,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5228": {
+      "name": "Kharid Scorpion",
+      "anims": {
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5229": {
+      "name": "Kharid Scorpion",
+      "anims": {
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5230": {
+      "name": "Kharid Scorpion",
+      "anims": {
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5242": {
+      "name": "Scorpion",
+      "anims": {
+        "attack": 6254,
+        "block": 6255,
+        "death": 6256
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "5728": {
+      "name": "Imp",
+      "anims": {
+        "attack": 169,
+        "block": 170,
+        "death": 172
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "6224": {
+      "name": "null",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "6225": {
+      "name": "null",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "6226": {
+      "name": "null",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "6227": {
+      "name": "null",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "6228": {
+      "name": "null",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "6229": {
+      "name": "null",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
     "6776": {
       "name": "Man",
       "anims": {
@@ -1253,11 +2286,22 @@
         "death": 512
       }
     },
+    "6793": {
+      "name": "Hell-Rat Behemoth",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
     "6818": {
       "name": "Man",
       "anims": {
         "attack": 422,
-        "block": 424,
+        "block": 425,
         "death": 836
       },
       "sounds": {
@@ -1297,6 +2341,61 @@
         "death": 512
       }
     },
+    "7024": {
+      "name": "Reanimated unicorn",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 3835
+      }
+    },
+    "7221": {
+      "name": "Scurrius",
+      "anims": {
+        "attack": 422,
+        "block": 424,
+        "death": 10705
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "7222": {
+      "name": "Scurrius",
+      "anims": {
+        "attack": 422,
+        "block": 424,
+        "death": 10705
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "7223": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "7225": {
+      "name": "null",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
     "7281": {
       "name": "Man",
       "anims": {
@@ -1328,6 +2427,105 @@
       },
       "sounds": {
         "death": 512
+      }
+    },
+    "8700": {
+      "name": "Giant frog",
+      "anims": {
+        "attack": 1793,
+        "block": 1794,
+        "death": 1795
+      },
+      "sounds": {
+        "death": 839
+      }
+    },
+    "8701": {
+      "name": "Big frog",
+      "anims": {
+        "attack": 1793,
+        "block": 1794,
+        "death": 1795
+      },
+      "sounds": {
+        "death": 843
+      }
+    },
+    "8702": {
+      "name": "Frog",
+      "anims": {
+        "attack": 1793,
+        "block": 1794,
+        "death": 1795
+      },
+      "sounds": {
+        "death": 843
+      }
+    },
+    "8986": {
+      "name": "Unicorn",
+      "anims": {
+        "attack": 289,
+        "block": 290,
+        "death": 292
+      },
+      "sounds": {
+        "death": 3835
+      }
+    },
+    "9026": {
+      "name": "Crystalline Rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "9029": {
+      "name": "Crystalline Unicorn",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 4625
+      }
+    },
+    "9040": {
+      "name": "Corrupted Rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "9043": {
+      "name": "Corrupted Unicorn",
+      "anims": {
+        "attack": 6376,
+        "block": 6375,
+        "death": 6377
+      },
+      "sounds": {
+        "death": 4625
+      }
+    },
+    "9209": {
+      "name": "null",
+      "anims": {
+        "attack": 289,
+        "block": 290,
+        "death": 292
+      },
+      "sounds": {
+        "death": 3835
       }
     },
     "9390": {
@@ -1407,6 +2605,39 @@
         "death": 512
       }
     },
+    "9483": {
+      "name": "Giant rat",
+      "anims": {
+        "attack": 4933,
+        "block": 4934,
+        "death": 4935
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "9618": {
+      "name": "null",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "10682": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
     "11057": {
       "name": "Man",
       "anims": {
@@ -1429,503 +2660,556 @@
         "death": 512
       }
     },
-    "1061": {
-      "name": "Angry unicorn",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 877
-      }
-    },
-    "2837": {
-      "name": "Unicorn",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 3835
-      }
-    },
-    "2849": {
-      "name": "Black unicorn",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 3835
-      }
-    },
-    "3910": {
-      "name": "Unicorn foal",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 3835
-      }
-    },
-    "3911": {
-      "name": "Black unicorn foal",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 3835
-      }
-    },
-    "4688": {
-      "name": "Angry unicorn",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 877
-      }
-    },
-    "7024": {
-      "name": "Reanimated unicorn",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 3835
-      }
-    },
-    "8986": {
-      "name": "Unicorn",
-      "anims": {
-        "attack": 289,
-        "block": 290,
-        "death": 292
-      },
-      "sounds": {
-        "death": 3835
-      }
-    },
-    "9029": {
-      "name": "Crystalline unicorn",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 4625
-      }
-    },
-    "9043": {
-      "name": "Corrupted unicorn",
-      "anims": {
-        "attack": 6376,
-        "block": 6375,
-        "death": 6377
-      },
-      "sounds": {
-        "death": 4625
-      }
-    },
-    "9209": {
-      "name": "Unicorn",
-      "anims": {
-        "attack": 289,
-        "block": 290,
-        "death": 292
-      },
-      "sounds": {
-        "death": 3835
-      }
-    },
-    "3134": {
-      "name": "Imp",
-      "anims": {
-        "attack": 169,
-        "block": 170,
-        "death": 172
-      }
-    },
-    "5007": {
-      "name": "Imp",
-      "anims": {
-        "attack": 169,
-        "block": 170,
-        "death": 172
-      }
-    },
-    "5728": {
-      "name": "Imp",
-      "anims": {
-        "attack": 169,
-        "block": 170,
-        "death": 172
-      }
-    },
-    "1173": {
-      "name": "Chicken",
-      "anims": {
-        "attack": 5387,
-        "block": 5388,
-        "death": 5389
-      }
-    },
-    "1174": {
-      "name": "Chicken",
-      "anims": {
-        "attack": 5387,
-        "block": 5388,
-        "death": 5389
-      }
-    },
-    "2804": {
-      "name": "Chicken",
-      "anims": {
-        "attack": 5387,
-        "block": 5388,
-        "death": 5389
-      }
-    },
-    "2805": {
-      "name": "Chicken",
-      "anims": {
-        "attack": 5387,
-        "block": 5388,
-        "death": 5389
-      }
-    },
-    "2806": {
-      "name": "Chicken",
-      "anims": {
-        "attack": 5387,
-        "block": 5388,
-        "death": 5389
-      }
-    },
-    "3316": {
-      "name": "Chicken",
-      "anims": {
-        "attack": 5387,
-        "block": 5388,
-        "death": 5389
-      }
-    },
-    "2479": {
-      "name": "Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "2480": {
-      "name": "Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "3024": {
-      "name": "Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "3025": {
-      "name": "Poison Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "3026": {
-      "name": "Pit Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "3027": {
-      "name": "King Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "5228": {
-      "name": "Kharid Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "5229": {
-      "name": "Kharid Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "5230": {
-      "name": "Kharid Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "5242": {
-      "name": "Scorpion",
-      "anims": {
-        "attack": 6254,
-        "block": 6255,
-        "death": 6256
-      }
-    },
-    "2477": {
-      "name": "Giant Spider",
-      "anims": {
-        "attack": 5319,
-        "block": 5320,
-        "death": 5321
-      }
-    },
-    "2478": {
-      "name": "Spider",
-      "anims": {
-        "attack": 5327,
-        "block": 5328,
-        "death": 5329
-      }
-    },
-    "3016": {
-      "name": "Shadow Spider",
-      "anims": {
-        "attack": 5327,
-        "block": 5328,
-        "death": 5329
-      }
-    },
-    "3017": {
-      "name": "Giant Spider",
-      "anims": {
-        "attack": 5319,
-        "block": 5320,
-        "death": 5321
-      }
-    },
-    "3018": {
-      "name": "Giant Spider",
-      "anims": {
-        "attack": 5319,
-        "block": 5320,
-        "death": 5321
-      }
-    },
-    "3019": {
-      "name": "Spider",
-      "anims": {
-        "attack": 5327,
-        "block": 5328,
-        "death": 5329
-      }
-    },
-    "3020": {
-      "name": "Jungle Spider",
-      "anims": {
-        "attack": 5327,
-        "block": 5328,
-        "death": 5329
-      }
-    },
-    "3021": {
-      "name": "Deadly Red Spider",
-      "anims": {
-        "attack": 5319,
-        "block": 5320,
-        "death": 5321
-      }
-    },
-    "3022": {
-      "name": "Ice Spider",
-      "anims": {
-        "attack": 5319,
-        "block": 5320,
-        "death": 5321
-      }
-    },
-    "3023": {
-      "name": "Poison Spider",
-      "anims": {
-        "attack": 5319,
-        "block": 5320,
-        "death": 5321
-      }
-    },
-    "1683": {
-      "name": "Crypt Spider",
-      "anims": {
-        "attack": 5327,
-        "block": 5328,
-        "death": 5329
-      }
-    },
-    "1684": {
-      "name": "Giant Crypt Spider",
-      "anims": {
-        "attack": 5319,
-        "block": 5320,
-        "death": 5321
-      }
-    },
     "11911": {
       "name": "Guard",
       "anims": {
         "attack": 386,
-        "block": 1156
+        "block": 1156,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "11912": {
       "name": "Guard",
       "anims": {
         "attack": 386,
-        "block": 1156
+        "block": 1156,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "11913": {
       "name": "Guard",
       "anims": {
         "attack": 386,
-        "block": 1156
+        "block": 1156,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "11914": {
       "name": "Guard",
       "anims": {
         "attack": 386,
-        "block": 1156
+        "block": 1156,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "11915": {
       "name": "Guard",
       "anims": {
         "attack": 386,
-        "block": 1156
+        "block": 1156,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "11916": {
       "name": "Guard",
       "anims": {
         "attack": 386,
-        "block": 1156
+        "block": 1156,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
       }
     },
     "11917": {
       "name": "Guard",
       "anims": {
         "attack": 386,
-        "block": 1156
+        "block": 1156,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "11918": {
+      "name": "Farmer",
+      "anims": {
+        "attack": 386,
+        "block": 387,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "11919": {
+      "name": "Farmer",
+      "anims": {
+        "attack": 386,
+        "block": 387,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "11920": {
+      "name": "Farmer",
+      "anims": {
+        "attack": 386,
+        "block": 387,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "11921": {
+      "name": "Farmer",
+      "anims": {
+        "attack": 433,
+        "block": 434,
+        "death": 836
+      },
+      "sounds": {
+        "death": 512
+      }
+    },
+    "13624": {
+      "name": "Rat",
+      "anims": {
+        "attack": 2705,
+        "block": 2706,
+        "death": 2707
+      },
+      "sounds": {
+        "death": 512
       }
     }
   },
   "refs": {
     "$comment": "Additional NPC combat sequences inferred from cache-backed reference sequence names.",
     "npcs": [
-      [2790, 5849, 5850, 5851],
-      [2791, 5849, 5850, 5851],
-      [2792, 5849, 5850, 5851],
-      [2793, 5849, 5850, 5851],
-      [2794, 5849, 5850, 5851],
-      [2795, 5849, 5850, 5851],
-      [2801, 5849, 5850, 5851],
-      [3010, 6489, 6488, 6490],
-      [3011, 6489, 6488, 6490],
-      [3012, 6489, 6488, 6490],
-      [3013, 6489, 6488, 6490],
-      [3527, 6489, 6488, 6490],
-      [5842, 5849, 5850, 5851],
-      [10393, 6489, 6488, 6490],
-      [10394, 6489, 6488, 6490],
-
-      [2098, 4652, 4651, 4653],
-      [2099, 4652, 4651, 4653],
-      [2100, 4652, 4651, 4653],
-      [2101, 4652, 4651, 4653],
-      [2102, 4652, 4651, 4653],
-      [2103, 4652, 4651, 4653],
-      [7261, 4652, 4651, 4653],
-      [10374, 4652, 4651, 4653],
-      [10375, 4652, 4651, 4653],
-      [10376, 4652, 4651, 4653],
-
-      [2090, 4658, 4657, 4659],
-      [2091, 4658, 4657, 4659],
-      [2092, 4658, 4657, 4659],
-      [2093, 4658, 4657, 4659],
-      [3851, 4658, 4657, 4659],
-      [7262, 4658, 4657, 4659],
-      [8015, 4658, 4657, 4659],
-      [8016, 4658, 4657, 4659],
-      [8017, 4658, 4657, 4659],
-      [8018, 4658, 4657, 4659],
-
-      [2085, 4672, 4671, 4673],
-      [2086, 4672, 4671, 4673],
-      [2087, 4672, 4671, 4673],
-      [2088, 4672, 4671, 4673],
-      [2089, 4672, 4671, 4673],
-      [7878, 4672, 4671, 4673],
-      [7879, 4672, 4671, 4673],
-      [7880, 4672, 4671, 4673],
-      [8488, 4672, 4671, 4673],
-      [8489, 4672, 4671, 4673],
-      [8490, 4672, 4671, 4673],
-
-      [2075, 4666, 4664, 4668],
-      [2076, 4666, 4664, 4668],
-      [2077, 4666, 4664, 4668],
-      [2078, 4666, 4664, 4668],
-      [2079, 4666, 4664, 4668],
-      [2080, 4666, 4664, 4668],
-      [2081, 4666, 4664, 4668],
-      [2082, 4666, 4664, 4668],
-      [2083, 4666, 4664, 4668],
-      [8392, 4666, 4664, 4668],
-      [8393, 4666, 4664, 4668],
-      [8394, 4666, 4664, 4668],
-
-      [7251, 4667, 4665, 4668],
-      [7252, 4667, 4665, 4668],
-
-      [260, 80, 89, 92],
-      [261, 80, 89, 92],
-      [262, 80, 89, 92],
-      [263, 80, 89, 92],
-      [264, 80, 89, 92],
-      [6593, 80, 89, 92],
-      [7868, 80, 89, 92],
-      [7869, 80, 89, 92],
-      [7870, 80, 89, 92]
+      [
+        2790,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        2791,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        2792,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        2793,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        2794,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        2795,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        2801,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        3010,
+        6489,
+        6488,
+        6490
+      ],
+      [
+        3011,
+        6489,
+        6488,
+        6490
+      ],
+      [
+        3012,
+        6489,
+        6488,
+        6490
+      ],
+      [
+        3013,
+        6489,
+        6488,
+        6490
+      ],
+      [
+        3527,
+        6489,
+        6488,
+        6490
+      ],
+      [
+        5842,
+        5849,
+        5850,
+        5851
+      ],
+      [
+        10393,
+        6489,
+        6488,
+        6490
+      ],
+      [
+        10394,
+        6489,
+        6488,
+        6490
+      ],
+      [
+        2098,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        2099,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        2100,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        2101,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        2102,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        2103,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        7261,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        10374,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        10375,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        10376,
+        4652,
+        4651,
+        4653
+      ],
+      [
+        2090,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        2091,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        2092,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        2093,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        3851,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        7262,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        8015,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        8016,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        8017,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        8018,
+        4658,
+        4657,
+        4659
+      ],
+      [
+        2085,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        2086,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        2087,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        2088,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        2089,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        7878,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        7879,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        7880,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        8488,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        8489,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        8490,
+        4672,
+        4671,
+        4673
+      ],
+      [
+        2075,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2076,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2077,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2078,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2079,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2080,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2081,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2082,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        2083,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        8392,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        8393,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        8394,
+        4666,
+        4664,
+        4668
+      ],
+      [
+        7251,
+        4667,
+        4665,
+        4668
+      ],
+      [
+        7252,
+        4667,
+        4665,
+        4668
+      ],
+      [
+        260,
+        80,
+        89,
+        92
+      ],
+      [
+        261,
+        80,
+        89,
+        92
+      ],
+      [
+        262,
+        80,
+        89,
+        92
+      ],
+      [
+        263,
+        80,
+        89,
+        92
+      ],
+      [
+        264,
+        80,
+        89,
+        92
+      ],
+      [
+        6593,
+        80,
+        89,
+        92
+      ],
+      [
+        7868,
+        80,
+        89,
+        92
+      ],
+      [
+        7869,
+        80,
+        89,
+        92
+      ],
+      [
+        7870,
+        80,
+        89,
+        92
+      ]
     ]
   },
   "defaults": {
