@@ -257,20 +257,16 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetNpcHead(interfaceId, id))) return this;
   }
 
+  // Real OSRS clientscript IDs (mesLayerMode7/mesLayerMode9), confirmed against
+  // OpenRune-Server's ProtectedAccess.countDialog()/stringDialog() - runClientScript(108, title)
+  // opens the numeric "enter amount" prompt (resolved via resume_countdialog), runClientScript(110,
+  // title, mode) opens the free-text prompt (resolved via resume_namedialog/resume_stringdialog).
   public sendEnterAmountPrompt(title: string): PacketSender {
-    // Java parity: opcode 27 (variable) for enter amount.
-    const out = new PacketBuilder(27, PacketType.VARIABLE);
-    out.putString(title);
-    this.player.getSession().write(out);
-    return this;
+    return this.sendClientScript(108, title);
   }
 
   public sendEnterInputPrompt(title: string): PacketSender {
-    // Java parity: opcode 187 (variable) for enter input.
-    const out = new PacketBuilder(187, PacketType.VARIABLE);
-    out.putString(title);
-    this.player.getSession().write(out);
-    return this;
+    return this.sendClientScript(110, title, 0);
   }
 
   public sendExit(): PacketSender {

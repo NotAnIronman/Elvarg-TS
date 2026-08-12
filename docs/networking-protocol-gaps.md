@@ -37,6 +37,19 @@ reaches the wire. This document is the deeper, feature-level follow-up.
   are dead *and* still have real callers (actual broken features, not just clutter) are catalogued
   individually below, with what would be needed to fix each - most need new client-side work in
   xrsps-typescript, not just an elvarg-side wiring fix.
+- **`sendEnterAmountPrompt`/`sendEnterInputPrompt` fixed** - server-initiated numeric/text entry
+  prompts (admin `::setlevel`, clan chat channel naming, preset naming, shop custom quantity) now
+  work. The reference wasn't in xrsps-typescript (it has no server-initiated prompt implementation
+  at all) but in OpenRune-Server: `ProtectedAccess.countDialog()`/`stringDialog()`
+  (`api/player/src/main/kotlin/org/rsmod/api/player/protect/ProtectedAccess.kt:2806-2839`) call
+  `mesLayerMode7`/`mesLayerMode9` (`api/player-output/.../ClientScripts.kt:78-82`), which resolve to
+  real, cache-verified OSRS clientscript IDs: `runClientScript(108, title)` opens the numeric prompt,
+  `runClientScript(110, title, mode)` opens the free-text one. Confirmed xrsps's client actually
+  executes real cache CS2 bytecode for server-pushed `runClientScript` calls (not a stub) at
+  `client/network/serverConnection/handlers/inboundWorld.ts:277-305`. Both methods now delegate to
+  the already-live `sendClientScript()` wrapper with those two script IDs - no new encoder needed,
+  and the response side (`resume_countdialog`/`resume_namedialog`/`resume_stringdialog`) was already
+  working. See `net/packet/PacketSender.ts:260-268`.
 
 ## The recurring bug pattern
 
@@ -471,7 +484,6 @@ Listed here with what was actually checked, not guessed:
 | Method (callers) | What it's for | What was checked |
 | --- | --- | --- |
 | `sendInteractionOption` (16) | Relabeling the right-click menu on other players ("Attack"/"Trade With"/"Challenge"/"null" during duels, wilderness, Castle Wars) | Checked the client's own menu-building code (`client/render/render/interact/check.ts`): "Attack" on other players is **not server-driven at all** - it's gated by `canAttackPlayers = isInWilderness(x, y)`, computed purely from the local player's own coordinates, which the client already has. For wilderness PvP specifically, these calls are provably unnecessary (the client already shows/hides Attack correctly with zero server input). For Castle Wars/Duel Arena, there is **no** server override for the wilderness-only gate - matches the already-documented "Bot Status right-click option" gap in kind: a client-side hardcoded rule, not a missing wire-up. `ClientState.playerAttackOption` (attack-option priority 0-4) *is* server-settable via a varp (`client/network/serverConnection/handlers/inboundWorld.ts:227`) if finer control over prioritization is ever needed, but that's a secondary concern, not what these calls are trying to do. |
-| `sendEnterAmountPrompt` (7), `sendEnterInputPrompt` (5) | Server-initiated numeric/text input prompts (admin `::setlevel`, clan chat channel naming, preset naming, shop/price-checker custom quantity) | The client's input-dialog machinery (`client/game/widgets/input/widgetKeyboardInput.ts`) is driven by a CS2 VM flag (`inputDialogType`) that gets set by CS2 opcode `SETKEYINPUTMODE_KEYBOARD` (`client/rs/cs2/handlers/ClientOps.ts:706-708`) - meaning a real server-initiated prompt would need to trigger that CS2 script via the already-live `encodeRunClientScript`/`encodeWidgetRunScript`. Searched xrsps's own server for any use of this (script ID, trigger point) and found none - xrsps itself has apparently never implemented server-initiated prompts, only the passive `resume_countdialog`/`resume_namedialog`/`resume_stringdialog` response side (which elvarg already handles correctly, see "Verified working" above). No reference scriptId to copy; guessing one risks silently invoking the wrong CS2 script. |
 | `sendPositionalHint` (3), `sendEntityHint` (3), `sendEntityHintRemoval` (6), `sendMultiIcon` (1) | Hint-arrows pointing at a tile or entity | Searched xrsps's `messages.ts` and `network/encoding/` for any hint-arrow message type or encoder - none exists. Not a wiring gap, a feature xrsps's own protocol doesn't have at all. |
 | `sendFriend` (4), `sendDeleteFriend` (2), `sendFriendStatus` (1), `sendAddIgnore` (3), `sendDeleteIgnore` (2) | Populating/updating the friends and ignore list UI (server → client direction) | Extends the already-documented friends/ignore-list gap: not only can the client not *send* add/remove friend (documented earlier), xrsps's `messages.ts` has no friend/ignore-related type in *either* direction - the server can't even push a friends-list snapshot to display. The feature doesn't exist in this protocol at all, not just the write path. |
 | `sendPoisonType`, `sendEffectTimer`, `sendGraphic`, `sendGlobalGraphic` | Poison/freeze/venom status indicators, tile-anchored graphics | Already covered above under "Confirmed live-gameplay bugs" - poison/freeze/venom need the `colorOverride` subsystem (missing entirely), tile graphics need a new server→client message (no `GRAPHIC`-family opcode exists in the current 160-packet table at all, only per-actor `SPOT_ANIM`). |
