@@ -1434,44 +1434,9 @@ export class MovementQueue {
 
         //System.err.println("RequestedX=" + objectX + " requestedY=" + objectY + " givenX=" + finalDestinationX + " givenY=" + finalDestinationY);
 
-        let finalObjectY = objectY;
-
         this.player.setPositionToFace(new Location(objectX, objectY));
-        let walkStage = 0;
         let repathAttempts = 0;
         TaskManager.submit(new MovementeTaskFunc(this.player.getIndex(), () => {
-            if (walkStage != 0) {
-
-                if (objectX == this.player.getLocation().getX() && finalObjectY == this.player.getLocation().getY()) {
-                    if (direction == 0)
-                        this.player.setDirection(Direction.WEST);
-                    else if (direction === 1) {
-                        this.player.setDirection(Direction.NORTH);
-                    } else if (direction === 2) {
-                        this.player.setDirection(Direction.EAST);
-                    } else if (direction === 3) {
-                        this.player.setDirection(Direction.SOUTH);
-                    }
-                }
-                this.pathX = this.player.getLocation().getX();
-                this.pathY = this.player.getLocation().getY();
-                if (walkStage === 1) {
-                    if (action !== null) {
-                        this.player.setPositionToFace(
-                            new Location(
-                                objectX,
-                                objectY,
-                                this.player.getLocation().getZ()
-                            )
-                        );
-                        action.execute();
-                    }
-                    TaskManager.cancelTasks(this.player.getIndex());
-                    return;
-                }
-                TaskManager.cancelTasks(this.player.getIndex());
-                return;
-            }
             if (PathFinder.reachedObject(
                 this.player,
                 objectX,
@@ -1482,7 +1447,14 @@ export class MovementQueue {
                 routeSpec.reachShape,
                 routeSpec.reachBlockAccessFlags
             )) {
-                walkStage = 1;
+                if (objectX === this.player.getLocation().getX() && objectY === this.player.getLocation().getY()) {
+                    this.player.setDirection([Direction.WEST, Direction.NORTH, Direction.EAST, Direction.SOUTH][direction]);
+                }
+                this.pathX = this.player.getLocation().getX();
+                this.pathY = this.player.getLocation().getY();
+                this.player.setPositionToFace(new Location(objectX, objectY, this.player.getLocation().getZ()));
+                action.execute();
+                TaskManager.cancelTasks(this.player.getIndex());
                 return;
             }
             if (this.points.length || this.player.getMovementQueue().isMovings()) {
@@ -1500,11 +1472,11 @@ export class MovementQueue {
                 }
             }
 
-            walkStage = -1;
             MovementQueue.log(
                 `[walkToObject] ${this.ownerLabel()} failed route=${this.player.getMovementQueue().hasRoute()} current=${this.player.getLocation().getX()},${this.player.getLocation().getY()} expected=${finalDestinationX},${finalDestinationY}`
             );
             this.player.getPacketSender().sendMessage("You can't reach that!");
+            TaskManager.cancelTasks(this.player.getIndex());
         }));
     }
 
