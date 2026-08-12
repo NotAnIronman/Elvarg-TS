@@ -85,8 +85,6 @@ const TREES = [
       ObjectIds.DEAD_TREE_10,
       1315,
       1316,
-      ObjectIds.EVERGREEN,
-      ObjectIds.EVERGREEN_2,
       ObjectIds.TREE_9,
       ObjectIds.TREE_10,
       ObjectIds.TREE_11,
