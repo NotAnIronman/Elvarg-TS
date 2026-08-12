@@ -1,21 +1,10 @@
-// import { Player } from "../../game/entity/impl/player/Player";
 import { PacketBuilder } from "./PacketBuilder";
 import { ValueType } from "./ValueType";
 import { ByteOrder } from "./ByteOrder";
-// import { CreationMenu } from "../../game/model/menu/CreationMenu";
 import { PacketType } from "./PacketType";
 import { PlayerStatus } from "../../game/model/PlayerStatus";
 import { Flag } from "../../game/model/Flag";
 import { Skill } from "../../game/model/Skill";
-// import { Skill } from "../../game/model/Skill";
-// import { GameConstants } from "../../game/GameConstants";
-// import { PlayerStatus } from "../../game/model/PlayerStatus";
-// import { Bank } from "../../game/model/container/impl/Bank";
-// import { PlayerInteractingOptions, PlayerInteractingOption } from "../../game/model/PlayerInteractingOption";
-// import { GameObject } from "../../game/entity/impl/object/GameObject";
-// import { ItemOnGround } from "../../game/entity/impl/grounditem/ItemOnGround";
-// import { Graphic } from "../../game/model/Graphic";
-// import { Inventory } from "../../game/model/container/impl/Inventory";
 import { Location } from "../../game/model/Location";
 import { DonatorRights } from "../../game/model/rights/DonatorRights";
 import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
@@ -69,33 +58,15 @@ import {
   WORLD_MAP_GROUP_ID,
   WORLD_MAP_TARGET_UID,
 } from "../protocol/WorldMapProtocol";
-// import { Animation } from "../../game/model/Animation";
-// import { Item } from "../../game/model/Item";
-// import { Mobile } from "../../game/entity/impl/Mobile";
-// import { EffectTimer } from "../../game/model/EffectTimer";
-// import { DonatorRights } from "../../game/model/rights/DonatorRights";
-
 const CHATBOX_MODAL_TARGET_UID = (162 << 16) | 567;
 
 export class PacketSender {
   private groundItemSerial = 0;
   private subInterfaceTargets = new Map<number, { targetUid: number; type: number }>();
   private chatboxGroupId = -1;
-  // private player: Player;
-  // constructor(player: Player) {
-  //     this.player = player;
-  // }
   private player: any;
   constructor(player: any) {
     this.player = player;
-  }
-
-  public sendDetails(): PacketSender {
-    let out = new PacketBuilder(249);
-    out.put(1);
-    out.putShort(this.player.getIndex());
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendMapRegion(): PacketSender {
@@ -131,12 +102,6 @@ export class PacketSender {
     return this;
   }
 
-  sendRegionReload(): this {
-    const out = new PacketBuilder(89);
-    this.player.getSession().write(out);
-    return this;
-  }
-
   sendSystemUpdate(time: number): this {
     const out = new PacketBuilder(114);
     const byteOrder = ByteOrder.LITTLE;
@@ -145,31 +110,8 @@ export class PacketSender {
     return this;
   }
 
-  sendTeleportInterface(menu: number): this {
-    this.player.setTeleportInterfaceOpen(true);
-    const out = new PacketBuilder(183);
-    out.put(menu);
-    this.player.getSession().write(out);
-    return this;
-  }
-  // sendCreationMenu(menu: CreationMenu): this {
-  //     this.player.setCreationMenu(menu);
-  //     this.sendString( menu.getTitle(), 31104);
-  //     const out = new PacketBuilder(167);
-  //     out.put(menu.getItems().length);
-  //     for (const itemId of menu.getItems()) {
-  //         out.putInt(itemId);
-  //     }
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
   sendSpecialAttackState(active: boolean): this {
     if (this.player.getSession().sendClientPacket(encodeVarp(301, active ? 1 : 0))) return this;
-    const out = new PacketBuilder(186);
-    out.put(active ? 1 : 0);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendSoundEffect(
@@ -182,10 +124,6 @@ export class PacketSender {
       loops: Math.max(1, loopType),
       delay,
     }))) return this;
-    const out = new PacketBuilder(174);
-    out.putShort(soundId).put(loopType).putShort(delay).putShort(volume);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendSound(soundId: number, volume: number, delay: number): this {
@@ -196,18 +134,10 @@ export class PacketSender {
 
   sendSong(id: number): this {
     if (this.player.getSession().sendClientPacket(encodePlaySong(id))) return this;
-    const out = new PacketBuilder(74);
-    out.putShorts(id, ByteOrder.LITTLE);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendJingle(id: number, delayTicks: number): this {
     if (this.player.getSession().sendClientPacket(encodePlayJingle(id, delayTicks))) return this;
-    const out = new PacketBuilder(121);
-    out.putShort(id < 0 ? 65535 : id).putShort(delayTicks < 0 ? 65535 : delayTicks);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendAreaSound(
@@ -243,12 +173,6 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeChatMessage(
       type === 16 ? "clan" : "channel", message, name
     ))) return this;
-    const out = new PacketBuilder(252, PacketType.VARIABLE);
-    out.put(type);
-    out.putString(name);
-    out.putString(message);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendPoisonType(type: number): this {
@@ -256,40 +180,12 @@ export class PacketSender {
     return this;
   }
 
-  // sendSkill(skill: Skill): this {
-  //     const out = new PacketBuilder(134);
-  //     out.put(skill.getButton());
-  //     out.putInt(this.player.getSkillManager().getCurrentLevel(Skill.AGILITY));
-  //     out.putInt(this.player.getSkillManager().getMaxLevel(skill));
-  //     out.putInt(this.player.getSkillManager().getExperience(skill));
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // sendExpDrop(skill: Skill, exp: number): this {
-  //     const out = new PacketBuilder(116);
-  //     out.put(skill.getButton());
-  //     out.putInt(exp);
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
   sendConfig(id: number, state: number): this {
     if (this.player.getSession().sendClientPacket(encodeVarp(id, state))) return this;
-    const out = new PacketBuilder(36);
-    out.putShorts(id, ByteOrder.LITTLE);
-    out.put(state);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendToggle(id: number, state: number): this {
     if (this.player.getSession().sendClientPacket(encodeVarp(id, state))) return this;
-    const out = new PacketBuilder(87);
-    out.putShorts(id, ByteOrder.LITTLE);
-    out.putsInt(state, ByteOrder.MIDDLE);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendChatOptions(
@@ -307,47 +203,14 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeRunEnergy(
       this.player.getRunEnergy(), this.player.isRunningReturn()
     ))) return this;
-    const out = new PacketBuilder(110);
-    out.put(this.player.getRunEnergy());
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendQuickPrayersState(activated: boolean): this {
     if (this.player.getSession().sendClientPacket(encodeVarbit(4103, activated ? 1 : 0))) return this;
-    const out = new PacketBuilder(111);
-    out.put(activated ? 1 : 0);
-    this.player.getSession().write(out);
-    return this;
   }
 
   updateSpecialAttackOrb(): this {
     if (this.player.getSession().sendClientPacket(encodeVarp(300, this.player.getSpecialPercentage() * 10))) return this;
-    const out = new PacketBuilder(137);
-    out.put(this.player.getSpecialPercentage());
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  sendDungeoneeringTabIcon(show: boolean): this {
-    const out = new PacketBuilder(103);
-    out.put(show ? 1 : 0);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  sendHeight(): this {
-    this.player
-      .getSession()
-      .write(new PacketBuilder(86).put(this.player.getLocation().getZ()));
-    return this;
-  }
-
-  sendIronmanMode(ironmanMode: number): this {
-    const out = new PacketBuilder(112);
-    out.put(ironmanMode);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendShowClanChatOptions(show: boolean): this {
@@ -361,24 +224,6 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeRunEnergy(
       this.player.getRunEnergy(), this.player.isRunningReturn()
     ))) return this;
-    const out = new PacketBuilder(113);
-    out.put(this.player.isRunningReturn() ? 1 : 0);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  sendWeight(weight: number): this {
-    const out = new PacketBuilder(240);
-    out.putShort(weight);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  commandFrame(i: number): this {
-    const out = new PacketBuilder(28);
-    out.put(i);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendInterface(id: number): this {
@@ -388,10 +233,6 @@ export class PacketSender {
 
     this.player.setInterfaceId(id);
     if (this.player.getSession().sendClientPacket(encodeWidgetOpen(id, true))) return this;
-    const out = new PacketBuilder(97);
-    out.putShort(id);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendConfiguredInterface(reference: string | number): this {
@@ -402,36 +243,18 @@ export class PacketSender {
   sendWalkableInterface(interfaceId: number): this {
     this.player.setWalkableInterfaceId(interfaceId);
     if (this.player.getSession().sendClientPacket(encodeWidgetOpen(interfaceId, false))) return this;
-    const out = new PacketBuilder(208);
-    out.putInt(interfaceId);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendInterfaceDisplayState(interfaceId: number, hide: boolean): this {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetHidden(interfaceId, hide))) return this;
-    const out = new PacketBuilder(171);
-    out.put(hide ? 1 : 0);
-    out.putInt(interfaceId);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendPlayerHeadOnInterface(id: number): PacketSender {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetPlayerHead(id))) return this;
-    const out = new PacketBuilder(185);
-    out.putShort(id, ValueType.A, ByteOrder.LITTLE);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendNpcHeadOnInterface(id: number, interfaceId: number): PacketSender {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetNpcHead(interfaceId, id))) return this;
-    const out = new PacketBuilder(75);
-    out.putShort(id, ValueType.A, ByteOrder.LITTLE);
-    out.putShort(interfaceId, ValueType.A, ByteOrder.LITTLE);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendEnterAmountPrompt(title: string): PacketSender {
@@ -446,12 +269,6 @@ export class PacketSender {
     // Java parity: opcode 187 (variable) for enter input.
     const out = new PacketBuilder(187, PacketType.VARIABLE);
     out.putString(title);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendInterfaceReset(): PacketSender {
-    const out = new PacketBuilder(68);
     this.player.getSession().write(out);
     return this;
   }
@@ -477,28 +294,10 @@ export class PacketSender {
 
   public sendInterfaceAnimation(interfaceId: number, animationId: number) {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetAnimation(interfaceId, animationId))) return this;
-    const out = new PacketBuilder(200);
-    out.putShort(interfaceId);
-    out.putShort(animationId);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendInterfaceModel(interfaceId: number, itemId: number, zoom: number) {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetItem(interfaceId, itemId, 1))) return this;
-    const out = new PacketBuilder(246);
-    out.putShorts(interfaceId, ByteOrder.LITTLE);
-    out.putShort(zoom).putShort(itemId);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendWidgetModel(widget: number, model: number) {
-    const out = new PacketBuilder(8);
-    out.putShort(widget);
-    out.putShort(model);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendTabInterface(tabId: number, interfaceId: number) {
@@ -529,35 +328,11 @@ export class PacketSender {
 
   public sendSidebarInterface(interfaceId: number): PacketSender {
     if (this.player.getSession().sendClientPacket(encodeWidgetOpen(interfaceId, false))) return this;
-    const out = new PacketBuilder(142);
-    out.putShorts(interfaceId, ByteOrder.LITTLE);
-    this.player.getSession().write(out);
-    return this;
   }
-
-  // public sendTabs() {
-  //     for (let tab = 0; tab < GameConstants.TAB_INTERFACES.length; tab++) {
-  //         let interface_ = GameConstants.TAB_INTERFACES[tab];
-
-  //         if (tab === 6) {
-  //             interface_ = this.player.getSpellbook().getInterfaceId();
-  //         }
-
-  //         this.sendTabInterface(tab, interface_);
-  //     }
-  //     return this;
-  // }
 
   public sendTab(id: number): PacketSender {
     let out = new PacketBuilder(106);
     out.puts(id, ValueType.C);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendFlashingSidebar(id: number): PacketSender {
-    let out = new PacketBuilder(24);
-    out.puts(id, ValueType.S);
     this.player.getSession().write(out);
     return this;
   }
@@ -574,90 +349,6 @@ export class PacketSender {
     // unrelated 0x0 icon-cluster anchor nested under the sidebar tree.
     this.chatboxGroupId = id;
     if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub(CHATBOX_MODAL_TARGET_UID, id))) return this;
-    let out = new PacketBuilder(164);
-    out.putShorts(id, ByteOrder.LITTLE);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendMapState(state: number): PacketSender {
-    let out = new PacketBuilder(99);
-    out.put(state);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendCameraAngle(
-    x: number,
-    y: number,
-    level: number,
-    speed: number,
-    angle: number
-  ): PacketSender {
-    let out = new PacketBuilder(177);
-    out.put(x / 64);
-    out.put(y / 64);
-    out.putShort(level);
-    out.put(speed);
-    out.put(angle);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendCameraShake(
-    verticalAmount: number,
-    verticalSpeed: number,
-    horizontalAmount: number,
-    horizontalSpeed: number
-  ): PacketSender {
-    const out = new PacketBuilder(35);
-    out.put(verticalAmount);
-    out.put(verticalSpeed);
-    out.put(horizontalAmount);
-    out.put(horizontalSpeed);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendCameraSpin(
-    x: number,
-    y: number,
-    z: number,
-    speed: number,
-    angle: number
-  ): PacketSender {
-    const out = new PacketBuilder(166);
-    out.put(x / 64);
-    out.put(y / 64);
-    out.putShort(z);
-    out.put(speed);
-    out.put(angle);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendCameraNeutrality(): PacketSender {
-    const out = new PacketBuilder(107);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendInterfaceScrollReset(interfaceId: number): PacketSender {
-    let out = new PacketBuilder(9);
-    out.putInt(interfaceId);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendScrollbarHeight(
-    interfaceId: number,
-    scrollMax: number
-  ): PacketSender {
-    let out = new PacketBuilder(10);
-    out.putInt(interfaceId);
-    out.putShort(scrollMax);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendInterfaceSet(interfaceId: number, sidebarInterfaceId: number) {
@@ -666,90 +357,12 @@ export class PacketSender {
     return this;
   }
 
-  // public sendItemContainer(container: Inventory, interfaceId: number) {
-  //     let out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
-
-  //     out.putInt(interfaceId);
-  //     out.putShort(container.capacity());
-  //     for (let item of container.getItems()) {
-  //         if (item == null || item.getId() <= 0 || item.getAmount() <= 0 && !(container instanceof Bank)) {
-  //             out.putInt(-1);
-  //             continue;
-  //         }
-  //         out.putInt(item.getAmount());
-  //         out.putShort(item.getId() + 1);
-  //     }
-
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // public sendItemContainers(container: Bank, interfaceId: number) {
-  //     let out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
-
-  //     out.putInt(interfaceId);
-  //     out.putShort(container.capacity());
-  //     for (let item of container.getItems()) {
-  //         if (item == null || item.getId() <= 0 || item.getAmount() <= 0 && !(container instanceof Bank)) {
-  //             out.putInt(-1);
-  //             continue;
-  //         }
-  //         out.putInt(item.getAmount());
-  //         out.putShort(item.getId() + 1);
-  //     }
-
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  public sendCurrentBankTab(current_tab: number) {
-    let out = new PacketBuilder(55);
-    out.put(current_tab);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  // public sendEffectTimer(delay: number, e: EffectTimer) {
-  //     let out = new PacketBuilder(54);
-  //     out.putShort(delay);
-  //     out.putShort(e.getClientSprite());
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // public sendInterfaceItems(interfaceId: number, items: Item[]) {
-  //     if (this.player.isPlayerBot()) {
-  //         return this;
-  //     }
-
-  //     let out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
-  //     out.putInt(interfaceId);
-  //     out.putShort(items.length);
-  //     for (let item of items) {
-  //         if (item == null) {
-  //             out.putInt(-1);
-  //             continue;
-  //         }
-  //         out.putInt(item.getAmount());
-  //         out.putShort(item.getId() + 1);
-  //     }
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
   public sendItemOnInterfaces(
     interfaceId: number,
     item: number,
     amount: number
   ) {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetItem(interfaceId, item, amount))) return this;
-    let out = new PacketBuilder(53, PacketType.VARIABLE_SHORT);
-    out.putInt(interfaceId);
-    out.putShort(1);
-    out.putInt(amount);
-    out.putShort(item + 1);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendItemOnInterface(
@@ -759,36 +372,10 @@ export class PacketSender {
     amount: number
   ) {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetItem(frame, item, amount))) return this;
-    let out = new PacketBuilder(34, PacketType.VARIABLE_SHORT);
-    out.putShort(frame);
-    out.put(slot);
-    out.putInt(amount);
-    out.putShort(item + 1);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public clearItemOnInterface(frame: number): PacketSender {
     if (this.player.getSession().sendClientPacket(encodeWidgetSetItem(frame, -1, 0))) return this;
-    const out = new PacketBuilder(72);
-    out.putShort(frame);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendSmithingData(
-    id: number,
-    slot: number,
-    interfaceId: number,
-    amount: number
-  ): PacketSender {
-    const out = new PacketBuilder(34, PacketType.VARIABLE_SHORT);
-    out.putShort(interfaceId);
-    out.put(slot);
-    out.putInt(amount);
-    out.putShort(id + 1);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendInteractionOption(
@@ -813,11 +400,6 @@ export class PacketSender {
       return this;
     }
     if (this.player.getSession().sendClientPacket(encodeWidgetSetText(id, safeText))) return this;
-    const out = new PacketBuilder(126, PacketType.VARIABLE_SHORT);
-    out.putString(safeText);
-    out.putInt(id);
-    this.player.getSession().write(out);
-    return this;
   }
 
   public sendInterfaceActions(
@@ -841,22 +423,6 @@ export class PacketSender {
     const out = new PacketBuilder(105);
     out.putInt(start);
     out.putInt(end);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public clearInterfaceItems(start: number, end: number): PacketSender {
-    let out = new PacketBuilder(112);
-    out.putInt(start);
-    out.putInt(end);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendRights() {
-    const out = new PacketBuilder(127);
-    out.put(this.player.getRights().getId());
-    out.put(DonatorRights.getId(this.player.getDonatorRights()));
     this.player.getSession().write(out);
     return this;
   }
@@ -910,22 +476,6 @@ export class PacketSender {
     return this;
   }
 
-  // public sendPrivateMessage(target: Player, message: Uint8Array, size: number): PacketSender {
-  //     const messageArray = Array.from(message);
-  //     if (this.player instanceof PlayerBot) {
-  //         (this.player as PlayerBot).getChatInteraction().receivedPrivateMessage(messageArray, target);
-  //         return this;
-  //     }
-  //     let out = new PacketBuilder(196, PacketType.VARIABLE);
-  //     out.putLong(target.getLongUsername());
-  //     out.putInt(target.getRelations().getPrivateMessageId());
-  //     out.put(target.getRights().getSpriteId());
-  //     out.put(DonatorRights.getSpriteId(0));
-  //     out.writePutBytes(message.toString());
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
   public sendFriendStatus(status: number) {
     const out = new PacketBuilder(221);
     out.put(status);
@@ -970,211 +520,8 @@ export class PacketSender {
     return this;
   }
 
-  // public sendGraphic(graphic: Graphic, position: Location): PacketSender {
-  //     this.sendPosition(position);
-  //     let out = new PacketBuilder(4);
-  //     out.put(0);
-  //     out.putShort(graphic.getId());
-  //     out.put(position.getZ());
-  //     out.putShort(graphic.getDelay());
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // public sendObject(object: GameObject): PacketSender {
-  //     this.sendPosition(object.getLocation());
-  //     let out = new PacketBuilder(151);
-  //     out.puts(object.getLocation().getZ(), ValueType.A);
-  //     out.putShorts(object.getId(), ByteOrder.LITTLE);
-  //     out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.S);
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  public sendAnimationReset(): PacketSender {
-    let out = new PacketBuilder(1);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  // public sendGlobalGraphic(graphic: Graphic, position: Location): PacketSender {
-  //     this.sendGraphic(graphic, position);
-  //     for (let p of this.player.getLocalPlayers()) {
-  //         p.getPacketSender().sendGraphic(graphic, position);
-  //     }
-  //     return this;
-  // }
-
-  // public sendObjectRemoval(object: GameObject): PacketSender {
-  //     if (!object) {
-  //         return this;
-  //     }
-
-  //     this.sendPosition(object.getLocation());
-  //     let out = new PacketBuilder(101);
-  //     out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.C);
-  //     out.put(object.getLocation().getZ());
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // public sendObjectAnimation(object: GameObject, anim: Animation): PacketSender {
-  //     this.sendPosition(object.getLocation());
-  //     let out = new PacketBuilder(160);
-  //     out.puts(0, ValueType.S);
-  //     out.puts((object.getType() << 2) + (object.getFace() & 3), ValueType.S);
-  //     out.putShort(anim.getId(), ValueType.A);
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // public alterGroundItem(item: ItemOnGround) {
-  //     this.sendPosition(item.getPosition());
-  //     let out = new PacketBuilder(84);
-  //     out.put(0);
-  //     out.putShort(item.getItem().getId()).putInt(item.getOldAmount()).putInt(item.getItem().getAmount());
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // public createGroundItem(item: ItemOnGround) {
-  //     this.sendPosition(item.getPosition());
-  //     let out = new PacketBuilder(44);
-  //     out.putShort(item.getItem().getId(), ValueType.A, ByteOrder.LITTLE);
-  //     out.putInt(item.getItem().getAmount()).put(0);
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  // public deleteGroundItem(item: ItemOnGround) {
-  //     this.sendPosition(item.getPosition());
-  //     let out = new PacketBuilder(156);
-  //     out.puts(0, ValueType.A);
-  //     out.putShort(item.getItem().getId());
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  public deleteRegionalSpawns(): PacketSender {
-    this.player.getSession().write(new PacketBuilder(178));
-    return this;
-  }
-
-  private writeLocalPosition(localX: number, localY: number): void {
-    const out = new PacketBuilder(85);
-    out.puts(localY, ValueType.C);
-    out.puts(localX, ValueType.C);
-    this.player.getSession().write(out);
-  }
-
-  private resolveLocalPosition(position: any): { localX: number; localY: number } | null {
-    if (
-      !position ||
-      typeof position.getX !== "function" ||
-      typeof position.getY !== "function"
-    ) {
-      return null;
-    }
-
-    const regionSource = this.player.getLastKnownRegion?.();
-    if (!regionSource) {
-      return null;
-    }
-
-    const localY = position.getY() - 8 * regionSource.getRegionY();
-    const localX = position.getX() - 8 * regionSource.getRegionX();
-
-    // Never clamp here. During region transitions, dropping out-of-range updates
-    // is safer than emitting a wrong tile/object placement.
-    if (localX < 0 || localX > 103 || localY < 0 || localY > 103) {
-      return null;
-    }
-
-    return { localX, localY };
-  }
-
-  private sendPositionIfVisible(position: any): boolean {
-    const local = this.resolveLocalPosition(position);
-    if (!local) {
-      return false;
-    }
-    this.writeLocalPosition(local.localX, local.localY);
-    return true;
-  }
-
-  public sendPosition(position: any) {
-    this.sendPositionIfVisible(position);
-    return this;
-  }
-
-  public sendConsoleMessage(message: string) {
-    let out = new PacketBuilder(123);
-    out.putString(message);
-    this.player.getSession().write(out);
-    return this;
-  }
-
-  public sendInterfaceSpriteChange(
-    childId: number,
-    firstSprite: number,
-    secondSprite: number
-  ): PacketSender {
-    // player.write(new PacketBuilder(140).writeShort(childId).writeByte((firstSprite << 0) + (secondSprite & 0x0)).toPacket());
-    return this;
-  }
-
-  // public getRegionOffset(position: Location): number {
-  //     // let x = position.getX() - (position.getRegionX() << 4);
-  //     // let y = position.getY() - (position.getRegionY() & 0x7);
-  //     let offset = ((x & 0x7)) << 4 + (y & 0x7);
-  //     return offset;
-  // }
-
-  // public sendProjectile(start: Location, end: Location, offset: number, speed: number, projectileId: number, startHeight: number, endHeight: number, lockon: Mobile, delay: number): PacketSender {
-  //     this.sendPosition(start);
-  //     let out = new PacketBuilder(117);
-  //     out.put(offset);
-  //     // out.put((end.getX() - start.getX()));
-  //     // out.put((end.getY() - start.getY()));
-  //     if (lockon != null) {
-  //         out.putShort(lockon.isPlayer() ? -(lockon.getIndex() + 1) : lockon.getIndex() + 1);
-  //     } else {
-  //         out.putShort(0);
-  //     }
-  //     out.putShort(projectileId);
-  //     out.put(startHeight);
-  //     out.put(endHeight);
-  //     out.putShort(delay);
-  //     out.putShort(speed);
-  //     out.put(16); // Angle
-  //     out.put(64);
-  //     this.player.getSession().write(out);
-  //     return this;
-  // }
-
-  public sendHideCombatBox(): PacketSender {
-    this.player.getSession().write(new PacketBuilder(128));
-    return this;
-  }
-
-  public sendObjectsRemoval(
-    chunkX: number,
-    chunkY: number,
-    height: number
-  ): PacketSender {
-    this.player
-      .getSession()
-      .write(new PacketBuilder(153).put(chunkX).put(chunkY).put(height));
-    return this;
-  }
-
-  // Basic chat message to client.
   sendMessage(message: string): this {
     if (this.player.getSession().sendClientPacket(encodeChatMessage("game", message ?? ""))) return this;
-    const out = new PacketBuilder(253, PacketType.VARIABLE);
-    out.putString(message ?? "");
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendPublicChat(message: string, from: string, playerId: number): this {
@@ -1184,7 +531,6 @@ export class PacketSender {
     return this;
   }
 
-  // Stubs to satisfy gameplay code; implement client opcodes as needed.
   sendPrivateMessage(target: any, message: Uint8Array, size: number): this {
     const text = Misc.ucFirst(Misc.textUnpack(Array.from(message), size).toLowerCase());
     this.player.getSession().sendClientPacket(encodeChatMessage(
@@ -1295,9 +641,6 @@ export class PacketSender {
       return this;
     }
     if (interfaceId >= 0 && this.player.getSession().sendClientPacket(encodeWidgetClose(interfaceId))) return this;
-    // Java parity: close interfaces with opcode 219 only.
-    this.player.getSession().write(new PacketBuilder(219, PacketType.FIXED));
-    return this;
   }
 
   sendItemContainer(containerOrInterfaceId: number | any, interfaceId?: number): this {
@@ -1330,10 +673,6 @@ export class PacketSender {
       return this;
     }
     return this;
-  }
-
-  sendItemContainers(container: any, interfaceId: number): this {
-    return this.sendItemContainer(container, interfaceId);
   }
 
   sendInterfaceItems(interfaceId: number, items?: any): this {
@@ -1406,36 +745,6 @@ export class PacketSender {
         ? { kind: "player", index: -targetIndex - 1 }
         : targetIndex > 0 ? { kind: "npc", index: targetIndex - 1 } : undefined,
     }]))) return this;
-
-    if (!this.sendPositionIfVisible(start)) {
-      return this;
-    }
-
-    const out = new PacketBuilder(117);
-    out.put(offset);
-    out.put(end.getX() - start.getX());
-    out.put(end.getY() - start.getY());
-
-    out.putShort(targetIndex);
-
-    out.putShort(projectileId);
-    out.put(startHeight);
-    out.put(endHeight);
-    out.putShort(delay);
-    out.putShort(speed);
-    out.put(angle);
-    out.put(distanceOffset);
-    if (process.env.PROJECTILE_DEBUG === "1") {
-      try {
-        console.log(
-          `[projectile.out] id=${projectileId} start=(${start.getX()},${start.getY()},${start.getZ?.() ?? 0}) end=(${end.getX()},${end.getY()},${end.getZ?.() ?? 0}) d=(${end.getX() - start.getX()},${end.getY() - start.getY()}) lockon=${targetIndex} delay=${delay} speed=${speed}`
-        );
-      } catch {
-        // debug logging must never affect packet delivery
-      }
-    }
-    this.player.getSession().write(out);
-    return this;
   }
 
   private resolveProjectileTargetIndex(lockon: any): number {
@@ -1456,11 +765,6 @@ export class PacketSender {
       return lockon.isPlayer() ? -(index + 1) : index + 1;
     }
     return 0;
-  }
-
-  // Additional stubs for gameplay code.
-  sendTabs(): this {
-    return this;
   }
 
   sendObject(object: any): this {
@@ -1550,14 +854,6 @@ export class PacketSender {
     return this;
   }
 
-  sendItemContainerInterface(_containerId: number, _interfaceId: number): this {
-    return this;
-  }
-
-  sendItemOnWidget(_widgetId: number, _modelZoom: number, _itemId: number): this {
-    return this;
-  }
-
   alterGroundItem(item: any): this {
     if (!item || typeof item.getPosition !== "function" || typeof item.getItem !== "function") {
       return this;
@@ -1565,17 +861,6 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeGroundItemsDelta(
       ++this.groundItemSerial, [this.groundItemView(item)], []
     ))) return this;
-    if (!this.sendPositionIfVisible(item.getPosition())) {
-      return this;
-    }
-    const out = new PacketBuilder(84);
-    out.put(0);
-    out
-      .putShort(item.getItem().getId())
-      .putInt(item.getOldAmount?.() ?? 0)
-      .putInt(item.getItem().getAmount());
-    this.player.getSession().write(out);
-    return this;
   }
 
   deleteGroundItem(item: any): this {
@@ -1585,14 +870,6 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeGroundItemsDelta(
       ++this.groundItemSerial, [], [item.getId()]
     ))) return this;
-    if (!this.sendPositionIfVisible(item.getPosition())) {
-      return this;
-    }
-    const out = new PacketBuilder(156);
-    out.puts(0, ValueType.A);
-    out.putShort(item.getItem().getId());
-    this.player.getSession().write(out);
-    return this;
   }
 
   createGroundItem(item: any): this {
@@ -1602,14 +879,6 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeGroundItemsDelta(
       ++this.groundItemSerial, [this.groundItemView(item)], []
     ))) return this;
-    if (!this.sendPositionIfVisible(item.getPosition())) {
-      return this;
-    }
-    const out = new PacketBuilder(44);
-    out.putShort(item.getItem().getId(), ValueType.A, ByteOrder.LITTLE);
-    out.putInt(item.getItem().getAmount()).put(0);
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendGroundItems(items: any[]): this {
@@ -1636,11 +905,6 @@ export class PacketSender {
     };
   }
 
-  sendItemOnEquipment(_slot: number): this {
-    this.player.getUpdateFlag().flag(Flag.APPEARANCE);
-    return this;
-  }
-
   sendSkill(skill: any): this {
     if (!skill || typeof skill.getIndex !== "function") {
       return this;
@@ -1653,14 +917,6 @@ export class PacketSender {
     if (this.player.getSession().sendClientPacket(encodeSkillsDelta(
       [this.skillView(skill)], skillManager.getTotalLevel(), skillManager.getCombatLevel()
     ))) return this;
-
-    const out = new PacketBuilder(134);
-    out.put(skill.getIndex());
-    out.putInt(skillManager.getCurrentLevel(skill));
-    out.putInt(skillManager.getMaxLevel(skill));
-    out.putInt(skillManager.getExperience(skill));
-    this.player.getSession().write(out);
-    return this;
   }
 
   sendInventorySlot(slot: number, itemId: number, quantity: number): this {
@@ -1694,11 +950,6 @@ export class PacketSender {
 
   sendVarbit(id: number, value: number): this {
     this.player.getSession().sendClientPacket(encodeVarbit(id, value));
-    return this;
-  }
-
-  sendVarpBatch(values: Record<number, number>): this {
-    for (const [id, value] of Object.entries(values)) this.sendConfig(Number(id), value);
     return this;
   }
 

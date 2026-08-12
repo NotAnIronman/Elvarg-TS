@@ -28,6 +28,15 @@ reaches the wire. This document is the deeper, feature-level follow-up.
   path specifically, not the per-tick packet dispatch the rest of this doc focuses on.
 - **The entire dead legacy encoder and legacy networking file cluster has been deleted** - see "Dead
   code" below for the full list and what was ported out of each before deletion.
+- **`PacketSender.ts` cleaned up** - 1785 → 1036 lines. See "PacketSender.ts cleanup" below for the
+  full breakdown: every method that only wrote to the dead `PlayerSession.write()` sink with zero
+  real callers was deleted outright; every already-live method's unreachable dead-code tail (the
+  `if (sendClientPacket(...)) return this;` pattern always returns, since `sendClientPacket()` itself
+  always returns `true` - so everything after it was dead) was stripped; `sendConsoleMessage` was
+  found to be a pure duplicate of the already-live `sendMessage` and merged into it. The methods that
+  are dead *and* still have real callers (actual broken features, not just clutter) are catalogued
+  individually below, with what would be needed to fix each - most need new client-side work in
+  xrsps-typescript, not just an elvarg-side wiring fix.
 
 ## The recurring bug pattern
 
@@ -41,8 +50,8 @@ Almost every confirmed bug below is one of these three shapes:
    → `createPlayerView()`/`createActorUpdates()` → `encodePlayerSync`/`encodeNpcSync`
    (`net/protocol/ClientProtocol.ts`). Any field the dead encoders computed that the live path never
    picked up was a silent regression - correct-looking code sitting right next to the real bug. Both
-   files are now gone (see "Dead code" below); watch for the same shape elsewhere - **`net/packet/PacketSender.ts` has the identical pattern at much larger scale, see the note at the end of the
-   "Dead code" section.**
+   files are now gone (see "Dead code" below). `net/packet/PacketSender.ts` had the identical pattern
+   at much larger scale (~140 methods) - see "PacketSender.ts cleanup" below.
 2. **Live encoder hardcodes a stub value.** The live path exists and runs, but bakes in a dummy
    constant instead of reading real state.
 3. **A handler silently no-ops for a whole case, or decodes a payload field it never reads.**
@@ -387,20 +396,86 @@ into `Server.ts`, unrelated admin-API tooling).
 | --- | --- |
 | `Bank.handleButton()` (`game/model/container/impl/Bank.ts:449-560`) | Dead (keyed on raw old-opcode widget IDs with zero live callers), but contains the only working implementation of bank search (`bankEntered`, line 552), tab collapse (line 482-502), and the note-withdrawal quick-toggle buttons. **Not ported in this pass** - the live widget dispatch (`Bank.handleWidgetAction()`) is keyed on small cache-native childIds (2, 3, 12, 17, 19, ...), and this repo has no reliable source for what childId the search button/tab buttons actually use in the current interface - guessing would risk silently misfiring on an unrelated click. Needs the real childId values (from the cache interface definition or the xrsps client's bank interface script) before this can be ported safely. |
 
-### `PacketSender.ts` has the same dead-encoder pattern, at much larger scale (not addressed in this pass)
+## `PacketSender.ts` cleanup
 
-Discovered while removing the dead legacy encoder above: `net/packet/PacketSender.ts` - a "live"
-file with 70+ importers across `game/` - has roughly 90 methods that call
-`this.player.getSession().write(out)`, the exact same no-op sink `PlayerUpdating.ts`/`NPCUpdating.ts`
-wrote into. Only a handful of methods (`sendRunEnergy`, `sendSpecialAttackState`,
-`sendQuickPrayersState`, etc.) have been modernized to try a live `sendClientPacket(encodeX(...))`
-first and fall back to the dead `write()` only if that live encoder doesn't exist yet. The rest go
-straight to the dead sink with no live fallback at all - `sendPoisonType()` and `sendEffectTimer()`
-above are two confirmed examples, but this pattern likely repeats across most of the file. This is a
-much larger, separate audit than the encoder cleanup in this pass (going through ~90 methods
-individually to determine which are truly reachable-but-dead, which already have a live
-counterpart under a different name, and which need a brand new live encoder written) - flagged here
-so it isn't mistaken for "already covered" by this cleanup.
+`net/packet/PacketSender.ts` had the exact same dead-encoder pattern as `PlayerUpdating.ts`/
+`NPCUpdating.ts` (see "The recurring bug pattern" above), just spread across ~140 methods instead of
+concentrated in two files. Went through every method individually (1785 lines → 1036 lines):
+
+**Zero-caller dead methods, deleted outright** (32 methods, confirmed zero callers anywhere including
+optional-chaining call sites like `x?.method?.()`, which a naive grep misses - one of these,
+`sendDetails()`, initially looked like it had a caller in `World.ts`, but that caller turned out to
+be inside a loop over `World.addPlayerQueue`, a queue nothing anywhere ever pushes to - a second,
+pre-existing dead-code island unrelated to this cleanup, discovered only because deleting the method
+it called surfaced a compile error): `sendDetails`, `sendRegionReload`, `sendTeleportInterface`,
+`sendDungeoneeringTabIcon`, `sendHeight`, `sendIronmanMode`, `sendWeight`, `commandFrame`,
+`sendInterfaceReset`, `sendWidgetModel`, `sendFlashingSidebar`, `sendMapState`, `sendCameraAngle`,
+`sendCameraShake`, `sendCameraSpin`, `sendCameraNeutrality`, `sendInterfaceScrollReset`,
+`sendScrollbarHeight`, `sendCurrentBankTab`, `sendSmithingData`, `clearInterfaceItems`, `sendRights`,
+`sendAnimationReset`, `deleteRegionalSpawns`, `sendInterfaceSpriteChange`, `sendHideCombatBox`,
+`sendObjectsRemoval`, `sendItemContainers` (a zero-caller alias of the live `sendItemContainer`),
+`sendTabs`, `sendItemContainerInterface`, `sendItemOnWidget`, `sendItemOnEquipment`, `sendVarpBatch`.
+
+**Dead position-write cluster, deleted** (`writeLocalPosition`/`resolveLocalPosition`/
+`sendPositionIfVisible`/`sendPosition`): called from inside otherwise-live methods
+(`sendProjectile`, `alterGroundItem`, `deleteGroundItem`, `createGroundItem`), but only from the
+unreachable dead-tail half of an `if (sendClientPacket(...)) return this;` branch - see next
+paragraph. Once those dead tails were stripped, this whole cluster had zero remaining callers.
+
+**Dead-tail stripping, ~31 methods** (the file's single biggest source of redundant code):
+`PlayerSession.sendClientPacket()` (`net/PlayerSession.ts:80-90`) unconditionally returns `true` on
+every code path, including the early-return branches for a closed channel or backpressure. That
+means every method shaped like `if (this.player.getSession().sendClientPacket(encodeX(...))) return
+this; <old raw-opcode PacketBuilder + write() call>` had a provably unreachable second half - not a
+bug exactly (nothing was broken, since the live encoder call above it always ran and always
+returned first), but real, measurable dead/duplicated code sitting in the most heavily-used file in
+the networking layer. Removed the unreachable tail from all ~31 methods that had one (`sendSpecialAttackState`, `sendSoundEffect`, `sendSong`, `sendJingle`, `sendSpecialMessage`, `sendConfig`,
+`sendToggle`, `sendRunEnergy`, `sendQuickPrayersState`, `updateSpecialAttackOrb`, `sendRunStatus`,
+`sendInterface`, `sendWalkableInterface`, `sendInterfaceDisplayState`, `sendPlayerHeadOnInterface`,
+`sendNpcHeadOnInterface`, `sendInterfaceAnimation`, `sendInterfaceModel`, `sendSidebarInterface`,
+`sendChatboxInterface`, `sendItemOnInterfaces`, `sendItemOnInterface`, `clearItemOnInterface`,
+`sendString`, `sendMessage`, `sendInterfaceRemoval`, `sendProjectile`, `alterGroundItem`,
+`deleteGroundItem`, `createGroundItem`, `sendSkill`).
+
+**Dead commented-out code, deleted**: the file had ~250 lines of commented-out old-draft method
+bodies scattered throughout - earlier attempts at methods that were later properly implemented
+elsewhere in the same file (old drafts of `sendGraphic`, `sendObject`, `sendObjectRemoval`,
+`sendObjectAnimation`, `alterGroundItem`, `createGroundItem`, `deleteGroundItem`, `sendProjectile`,
+`sendItemContainer(s)`, `sendPrivateMessage`, `sendEffectTimer`, `sendInterfaceItems`, `sendTabs`,
+`sendSkill`, `sendExpDrop`), plus a handful of commented-out imports and a stale duplicated
+constructor. Also removed two now-misleading header comments (`// Stubs to satisfy gameplay code;
+implement client opcodes as needed.` and `// Additional stubs for gameplay code.`) sitting directly
+above methods that are actually live.
+
+**Duplicate live method merged**: `sendConsoleMessage()` was dead (old opcode 123, `.write()` only),
+but tracing its 6 callers (`plugins/commands/AdminCommands.plugin.js`) showed every single one was
+plain admin-command feedback text ("Noclip enabled.", "Reloaded", etc.) - functionally identical to
+the already-live `sendMessage()` (`encodeChatMessage("game", ...)`). Replaced all 6 call sites with
+`sendMessage()` and deleted `sendConsoleMessage()`, rather than write a redundant second live
+encoder for the same thing.
+
+**False positive, no change needed**: `sendInterfaceSet()` looked dead by a naive "does the method
+call `sendClientPacket`" scan, but it actually delegates to two already-live methods
+(`sendInterface()` + `sendSidebarInterface()`) - it just doesn't call `sendClientPacket` *directly*.
+Confirmed correct as-is.
+
+### Dead methods with real callers - actual broken features, not yet fixable from elvarg alone
+
+These still call the dead `.write()` sink and have live callers (so they're broken today), but unlike
+the overhead-icon/login-ban fixes earlier in this doc, none of these had a confirmable live
+counterpart to port to - xrsps-typescript's own server has no reference implementation for most of
+them either. Fixing these means adding new protocol support (new message types, new client-side CS2
+script wiring, or both) in xrsps-typescript first, the same category as "Missing subsystems" above.
+Listed here with what was actually checked, not guessed:
+
+| Method (callers) | What it's for | What was checked |
+| --- | --- | --- |
+| `sendInteractionOption` (16) | Relabeling the right-click menu on other players ("Attack"/"Trade With"/"Challenge"/"null" during duels, wilderness, Castle Wars) | Checked the client's own menu-building code (`client/render/render/interact/check.ts`): "Attack" on other players is **not server-driven at all** - it's gated by `canAttackPlayers = isInWilderness(x, y)`, computed purely from the local player's own coordinates, which the client already has. For wilderness PvP specifically, these calls are provably unnecessary (the client already shows/hides Attack correctly with zero server input). For Castle Wars/Duel Arena, there is **no** server override for the wilderness-only gate - matches the already-documented "Bot Status right-click option" gap in kind: a client-side hardcoded rule, not a missing wire-up. `ClientState.playerAttackOption` (attack-option priority 0-4) *is* server-settable via a varp (`client/network/serverConnection/handlers/inboundWorld.ts:227`) if finer control over prioritization is ever needed, but that's a secondary concern, not what these calls are trying to do. |
+| `sendEnterAmountPrompt` (7), `sendEnterInputPrompt` (5) | Server-initiated numeric/text input prompts (admin `::setlevel`, clan chat channel naming, preset naming, shop/price-checker custom quantity) | The client's input-dialog machinery (`client/game/widgets/input/widgetKeyboardInput.ts`) is driven by a CS2 VM flag (`inputDialogType`) that gets set by CS2 opcode `SETKEYINPUTMODE_KEYBOARD` (`client/rs/cs2/handlers/ClientOps.ts:706-708`) - meaning a real server-initiated prompt would need to trigger that CS2 script via the already-live `encodeRunClientScript`/`encodeWidgetRunScript`. Searched xrsps's own server for any use of this (script ID, trigger point) and found none - xrsps itself has apparently never implemented server-initiated prompts, only the passive `resume_countdialog`/`resume_namedialog`/`resume_stringdialog` response side (which elvarg already handles correctly, see "Verified working" above). No reference scriptId to copy; guessing one risks silently invoking the wrong CS2 script. |
+| `sendPositionalHint` (3), `sendEntityHint` (3), `sendEntityHintRemoval` (6), `sendMultiIcon` (1) | Hint-arrows pointing at a tile or entity | Searched xrsps's `messages.ts` and `network/encoding/` for any hint-arrow message type or encoder - none exists. Not a wiring gap, a feature xrsps's own protocol doesn't have at all. |
+| `sendFriend` (4), `sendDeleteFriend` (2), `sendFriendStatus` (1), `sendAddIgnore` (3), `sendDeleteIgnore` (2) | Populating/updating the friends and ignore list UI (server → client direction) | Extends the already-documented friends/ignore-list gap: not only can the client not *send* add/remove friend (documented earlier), xrsps's `messages.ts` has no friend/ignore-related type in *either* direction - the server can't even push a friends-list snapshot to display. The feature doesn't exist in this protocol at all, not just the write path. |
+| `sendPoisonType`, `sendEffectTimer`, `sendGraphic`, `sendGlobalGraphic` | Poison/freeze/venom status indicators, tile-anchored graphics | Already covered above under "Confirmed live-gameplay bugs" - poison/freeze/venom need the `colorOverride` subsystem (missing entirely), tile graphics need a new server→client message (no `GRAPHIC`-family opcode exists in the current 160-packet table at all, only per-actor `SPOT_ANIM`). |
+| `sendChatOptions`, `sendShowClanChatOptions`, `sendInterfaceActions`, `clearInterfaceText`, `sendURL`, `sendSystemUpdate`, `sendEnableNoclip`, `sendExit`, `sendInterfaceComponentMoval`, `sendTab`, `sendTotalExp`, `sendExpDrop`, `sendCreationMenu`, `sendInterfaceItems` | Misc: clan chat member-list detail rendering, admin/debug tooling (noclip toggle, force-disconnect, scheduled-restart countdown, open a URL), sidebar tab highlight sync, exp-drop popups, the Fletching creation menu, and the duel offer/scoreboard item-list widget (`Duelling.ts`, 5 call sites) | Checked xrsps's `messages.ts` for each - no matching message type for any of them. `sendInterfaceItems` is the one partial exception: the underlying mechanism (`encodeWidgetSetItem`, already live) is right there and the calling convention for a multi-item container is already established elsewhere in this codebase (`Presets.plugin.js` loops `sendItemOnInterfaces(baseId + i, itemId, amount)` per slot rather than sending a batch) - but converting `Duelling.ts` to that pattern safely also requires clearing any slots beyond the new item count (the old opcode-53 packet was a full-replace snapshot; per-slot `encodeWidgetSetItem` calls are not), which needs the duel container's real max-slot count. Not guessed in this pass - flagged as the most tractable one to pick up next given the live building block already exists.
 
 From the previous cleanup pass, already removed: the obsolete `PacketExecutor` adapter, the
 command-packet shim, several dead `*PacketListener.ts` files, and the raw-container bank decoder in

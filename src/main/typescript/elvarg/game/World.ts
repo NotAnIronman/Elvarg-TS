@@ -760,7 +760,6 @@ export class World {
                     player.isPlayerBot?.() !== true &&
                     World.isPlayerSessionConnected(player)
                 ) {
-                    player.getPacketSender?.().sendDetails?.();
                     activeRegionsChanged = true;
                 }
             }

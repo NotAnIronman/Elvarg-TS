@@ -909,7 +909,7 @@ module.exports = {
         return true;
       }
       player.getPacketSender().sendEnableNoclip();
-      player.getPacketSender().sendConsoleMessage("Noclip enabled.");
+      player.getPacketSender().sendMessage("Noclip enabled.");
       return true;
     });
 
@@ -1166,7 +1166,7 @@ module.exports = {
         return true;
       }
       PlayerPunishment.init();
-      player.getPacketSender().sendConsoleMessage("Reloaded");
+      player.getPacketSender().sendMessage("Reloaded");
       return true;
     });
 
@@ -1182,7 +1182,7 @@ module.exports = {
             "Some plugin shop definition sources failed to reload."
           );
         }
-        player.getPacketSender().sendConsoleMessage(`Reloaded shops (${shopCount}).`);
+        player.getPacketSender().sendMessage(`Reloaded shops (${shopCount}).`);
       } catch (error) {
         console.error(error);
         player.getPacketSender().sendMessage("Error reloading shops.");
@@ -1196,7 +1196,7 @@ module.exports = {
       }
       try {
         new NpcDropDefinitionLoader().load();
-        player.getPacketSender().sendConsoleMessage("Reloaded drops.");
+        player.getPacketSender().sendMessage("Reloaded drops.");
       } catch (error) {
         console.error(error);
         player.getPacketSender().sendMessage("Error reloading npc drops.");
@@ -1221,7 +1221,7 @@ module.exports = {
         ).join("+") || "none";
         player
           .getPacketSender()
-          .sendConsoleMessage(`Reloaded npc spawns from: ${source}.`);
+          .sendMessage(`Reloaded npc spawns from: ${source}.`);
       } catch (error) {
         console.error(error);
         player.getPacketSender().sendMessage("Error reloading npc spawns.");
@@ -1233,7 +1233,7 @@ module.exports = {
       if (!requireRights(player, ownerOrDev)) {
         return true;
       }
-      player.getPacketSender().sendConsoleMessage("Reloaded npc defs.");
+      player.getPacketSender().sendMessage("Reloaded npc defs.");
       return true;
     });
 
