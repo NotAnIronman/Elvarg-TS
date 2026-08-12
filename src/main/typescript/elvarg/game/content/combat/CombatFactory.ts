@@ -168,20 +168,10 @@ export class CombatFactory {
         let damage = 0;
         if (type == CombatType.MELEE) {
             damage = Misc.randomInclusive(0, DamageFormulas.calculateMaxMeleeHit(entity));
-
-            // Do melee effects with the calculated damage..
-            if (victim.getPrayerActive()[PrayerHandler.PROTECT_FROM_MELEE]) {
-                damage *= 0.6;
-            }
-
         } else if (type == CombatType.RANGED) {
             let maxHit = DamageFormulas.calculateMaxRangedHit(entity);
             maxHit = PluginManager.modifyRangedMaxHit(entity, victim, maxHit);
             damage = Misc.randomInclusive(0, maxHit);
-
-            if (victim.getPrayerActive()[PrayerHandler.PROTECT_FROM_MISSILES]) {
-                damage *= 0.6;
-            }
 
             // Do ranged effects with the calculated damage..
             if (entity.isPlayer()) {
@@ -202,9 +192,6 @@ export class CombatFactory {
             }
         } else if (type == CombatType.MAGIC) {
             damage = Misc.randomInclusive(0, DamageFormulas.getMagicMaxhit(entity));
-            if (victim.getPrayerActive()[PrayerHandler.PROTECT_FROM_MAGIC]) {
-                damage *= 0.6;
-            }
         }
 
         // Do magic effects with the calculated damage..
@@ -217,7 +204,8 @@ export class CombatFactory {
          */
 
         // Decrease damage if victim is a player and has prayers active..
-        if ((!CombatFactory.fullVeracs(entity) || Misc.getRandom(4) == 1)) {
+        // Verac's set effect: 25% chance to ignore the target's protection prayer.
+        if ((!CombatFactory.fullVeracs(entity) || Misc.randomInclusive(0, 3) === 0)) {
 
             // Check if victim is is using correct protection prayer
             if (PrayerHandler.isActivated(victim, PrayerHandler.getProtectingPrayer(type))) {
@@ -793,6 +781,14 @@ export class CombatFactory {
             return;
         }
 
+        // Venom can't be re-applied, restacked, or downgraded back to regular
+        // poison once active - it only ends via a cure. Matches OSRS.
+        if (entity.isVenomed()) {
+            return;
+        }
+
+        const isVenom = poisonOrbType === 2;
+
         // If the entity is a player, we check for poison immunity. If they have
         // no immunity then we send them a message telling them that they are
         // poisoned.
@@ -808,7 +804,11 @@ export class CombatFactory {
             player.getPacketSender().sendPoisonType(poisonOrbType);
         }
 
-        entity.setPoisonDamage(Math.max(entity.getPoisonDamage(), poisonSeverity));
+        entity.setVenomed(isVenom);
+        // Venom overrides any existing (weaker) poison outright and starts its
+        // own escalating curve; regular poison keeps the OSRS re-poison rule of
+        // taking the stronger of the current and new severity.
+        entity.setPoisonDamage(isVenom ? poisonSeverity : Math.max(entity.getPoisonDamage(), poisonSeverity));
         if (!alreadyPoisoned) {
             TaskManager.submit(new CombatPoisonEffect(entity));
         }
@@ -919,13 +919,21 @@ export class CombatFactory {
     }
 
     static stun(character: Mobile, seconds: number, force: boolean) {
+        // OSRS grants a 1-tick grace period after a stun wears off during
+        // which the target can't be re-stunned - always enforced (unlike
+        // the "already stunned" guard below, `force` never bypasses this).
+        if (character.getTimers().has(TimerKey.STUN_IMMUNITY)) {
+            return;
+        }
         if (!force) {
             if (character.getTimers().has(TimerKey.STUN)) {
                 return;
             }
         }
 
-        character.getTimers().registers(TimerKey.STUN, Misc.getTicks(seconds));
+        const ticks = Misc.getTicks(seconds);
+        character.getTimers().registers(TimerKey.STUN, ticks);
+        character.getTimers().registers(TimerKey.STUN_IMMUNITY, ticks + 1);
         character.getCombat().reset();
         character.getMovementQueue().reset();
         character.performGraphic(new Graphic(348, GraphicHeight.HIGH));

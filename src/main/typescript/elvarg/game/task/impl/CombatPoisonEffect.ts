@@ -46,21 +46,35 @@ export class CombatPoisonEffect extends Task {
       return;
     }
 
-    const poisonSeverity = this.entity.getPoisonDamage();
-    if (poisonSeverity <= 0) {
+    const currentValue = this.entity.getPoisonDamage();
+    if (currentValue <= 0) {
       this.stop();
       return;
     }
-    const poisonDamage = CombatPoisonEffect.damageFromSeverity(poisonSeverity);
+
+    if (this.entity.isVenomed()) {
+      // OSRS venom: the stored value IS the damage dealt (no severity->damage
+      // formula), escalates by 2 each hit up to a cap of 20, and does not
+      // decay or expire on its own - only a cure ends it.
+      this.entity
+        .getCombat()
+        .getHitQueue()
+        .addPendingDamage([new HitDamage(currentValue, HitMask.GREEN)]);
+      this.entity.setPoisonDamage(Math.min(20, currentValue + 2));
+      this.ticksUntilHit = 30;
+      return;
+    }
+
+    const poisonDamage = CombatPoisonEffect.damageFromSeverity(currentValue);
     this.entity
       .getCombat()
       .getHitQueue()
       .addPendingDamage([new HitDamage(poisonDamage, HitMask.GREEN)]);
 
-    this.entity.setPoisonDamage(poisonSeverity - 1);
+    this.entity.setPoisonDamage(currentValue - 1);
     this.ticksUntilHit = 30;
 
-    if (poisonSeverity <= 1) {
+    if (currentValue <= 1) {
       this.stop();
       return;
     }
@@ -68,6 +82,7 @@ export class CombatPoisonEffect extends Task {
 
   public stop() {
     this.entity.setPoisonDamage(0);
+    this.entity.setVenomed(false);
 
     if (this.entity.isPlayer()) {
       this.entity.getAsPlayer().getPacketSender().sendPoisonType(0);
@@ -295,7 +310,7 @@ export class CombatPoisonData {
     CombatPoisonData.types.set(ItemIdentifiers.AMETHYST_ARROW_P_PLUS_PLUS_, PoisonType.MILD);
 
     CombatPoisonData.types.set(ItemIdentifiers.TOXIC_BLOWPIPE, PoisonType.VENOM);
-    CombatPoisonData.types.set(ItemIdentifiers.ABYSSAL_TENTACLE, PoisonType.VENOM);
+    // Note: Abyssal tentacle has no poison/venom effect in OSRS - do not add it here.
   }
 
   public static getPoisonType(item?: Item): PoisonType | undefined {
@@ -312,8 +327,10 @@ export class CombatPoisonData {
         return 25;
       case PoisonType.SUPER:
         return 30;
+      // Venom doesn't use the severity/decay model - this is its fixed
+      // starting damage (see CombatPoisonEffect.execute and CombatFactory.poisonEntity).
       case PoisonType.VENOM:
-        return 12;
+        return 6;
       default:
         return 20;
     }
@@ -326,7 +343,7 @@ export class CombatPoisonData {
       case PoisonType.MILD:
         return 16;
       case PoisonType.VENOM:
-        return 12;
+        return 6;
       default:
         return 6;
     }

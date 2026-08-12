@@ -7,6 +7,8 @@ export class TimerKey {
 	public static readonly FREEZE = new TimerKey();
 	public static readonly FREEZE_IMMUNITY = new TimerKey(); 
 	public static readonly STUN =  new TimerKey();
+	/** Grace period after a stun wears off during which the target can't be re-stunned. */
+	public static readonly STUN_IMMUNITY = new TimerKey();
 	public static readonly ATTACK_IMMUNITY = new TimerKey();
 	public static readonly CASTLEWARS_TAKE_ITEM = new TimerKey();
 	public static readonly STEPPING_OUT = new TimerKey();

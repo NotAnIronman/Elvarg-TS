@@ -67,6 +67,8 @@ export class PlayerSave {
     private specPercentage: number;
     private recoilDamage: number;
     private poisonDamage: number;
+    /** Whether poisonDamage represents an active venom (vs. ordinary poison) affliction. */
+    private venomed: boolean;
     private crystalBowShotsInStage: number;
     private crystalBowTrackedStageItemId: number;
     private poisonImmunityTimer: number;
@@ -240,6 +242,14 @@ export class PlayerSave {
 
     public setPoisonDamage(poisonDamage: number): void {
         this.poisonDamage = poisonDamage;
+    }
+
+    public isVenomed(): boolean {
+        return this.venomed;
+    }
+
+    public setVenomed(venomed: boolean): void {
+        this.venomed = venomed;
     }
 
     public getCrystalBowShotsInStage(): number {
@@ -641,6 +651,7 @@ export class PlayerSave {
         player.setSpecialPercentage(this.specPercentage);
         player.setRecoilDamage(this.recoilDamage);
         player.setPoisonDamage(this.poisonDamage);
+        player.setVenomed(this.venomed);
 
         player.getCombat().getPoisonImmunityTimer().start(this.poisonImmunityTimer);
         player.getCombat().getFireImmunityTimer().start(this.fireImmunityTimer);
@@ -735,6 +746,7 @@ export class PlayerSave {
         playerSave.specPercentage = player.getSpecialPercentage();
         playerSave.recoilDamage = player.getRecoilDamage();
         playerSave.poisonDamage = player.getPoisonDamage();
+        playerSave.venomed = player.isVenomed();
 
         playerSave.poisonImmunityTimer = player.getCombat().getPoisonImmunityTimer().secondsRemaining();
         playerSave.fireImmunityTimer = player.getCombat().getFireImmunityTimer().secondsRemaining();

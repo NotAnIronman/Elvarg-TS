@@ -26,7 +26,12 @@ export class ShoveCombatMethod extends CombatMethod {
     }
 
     start(character: Mobile, target: Mobile): void {
-        if (target.getTimers().has(TimerKey.STUN)) {
+        // Also blocked during the 1-tick grace period after a stun wears
+        // off (see CombatFactory.stun) - Shove can't land on the same
+        // target more than once every 6 ticks. Checked here, before any
+        // energy/animation/sound, so a blocked Shove doesn't waste the
+        // special attack.
+        if (target.getTimers().has(TimerKey.STUN) || target.getTimers().has(TimerKey.STUN_IMMUNITY)) {
             return;
         }
 
@@ -76,7 +81,9 @@ export class ShoveCombatMethod extends CombatMethod {
             }
         }
 
-        character.getCombat().setAttackDelay(character.getBaseAttackSpeed());
+        // Shove's own attack speed is 1 tick slower than the weapon's normal
+        // speed (5 ticks vs. the spear's normal 4), not the weapon's base speed.
+        character.getCombat().setAttackDelay(character.getBaseAttackSpeed() + 1);
         character.setSpecialActivated(false);
         if (character.isPlayer()) {
             CombatSpecial.updateBar(character.getAsPlayer());

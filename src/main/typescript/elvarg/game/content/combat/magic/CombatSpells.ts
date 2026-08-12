@@ -11,10 +11,65 @@ import { Projectile } from "../../../model/Projectile";
 import { Skill } from "../../../model/Skill";
 import { Sound } from "../../../Sound";
 import { Misc } from "../../../../util/Misc";
+import { ItemIdentifiers } from "../../../../util/ItemIdentifiers";
+import { Equipment } from "../../../model/container/impl/Equipment";
+import { Flag } from "../../../model/Flag";
 import { PrayerHandler } from "../../PrayerHandler";
 import { CombatEffectSpell } from "./CombatEffectSpell";
-import { CombatNormalSpell } from "./CombatNormalSpell";
+import { CombatNormalSpell, CombatNormalSpellOptions } from "./CombatNormalSpell";
 import { CombatSpell } from "./CombatSpell";
+
+/**
+ * Charge-based combat spell for the powered staves (tridents). OSRS charges
+ * these with runes/coins (seas) or runes/Zulrah scales (swamp) rather than
+ * consuming inventory runes per cast - charges are consumed one-per-cast and
+ * the weapon simply can't cast once depleted. See plugins/items/Trident.plugin.js
+ * for the charging interaction; both sides share state via TRIDENT_CHARGE_META_KEY.
+ */
+export const TRIDENT_CHARGE_META_KEY = "tridentCharges";
+export const TRIDENT_MAX_CHARGES = 2500;
+
+class TridentSpell extends CombatNormalSpell {
+    constructor(
+        options: CombatNormalSpellOptions,
+        private readonly chargedWeaponId: number,
+        private readonly unchargedWeaponId: number,
+    ) {
+        super(options);
+    }
+
+    canCast(player: Player, del: boolean): boolean {
+        if (!super.canCast(player, del)) {
+            return false;
+        }
+
+        const weapon = player.getEquipment().get(Equipment.WEAPON_SLOT);
+        const weaponId = weapon?.getId();
+        if (weaponId !== this.chargedWeaponId && weaponId !== this.unchargedWeaponId) {
+            return true;
+        }
+
+        const charges = Math.max(0, Number(weapon.getMetaValue(TRIDENT_CHARGE_META_KEY)) || 0);
+        if (charges <= 0) {
+            player.getPacketSender().sendMessage("Your trident has run out of charges.");
+            player.getCombat().reset();
+            return false;
+        }
+
+        if (!del) {
+            return true;
+        }
+
+        const remaining = charges - 1;
+        weapon.setMetaValue(TRIDENT_CHARGE_META_KEY, remaining);
+        if (remaining <= 0 && weapon.getId() !== this.unchargedWeaponId) {
+            weapon.setId(this.unchargedWeaponId);
+            player.getEquipment().refreshItems();
+            player.getUpdateFlag().flag(Flag.APPEARANCE);
+        }
+        return true;
+    }
+}
 
 const getCombatFactory = () =>
     require("../CombatFactory").CombatFactory as typeof import("../CombatFactory").CombatFactory;
@@ -1674,7 +1729,7 @@ export class CombatSpells {
         () => { return Sound.ICA_BARRAGE_IMPACT; }
 
     )
-    public static TRIDENT_OF_THE_SEAS = new CombatNormalSpell({
+    public static TRIDENT_OF_THE_SEAS = new TridentSpell({
         castAnimation(): Animation {
             return new Animation(1167);
         },
@@ -1714,9 +1769,9 @@ export class CombatSpells {
         spellId(): number {
             return 1;
         }
-    });
+    }, ItemIdentifiers.TRIDENT_OF_THE_SEAS, ItemIdentifiers.UNCHARGED_TRIDENT);
 
-    public static TRIDENT_OF_THE_SWAMP = new CombatNormalSpell({
+    public static TRIDENT_OF_THE_SWAMP = new TridentSpell({
         castAnimation(): Animation {
             return new Animation(1167);
         },
@@ -1756,7 +1811,7 @@ export class CombatSpells {
         spellId(): number {
             return 1;
         }
-    });
+    }, ItemIdentifiers.TRIDENT_OF_THE_SWAMP, ItemIdentifiers.UNCHARGED_TOXIC_TRIDENT);
 
     /**
 

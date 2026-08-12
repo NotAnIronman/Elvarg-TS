@@ -62,17 +62,19 @@ export class ObjectDefinition extends ObjectIdentifiers {
     getInteractions(): string[] | null { return this.interactions; }
     getMinimapFunction(): number { return this.minimapFunction; }
 
+    // Barrows crypt staircases (Ahrim/Dharok/Guthan/Karil/Verac=20667-20670,20672,
+    // Torag=20671) - the cache names all six generically "Staircase" with no
+    // per-brother distinction, so these can't be represented as named
+    // ObjectIdentifiers constants. Referenced by raw id here instead.
+    private static readonly BARROWS_STAIRCASE_SIZE_2 = new Set([20667, 20668, 20669, 20670, 20672]);
+    private static readonly BARROWS_STAIRCASE_SIZE_3 = 20671;
+
     getSize(): number {
         switch (this.id) {
-            case ObjectDefinition.BARROWS_STAIRCASE_AHRIM:
-            case ObjectDefinition.BARROWS_STAIRCASE_DHAROK:
-            case ObjectDefinition.BARROWS_STAIRCASE_GUTHAN:
-            case ObjectDefinition.BARROWS_STAIRCASE_KARIL:
-            case ObjectDefinition.BARROWS_STAIRCASE_VERAC:
-                return 2;
-            case ObjectDefinition.BARROWS_STAIRCASE_TORAG:
+            case ObjectDefinition.BARROWS_STAIRCASE_SIZE_3:
                 return 3;
             default:
+                if (ObjectDefinition.BARROWS_STAIRCASE_SIZE_2.has(this.id)) return 2;
                 return this.sizeX + this.sizeY - 1;
         }
     }

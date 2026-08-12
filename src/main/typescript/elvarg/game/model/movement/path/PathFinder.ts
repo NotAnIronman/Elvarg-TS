@@ -183,6 +183,18 @@ export class PathFinder {
             blockingMask?: number;
         } = {}
     ): number {
+        // Every route calculation starts a fresh queue from the entity's live
+        // position. Without this, addSteps() below interpolates the new
+        // waypoints from the tail of whatever was left in the OLD queue
+        // (MovementQueue.getLast()) instead of from the entity's actual
+        // current tile - harmless for callers that already reset first (this
+        // is a no-op on an empty queue), but combat's routeToward()/
+        // CombatRange.route() re-invoke this every time a chased target's
+        // tile changes without ever resetting, so a mid-chase recompute was
+        // splicing a straight-line "connector" from the stale old waypoints
+        // back to the new ones - visible as the character walking toward the
+        // target, then backtracking, then correcting again.
+        entity.getMovementQueue().reset();
         entity.getMovementQueue().lastDestX = destX;
         entity.getMovementQueue().lastDestY = destY;
         entity.getMovementQueue().setRoute(false);
@@ -205,7 +217,8 @@ export class PathFinder {
             locShape: options.locShape ?? -1,
             moveNear: options.moveNear ?? true,
             blockAccessFlags: options.blockAccessFlags ?? 0,
-            maxWaypoints: options.maxWaypoints ?? 100,
+            // Matches OSRS's 25-checkpoint path cap (see RsmodRouteFinding's default).
+            maxWaypoints: options.maxWaypoints ?? 25,
             privateArea: entity.getPrivateArea(),
         });
 
@@ -365,6 +378,17 @@ export class PathFinder {
         const privateArea = attacker.getPrivateArea();
         const targetLocation = defender.getLocation();
         const current = attacker.getLocation();
+        // Chebyshev distance (the metric used below) has wide "plateaus" of
+        // tied values - several candidate approach tiles are often equally
+        // close. Recomputed every tick a moving target's tile changes, a
+        // strict "<" tie-break has no reason to keep picking the same tile
+        // twice in a row, so it can alternate between two equally-valid
+        // tiles as the target shifts by a single tile, making the attacker
+        // waffle between them instead of converging. Preferring whatever
+        // tile the attacker was already walking toward (if it's still just
+        // as good) keeps the choice stable once made.
+        const preferredX = attacker.getMovementQueue().lastDestX;
+        const preferredY = attacker.getMovementQueue().lastDestY;
 
         if (distance === 1) {
             const size = attacker.getSize();
@@ -372,6 +396,7 @@ export class PathFinder {
             let bestTile: Location | null = null;
             let bestDistance = Number.POSITIVE_INFINITY;
             let bestPerpendicular = false;
+            let bestPreferred = false;
             for (const tile of defender.outterTiles()) {
                 if (!RegionManager.canMovestart(attacker.getLocation(), tile, size, size, privateArea)
                     || RegionManager.blocked(tile, privateArea)) {
@@ -386,13 +411,15 @@ export class PathFinder {
                     size === 1 &&
                     followingSize === 1 &&
                     tile.isPerpendicularTo(current);
+                const tilePreferred = tile.getX() === preferredX && tile.getY() === preferredY;
                 if (
                     tileDistance < bestDistance ||
-                    (tileDistance === bestDistance && tilePerpendicular && !bestPerpendicular)
+                    (tileDistance === bestDistance && !bestPreferred && (tilePreferred || (tilePerpendicular && !bestPerpendicular)))
                 ) {
                     bestTile = tile;
                     bestDistance = tileDistance;
                     bestPerpendicular = tilePerpendicular;
+                    bestPreferred = tilePreferred;
                 }
             }
             if (bestTile != null) {
@@ -414,6 +441,7 @@ export class PathFinder {
 
             let bestTile: Location | undefined = undefined;
             let bestDistance = Number.POSITIVE_INFINITY;
+            let bestPreferred = false;
             for (const possibleTile of possibleTiles) {
                 if (RegionManager.blocked(possibleTile, attacker.getPrivateArea())) {
                     continue;
@@ -422,9 +450,14 @@ export class PathFinder {
                     continue;
                 }
                 const tileDistance = current.getDistance(possibleTile);
-                if (tileDistance < bestDistance) {
+                const tilePreferred = possibleTile.getX() === preferredX && possibleTile.getY() === preferredY;
+                if (
+                    tileDistance < bestDistance ||
+                    (tileDistance === bestDistance && tilePreferred && !bestPreferred)
+                ) {
                     bestDistance = tileDistance;
                     bestTile = possibleTile;
+                    bestPreferred = tilePreferred;
                 }
             }
             tile = bestTile;

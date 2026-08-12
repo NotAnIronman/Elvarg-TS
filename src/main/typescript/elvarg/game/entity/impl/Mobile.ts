@@ -77,6 +77,13 @@ export abstract class Mobile extends Entity {
     combatFollowing: any;
     npcTransformationId = -1;
     poisonDamage: number;
+    /**
+     * True when the current affliction is venom rather than ordinary
+     * poison. Venom uses a different damage curve (see CombatPoisonEffect):
+     * it starts low and escalates over time instead of decaying, and
+     * doesn't expire on its own.
+     */
+    private venomed = false;
     prayerActive = new Array<boolean>(30);
     curseActive = new Array<boolean>(20);
     resetMovementQueue = false;
@@ -357,6 +364,14 @@ export abstract class Mobile extends Entity {
     }
     isPoisoned(): boolean {
         return this.poisonDamage > 0;
+    }
+
+    isVenomed(): boolean {
+        return this.venomed && this.poisonDamage > 0;
+    }
+
+    setVenomed(venomed: boolean) {
+        this.venomed = venomed;
     }
 
     getPositionToFace(): Location {

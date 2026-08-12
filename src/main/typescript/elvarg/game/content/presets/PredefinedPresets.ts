@@ -91,7 +91,7 @@ export class PredefinedPresets {
     );
 
     public static DDS_PURE_R_73: Presetable = new Presetable("DDS Pure (R)", [
-        new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 75), new Item(ItemIdentifiers.RANGING_POTION_4_), new Item(ItemIdentifiers.SUPER_STRENGTH_4_),
+        new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 75), new Item(ItemIdentifiers.RANGING_POTION_4_), new Item(ItemIdentifiers.SUPER_STRENGTH_4_),
         new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SUPER_ATTACK_4_),
         new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SARADOMIN_BREW_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
         new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK),
@@ -118,7 +118,7 @@ export class PredefinedPresets {
     );
 
     public static G_MAULER_70: Presetable = new Presetable("G Mauler (R)",  [
-            new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 75), new Item(ItemIdentifiers.RANGING_POTION_4_), new Item(ItemIdentifiers.SUPER_STRENGTH_4_),
+            new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 75), new Item(ItemIdentifiers.RANGING_POTION_4_), new Item(ItemIdentifiers.SUPER_STRENGTH_4_),
             new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.GRANITE_MAUL), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SUPER_ATTACK_4_),
             new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SARADOMIN_BREW_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
             new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK),
@@ -229,7 +229,7 @@ export class PredefinedPresets {
     );
 
     public static MAIN_RCB_TANK_126: Presetable = new Presetable("Main RCB Tank", [
-        new Item(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_), new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 175), new Item(ItemIdentifiers.RANGING_POTION_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
+        new Item(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_), new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 175), new Item(ItemIdentifiers.RANGING_POTION_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
         new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.ASTRAL_RUNE, 1000), new Item(ItemIdentifiers.EARTH_RUNE, 1000), new Item(ItemIdentifiers.DEATH_RUNE, 1000),
         new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.COOKED_KARAMBWAN),
         new Item(ItemIdentifiers.SUPER_ATTACK_4_), new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.COOKED_KARAMBWAN),
@@ -248,7 +248,7 @@ export class PredefinedPresets {
             new Item(ItemIdentifiers.BARROWS_GLOVES),
             new Item(ItemIdentifiers.DRAGON_BOOTS),
             new Item(ItemIdentifiers.RING_OF_RECOIL),
-            new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 175),
+            new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 175),
         ],
         [99, 99, 99, 99, 99, 99, 99],
         MagicSpellbook.LUNAR,
@@ -283,7 +283,7 @@ export class PredefinedPresets {
     );
 
     public static MAIN_BARRAGE_126: Presetable = new Presetable("Main Barrage", [
-        new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 150), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
+        new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 150), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
         new Item(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_), new Item(ItemIdentifiers.WATER_RUNE, 6000), new Item(ItemIdentifiers.BLOOD_RUNE, 2000), new Item(ItemIdentifiers.DEATH_RUNE, 4000),
         new Item(ItemIdentifiers.BLACK_DHIDE_BODY), new Item(ItemIdentifiers.BLACK_DHIDE_CHAPS), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
         new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.COOKED_KARAMBWAN),
@@ -330,7 +330,7 @@ export class PredefinedPresets {
             new Item(ItemIdentifiers.VOID_KNIGHT_GLOVES),
             new Item(ItemIdentifiers.DRAGON_BOOTS),
             new Item(ItemIdentifiers.RING_OF_RECOIL),
-            new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 175),
+            new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 175),
         ],
         [99, 99, 99, 99, 99, 99, 99],
         MagicSpellbook.LUNAR,
@@ -395,7 +395,7 @@ export class PredefinedPresets {
         [
             new Item(ItemIdentifiers.RUNE_CROSSBOW), new Item(ItemIdentifiers.BLACK_DHIDE_CHAPS), new Item(ItemIdentifiers.RANGING_POTION_4_), new Item(ItemIdentifiers.SUPER_STRENGTH_4_),
             new Item(ItemIdentifiers.AVAS_ACCUMULATOR), new Item(ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SUPER_ATTACK_4_),
-            new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 75), new Item(ItemIdentifiers.BOOK_OF_WAR), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
+            new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 75), new Item(ItemIdentifiers.BOOK_OF_WAR), new Item(ItemIdentifiers.SUPER_RESTORE_4_), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
             new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SARADOMIN_BREW_4_),
             new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK),
             new Item(ItemIdentifiers.COOKED_KARAMBWAN), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK), new Item(ItemIdentifiers.SHARK),
@@ -406,9 +406,9 @@ export class PredefinedPresets {
             new Item(ItemIdentifiers.ZAMORAK_CAPE),
             new Item(ItemIdentifiers.MAGIC_SHORTBOW),
             new Item(ItemIdentifiers.AMULET_OF_GLORY),
-            new Item(ItemIdentifiers.ZAMORAK_ROBE),
+            new Item(ItemIdentifiers.ZAMORAK_MONK_BOTTOM),
             null,
-            new Item(ItemIdentifiers.ZAMORAK_ROBE_3),
+            new Item(ItemIdentifiers.ZAMORAK_MONK_TOP),
             new Item(ItemIdentifiers.MITHRIL_GLOVES),
             new Item(ItemIdentifiers.CLIMBING_BOOTS),
             new Item(ItemIdentifiers.RING_OF_RECOIL),
@@ -469,7 +469,7 @@ export class PredefinedPresets {
             new Item(ItemIdentifiers.BARROWS_GLOVES),
             new Item(ItemIdentifiers.CLIMBING_BOOTS),
             new Item(ItemIdentifiers.RING_OF_RECOIL),
-            new Item(ItemIdentifiers.DRAGON_BOLTS_E_, 500),
+            new Item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 500),
         ],
         /* atk, def, str, hp, range, pray, mage */
         [99, 99, 99, 99, 99, 99, 99],

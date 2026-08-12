@@ -30,8 +30,6 @@ export class Bank extends ItemContainer {
     public static readonly TOTAL_BANK_TABS = 11;
     public static readonly CONTAINER_START = 50300;
     public static readonly BANK_SEARCH_TAB_INDEX = Bank.TOTAL_BANK_TABS - 1;
-    public static readonly BANK_SCROLL_BAR_INTERFACE_ID = 5385;
-    public static readonly BANK_TAB_INTERFACE_ID = 5383;
     public static readonly INVENTORY_INTERFACE_ID = 5064;
     public static readonly MAIN_INTERFACE_ID = 12;
     public static readonly SIDE_INTERFACE_ID = 15;
@@ -42,7 +40,7 @@ export class Bank extends ItemContainer {
 
     public static isOpen(player: Player): boolean {
         return player.getStatus() === PlayerStatus.BANKING &&
-            (player.getInterfaceId() === 5292 || player.getInterfaceId() === Bank.MAIN_INTERFACE_ID);
+            player.getInterfaceId() === Bank.MAIN_INTERFACE_ID;
     }
 
     public static withdraw(player: Player, item: number, slot: number, amount: number, fromBankTab: number) {
@@ -702,20 +700,30 @@ export class Bank extends ItemContainer {
 
         const player = this.getPlayer();
         const sender = player.getPacketSender();
+        const varps = {
+            548: 1,
+            4611: Math.max(0, 1410 - this.capacity()),
+        };
+        const varbits: Record<number, number> = {
+            3755: player.isPlaceholders() ? 1 : 0,
+            3958: player.withdrawAsNote() ? 1 : 0,
+            3959: player.insertModeReturn() ? 1 : 0,
+            3960: player.getBankCustomQuantity(),
+            4150: player.getCurrentBankTab(),
+            4170: 0,
+            5450: 1,
+            6590: player.getBankQuantityMode(),
+        };
+        for (let tab = 1; tab <= 9; tab++) {
+            varbits[4170 + tab] = player.getBank(tab).getValidItems().length;
+        }
         player.setInterfaceId(Bank.MAIN_INTERFACE_ID);
-        sender.sendConfig(548, 1)
-            .sendVarbit(4150, player.getCurrentBankTab())
-            .sendVarbit(3755, player.isPlaceholders() ? 1 : 0)
-            .sendVarbit(3958, player.withdrawAsNote() ? 1 : 0)
-            .sendVarbit(3959, player.insertModeReturn() ? 1 : 0)
-            .sendVarbit(3960, player.getBankCustomQuantity())
-            .sendVarbit(5450, 1)
-            .sendVarbit(6590, player.getBankQuantityMode())
-            .sendInterfaceScript(917, [-1, -2])
-            .sendSubInterface((161 << 16) | 16, Bank.MAIN_INTERFACE_ID, 0)
-            .sendSubInterface((161 << 16) | 74, Bank.SIDE_INTERFACE_ID, 3)
+        sender.sendInterfaceScript(917, [-1, -2])
+            .sendSubInterface((161 << 16) | 16, Bank.MAIN_INTERFACE_ID, 0, { varps, varbits })
+            .sendSubInterface((161 << 16) | 74, Bank.SIDE_INTERFACE_ID, 3, { varps, varbits })
             .sendInterfaceFlagsRange((Bank.MAIN_INTERFACE_ID << 16) | 12, 0, 1409, 3409919)
             .sendInterfaceFlagsRange((Bank.SIDE_INTERFACE_ID << 16) | 3, 0, 27, 3278846)
+            .sendVarbit(12393, 1)
             .sendString(`Bank of ${GameConstants.NAME}`, (Bank.MAIN_INTERFACE_ID << 16) | 3);
         this.refreshItems();
         if (opening) Sounds.sendSound(this.getPlayer(), Sound.CONTAINER_OPEN);

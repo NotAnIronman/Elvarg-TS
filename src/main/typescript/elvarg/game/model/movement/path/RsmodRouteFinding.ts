@@ -143,7 +143,9 @@ export class RsmodRouteFinding {
       locShape = -1,
       moveNear = true,
       blockAccessFlags = 0,
-      maxWaypoints = 100,
+      // Real OSRS/RSMod caps an extracted path at 25 checkpoints - a
+      // longer route stops at the 25th and needs a fresh click to continue.
+      maxWaypoints = 25,
     } = options;
 
     this.reset();

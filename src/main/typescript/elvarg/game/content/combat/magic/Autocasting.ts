@@ -17,7 +17,7 @@ export class Autocasting {
         ItemIdentifiers.KODAI_WAND, ItemIdentifiers.MASTER_WAND, ItemIdentifiers.ANCIENT_STAFF,
         ItemIdentifiers.NIGHTMARE_STAFF, ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF,
         ItemIdentifiers.ELDRITCH_NIGHTMARE_STAFF, ItemIdentifiers.TOXIC_STAFF_OF_THE_DEAD,
-        ItemIdentifiers.ELDER_WAND, ItemIdentifiers.STAFF_OF_THE_DEAD, ItemIdentifiers.STAFF_OF_LIGHT,
+        ItemIdentifiers.STAFF_OF_THE_DEAD, ItemIdentifiers.STAFF_OF_LIGHT,
     ]);
 
     private static readonly AUTOCAST_SPELLS = new Map<number, CombatSpell>([

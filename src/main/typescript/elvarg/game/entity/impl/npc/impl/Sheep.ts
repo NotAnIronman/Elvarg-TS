@@ -96,28 +96,16 @@ export class Sheep extends NPC implements NPCInteraction  {
         )
     }
 
+    // TODO: the wool-color/bald transform ids this used to reference (e.g.
+    // SHEEP_FULL_GREY_HEAD/SHEEP_BALD_GREY_HEAD) had gone stale and were
+    // actually pointing at Cow/Piglet/Rooster/Chicken NPCs in the current
+    // cache, not sheep at all - shearing would have transformed the sheep
+    // into a farm animal. The cache doesn't distinguish sheep by wool
+    // color/head state in its names (every regular sheep is just "Sheep"),
+    // so the correct per-variant NPC ids need to be re-sourced (e.g. from
+    // the OSRS wiki) before this can be restored. Returning -1 (no
+    // transform, same sentinel the old default case used) until then.
     private getSheepTransformId(npc: NPC): number {
-        switch (npc.getId()) {
-            case NpcIdentifiers.SHEEP_FULL_BLACK_HEAD:
-                return NpcIdentifiers.SHEEP_BALD_BLACK_HEAD;
-            case NpcIdentifiers.SHEEP_BALD_BLACK_HEAD:
-                return NpcIdentifiers.SHEEP_FULL_BLACK_HEAD;
-            case NpcIdentifiers.SHEEP_FULL_GREY_HEAD:
-                return NpcIdentifiers.SHEEP_BALD_GREY_HEAD;
-            case NpcIdentifiers.SHEEP_BALD_GREY_HEAD:
-                return NpcIdentifiers.SHEEP_FULL_GREY_HEAD;
-            case NpcIdentifiers.SHEEP_FULL_WHITE_HEAD:
-                return NpcIdentifiers.SHEEP_BALD_WHITE_HEAD;
-            case NpcIdentifiers.SHEEP_BALD_WHITE_HEAD:
-                return NpcIdentifiers.SHEEP_FULL_WHITE_HEAD;
-            case NpcIdentifiers.SHEEP_FULL_YELLOW_GREY_HEAD:
-                return NpcIdentifiers.SHEEP_BALD_YELLOW_GREY_HEAD;
-            case NpcIdentifiers.SHEEP_FULL_YELLOW_BLACK_HEAD:
-                return NpcIdentifiers.SHEEP_BALD_YELLOW_BLACK_HEAD;
-            default:
-                return -1;
-        }
-
-
+        return -1;
     }
 }

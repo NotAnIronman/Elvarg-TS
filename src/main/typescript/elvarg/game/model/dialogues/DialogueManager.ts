@@ -59,6 +59,10 @@ export class DialogueManager {
         return this.dialogues.has(this.index);
     }
 
+    public canContinue(widgetId: number): boolean {
+        return this.isActive() && this.player.getPacketSender().isChatboxInterface(widgetId >>> 16);
+    }
+
     /**
      * Advances, starting the next dialogue.
      */

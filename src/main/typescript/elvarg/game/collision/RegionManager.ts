@@ -43,9 +43,16 @@ export class RegionManager {
         if (fs.existsSync(replacementDir)) {
             for (const name of fs.readdirSync(replacementDir).sort()) {
                 const match = /^(\d+)\.pack$/.exec(name);
-                if (match) MapRegionReplacementManager.replaceMapRegion(
-                    Number(match[1]), path.join(replacementDir, name),
-                );
+                if (!match) continue;
+                const packPath = path.join(replacementDir, name);
+                try {
+                    MapRegionReplacementManager.replaceMapRegion(Number(match[1]), packPath);
+                } catch (err) {
+                    console.warn(
+                        `[collision] skipping region replacement pack (falling back to cache region): ${packPath}`,
+                        (err as Error)?.message ?? err
+                    );
+                }
             }
         }
         console.info(`[collision] indexed ${RegionManager.regions.size} cache regions`);

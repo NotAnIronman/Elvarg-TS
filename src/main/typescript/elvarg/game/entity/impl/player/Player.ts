@@ -134,6 +134,13 @@ export class Player extends Mobile {
     private skillAnimation: number;
     private drainingPrayer = false;
     private prayerPointDrain = 0;
+    /**
+     * True when a prayer was newly activated this tick. OSRS applies the
+     * prayer's effect immediately but skips that tick's drain, which is what
+     * makes 1-tick "flicking" free. Consumed (read + reset) by
+     * PrayerHandler.processDrain each tick.
+     */
+    private prayerActivatedThisTick = false;
     private spellbook: MagicSpellbook = MagicSpellbook.NORMAL;
     private destroyItem = -1;
     private updateInventory: boolean; // Updates inventory on next tick
@@ -165,6 +172,18 @@ export class Player extends Mobile {
     private consecutiveTasks: number;
 
     // Combat
+    /**
+     * OSRS PID: processing priority for same-tick ties (movement onto a
+     * shared tile, attacks landing on the same target, etc - lower goes
+     * first). Randomized on login and re-randomized every 100-150 ticks
+     * (60-90s), per player, matching the mechanic OSRS has used since the
+     * April 2016 "Bank Placeholders & PID" update - PID is NOT a fixed
+     * login-order slot; it was randomized every tick before that update and
+     * has been randomized on this 100-150 tick cycle since.
+     */
+    private pidPriority: number = Misc.getRandomDouble(0x7fffffff);
+    /** Tick this player's PID is next due to reshuffle; 0 forces an immediate roll on first process(). */
+    private nextPidReshuffleTick = 0;
     public skullType: SkullType;
     public combatSpecial: CombatSpecial;
     private recoilDamage: number;
@@ -239,6 +258,7 @@ export class Player extends Mobile {
         this.getTimers().cancel(TimerKey.FREEZE);
         this.getCombat().getPrayerBlockTimer().stop();
         this.setPoisonDamage(0);
+        this.setVenomed(false);
         this.setWildernessLevel(0);
         this.setRecoilDamage(0);
         this.setSkullTimer(0);
@@ -384,12 +404,6 @@ export class Player extends Mobile {
 
         // Timers
         timed("timers", () => this.getTimers().process());
-
-        // Process incoming packets...
-        let session = this.getSession();
-        if (!isBot && session != null) {
-            timed("packets", () => session.processPackets());
-        }
 
         if (isBot) {
             timed("overlap_break", () => this.tryBreakBotCombatOverlap());
@@ -668,7 +682,6 @@ export class Player extends Mobile {
         this.setResetMovementQueue(true);
         this.getCombat().reset();
         this.getSkillManager().ensureCombatBaseline();
-        WeaponInterfaces.assign(this);
         const autocastSpell = this.getCombat().getAutocastSpell();
         if (autocastSpell != null && autocastSpell.getSpellbook?.() !== this.getSpellbook()) {
             Autocasting.setAutocast(this, null);
@@ -677,22 +690,16 @@ export class Player extends Mobile {
         } else {
             Autocasting.setAutocast(this, null);
         }
-        this.getPacketSender().sendTabInterface(6, this.getSpellbook().getInterfaceId());
-        CombatSpecial.ensureRestoreTask(this);
-
-        // Keep baseline right-click player interactions available outside wilderness/duel areas.
-        this.getPacketSender().sendInteractionOption("Follow", 3, false);
-        this.getPacketSender().sendInteractionOption("Trade With", 4, false);
     }
-
 
     closeInterruptibleInterfaces(): void {
         if (
             this.status !== PlayerStatus.TRADING &&
             this.status !== PlayerStatus.DUELING &&
-            (this.status !== PlayerStatus.NONE || this.interfaceId >= 0 || this.dialogueManager.isActive())
+            (this.status !== PlayerStatus.NONE || this.interfaceId >= 0 || this.dialogueManager.isActive() ||
+                this.packetSender.hasInterruptibleInterface())
         ) {
-            this.packetSender.sendInterfaceRemoval();
+            this.packetSender.closeInterruptibleInterfaces();
         }
     }
 
@@ -956,6 +963,17 @@ export class Player extends Mobile {
 
     public setPrayerPointDrain(prayerPointDrain: number) {
         this.prayerPointDrain = prayerPointDrain;
+    }
+
+    public markPrayerActivatedThisTick(): void {
+        this.prayerActivatedThisTick = true;
+    }
+
+    /** Reads and clears the flag in one step so it only ever applies to a single tick. */
+    public consumePrayerActivatedThisTick(): boolean {
+        const activated = this.prayerActivatedThisTick;
+        this.prayerActivatedThisTick = false;
+        return activated;
     }
 
     public getLastItemPickup(): Stopwatch {
@@ -1309,6 +1327,29 @@ export class Player extends Mobile {
 
     public getSpecialAttackRestore(): SecondsTimer {
         return this.specialAttackRestore;
+    }
+
+    public getPidPriority(): number {
+        return this.pidPriority;
+    }
+
+    /**
+     * Re-randomizes this player's PID once its 100-150 tick (60-90s) window
+     * has elapsed, matching OSRS's behavior since the April 2016 PID update.
+     * Called once per tick, per player, before same-tick processing order is
+     * decided for that tick. The Duel Arena exception (priority is frozen
+     * for the duration of a duel so both fighters see consistent conditions)
+     * is honored by simply not rolling while the player is dueling.
+     */
+    public maybeReshufflePid(currentTick: number): void {
+        if (currentTick < this.nextPidReshuffleTick) {
+            return;
+        }
+        if (this.getDueling().inDuel()) {
+            return;
+        }
+        this.pidPriority = Misc.getRandomDouble(0x7fffffff);
+        this.nextPidReshuffleTick = currentTick + 100 + Math.floor(Math.random() * 51);
     }
 
     public getSkullType(): SkullType {

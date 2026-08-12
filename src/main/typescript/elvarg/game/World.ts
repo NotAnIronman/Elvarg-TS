@@ -641,6 +641,13 @@ export class World {
         const timed = <T>(phase: string, fn: () => T): T =>
             ServerPerf.measurePhase(`world.${phase}`, fn);
 
+        // Re-roll any player's PID whose 100-150 tick window has elapsed,
+        // before same-tick processing order is decided below.
+        timed("pid_reshuffle", () => {
+            const cycle = World.processCycle;
+            World.players.forEach((player) => player.maybeReshufflePid(cycle));
+        });
+
         // Process all active {@link Task}s..
         timed("task_manager", () => {
             try {
@@ -783,13 +790,19 @@ export class World {
         });
 
         // Sequential processing to avoid null-slot crashes during bring-up.
+        // Players are processed in PID order so that same-tick ties (who
+        // claims a shared movement tile, whose attack lands first on a
+        // shared target) resolve the way OSRS resolves them.
         timed("process_players", () => {
             const cycle = World.processCycle;
             World.rebuildRealPlayerObserverBuckets();
-            World.players.forEach((player) => {
+            const orderedPlayers: Player[] = [];
+            World.players.forEach((player) => orderedPlayers.push(player));
+            orderedPlayers.sort((a, b) => a.getPidPriority() - b.getPidPriority());
+            for (const player of orderedPlayers) {
                 try {
                     if (!World.shouldProcessBotPlayerThisTick(player, cycle)) {
-                        return;
+                        continue;
                     }
                     player.process();
                     ShopManager.processPlayer(player);
@@ -800,7 +813,7 @@ export class World {
                     console.error(e);
                     player.requestLogout();
                 }
-            });
+            }
         });
 
         timed("process_npcs", () => {
@@ -844,6 +857,15 @@ export class World {
                     if (World.shouldRunNetworkUpdates(player)) {
                         player.getSession().flush(World.processCycle);
                     }
+                } catch (e) {
+                    console.log(e);
+                    player.requestLogout();
+                }
+            });
+            // A bot can appear before its human observer in the player list. Keep
+            // its flags until every observer has built this tick's sync frame.
+            World.players.forEach((player) => {
+                try {
                     player.resetUpdating();
                     player.setCachedUpdateBlock(null);
                 } catch (e) {

@@ -1,8 +1,56 @@
 import { Mobile } from './Mobile';
-import { FastDeque } from '../../../util/FastDeque';
+
+/**
+ * Binary min-heap of free slot indices. World slot indices are assigned
+ * lowest-currently-free-first, matching how OSRS assigns entity indices
+ * (used for update-block encoding, view-distance culling, etc). Note this is
+ * NOT the same thing as PID/processing priority - see Player.pidPriority -
+ * which is independently randomized and does not derive from this index.
+ * A plain FIFO free-list would not give lowest-first allocation: once the
+ * initial run of virgin slots is consumed, freed slots would only be reused
+ * in the order they were freed rather than numeric order, so a long-uptime
+ * world would just hand out ever-increasing indices instead of always
+ * reusing the lowest free one.
+ */
+class SlotMinHeap {
+    private heap: number[] = [];
+
+    push(value: number): void {
+        this.heap.push(value);
+        let i = this.heap.length - 1;
+        while (i > 0) {
+            const parent = (i - 1) >> 1;
+            if (this.heap[parent] <= this.heap[i]) break;
+            [this.heap[parent], this.heap[i]] = [this.heap[i], this.heap[parent]];
+            i = parent;
+        }
+    }
+
+    shift(): number | undefined {
+        if (this.heap.length === 0) return undefined;
+        const top = this.heap[0];
+        const last = this.heap.pop()!;
+        if (this.heap.length > 0) {
+            this.heap[0] = last;
+            let i = 0;
+            const n = this.heap.length;
+            while (true) {
+                const left = i * 2 + 1;
+                const right = i * 2 + 2;
+                let smallest = i;
+                if (left < n && this.heap[left] < this.heap[smallest]) smallest = left;
+                if (right < n && this.heap[right] < this.heap[smallest]) smallest = right;
+                if (smallest === i) break;
+                [this.heap[smallest], this.heap[i]] = [this.heap[i], this.heap[smallest]];
+                i = smallest;
+            }
+        }
+        return top;
+    }
+}
 
 export class MobileList<E extends Mobile> implements Iterable<E> {
-    private slotQueue: FastDeque<number> = new FastDeque<number>();
+    private slotQueue: SlotMinHeap = new SlotMinHeap();
     private capacity: number;
     public characters: E[];
     private size: number;

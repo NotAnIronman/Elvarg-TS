@@ -208,6 +208,7 @@ export class PrayerHandler {
                 Sounds.sendSound(player, activationSound);
             }
             PrayerHandler.startDrain(player);
+            player.markPrayerActivatedThisTick();
             if (pd.hint !== -1) {
                 const hintId = PrayerHandler.getHeadHint(character);
                 player.getAppearance().setHeadHint(hintId);
@@ -394,6 +395,13 @@ export class PrayerHandler {
 
     public static processDrain(player: Player) {
         if (!player.isDrainingPrayer()) {
+            return;
+        }
+
+        // A prayer activated this tick takes effect immediately (the
+        // protection/boost applies right away) but isn't charged until the
+        // following tick - this is what makes 1-tick prayer flicking free.
+        if (player.consumePrayerActivatedThisTick()) {
             return;
         }
 

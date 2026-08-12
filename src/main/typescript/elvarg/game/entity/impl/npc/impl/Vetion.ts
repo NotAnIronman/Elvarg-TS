@@ -34,7 +34,7 @@ export class Vetion extends NPC {
             }
         }
 
-        if (this.getNpcTransformationId() == NpcIdentifiers.VETION_REBORN) {
+        if (this.getNpcTransformationId() == NpcIdentifiers.VETION_2) {
             if (this.rebornTimer == 500) {
                 this.spawnedHellhounds = true;
                 this.setNpcTransformationId(NpcIdentifiers.VETION);
@@ -46,9 +46,9 @@ export class Vetion extends NPC {
 
     private spawnHellhounds(target: Mobile) {
         for (let i = 0; i < 2; i++) {
-            let hellhoundId = NpcIdentifiers.VETION_HELLHOUND;
-            if (this.getNpcTransformationId() == NpcIdentifiers.VETION_REBORN) {
-                hellhoundId = NpcIdentifiers.GREATER_VETION_HELLHOUND;
+            let hellhoundId = NpcIdentifiers.SKELETON_HELLHOUND_3;
+            if (this.getNpcTransformationId() == NpcIdentifiers.VETION_2) {
+                hellhoundId = NpcIdentifiers.GREATER_SKELETON_HELLHOUND;
             }
             const hellhound = NPC.create(hellhoundId, this.getLocation()) as VetionHellhound;
             hellhound.setVetion(this);
@@ -67,9 +67,9 @@ export class Vetion extends NPC {
         this.hellhounds = [];
         this.spawnedHellhounds = false;
 
-        if (this.getNpcTransformationId() != NpcIdentifiers.VETION_REBORN) {
+        if (this.getNpcTransformationId() != NpcIdentifiers.VETION_2) {
             this.setHitpoints(this.getDefinition().getHitpoints());
-            this.setNpcTransformationId(NpcIdentifiers.VETION_REBORN);
+            this.setNpcTransformationId(NpcIdentifiers.VETION_2);
             this.forceChat("Do it again!");
             return;
         }

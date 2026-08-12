@@ -92,7 +92,6 @@ export class Combat {
         this.method = method;
         const bypassDelay = instant || method instanceof GraniteMaulCombatMethod;
         const cycle = World.getProcessCycle();
-        if (!bypassDelay && cycle < this.nextAttackCycle) return false;
 
         if (!CombatFactory.validTarget(this.character, target)) {
             this.reset();
@@ -112,10 +111,18 @@ export class Combat {
             }
         }
 
+        // Moving toward the target must never wait on the previous weapon's
+        // attack cooldown - only landing the next hit is gated by that. This
+        // has to run before the cooldown check below: switching targets (or
+        // a target moving out of range) mid-cooldown should start pathing
+        // immediately, exactly like a first-time target click, instead of
+        // standing still until the old weapon-speed timer happens to expire.
         if (!CombatRange.canReach(this.character, method, target)) {
             this.routeToward(method, target);
             return false;
         }
+
+        if (!bypassDelay && cycle < this.nextAttackCycle) return false;
 
         this.character.getMovementQueue().reset();
         this.route = null;

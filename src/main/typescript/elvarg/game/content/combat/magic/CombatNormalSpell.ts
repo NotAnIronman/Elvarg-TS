@@ -6,7 +6,7 @@ import { Projectile } from "../../../model/Projectile";
 import { Player } from "../../../entity/impl/player/Player";
 import { Item } from "../../../model/Item";
 
-interface CombatNormalSpellOptions {
+export interface CombatNormalSpellOptions {
     spellId: () => number
     maximumHit:() => number 
     castAnimation:() => Animation
