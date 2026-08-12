@@ -406,7 +406,7 @@ function openSmeltingInterface(player) {
     ["What would you like to smelt?", ...SMELTING_RECIPES.map((recipe) => recipe.name)].join("|"),
     SMELTING_SKILLMULTI_MAX_QUANTITY,
     ...itemIds,
-    1,
+    SMELTING_SKILLMULTI_MAX_QUANTITY,
   ]);
 }
 
