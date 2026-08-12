@@ -7,8 +7,6 @@ import { NPC } from './entity/impl/npc/NPC';
 import { GameObject } from './entity/impl/object/GameObject';
 import { MapObjects } from './entity/impl/object/MapObjects';
 import { Player } from './entity/impl/player/Player';
-import { NPCUpdating } from '../game/entity/updating/NPCUpdating'
-import { PlayerUpdating } from './entity/updating/PlayerUpdating';
 import { Graphic } from './model/Graphic';
 import { Location } from './model/Location';
 import { TaskManager } from './task/TaskManager';
@@ -398,6 +396,85 @@ export class World {
         const nearby = World.collectFromBuckets(World.npcUpdateBuckets, player.getLocation());
         nearby.sort((a, b) => a.getIndex() - b.getIndex());
         return nearby;
+    }
+
+    private static readonly MAX_LOCAL_PLAYERS = 255;
+    private static readonly MAX_NEW_LOCAL_PLAYERS_PER_CYCLE = 25;
+    private static readonly MAX_LOCAL_NPCS = 255;
+
+    // Maintains player.getLocalPlayers() - the per-tick sync path (PlayerSession.flushClient)
+    // reads this list directly to know who to include in the player's view.
+    private static updateLocalPlayers(player: Player): void {
+        const localPlayers = player.getLocalPlayers();
+        const retained = localPlayers.filter((localPlayer) =>
+            World.getPlayers().get(localPlayer.getIndex()) != null &&
+            localPlayer.getLocation().isViewableFrom(player.getLocation()) &&
+            !localPlayer.isNeedsPlacement() &&
+            localPlayer.getPrivateArea() === player.getPrivateArea()
+        );
+        localPlayers.length = 0;
+        localPlayers.push(...retained);
+
+        const localIndexes = new Set(localPlayers.map((localPlayer) => localPlayer.getIndex()));
+        let added = 0;
+        for (const candidate of World.getNearbyPlayersForUpdate(player)) {
+            if (localPlayers.length >= World.MAX_LOCAL_PLAYERS || added >= World.MAX_NEW_LOCAL_PLAYERS_PER_CYCLE) break;
+            if (!candidate || candidate === player || localIndexes.has(candidate.getIndex())) continue;
+            if (!candidate.getLocation().isViewableFrom(player.getLocation())) continue;
+            if (candidate.getPrivateArea() !== player.getPrivateArea()) continue;
+            localPlayers.push(candidate);
+            localIndexes.add(candidate.getIndex());
+            added++;
+        }
+    }
+
+    // Maintains player.getLocalNpcs() - the per-tick sync path (PlayerSession.flushClient)
+    // reads this list directly to know which NPCs to include in the player's view.
+    private static updateLocalNpcs(player: Player, nearbyNpcs: NPC[]): void {
+        const localNpcs = player.getLocalNpcs();
+        for (let index = 0; index < localNpcs.length;) {
+            const npc = localNpcs[index];
+            if (
+                World.getNpcs().get(npc.getIndex()) != null &&
+                npc.isRegistered() &&
+                npc.isVisible() &&
+                player.getLocation().isViewableFrom(npc.getLocation()) &&
+                !npc.isNeedsPlacement() &&
+                npc.getPrivateArea() === player.getPrivateArea()
+            ) {
+                index++;
+            } else {
+                localNpcs.splice(index, 1);
+            }
+        }
+
+        const localIndexes = new Set(localNpcs.map((npc) => npc.getIndex()));
+
+        // Keep the owner's active pet in their local NPC list even when normal candidate
+        // scans are noisy, to avoid a "spawned but invisible" pet.
+        const currentPet = player.getCurrentPet?.();
+        if (currentPet != null && currentPet.isRegistered() && currentPet.isVisible()) {
+            if (currentPet.getPrivateArea() !== player.getPrivateArea()) {
+                currentPet.setArea(player.getArea());
+            }
+            if (
+                !localIndexes.has(currentPet.getIndex()) &&
+                localNpcs.length < World.MAX_LOCAL_NPCS &&
+                currentPet.getLocation().isViewableFrom(player.getLocation())
+            ) {
+                localNpcs.push(currentPet);
+                localIndexes.add(currentPet.getIndex());
+            }
+        }
+
+        for (const npc of nearbyNpcs) {
+            if (localNpcs.length >= World.MAX_LOCAL_NPCS) break;
+            if (npc == null || localIndexes.has(npc.getIndex()) || !npc.isVisible() || npc.isNeedsPlacement()) continue;
+            if (npc.getPrivateArea() !== player.getPrivateArea()) continue;
+            if (!npc.getLocation().isViewableFrom(player.getLocation())) continue;
+            localNpcs.push(npc);
+            localIndexes.add(npc.getIndex());
+        }
     }
 
     public static refreshActiveRegions(): void {
@@ -842,8 +919,8 @@ export class World {
             World.forEachNetworkPlayer((player) => {
                 try {
                     const nearbyNpcs = World.getNearbyNpcsForUpdate(player);
-                    PlayerUpdating.update(player);
-                    NPCUpdating.update(player, nearbyNpcs);
+                    World.updateLocalPlayers(player);
+                    World.updateLocalNpcs(player, nearbyNpcs);
                 } catch (e) {
                     console.error("[World] Player/NPC updating failure", e);
                     player.requestLogout();

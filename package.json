@@ -83,7 +83,7 @@
   "scripts": {
     "build": "tsc --build",
     "start": "node ./dist/Server.js",
-    "start:prod": "PLAYER_UPDATE_BUCKET_COMPARE=0 PACKET_LOGGING=0 PACKET_OUT_LOGGING=0 BOT_RUNTIME_EVENT_LOGGING=0 BOT_RUNTIME_TELEMETRY_ENABLED=0 BOT_TASK_PROFILER_ENABLED=0 TASK_SLOW_WARN_ENABLED=0 PLAYER_UPDATE_DEBUG=0 PROJECTILE_DEBUG=0 MAGIC_CAST_DEBUG=0 node --max-old-space-size=8192 ./dist/Server.js",
+    "start:prod": "BOT_RUNTIME_EVENT_LOGGING=0 BOT_RUNTIME_TELEMETRY_ENABLED=0 BOT_TASK_PROFILER_ENABLED=0 TASK_SLOW_WARN_ENABLED=0 PROJECTILE_DEBUG=0 MAGIC_CAST_DEBUG=0 node --max-old-space-size=8192 ./dist/Server.js",
     "dev": "nodemon --ext ts,json,js ./src/main/typescript/elvarg/Server.ts 0",
     "test:login": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/login-smoke.ts",
     "test:protocol": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/login-protocol-harness.ts",

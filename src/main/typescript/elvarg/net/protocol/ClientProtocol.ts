@@ -50,6 +50,7 @@ export type PlayerAppearance = {
   kits: number[];
   equip: number[];
   equipQty?: number[];
+  headIcons?: { skull: number; prayer: number };
 };
 
 export type Tile = { x: number; y: number; level: number };
@@ -1465,8 +1466,8 @@ export function encodePlayerAppearance(
   };
 
   byte(appearance.gender);
-  byte(-1); // skull
-  byte(-1); // prayer icon
+  byte(appearance.headIcons?.skull ?? -1);
+  byte(appearance.headIcons?.prayer ?? -1);
   for (let copy = 0; copy < 2; copy++) {
     for (let slot = 0; slot < 12; slot++) {
       const value = equipmentSlot(slot);

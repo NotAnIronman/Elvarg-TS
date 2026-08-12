@@ -10,6 +10,7 @@ import { PlayerStatus } from "../game/model/PlayerStatus";
 import { PlayerRights } from "../game/model/rights/PlayerRights";
 import { PluginManager } from "../plugins/PluginManager";
 import { Misc } from "../util/Misc";
+import { PlayerPunishment } from "../util/PlayerPunishment";
 import { WebSocketBinaryChannel } from "./BinaryChannel";
 import { PlayerSession } from "./PlayerSession";
 import { CachePipeline } from "../game/cache/CachePipeline";
@@ -522,6 +523,14 @@ class ClientConnection {
       this.failLogin(3, "Invalid username or password.");
       return;
     }
+    if (PlayerPunishment.banned(username)) {
+      this.failLogin(4, "Your account has been disabled.");
+      return;
+    }
+    if (PlayerPunishment.IPBanned(this.channel.remoteAddress)) {
+      this.failLogin(27, "Your IP address has been banned.");
+      return;
+    }
     if (
       World.getPlayers().isFull() ||
       World.getPlayerByName(username) ||
@@ -724,6 +733,10 @@ class ClientConnection {
       ].map((value) => value ?? -1),
       equip: displayEquipment.map((item) => item?.getId?.() ?? -1),
       equipQty: displayEquipment.map((item) => item?.getAmount?.() ?? 0),
+      headIcons: {
+        skull: player.isSkulled() ? player.getSkullType().getIconId() : -1,
+        prayer: player.getAppearance().getHeadHint(),
+      },
     };
   }
 

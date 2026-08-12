@@ -1,4 +1,3 @@
-import { LoginDetailsMessage } from "./login/LoginDetailsMessage";
 import { Packet } from "./packet/Packet";
 import { PacketBuilder } from "./packet/PacketBuilder";
 import { NetworkConstants } from "./NetworkConstants";
@@ -56,13 +55,6 @@ export class PlayerSession {
 
   constructor(channel: SessionChannel) {
     this.channel = channel;
-  }
-
-  public async finalizeLogin(msg: LoginDetailsMessage) {
-    this.channel.removeAllListeners?.("packet");
-    this.channel.on?.("packet", (_data: unknown) => {
-      // Legacy socket.io login path is not used by the WebSocket server bootstrap.
-    });
   }
 
   public write(_builder: PacketBuilder) {
@@ -228,6 +220,10 @@ export class PlayerSession {
           ].map((value) => value ?? -1),
           equip: equipment.map((item) => item?.getId?.() ?? -1),
           equipQty: equipment.map((item) => item?.getAmount?.() ?? 0),
+          headIcons: {
+            skull: player.isSkulled() ? player.getSkullType().getIconId() : -1,
+            prayer: player.getAppearance().getHeadHint(),
+          },
         },
         player.getUsername(),
         player.getSkillManager().getCombatLevel(),
