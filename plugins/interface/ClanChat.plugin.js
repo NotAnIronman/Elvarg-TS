@@ -2,14 +2,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { DonatorRights } = require("../../src/main/typescript/elvarg/game/model/rights/DonatorRights");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { SecondsTimer } = require("../../src/main/typescript/elvarg/game/model/SecondsTimer");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
-const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
-const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const {
   getActiveBotRuntime,
@@ -1137,20 +1134,13 @@ function allowChat(player, text) {
   return true;
 }
 
-const clanChatPacketListener = {
-  execute(player, packet) {
-    if (!player || player.getHitpoints?.() <= 0) {
-      return;
-    }
-
-    const clanMessage = packet.readString?.();
-    if (!allowChat(player, clanMessage)) {
-      return;
-    }
-
-    ClanChatManager.sendMessage(player, clanMessage);
-  },
-};
+// Sending a clan chat message currently has no live wire path: the client
+// protocol's "chat" packet only encodes public/game (a single 0/1 byte),
+// and the client's own CHAT_SENDCLAN handler is an unimplemented stub that
+// discards its inputs and transmits nothing - confirmed by reading the
+// xrsps-typescript client source directly. allowChat() (mute/word-filter
+// check) is kept above for when that gets a real client-side fix; there's
+// nothing to hook it up to server-side until then.
 
 function handleClanChatButton(player, buttonId, menuId = 0) {
   if (!player || !Number.isInteger(buttonId)) {
@@ -1199,6 +1189,9 @@ function handleClanChatButton(player, buttonId, menuId = 0) {
   }
 }
 
+let World;
+let PlayerPunishment;
+
 module.exports = {
   ClanChat,
   ClanChatManager,
@@ -1206,6 +1199,8 @@ module.exports = {
   BannedMember,
   name: "ClanChat",
   register(api) {
+    World = api.getWorld();
+    PlayerPunishment = api.getPlayerPunishment();
     api.onServerStartup(() => {
       ClanChatManager.init();
     });
@@ -1262,6 +1257,5 @@ module.exports = {
       }
     );
 
-    api.registerPacketListener(PacketConstants.CLAN_CHAT_OPCODE, clanChatPacketListener);
   },
 };

@@ -2,8 +2,6 @@ const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { HitDamage } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitDamage");
 const { HitMask } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitMask");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
@@ -153,9 +151,14 @@ function pickpocketSucceeded(player, def) {
   return factor > fluke;
 }
 
+let TaskManager;
+let CombatFactory;
+
 module.exports = {
   name: "Thieving",
   register(api) {
+    TaskManager = api.getTaskManager();
+    CombatFactory = api.getCombatFactory();
     api.onNpcFirstClick(Array.from(PICKPOCKET_BY_NPC_ID.keys()), function pickpocket(event) {
       const { player, npc, npcId } = event;
       const def = PICKPOCKET_BY_NPC_ID.get(npcId);

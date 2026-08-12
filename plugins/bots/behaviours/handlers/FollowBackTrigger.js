@@ -1,6 +1,3 @@
-const { World } = require("../../../../src/main/typescript/elvarg/game/World");
-const { Packet } = require("../../../../src/main/typescript/elvarg/net/packet/Packet");
-const { PacketConstants } = require("../../../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { resetMovementState } = require("../state/PlayerBotState");
 const { callModeHook } = require("../hooks/ModeHookContract");
 
@@ -12,19 +9,6 @@ class FollowBackTrigger {
     this.api = api;
     this.behaviorMode = options.behaviorMode;
     this.botStatusReporter = options.botStatusReporter ?? null;
-  }
-
-  resolveTargetedPlayer(opcode, packet) {
-    const payload = packet?.getBuffer?.();
-    if (!payload || payload.length < 2) {
-      return null;
-    }
-    const parsed = new Packet(opcode, payload);
-    const targetIndex = parsed.readLEShort();
-    if (targetIndex < 0) {
-      return null;
-    }
-    return World.getPlayers().get(targetIndex) ?? null;
   }
 
   activateMode(target, state, mode, reason, nowMs) {
@@ -85,12 +69,12 @@ class FollowBackTrigger {
     });
   }
 
-  handleEstablishedPacket({ opcode, packet, player }, nowMs = Date.now()) {
-    if (opcode !== PacketConstants.FOLLOW_PLAYER_OPCODE || !packet || !player) {
+  handlePlayerFollow({ player, leader }, nowMs = Date.now()) {
+    if (!player) {
       return;
     }
 
-    const followed = this.resolveTargetedPlayer(opcode, packet);
+    const followed = leader;
     const followedUsername = followed?.getUsername?.();
 
     if (

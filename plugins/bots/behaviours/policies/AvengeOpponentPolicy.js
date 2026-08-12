@@ -1,9 +1,7 @@
 "use strict";
 
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
-const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const {
-  CombatFactory,
   CanAttackResponse,
 } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { applyGeneratedPvpLoadout } = require("./PvpLoadoutPolicy");
@@ -19,6 +17,8 @@ const IMMEDIATE_PJ_DURATION_MS = 30000;
 class AvengeOpponentPolicy {
   constructor(options = {}) {
     this.botStatesByName = options.botStatesByName ?? new Map();
+    this.AreaManager = options.api.getAreaManager();
+    this.CombatFactory = options.api.getCombatFactory();
     this.behaviorMode = options.behaviorMode ?? {};
     this.config = options.config ?? {};
   }
@@ -120,7 +120,7 @@ class AvengeOpponentPolicy {
     if (!bot || !state || !state.pvp || !target) {
       return false;
     }
-    const isMultiEngagement = AreaManager.inMulti(bot) && AreaManager.inMulti(target);
+    const isMultiEngagement = this.AreaManager.inMulti(bot) && this.AreaManager.inMulti(target);
     if (!isMultiEngagement) {
       const targetCombat = target.getCombat?.();
       const targetTarget = targetCombat?.getTarget?.();
@@ -143,8 +143,8 @@ class AvengeOpponentPolicy {
         return false;
       }
     }
-    const method = CombatFactory.getMethod(bot);
-    if (CombatFactory.canAttack(bot, method, target) !== CanAttackResponse.CAN_ATTACK) {
+    const method = this.CombatFactory.getMethod(bot);
+    if (this.CombatFactory.canAttack(bot, method, target) !== CanAttackResponse.CAN_ATTACK) {
       return false;
     }
     const durationMs = Math.max(

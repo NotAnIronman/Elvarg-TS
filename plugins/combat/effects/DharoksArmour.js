@@ -1,8 +1,8 @@
 const { Skill } = require("../../../src/main/typescript/elvarg/game/model/Skill");
-const { CombatFactory } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
-const { registerMeleeHitModifier } = require("../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
 
 const DHAROK_VETERAN_MULTIPLIER = 0.35;
+
+let CombatFactory;
 
 function applyDharokModifiers(entity, baseHit) {
   if (!entity || !CombatFactory.fullDharoks(entity)) {
@@ -31,6 +31,7 @@ function applyDharokModifiers(entity, baseHit) {
   return baseHit;
 }
 
-module.exports = function registerDharoksArmourEffects() {
-  registerMeleeHitModifier(applyDharokModifiers);
+module.exports = function registerDharoksArmourEffects(api) {
+  CombatFactory = api.getCombatFactory();
+  api.registerMeleeHitModifier(applyDharokModifiers);
 };

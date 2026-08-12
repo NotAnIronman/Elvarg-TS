@@ -2,12 +2,12 @@ const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag
 const { Animation } = require("../../../../src/main/typescript/elvarg/game/model/Animation");
 const { Graphic } = require("../../../../src/main/typescript/elvarg/game/model/Graphic");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
-const { TaskManager } = require("../../../../src/main/typescript/elvarg/game/task/TaskManager");
 const { clearMovementRequest } = require("../navigation/BotNavigation");
 const {
   clearPresetState,
   isPresetActive,
   restorePresetSnapshot,
+  initPresetsStateCoreAccess,
 } = require("../../../interface/PresetsState");
 
 const HOME_TELEPORT_START_ANIMATION = new Animation(714);
@@ -320,6 +320,14 @@ function clearBankRunBehaviorState(state) {
   state.bankRun.lastStuckWarningAt = 0;
   state.bankRun.suppressAutoRetaliate = false;
   state.bankRun.previousAutoRetaliate = null;
+}
+
+let TaskManager = null;
+
+/** Called once from PlayerBots.plugin.js's register(api), before any bot behavior runs. */
+function initPlayerBotStateCoreAccess(api) {
+  TaskManager = api.getTaskManager();
+  initPresetsStateCoreAccess(api);
 }
 
 function resetMovementState(player) {
@@ -790,6 +798,7 @@ function markResumeSoon(state, nowMs = Date.now(), blockedRetargetMinDelayMs = 0
 }
 
 module.exports = {
+  initPlayerBotStateCoreAccess,
   allowsAutonomousMode,
   clearFollowState,
   createInitialState,

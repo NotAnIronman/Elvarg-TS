@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 const { MapObjects } = require("../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
-const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 
 function regionBounds(regionId) {
   return {
@@ -10,7 +9,7 @@ function regionBounds(regionId) {
   };
 }
 
-function regionIdsForBounds(minX, maxX, minY, maxY) {
+function regionIdsForBounds(regionManager, minX, maxX, minY, maxY) {
   const startRegionX = minX >> 6;
   const endRegionX = maxX >> 6;
   const startRegionY = minY >> 6;
@@ -18,7 +17,7 @@ function regionIdsForBounds(minX, maxX, minY, maxY) {
   const ids = [];
   for (let regionX = startRegionX; regionX <= endRegionX; regionX++) {
     for (let regionY = startRegionY; regionY <= endRegionY; regionY++) {
-      ids.push(RegionManager.regionIdForTile(regionX << 6, regionY << 6));
+      ids.push(regionManager.regionIdForTile(regionX << 6, regionY << 6));
     }
   }
   return ids;
@@ -31,6 +30,7 @@ function distanceSquared(aX, aY, bX, bY) {
 }
 
 function createTraversalAssist(api, options = {}) {
+  const RegionManager = api.getRegionManager();
   const trackedObjectIds = new Set(options.objectIds ?? []);
   const objectsByRegion = new Map();
   let indexInitialized = false;
@@ -451,7 +451,7 @@ function createTraversalAssist(api, options = {}) {
     const playerY = player.getLocation().getY();
     let closest = null;
     let closestDistance = Number.MAX_SAFE_INTEGER;
-    const regionIds = regionIdsForBounds(minX, maxX, minY, maxY);
+    const regionIds = regionIdsForBounds(RegionManager, minX, maxX, minY, maxY);
     ensureRegionsLoaded(regionIds);
     const privateArea = player.getPrivateArea?.() ?? null;
 
@@ -563,7 +563,7 @@ function createTraversalAssist(api, options = {}) {
     const maxX = loc.getX() + radius * 64;
     const minY = loc.getY() - radius * 64;
     const maxY = loc.getY() + radius * 64;
-    return regionIdsForBounds(minX, maxX, minY, maxY);
+    return regionIdsForBounds(RegionManager, minX, maxX, minY, maxY);
   }
 
   function findCandidatesByIds(player, objectIds, options = {}) {

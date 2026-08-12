@@ -1,4 +1,3 @@
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ForceMovementTask } = require("../../src/main/typescript/elvarg/game/task/impl/ForceMovementTask");
 const { ForceMovement } = require("../../src/main/typescript/elvarg/game/model/ForceMovement");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
@@ -8,9 +7,12 @@ const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const {
   commitPresetState,
   isPresetActive,
+  initPresetsStateCoreAccess,
 } = require("../interface/PresetsState");
 
 const WILDERNESS_DITCH_OBJECT_ID = ObjectIds.WILDERNESS_DITCH;
+
+let TaskManager;
 
 function resolveDitchYOffset(player, ditchY, sourceY) {
   const thresholdY = Number.isInteger(ditchY) ? ditchY + 1 : 3522;
@@ -55,6 +57,8 @@ function tryCrossWildernessDitch(player, ditchY, sourceY, options = {}) {
 module.exports = {
   name: "WildernessDitch",
   register: (api) => {
+    TaskManager = api.getTaskManager();
+    initPresetsStateCoreAccess(api);
     api.onObjectFirstClick(
       WILDERNESS_DITCH_OBJECT_ID,
       ({ player, location, sourceLocation }) =>

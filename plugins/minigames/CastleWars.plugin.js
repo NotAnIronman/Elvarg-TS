@@ -1,5 +1,4 @@
 const { Area, BasicAttackResponse } = require("../../src/main/typescript/elvarg/game/model/areas/Area");
-const { AreaManager } = require("../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const { Boundary } = require("../../src/main/typescript/elvarg/game/model/Boundary");
 const { PolygonalBoundary } = require("../../src/main/typescript/elvarg/game/model/PolygonalBoundary");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
@@ -7,11 +6,8 @@ const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
-const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { CountdownTask } = require("../../src/main/typescript/elvarg/game/task/impl/CountdownTask");
 const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
@@ -1093,10 +1089,19 @@ function createCastleWars(api) {
   api.onItemOnPlayer(handleItemOnPlayer);
 }
 
+let AreaManager;
+let BonusManager;
+let ObjectManager;
+let TaskManager;
+
 module.exports = {
   name: "CastleWars",
   dependsOn: ["Food"],
   register(api) {
+    AreaManager = api.getAreaManager();
+    BonusManager = api.getBonusManager();
+    ObjectManager = api.getObjectManager();
+    TaskManager = api.getTaskManager();
     createCastleWars(api);
   },
 };

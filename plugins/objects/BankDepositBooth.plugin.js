@@ -1,26 +1,20 @@
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
-const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
-const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
-const { ItemContainerActionPacketListener } = require("../../src/main/typescript/elvarg/net/packet/impl/ItemContainerActionPacketListener");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
-const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
+let pluginApi;
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
-const { handleBankContainerAction } = require("./BankBooths.plugin");
 
-const IFACE = 4465;
-const CONTAINER = 7423;
-const SIDEBAR = 192;
-
-const BTN_DEPOSIT = new Set([50004, 50007]);
-const BTN_CLOSE = new Set([5384, 50001]);
-const DEPOSIT_OPCODES = [
-  PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.FOURTH_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.FIFTH_ITEM_CONTAINER_ACTION_OPCODE,
-];
+// OpenRune cache names: interface.bank_depositbox and its inventory controls.
+const IFACE = 192;
+const CONTAINER = (IFACE << 16) | 24; // component.bank_depositbox:inventory
+const BTN_DEPOSIT = new Set([
+  (IFACE << 16) | 31, // component.bank_depositbox:deposit_inv
+  (IFACE << 16) | 30, // component.bank_depositbox:deposit_worn
+]);
+// Deposit quantity per right-click option on a container item, matching
+// OSRS's Deposit-1/5/10/All/X convention. clickType 5 (X) prompts for a
+// custom amount instead of having a fixed one.
+const DEPOSIT_AMOUNT_BY_CLICK_TYPE = { 1: 1, 2: 5, 3: 10, 4: Number.MAX_SAFE_INTEGER };
 
 const DEPOSIT_BOX_IDS = [
   ObjectIds.BANK_DEPOSIT_BOX,
@@ -34,14 +28,12 @@ const DEPOSIT_BOX_IDS = [
   ObjectIds.BANK_DEPOSIT_BOX_9,
   ObjectIds.DOOR_223,
 ].filter((id) => Number.isInteger(id));
-const itemContainerFallback = new ItemContainerActionPacketListener();
 
 function refresh(player) {
   const sender = player?.getPacketSender?.();
   if (!sender) return;
   sender.clearItemOnInterface(CONTAINER);
   sender.sendItemContainer(player.getInventory(), CONTAINER);
-  sender.sendInterfaceSet(IFACE, SIDEBAR);
 }
 
 function open(player) {
@@ -65,56 +57,45 @@ function deposit(player, slot, itemId, amount) {
   refresh(player);
 }
 
-function decodeDepositAction(opcode, payload) {
-  const p = new Packet(opcode, payload);
-  switch (opcode) {
-    case PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE:
-      return { iface: p.readInt(), slot: p.readShortA(), itemId: p.readShortA(), amount: 1 };
-    case PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE:
-      return { iface: p.readInt(), itemId: p.readLEShortA(), slot: p.readLEShort(), amount: 5 };
-    case PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE:
-      return { iface: p.readInt(), itemId: p.readShortA(), slot: p.readShortA(), amount: 10 };
-    case PacketConstants.FOURTH_ITEM_CONTAINER_ACTION_OPCODE:
-      return { slot: p.readShortA(), iface: p.readInt(), itemId: p.readShortA(), amount: Number.MAX_SAFE_INTEGER };
-    case PacketConstants.FIFTH_ITEM_CONTAINER_ACTION_OPCODE:
-      return { iface: p.readInt(), slot: p.readLEShort(), itemId: p.readLEShort(), amount: null };
-    default:
-      return null;
-  }
-}
-
-function handleDepositContainerAction(player, opcode, payload) {
-  const decoded = decodeDepositAction(opcode, payload);
-  if (!decoded || decoded.iface !== CONTAINER) return false;
-  if (PluginManager.emitCanBank(player) === false) {
+// interfaceId/itemId/slot/clickType are already decoded for us here - the
+// live ItemActionPacketListener.handleAction (called from NetworkBuilder.ts
+// for every inventory/container item click) parses the packet once and
+// fires pluginApi.emitItemAction with the result, for every clickType
+// (1 through 5) uniformly. Filtering on interfaceId === CONTAINER is the
+// same scoping the old raw-opcode iface check used to do.
+function handleDepositContainerAction(player, interfaceId, itemId, slot, clickType) {
+  if (interfaceId !== CONTAINER) return false;
+  if (pluginApi.emitCanBank(player) === false) {
     return true;
   }
 
-  if (decoded.amount == null) {
+  const amount = DEPOSIT_AMOUNT_BY_CLICK_TYPE[clickType];
+  if (amount === undefined) {
     player.setEnteredAmountAction({
-      execute: (amount) => deposit(player, decoded.slot, decoded.itemId, amount),
+      execute: (entered) => deposit(player, slot, itemId, entered),
     });
     player.getPacketSender().sendEnterAmountPrompt("How many would you like to deposit?");
     return true;
   }
 
-  deposit(player, decoded.slot, decoded.itemId, decoded.amount);
+  deposit(player, slot, itemId, amount);
   return true;
 }
 
 function handleDepositButton(player, button) {
   if (!player || player.getInterfaceId?.() !== IFACE) return false;
-  if (PluginManager.emitCanBank(player) === false) {
+  if (pluginApi.emitCanBank(player) === false) {
     return true;
   }
   if (BTN_DEPOSIT.has(button)) {
-    Bank.depositItems(player, player.getInventory(), true);
+    Bank.depositItems(
+      player,
+      button === ((IFACE << 16) | 30)
+        ? player.getEquipment()
+        : player.getInventory(),
+      true
+    );
     refresh(player);
-    return true;
-  }
-  if (BTN_CLOSE.has(button)) {
-    Sounds.sendSound(player, Sound.CONTAINER_CLOSE);
-    player.getPacketSender().sendInterfaceRemoval();
     return true;
   }
   return false;
@@ -129,9 +110,10 @@ function isDepositBooth(event) {
 module.exports = {
   name: "BankDepositBooth",
   register(api) {
+    pluginApi = api;
     api.onObjectFirstClick(DEPOSIT_BOX_IDS, (event) => {
       if (!isDepositBooth(event)) return;
-      if (PluginManager.emitCanBank(event.player) === false) {
+      if (pluginApi.emitCanBank(event.player) === false) {
         event.handled = true;
         return;
       }
@@ -139,23 +121,17 @@ module.exports = {
       event.handled = true;
     });
 
-    const onContainer = {
-      execute(player, packet) {
-        const opcode = packet.getOpcode();
-        const payload = packet.getBuffer();
-        if (handleDepositContainerAction(player, opcode, payload)) return;
-        if (handleBankContainerAction(player, opcode, payload)) return;
-        itemContainerFallback.execute(player, new Packet(opcode, payload));
-      },
-    };
-    for (const opcode of DEPOSIT_OPCODES) {
-      api.registerAlivePacketListener(opcode, onContainer);
-    }
-
-    api.onButtonClick((event) => {
-      if (handleDepositButton(event.player, event.buttonId)) {
+    api.onItemAction((event) => {
+      if (handleDepositContainerAction(event.player, event.interfaceId, event.itemId, event.slot, event.clickType)) {
         event.handled = true;
       }
+    });
+
+    api.onInterfaceActionButton([...BTN_DEPOSIT], (event) => {
+      if (handleDepositButton(event.player, event.buttonId)) {
+        return true;
+      }
+      return false;
     });
   },
 };

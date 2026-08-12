@@ -1,4 +1,3 @@
-const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { Bank } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
@@ -438,7 +437,7 @@ class SmeltingBehavior {
         const smeltingState = state.smelting;
         const boothLoc = bankBooth.getLocation();
         player.setPositionToFace(boothLoc);
-        PluginManager.emitObjectInteraction({
+        this.api.emitObjectInteraction({
           player,
           object: bankBooth,
           objectId: bankBooth.getId(),
@@ -580,7 +579,7 @@ class SmeltingBehavior {
         const smeltingState = state.smelting;
         const furnaceLoc = furnace.getLocation();
         player.setPositionToFace(furnaceLoc);
-        PluginManager.emitObjectInteraction({
+        this.api.emitObjectInteraction({
           player,
           object: furnace,
           objectId: furnace.getId(),

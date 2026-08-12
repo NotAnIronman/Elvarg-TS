@@ -5,11 +5,9 @@ const {
   CombatType,
 } = require("../../../../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const {
-  CombatFactory,
   CanAttackResponse,
 } = require("../../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { GameConstants } = require("../../../../../src/main/typescript/elvarg/game/GameConstants");
-const { ServerPerf } = require("../../../../../src/main/typescript/elvarg/util/ServerPerf");
 const { randomInRange } = require("../../navigation/BotNavigation");
 const {
   getPvpCombatSnapshot,
@@ -45,7 +43,7 @@ const MANAGED_OFFENSIVE_PRAYERS = Object.freeze([
 ]);
 const GAME_TICK_MS = Number(GameConstants.GAME_ENGINE_PROCESSING_CYCLE_RATE ?? 600);
 
-function deactivatePrayerSet(player, prayerIds, exceptPrayerId = null) {
+function deactivatePrayerSet(prayerHandler, player, prayerIds, exceptPrayerId = null) {
   if (!player || !Array.isArray(prayerIds)) {
     return;
   }
@@ -53,22 +51,22 @@ function deactivatePrayerSet(player, prayerIds, exceptPrayerId = null) {
     if (prayerId === exceptPrayerId) {
       continue;
     }
-    if (PrayerHandler.isActivated(player, prayerId)) {
-      PrayerHandler.deactivatePrayer(player, prayerId);
+    if (prayerHandler.isActivated(player, prayerId)) {
+      prayerHandler.deactivatePrayer(player, prayerId);
     }
   }
 }
 
-function activateFirstAvailablePrayer(player, prayerIds) {
+function activateFirstAvailablePrayer(prayerHandler, player, prayerIds) {
   if (!player || !Array.isArray(prayerIds)) {
     return null;
   }
   for (const prayerId of prayerIds) {
-    if (PrayerHandler.isActivated(player, prayerId)) {
+    if (prayerHandler.isActivated(player, prayerId)) {
       return prayerId;
     }
-    PrayerHandler.activatePrayerPrayerId(player, prayerId);
-    if (PrayerHandler.isActivated(player, prayerId)) {
+    prayerHandler.activatePrayerPrayerId(player, prayerId);
+    if (prayerHandler.isActivated(player, prayerId)) {
       return prayerId;
     }
   }
@@ -125,6 +123,9 @@ function clearApproachForTarget(player, target) {
 
 class PvpCombatExecutionNode {
   constructor(options = {}) {
+    this.CombatFactory = options.api.getCombatFactory();
+    this.PrayerHandler = options.api.getPrayerHandler();
+    this.ServerPerf = options.api.getServerPerf();
     this.setPhase = options.setPhase;
     this.maybeSwitchBackToPrimaryWeapon = options.maybeSwitchBackToPrimaryWeapon;
     this.maybeUseSpecialAttack = options.maybeUseSpecialAttack;
@@ -300,12 +301,12 @@ class PvpCombatExecutionNode {
     const shouldRefreshProtectionPrayers = !protectionStable;
     if (desiredProtectionPrayer != null) {
       if (shouldRefreshProtectionPrayers) {
-        activateFirstAvailablePrayer(player, [desiredProtectionPrayer]);
-        deactivatePrayerSet(player, PrayerHandler.PROTECTION_PRAYERS, desiredProtectionPrayer);
+        activateFirstAvailablePrayer(this.PrayerHandler, player, [desiredProtectionPrayer]);
+        deactivatePrayerSet(this.PrayerHandler, player, PrayerHandler.PROTECTION_PRAYERS, desiredProtectionPrayer);
       }
     } else {
       if (shouldRefreshProtectionPrayers) {
-        deactivatePrayerSet(player, PrayerHandler.PROTECTION_PRAYERS);
+        deactivatePrayerSet(this.PrayerHandler, player, PrayerHandler.PROTECTION_PRAYERS);
       }
     }
 
@@ -324,11 +325,11 @@ class PvpCombatExecutionNode {
     const shouldRefreshOffensivePrayers = !offensiveStable;
     let activatedOffensivePrayer = pvp.cachedOffensivePrayerId ?? null;
     if (shouldRefreshOffensivePrayers) {
-      activatedOffensivePrayer = activateFirstAvailablePrayer(player, offensivePrayerIds);
+      activatedOffensivePrayer = activateFirstAvailablePrayer(this.PrayerHandler, player, offensivePrayerIds);
       if (activatedOffensivePrayer != null) {
-        deactivatePrayerSet(player, MANAGED_OFFENSIVE_PRAYERS, activatedOffensivePrayer);
+        deactivatePrayerSet(this.PrayerHandler, player, MANAGED_OFFENSIVE_PRAYERS, activatedOffensivePrayer);
       } else {
-        deactivatePrayerSet(player, MANAGED_OFFENSIVE_PRAYERS);
+        deactivatePrayerSet(this.PrayerHandler, player, MANAGED_OFFENSIVE_PRAYERS);
       }
     }
     pvp.cachedProtectionPrayerId = desiredProtectionPrayer;
@@ -363,7 +364,7 @@ class PvpCombatExecutionNode {
     }
 
     try {
-      return PrayerHandler.getProtectingPrayer(targetMethodType);
+      return this.PrayerHandler.getProtectingPrayer(targetMethodType);
     } catch (_error) {
       return null;
     }
@@ -436,7 +437,7 @@ class PvpCombatExecutionNode {
       combat.getAttacker?.() === target ||
       player.getCombatFollowing?.() === target;
     const canAttackTargetNow =
-      CombatFactory.canAttack(player, CombatFactory.getMethod(player), target) ===
+      this.CombatFactory.canAttack(player, this.CombatFactory.getMethod(player), target) ===
       CanAttackResponse.CAN_ATTACK;
     const shouldApproachTarget = committedToTarget || canAttackTargetNow;
     if (!shouldApproachTarget) {
@@ -447,7 +448,7 @@ class PvpCombatExecutionNode {
     }
 
     const profile = this.getProfile?.(state) ?? null;
-    ServerPerf.measurePhase("bot.pvp.combat_execution.spec", () =>
+    this.ServerPerf.measurePhase("bot.pvp.combat_execution.spec", () =>
       this.maybeUseSpecialAttack?.({
         player,
         state,
@@ -457,7 +458,7 @@ class PvpCombatExecutionNode {
         scheduleSpecReview: this.scheduleSpecReview,
       })
     );
-    const pressureResult = ServerPerf.measurePhase(
+    const pressureResult = this.ServerPerf.measurePhase(
       "bot.pvp.combat_execution.pressure_script",
       () =>
         this.maybeRunPressureCombatScript?.({
@@ -480,7 +481,7 @@ class PvpCombatExecutionNode {
           pressureResult?.forcedCombatType ?? null
         )
       ) {
-        ServerPerf.measurePhase("bot.pvp.combat_execution.prayer_review", () =>
+        this.ServerPerf.measurePhase("bot.pvp.combat_execution.prayer_review", () =>
           this.forcePrayerSync(player, state, target, nowMs, profile)
         );
       }
@@ -490,8 +491,8 @@ class PvpCombatExecutionNode {
       }
       return "running";
     }
-    ServerPerf.measurePhase("bot.pvp.combat_execution.combat_sync_or_reissue", () =>
-      ServerPerf.measurePhase("bot.pvp.combat_sync.switchback", () =>
+    this.ServerPerf.measurePhase("bot.pvp.combat_execution.combat_sync_or_reissue", () =>
+      this.ServerPerf.measurePhase("bot.pvp.combat_sync.switchback", () =>
         this.maybeSwitchBackToPrimaryWeapon?.({
           player,
           state,
@@ -500,7 +501,7 @@ class PvpCombatExecutionNode {
       )
     );
     if (nowMs >= Number(pvp.nextPrayerReviewAt ?? 0)) {
-      ServerPerf.measurePhase("bot.pvp.combat_execution.prayer_review", () =>
+      this.ServerPerf.measurePhase("bot.pvp.combat_execution.prayer_review", () =>
         this.reviewPrayers(player, state, target, nowMs, profile)
       );
     }
@@ -510,15 +511,15 @@ class PvpCombatExecutionNode {
       return "running";
     }
 
-    ServerPerf.measurePhase("bot.pvp.combat_execution.combat_sync_or_reissue", () =>
-      ServerPerf.measurePhase("bot.pvp.combat_sync.attack_reissue", () => {
+    this.ServerPerf.measurePhase("bot.pvp.combat_execution.combat_sync_or_reissue", () =>
+      this.ServerPerf.measurePhase("bot.pvp.combat_sync.attack_reissue", () => {
         const currentTarget = combat.getTarget?.();
         if (currentTarget && currentTarget !== target) {
           combat.reset?.();
         }
 
         if (
-          CombatFactory.canAttack(player, CombatFactory.getMethod(player), target) !==
+          this.CombatFactory.canAttack(player, this.CombatFactory.getMethod(player), target) !==
           CanAttackResponse.CAN_ATTACK
         ) {
           clearApproachForTarget(player, target);

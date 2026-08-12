@@ -1,11 +1,3 @@
-const { World } = require("../../../src/main/typescript/elvarg/game/World");
-const { Packet } = require("../../../src/main/typescript/elvarg/net/packet/Packet");
-const { PacketConstants } = require("../../../src/main/typescript/elvarg/net/packet/PacketConstants");
-const { AreaManager } = require("../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
-const {
-  CombatFactory,
-  CanAttackResponse,
-} = require("../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const {
   ClanChatManager,
 } = require("../../interface/ClanChat.plugin");
@@ -30,6 +22,7 @@ const {
   recallRecruitedBot,
 } = require("./BotRecruitRuntime");
 const {
+  initBotDeathLootCoreAccess,
   clearBotDeathLootPlan,
   handleBotDeathItemDrop,
 } = require("./BotDeathLoot");
@@ -39,20 +32,6 @@ const BOT_RESPAWN_REACQUIRE_DELAY_MIN_MS = 3500;
 const BOT_RESPAWN_REACQUIRE_DELAY_MAX_MS = 7000;
 const ATTR_RECRUIT_SINGLEWAY_WARN_UNTIL = "botRecruitSinglewayWarnUntil";
 const RECRUIT_SINGLEWAY_WARN_COOLDOWN_MS = 5000;
-
-function resolveAttackedPlayer(packet) {
-  const payload = packet?.getBuffer?.();
-  const opcode = packet?.getOpcode?.();
-  if (!payload || payload.length < 2 || opcode !== PacketConstants.ATTACK_PLAYER_OPCODE) {
-    return null;
-  }
-  const parsed = new Packet(opcode, payload);
-  const targetIndex = parsed.readLEShort();
-  if (targetIndex < 0) {
-    return null;
-  }
-  return World.getPlayers().get(targetIndex) ?? null;
-}
 
 function isActiveClanRecruit(owner, bot) {
   if (!owner || !bot || owner.isPlayerBot?.() === true || bot.isPlayerBot?.() !== true) {
@@ -69,17 +48,6 @@ function isActiveClanRecruit(owner, bot) {
   }
   const ownerClan = ClanChatManager.getClanChat(owner);
   return ownerClan != null && bot.getCurrentClanChat?.() === ownerClan;
-}
-
-function canStartPlayerAttack(attacker, target) {
-  if (!attacker || !target) {
-    return false;
-  }
-  const combatMethod = CombatFactory.getMethod(attacker);
-  return (
-    CombatFactory.canAttack(attacker, combatMethod, target) ===
-    CanAttackResponse.CAN_ATTACK
-  );
 }
 
 function clearPersistentPvpRespawnAggro(victim, runtime, nowMs) {
@@ -174,7 +142,7 @@ function maybeWarnRecruitSingleway(bot, owner, nowMs) {
   bot.forceChat?.("Sorry, not in multi- cant help");
 }
 
-function handleClanRecruitAssist({ runtime, behaviorMode, player, target, nowMs }) {
+function handleClanRecruitAssist({ runtime, behaviorMode, player, target, nowMs, api }) {
   if (!runtime || !behaviorMode || !player || player.isPlayerBot?.() === true || !target) {
     return;
   }
@@ -190,6 +158,7 @@ function handleClanRecruitAssist({ runtime, behaviorMode, player, target, nowMs 
     return;
   }
 
+  const AreaManager = api.getAreaManager();
   for (const [botUsername, entry] of runtime.entriesByUsername ?? []) {
     const bot = entry?.player;
     const state = entry?.state;
@@ -278,7 +247,6 @@ function registerBotEvents(options) {
     runtime,
     behaviorMode,
     playerPersistence,
-    manualControlPacketOpcodes,
     followBackTrigger,
     combatReactionTrigger,
     pathBlockedHandler,
@@ -286,6 +254,8 @@ function registerBotEvents(options) {
     avengeOpponentPolicy,
     pvpJumpOnKillPolicy,
   } = options;
+
+  initBotDeathLootCoreAccess(api);
 
   const handleRuntimeRemoval = ({ player, username, source }) => {
     if (
@@ -328,17 +298,21 @@ function registerBotEvents(options) {
     handleBotDeathItemDrop(event, runtime);
   });
 
-  api.onEstablishedPacket((event) => {
-    const nowMs = Date.now();
-    followBackTrigger.handleEstablishedPacket(event, nowMs);
-    combatReactionTrigger.handleEstablishedPacket(event, nowMs);
+  api.onPlayerFollow((event) => {
+    followBackTrigger.handlePlayerFollow(event, Date.now());
+  });
 
-    const { opcode, player } = event;
-    if (!manualControlPacketOpcodes.has(opcode)) {
-      return;
-    }
+  api.onPlayerAttack((event) => {
+    combatReactionTrigger.handlePlayerAttack(event, Date.now());
+  });
 
-    const username = player.getUsername?.();
+  // Manual object interactions (doors, levers, etc.) are the live equivalent
+  // of the old MANUAL_CONTROL_PACKET_OPCODES set (which was exclusively the 5
+  // object-click opcodes) - still the strongest "this player is at the
+  // keyboard" signal available.
+  api.onObjectInteraction((event) => {
+    const { player, objectId } = event;
+    const username = player?.getUsername?.();
     if (!username || !runtime.botmeUsernames.has(username)) {
       return;
     }
@@ -350,7 +324,7 @@ function registerBotEvents(options) {
     player
       .getPacketSender()
       .sendMessage("botme auto-disabled due to manual input.");
-    botApi.log("botme_auto_disabled_manual_input", { username, opcode });
+    botApi.log("botme_auto_disabled_manual_input", { username, objectId });
   });
 
   api.onPlayerProcess(({ player }) => {
@@ -366,6 +340,7 @@ function registerBotEvents(options) {
       behaviorMode,
       player,
       target,
+      api,
       nowMs: Date.now(),
     });
   });

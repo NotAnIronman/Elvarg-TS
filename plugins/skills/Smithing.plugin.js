@@ -4,17 +4,46 @@ const { Animation } = require("../../src/main/typescript/elvarg/game/model/Anima
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
-const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
-const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const SMELT_ANIMATION = new Animation(899);
 const SMITH_ANIMATION = new Animation(898);
 
-const SMELTING_CHATBOX_INTERFACE_ID = 2400;
-const EQUIPMENT_CREATION_INTERFACE_ID = 994;
-const EQUIPMENT_CREATION_COLUMN_IDS = new Set([1119, 1120, 1121, 1122, 1123]);
+const SMELTING_SKILLMULTI_GROUP_ID = 270;
+const SMELTING_SKILLMULTI_FIRST_ITEM_COMPONENT = 15;
+const SMELTING_SKILLMULTI_MAX_QUANTITY = 28;
+const SMELTING_SKILLMULTI_TARGET_UID = (162 << 16) | 567;
+const SMELTING_CHATMODAL_UNCLAMP_VARBIT = 10670;
+// OpenRune cache names: interface.smithing and varbit.smithing_bar_type.
+const SMITHING_INTERFACE_ID = 312;
+const MAIN_MODAL_TARGET_UID = (161 << 16) | 16;
+const MAIN_MODAL_OPEN_SCRIPT = 2524;
+const SMITHING_BAR_TYPE_VARBIT = 3216;
+const SMITHING_BAR_TYPE_BY_ITEM_ID = new Map([
+  [2349, 0], // Bronze
+  [2351, 1], // Iron
+  [2353, 2], // Steel
+  [2359, 3], // Mithril
+  [2361, 4], // Adamantite
+  [2363, 5], // Runite
+]);
+const SMITHING_COMPONENT_BY_PRODUCT = new Map([
+  ["Dagger", 9], ["Sword", 10], ["Scimitar", 11], ["Long sword", 12],
+  ["2 hand sword", 13], ["Axe", 14], ["Mace", 15], ["Warhammer", 16],
+  ["Battle axe", 17], ["Claws", 18], ["Chainbody", 19], ["Plate legs", 20],
+  ["Plate skirt", 21], ["Plate body", 22], ["Nails", 23], ["Med helm", 24],
+  ["Full helm", 25], ["Square shield", 26], ["Kite shield", 27],
+  ["Dart tips", 29], ["Arrowtips", 30], ["Throwing knives", 31],
+  ["Studs", 32], ["Bolts (unf)", 34],
+]);
+const SMITHING_PRODUCT_BY_COMPONENT = new Map(
+  [...SMITHING_COMPONENT_BY_PRODUCT].map(([product, component]) => [component, product])
+);
+const SMITHING_BUTTON_IDS = new Set(
+  [...SMITHING_PRODUCT_BY_COMPONENT.keys()].map(
+    (component) => (SMITHING_INTERFACE_ID << 16) | component
+  )
+);
 const SMELTING_INTERVAL_TICKS = 5;
 const SMITHING_INTERVAL_TICKS = 5;
 const CANNONBALL_SMITHING_INTERVAL_TICKS = 8;
@@ -62,120 +91,72 @@ const ANVIL_OBJECT_IDS = new Set(
 
 const SMELTING_RECIPES = [
   {
+    name: "Bronze bar",
     barId: ItemIds.BRONZE_BAR,
     level: 1,
     xp: 6.2,
-    frame: 2405,
-    buttons: [
-      [3987, 1],
-      [3986, 5],
-      [2807, 10],
-      [2414, -1],
-    ],
     ingredients: [
       [ItemIds.COPPER_ORE, 1],
       [ItemIds.TIN_ORE, 1],
     ],
   },
   {
+    name: "Iron bar",
     barId: ItemIds.IRON_BAR,
     level: 15,
     xp: 12.5,
-    frame: 2406,
-    buttons: [
-      [3991, 1],
-      [3990, 5],
-      [3989, 10],
-      [3988, -1],
-    ],
     ingredients: [[ItemIds.IRON_ORE, 1]],
     successChance: 0.5,
   },
   {
+    name: "Silver bar",
     barId: ItemIds.SILVER_BAR,
     level: 20,
     xp: 13.7,
-    frame: 2407,
-    buttons: [
-      [3995, 1],
-      [3994, 5],
-      [3993, 10],
-      [3992, -1],
-    ],
     ingredients: [[ItemIds.SILVER_ORE, 1]],
   },
   {
+    name: "Steel bar",
     barId: ItemIds.STEEL_BAR,
     level: 30,
     xp: 17.5,
-    frame: 2409,
-    buttons: [
-      [3999, 1],
-      [3998, 5],
-      [3997, 10],
-      [3996, -1],
-    ],
     ingredients: [
       [ItemIds.IRON_ORE, 1],
       [ItemIds.COAL, 2],
     ],
   },
   {
+    name: "Gold bar",
     barId: ItemIds.GOLD_BAR,
     level: 40,
     xp: 22.5,
-    frame: 2410,
-    buttons: [
-      [4003, 1],
-      [4002, 5],
-      [4001, 10],
-      [4000, -1],
-    ],
     ingredients: [[ItemIds.GOLD_ORE, 1]],
   },
   {
+    name: "Mithril bar",
     barId: ItemIds.MITHRIL_BAR,
     level: 50,
     xp: 30,
-    frame: 2411,
-    buttons: [
-      [7441, 1],
-      [7440, 5],
-      [6397, 10],
-      [4158, -1],
-    ],
     ingredients: [
       [ItemIds.MITHRIL_ORE, 1],
       [ItemIds.COAL, 4],
     ],
   },
   {
+    name: "Adamantite bar",
     barId: ItemIds.ADAMANTITE_BAR,
     level: 70,
     xp: 37.5,
-    frame: 2412,
-    buttons: [
-      [7446, 1],
-      [7444, 5],
-      [7443, 10],
-      [7442, -1],
-    ],
     ingredients: [
       [ItemIds.ADAMANTITE_ORE, 1],
       [ItemIds.COAL, 6],
     ],
   },
   {
+    name: "Runite bar",
     barId: ItemIds.RUNITE_BAR,
     level: 85,
     xp: 50,
-    frame: 2413,
-    buttons: [
-      [7450, 1],
-      [7449, 5],
-      [7448, 10],
-      [7447, -1],
-    ],
     ingredients: [
       [ItemIds.RUNITE_ORE, 1],
       [ItemIds.COAL, 8],
@@ -353,8 +334,6 @@ const SMITHABLE_EQUIPMENT = SMITHABLE_EQUIPMENT_DATA.map(
 );
 
 const SMITHABLE_EQUIPMENT_BY_BAR = new Map();
-const SMITHABLE_BY_CLICK_KEY = new Map();
-const SMITHING_TEXT_FRAME_IDS = new Set();
 
 for (const smithable of SMITHABLE_EQUIPMENT) {
   const existing = SMITHABLE_EQUIPMENT_BY_BAR.get(smithable.barId);
@@ -363,37 +342,27 @@ for (const smithable of SMITHABLE_EQUIPMENT) {
   } else {
     SMITHABLE_EQUIPMENT_BY_BAR.set(smithable.barId, [smithable]);
   }
-  SMITHABLE_BY_CLICK_KEY.set(
-    `${smithable.itemFrame}:${smithable.itemSlot}:${smithable.itemId}`,
-    smithable
-  );
-  SMITHING_TEXT_FRAME_IDS.add(smithable.nameFrame);
-  SMITHING_TEXT_FRAME_IDS.add(smithable.barFrame);
 }
 
 const SMELT_RECIPES_BY_INGREDIENT = new Map();
-const SMELT_RECIPES_BY_BUTTON = new Map();
 
 for (const recipe of SMELTING_RECIPES) {
   for (const [ingredientId] of recipe.ingredients) {
     SMELT_RECIPES_BY_INGREDIENT.set(ingredientId, recipe);
   }
-  for (const [buttonId, amount] of recipe.buttons) {
-    SMELT_RECIPES_BY_BUTTON.set(buttonId, { recipe, amount });
-  }
 }
 
-const SMELTING_BUTTON_IDS = Array.from(SMELT_RECIPES_BY_BUTTON.keys());
-
-const EQUIPMENT_CONTAINER_ACTION_OPCODES = [
-  PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE,
-];
+const SMELTING_SKILLMULTI_BUTTON_IDS = SMELTING_RECIPES.map(
+  (_, index) =>
+    (SMELTING_SKILLMULTI_GROUP_ID << 16) |
+    (SMELTING_SKILLMULTI_FIRST_ITEM_COMPONENT + index)
+);
 
 let smithingTick = 0;
 const ACTIVE_SMITHING_SESSIONS = new Map();
 const ACTIVE_SMELTERS = new Set();
+const ACTIVE_SMELTING_MENUS = new Set();
+const ACTIVE_SMITHING_MENUS = new Map();
 
 function getSmithingLevel(player) {
   return player.getSkillManager().getCurrentLevel(Skill.SMITHING);
@@ -416,10 +385,37 @@ function consumeIngredients(inventory, recipe) {
 
 function openSmeltingInterface(player) {
   const sender = player.getPacketSender();
-  for (const recipe of SMELTING_RECIPES) {
-    sender.sendInterfaceModel(recipe.frame, recipe.barId, 150);
+  const itemIds = SMELTING_RECIPES.map((recipe) => recipe.barId);
+  while (itemIds.length < 18) itemIds.push(-1);
+
+  ACTIVE_SMELTING_MENUS.add(player);
+  sender
+    .sendInterfaceScript(2379)
+    .sendVarbit(SMELTING_CHATMODAL_UNCLAMP_VARBIT, 1)
+    .sendInterfaceDisplayState(SMELTING_SKILLMULTI_TARGET_UID, false)
+    .sendSubInterface(
+      SMELTING_SKILLMULTI_TARGET_UID,
+      SMELTING_SKILLMULTI_GROUP_ID,
+      0
+  );
+  for (const buttonId of SMELTING_SKILLMULTI_BUTTON_IDS) {
+    sender.sendInterfaceFlagsRange(buttonId, 0, SMELTING_SKILLMULTI_MAX_QUANTITY, 2);
   }
-  sender.sendChatboxInterface(SMELTING_CHATBOX_INTERFACE_ID);
+  sender.sendInterfaceScript(2046, [
+    13,
+    ["What would you like to smelt?", ...SMELTING_RECIPES.map((recipe) => recipe.name)].join("|"),
+    SMELTING_SKILLMULTI_MAX_QUANTITY,
+    ...itemIds,
+    1,
+  ]);
+}
+
+function closeSmeltingInterface(player) {
+  if (!ACTIVE_SMELTING_MENUS.delete(player)) return;
+  player
+    .getPacketSender()
+    .closeSubInterface(SMELTING_SKILLMULTI_TARGET_UID)
+    .sendInterfaceDisplayState(SMELTING_SKILLMULTI_TARGET_UID, true);
 }
 
 function performSmeltAction(player, recipe) {
@@ -511,15 +507,22 @@ class CloseSmithingInterfaceTask extends Task {
   }
 
   execute() {
-    if (this.player?.isRegistered?.()) {
-      this.player.getPacketSender().sendInterfaceRemoval();
-    }
+    closeSmithingInterface(this.player);
     this.stop();
   }
 }
 
 function closeSmithingInterfaceNextTick(player) {
   TaskManager.submit(new CloseSmithingInterfaceTask(player));
+}
+
+function closeSmithingInterface(player) {
+  if (!player?.isRegistered?.() || player.getInterfaceId() !== SMITHING_INTERFACE_ID) {
+    return;
+  }
+  ACTIVE_SMITHING_MENUS.delete(player);
+  player.setInterfaceId(-1);
+  player.getPacketSender().closeSubInterface(MAIN_MODAL_TARGET_UID);
 }
 
 function startSmeltingSession(activeSessions, player, recipe, amount) {
@@ -612,33 +615,6 @@ function isSmeltingActive(player) {
   return ACTIVE_SMELTERS.has(player);
 }
 
-function handleSmeltingButton(activeSessions, player, buttonId) {
-  const entry = SMELT_RECIPES_BY_BUTTON.get(buttonId);
-  if (!entry) {
-    return false;
-  }
-
-  closeSmithingInterfaceNextTick(player);
-
-  if (entry.amount === -1) {
-    player.setEnteredAmountAction({
-      execute: (amount) => {
-        if (!Number.isInteger(amount) || amount <= 0) {
-          return;
-        }
-        startSmeltingSession(activeSessions, player, entry.recipe, amount);
-      },
-    });
-    player
-      .getPacketSender()
-      .sendEnterAmountPrompt("Enter amount of bars to smelt:");
-    return true;
-  }
-
-  startSmeltingSession(activeSessions, player, entry.recipe, entry.amount);
-  return true;
-}
-
 function openEquipmentCreationInterface(player, preferredBarId = null) {
   const inventory = player.getInventory();
   const smithingLevel = getSmithingLevel(player);
@@ -688,40 +664,21 @@ function openEquipmentCreationInterface(player, preferredBarId = null) {
     return false;
   }
 
-  const sender = player.getPacketSender();
-  for (let interfaceId = 1119; interfaceId <= 1123; interfaceId++) {
-    sender.clearItemOnInterface(interfaceId);
+  const barType = SMITHING_BAR_TYPE_BY_ITEM_ID.get(selectedBar.barId);
+  if (barType == null) {
+    return false;
   }
 
-  for (const frameId of SMITHING_TEXT_FRAME_IDS) {
-    sender.sendString("", frameId);
+  ACTIVE_SMITHING_MENUS.set(player, selectedBar.barId);
+  player.setInterfaceId(SMITHING_INTERFACE_ID);
+  player
+    .getPacketSender()
+    .sendVarbit(SMITHING_BAR_TYPE_VARBIT, barType)
+    .sendInterfaceScript(MAIN_MODAL_OPEN_SCRIPT, [-1, -1])
+    .sendSubInterface(MAIN_MODAL_TARGET_UID, SMITHING_INTERFACE_ID, 0);
+  for (const buttonId of SMITHING_BUTTON_IDS) {
+    player.getPacketSender().sendInterfaceFlags(buttonId, 2);
   }
-
-  const smithables = SMITHABLE_EQUIPMENT_BY_BAR.get(selectedBar.barId) || [];
-  for (const smithable of smithables) {
-    sender.sendSmithingData(
-      smithable.itemId,
-      smithable.itemSlot,
-      smithable.itemFrame,
-      smithable.amount
-    );
-
-    const barColor =
-      inventory.getAmount(smithable.barId) >= smithable.barsRequired
-        ? "@gre@"
-        : "@red@";
-    const itemColor = smithingLevel >= smithable.requiredLevel ? "@whi@" : "@bla@";
-
-    sender.sendString(
-      `${barColor}${smithable.barsRequired} ${
-        smithable.barsRequired > 1 ? "bars" : "bar"
-      }`,
-      smithable.barFrame
-    );
-    sender.sendString(`${itemColor}${smithable.name}`, smithable.nameFrame);
-  }
-
-  sender.sendInterface(EQUIPMENT_CREATION_INTERFACE_ID);
   return true;
 }
 
@@ -735,6 +692,26 @@ class SmithingTask extends Task {
   execute() {
     this.cycle++;
     smithingTick = this.cycle;
+
+    for (const player of ACTIVE_SMELTING_MENUS) {
+      if (
+        !player?.isRegistered?.() ||
+        player.getMovementQueue().size() > 0 ||
+        player.getForceMovement() != null
+      ) {
+        closeSmeltingInterface(player);
+      }
+    }
+
+    for (const player of ACTIVE_SMITHING_MENUS.keys()) {
+      if (
+        !player?.isRegistered?.() ||
+        player.getMovementQueue().size() > 0 ||
+        player.getForceMovement() != null
+      ) {
+        closeSmithingInterface(player);
+      }
+    }
 
     for (const [player, session] of this.activeSessions) {
       if (!player || !player.isRegistered?.() || player.getHitpoints() <= 0) {
@@ -781,151 +758,27 @@ class SmithingTask extends Task {
   }
 }
 
-function decodeEquipmentContainerAction(opcode, payload) {
-  const packet = new Packet(opcode, payload);
-
-  switch (opcode) {
-    case PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        interfaceId: packet.readInt(),
-        slot: packet.readShortA(),
-        itemId: packet.readShortA(),
-        amount: 1,
-      };
-    case PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        interfaceId: packet.readInt(),
-        itemId: packet.readLEShortA(),
-        slot: packet.readLEShort(),
-        amount: 5,
-      };
-    case PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        interfaceId: packet.readInt(),
-        itemId: packet.readShortA(),
-        slot: packet.readShortA(),
-        amount: 10,
-      };
-    default:
-      return null;
-  }
-}
-
-function normalizeItemId(itemId) {
-  if (!Number.isInteger(itemId)) {
-    return -1;
-  }
-  return itemId < 0 ? itemId + 0x10000 : itemId;
-}
-
-function findSmithableByClick(interfaceId, slot, itemId) {
-  const normalizedItemId = normalizeItemId(itemId);
-  if (!Number.isInteger(slot) || slot < 0 || normalizedItemId <= 0) {
-    return null;
-  }
-
-  return (
-    SMITHABLE_BY_CLICK_KEY.get(`${interfaceId}:${slot}:${normalizedItemId}`) || null
-  );
-}
-
-function readShortVariants(payload, offset) {
-  if (!Buffer.isBuffer(payload) || payload.length < offset + 2) {
-    return [];
-  }
-
-  const be = payload.readInt16BE(offset);
-  const le = payload.readInt16LE(offset);
-  const shortA =
-    (((payload[offset] & 0xff) << 8) | ((payload[offset + 1] - 128) & 0xff));
-  const shortASigned = shortA > 32767 ? shortA - 0x10000 : shortA;
-  const leShortA =
-    (((payload[offset] - 128) & 0xff) | ((payload[offset + 1] & 0xff) << 8));
-  const leShortASigned = leShortA > 32767 ? leShortA - 0x10000 : leShortA;
-
-  return [...new Set([be, le, shortASigned, leShortASigned])];
-}
-
-function resolveSmithableForContainerAction(opcode, payload, decoded) {
-  let smithable = findSmithableByClick(
-    decoded.interfaceId,
-    decoded.slot,
-    decoded.itemId
-  );
-  if (smithable) {
-    return smithable;
-  }
-
-  const slotOffsetsByOpcode = {
-    [PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE]: 4,
-    [PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-    [PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-  };
-
-  const itemOffsetsByOpcode = {
-    [PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-    [PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE]: 4,
-    [PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE]: 4,
-  };
-
-  const slotOffset = slotOffsetsByOpcode[opcode];
-  const itemOffset = itemOffsetsByOpcode[opcode];
-  if (!Number.isInteger(slotOffset) || !Number.isInteger(itemOffset)) {
-    return null;
-  }
-
-  const slotVariants = readShortVariants(payload, slotOffset);
-  const itemVariants = readShortVariants(payload, itemOffset);
-
-  for (const slot of slotVariants) {
-    for (const itemId of itemVariants) {
-      smithable = findSmithableByClick(decoded.interfaceId, slot, itemId);
-      if (smithable) {
-        return smithable;
-      }
-
-      if (opcode === PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE) {
-        smithable = findSmithableByClick(decoded.interfaceId, itemId, slot);
-        if (smithable) {
-          return smithable;
-        }
-      }
-    }
-  }
-
-  return null;
-}
-
-function handleEquipmentContainerAction(activeSessions, player, opcode, payload) {
-  const decoded = decodeEquipmentContainerAction(opcode, payload);
-  if (!decoded) {
+function handleSmithingInterfaceAction(activeSessions, player, buttonId) {
+  const barId = ACTIVE_SMITHING_MENUS.get(player);
+  if (player.getInterfaceId() !== SMITHING_INTERFACE_ID || barId == null) {
     return false;
   }
 
-  if (!EQUIPMENT_CREATION_COLUMN_IDS.has(decoded.interfaceId)) {
-    return false;
-  }
+  const product = SMITHING_PRODUCT_BY_COMPONENT.get(buttonId & 0xffff);
+  const smithable = SMITHABLE_EQUIPMENT_BY_BAR
+    .get(barId)
+    ?.find((entry) => entry.name === product);
+  if (!smithable) return false;
 
-  if (player.getInterfaceId() !== EQUIPMENT_CREATION_INTERFACE_ID) {
-    return false;
-  }
-
-  const smithable = resolveSmithableForContainerAction(opcode, payload, decoded);
-  if (!smithable) {
-    return false;
-  }
-
-  const started = startSmithingSession(
-    activeSessions,
-    player,
-    smithable,
-    decoded.amount
-  );
+  ACTIVE_SMITHING_MENUS.delete(player);
+  const started = startSmithingSession(activeSessions, player, smithable, 1);
   if (started) {
     closeSmithingInterfaceNextTick(player);
   }
   return started;
 }
+
+let TaskManager;
 
 module.exports = {
   name: "Smithing",
@@ -934,10 +787,13 @@ module.exports = {
   startBotSmelting,
   isSmeltingActive,
   register(api) {
+    TaskManager = api.getTaskManager();
     TaskManager.submit(new SmithingTask(ACTIVE_SMITHING_SESSIONS));
 
     api.onPlayerDisconnect(({ player }) => {
       stopSmithingSession(ACTIVE_SMITHING_SESSIONS, player, false);
+      ACTIVE_SMELTING_MENUS.delete(player);
+      ACTIVE_SMITHING_MENUS.delete(player);
     });
     api.onPlayerLevelUp(({ player }) => {
       stopSmithingSession(ACTIVE_SMITHING_SESSIONS, player, false);
@@ -958,25 +814,25 @@ module.exports = {
       return true;
     });
 
-    api.onButton(SMELTING_BUTTON_IDS, ({ player, buttonId }) =>
-      handleSmeltingButton(ACTIVE_SMITHING_SESSIONS, player, buttonId)
-    );
-
-    api.onInterfaceActionButton(SMELTING_BUTTON_IDS, ({ player, buttonId }) =>
-      handleSmeltingButton(ACTIVE_SMITHING_SESSIONS, player, buttonId)
-    );
-
-    api.onEstablishedPacket(({ opcode, packet, player }) => {
-      if (!EQUIPMENT_CONTAINER_ACTION_OPCODES.includes(opcode)) {
-        return;
+    api.onInterfaceActionButton(
+      SMELTING_SKILLMULTI_BUTTON_IDS,
+      ({ player, buttonId, action }) => {
+        if (!ACTIVE_SMELTING_MENUS.has(player)) return false;
+        const recipe =
+          SMELTING_RECIPES[
+            (buttonId & 0xffff) - SMELTING_SKILLMULTI_FIRST_ITEM_COMPONENT
+          ];
+        if (!recipe) return false;
+        closeSmeltingInterface(player);
+        return startSmeltingSession(ACTIVE_SMITHING_SESSIONS, player, recipe, action);
       }
-      handleEquipmentContainerAction(
-        ACTIVE_SMITHING_SESSIONS,
-        player,
-        opcode,
-        packet.getBuffer()
-      );
-    });
+    );
+
+    api.onInterfaceActionButton(
+      [...SMITHING_BUTTON_IDS],
+      ({ player, buttonId }) =>
+        handleSmithingInterfaceAction(ACTIVE_SMITHING_SESSIONS, player, buttonId)
+    );
 
     api.onItemOnObject((event) => {
       const { player, objectId, itemId } = event;

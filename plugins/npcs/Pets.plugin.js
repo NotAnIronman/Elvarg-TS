@@ -1,6 +1,3 @@
-const { World } = require("../../src/main/typescript/elvarg/game/World");
-const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
-const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
@@ -725,9 +722,16 @@ const Pets = {
   interact,
 };
 
+let World;
+let RegionManager;
+let ItemOnGroundManager;
+
 module.exports = {
   name: "Pets",
   register(api) {
+    World = api.getWorld();
+    RegionManager = api.getRegionManager();
+    ItemOnGroundManager = api.getItemOnGroundManager();
     pluginApi = api;
 
     api.onItemDropPolicy((event) => {

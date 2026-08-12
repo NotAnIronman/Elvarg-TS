@@ -6,7 +6,10 @@ const { Animation } = require("../../src/main/typescript/elvarg/game/model/Anima
 const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
-const { resolveChromaticDragonfireDamage } = require("../combat/DragonfireProtection");
+const {
+  resolveChromaticDragonfireDamage,
+  initDragonfireProtectionCoreAccess,
+} = require("../combat/DragonfireProtection");
 
 const GREEN_DRAGON_IDS = [
   NpcIdentifiers.GREEN_DRAGON,
@@ -114,6 +117,7 @@ class GreenDragonCombatMethod extends CombatMethod {
 module.exports = {
   name: "Dragons",
   register(api) {
+    initDragonfireProtectionCoreAccess(api);
     api.registerNpcCombatMethodProvider(
       GREEN_DRAGON_IDS,
       GreenDragonCombatMethod,

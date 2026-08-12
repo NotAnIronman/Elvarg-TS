@@ -1,7 +1,6 @@
 "use strict";
 
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
-const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { isPvpOnlyBotState } = require("../state/PlayerBotState");
 
 const IMMEDIATE_PJ_DURATION_MS = 30000;
@@ -16,6 +15,7 @@ const DEFAULT_PJ_MAX_RESPONDERS = 3;
 class PvpJumpOnKillPolicy {
   constructor(options = {}) {
     this.botStatesByName = options.botStatesByName ?? new Map();
+    this.World = options.api.getWorld();
     this.behaviorMode = options.behaviorMode ?? {};
     this.config = options.config ?? {};
   }
@@ -81,7 +81,7 @@ class PvpJumpOnKillPolicy {
       return [];
     }
 
-    const nearbyPlayers = World.getNearbyPlayersForUpdate?.(victim) ?? [];
+    const nearbyPlayers = this.World.getNearbyPlayersForUpdate?.(victim) ?? [];
     const victimLoc = victim.getLocation?.();
     const victimPrivateArea = victim.getPrivateArea?.();
     const candidates = [];

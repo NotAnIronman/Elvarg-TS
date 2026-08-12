@@ -1,6 +1,5 @@
 const { Equipment } = require("../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { ItemIdentifiers } = require("../../../src/main/typescript/elvarg/util/ItemIdentifiers");
-const { registerMagicHitModifier } = require("../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
 
 const STAFF_MULTIPLIERS = new Map([
   [ItemIdentifiers.AHRIMS_STAFF, 1.05],
@@ -23,6 +22,6 @@ function applyMagicStaffDamage(entity, baseHit) {
   return baseHit;
 }
 
-module.exports = function registerMagicStaffEffects() {
-  registerMagicHitModifier(applyMagicStaffDamage);
+module.exports = function registerMagicStaffEffects(api) {
+  api.registerMagicHitModifier(applyMagicStaffDamage);
 };

@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 
-const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { MapRegionReplacementManager } = require("../../src/main/typescript/elvarg/game/collision/MapRegionReplacementManager");
 const { CacheMaps } = require("../../src/main/typescript/elvarg/game/cache/CacheMaps");
 const { Buffer } = require("../../src/main/typescript/elvarg/game/collision/Buffer");
@@ -13,6 +12,13 @@ const {
   ANALYSIS_REPORT_DIRECTORY,
 } = require("./ProceduralDataPaths");
 const { buildLadderCatalogFromExamples } = require("./LadderUtil");
+
+let RegionManager;
+
+/** Called from each plugin that uses this module, before any region analysis runs. */
+function initRegionBuildingAnalysisCoreAccess(api) {
+  RegionManager = api.getRegionManager();
+}
 
 const STRUCTURE_NAME_PATTERN = /(wall|roof|door|window|house|building|fence|gate|arch)/i;
 const STRUCTURE_TYPES = new Set([
@@ -2062,6 +2068,7 @@ function writeAnalysisReport(player, radius = 1) {
 }
 
 module.exports = {
+  initRegionBuildingAnalysisCoreAccess,
   writeAnalysisReport,
   writeLearnedPresetFile,
   writeHouseExample,

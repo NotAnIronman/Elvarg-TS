@@ -1,15 +1,11 @@
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
-const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
-const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
-const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
+let pluginApi;
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds, ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
@@ -91,7 +87,7 @@ function canLightFireAt(player, location) {
     return false;
   }
   if (ObjectManager.existsLocation(location)) {
-    const handled = PluginManager.emitFiremakingBlocked({
+    const handled = pluginApi.emitFiremakingBlocked({
       player,
       location: {
         x: location.getX(),
@@ -614,6 +610,11 @@ function startBotInventoryFiremaking(player, preferredLogId = null) {
   );
 }
 
+let TaskManager;
+let ObjectManager;
+let ItemOnGroundManager;
+let World;
+
 module.exports = {
   name: "Firemaking",
   startBotInventoryFiremaking,
@@ -625,6 +626,11 @@ module.exports = {
     return LIGHTABLE_LOGS_BY_ID.has(itemId);
   },
   register(api) {
+    TaskManager = api.getTaskManager();
+    ObjectManager = api.getObjectManager();
+    ItemOnGroundManager = api.getItemOnGroundManager();
+    World = api.getWorld();
+    pluginApi = api;
     const activeSessions = new Map();
     activeSessionsRef = activeSessions;
 

@@ -1,15 +1,12 @@
 const { Area } = require("../../src/main/typescript/elvarg/game/model/areas/Area");
 const { Boundary } = require("../../src/main/typescript/elvarg/game/model/Boundary");
-const { AreaManager } = require("../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { CombatMethod } = require("../../src/main/typescript/elvarg/game/content/combat/method/CombatMethod");
 const { PendingHit } = require("../../src/main/typescript/elvarg/game/content/combat/hit/PendingHit");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { CombatType } = require("../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const { Projectile } = require("../../src/main/typescript/elvarg/game/model/Projectile");
-const { PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatEquipment } = require("../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
@@ -187,9 +184,16 @@ class KingBlackDragonCombatMethod extends CombatMethod {
   }
 }
 
+let AreaManager;
+let PrayerHandler;
+let CombatFactory;
+
 module.exports = {
   name: "KingBlackDragon",
   register(api) {
+    AreaManager = api.getAreaManager();
+    PrayerHandler = api.getPrayerHandler();
+    CombatFactory = api.getCombatFactory();
     if (!AreaManager.areas.some((area) => area instanceof KingBlackDragonArea)) {
       AreaManager.areas.push(new KingBlackDragonArea());
     }

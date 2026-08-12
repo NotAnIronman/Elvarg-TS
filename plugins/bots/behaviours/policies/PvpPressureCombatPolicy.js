@@ -3,11 +3,9 @@
 const { CombatType } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const { CombatSpells } = require("../../../../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells");
 const { MagicSpellbook } = require("../../../../src/main/typescript/elvarg/game/model/MagicSpellbook");
-const { PrayerHandler } = require("../../../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { EquipPacketListener } = require("../../../../src/main/typescript/elvarg/net/packet/impl/EquipPacketListener");
 const { TimerKey } = require("../../../../src/main/typescript/elvarg/util/timers/TimerKey");
-const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const { Inventory } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Inventory");
 const {
   BOW_INTERFACES,
@@ -30,6 +28,15 @@ const FREEZE_SPELLS = Object.freeze({
   veteran: CombatSpells.SNARE,
   elite: CombatSpells.ENTANGLE,
 });
+
+let PrayerHandler = null;
+let ServerPerf = null;
+
+/** Called once from PvpBehavior.js's constructor, before any tick() runs. */
+function initPvpPressureCombatPolicyCoreAccess(api) {
+  PrayerHandler = api.getPrayerHandler();
+  ServerPerf = api.getServerPerf();
+}
 
 function isVeteranOrEliteProfile(profile) {
   return profile?.id === "veteran" || profile?.id === "elite";
@@ -427,5 +434,6 @@ function maybeRunPressureCombatScript(context) {
 }
 
 module.exports = {
+  initPvpPressureCombatPolicyCoreAccess,
   maybeRunPressureCombatScript,
 };

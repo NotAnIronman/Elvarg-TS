@@ -1,4 +1,3 @@
-const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
@@ -371,7 +370,7 @@ class WoodcuttingBehavior {
     const targetLocation = targetTree.getLocation();
     player.getMovementQueue().walkToObject(targetTree, {
       execute: () => {
-        PluginManager.emitObjectInteraction({
+        this.api.emitObjectInteraction({
           player,
           object: targetTree,
           objectId: targetTree.getId(),

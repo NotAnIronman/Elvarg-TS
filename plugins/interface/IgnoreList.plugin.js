@@ -1,44 +1,11 @@
-const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
-
-function readUsername(packet) {
-  if (!packet || packet.getSize() < 8) {
-    return null;
-  }
-  const username = packet.readLongBigInt ? packet.readLongBigInt() : BigInt(packet.readLong());
-  if (typeof username !== "bigint" || username <= 0n) {
-    return null;
-  }
-  return username;
-}
-
-const ignorePacketListener = {
-  execute(player, packet) {
-    try {
-      const username = readUsername(packet);
-      if (username == null) {
-        return;
-      }
-
-      switch (packet.getOpcode()) {
-        case PacketConstants.ADD_IGNORE_OPCODE:
-          player.getRelations().addIgnore(username);
-          return;
-        case PacketConstants.REMOVE_IGNORE_OPCODE:
-          player.getRelations().deleteIgnore(username);
-          return;
-        default:
-          return;
-      }
-    } catch (err) {
-      console.error("[plugin:IgnoreList] packet handling failed", err);
-    }
-  },
-};
+// Add/remove ignore is client-protocol-blocked - xrsps-typescript's client has
+// no way to send these actions at all (no message type exists for them). See
+// docs/networking-protocol-gaps.md. The handler used to be wired up via the dead
+// registerAlivePacketListener/PACKETS dispatch, which never actually ran once
+// elvarg switched to NetworkBuilder.ts's live dispatch; removed along with the
+// rest of that dead system.
 
 module.exports = {
   name: "IgnoreList",
-  register(api) {
-    api.registerAlivePacketListener(PacketConstants.ADD_IGNORE_OPCODE, ignorePacketListener);
-    api.registerAlivePacketListener(PacketConstants.REMOVE_IGNORE_OPCODE, ignorePacketListener);
-  },
+  register(api) {},
 };

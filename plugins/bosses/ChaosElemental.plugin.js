@@ -8,11 +8,8 @@ const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
-const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
 const ChaosElementalAttackType = {
@@ -249,9 +246,16 @@ function shuffleInPlace(values) {
   }
 }
 
+let BonusManager;
+let RegionManager;
+let TaskManager;
+
 module.exports = {
   name: "ChaosElemental",
   register(api) {
+    BonusManager = api.getBonusManager();
+    RegionManager = api.getRegionManager();
+    TaskManager = api.getTaskManager();
     api.registerNpcCombatMethodProvider(
       [
         NpcIdentifiers.CHAOS_ELEMENTAL,

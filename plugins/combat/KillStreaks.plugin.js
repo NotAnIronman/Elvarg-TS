@@ -1,7 +1,5 @@
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
-const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
 
@@ -411,10 +409,15 @@ function handlePlayerKill(killer, victim) {
   });
 }
 
+let World;
+let ItemOnGroundManager;
+
 module.exports = {
   name: "KillStreaks",
   dependsOn: ["Wilderness"],
   register(api) {
+    World = api.getWorld();
+    ItemOnGroundManager = api.getItemOnGroundManager();
     api.onPlayerLogin(({ player }) => {
       syncKillstreakGlow(player);
       updatePvpInterface(player);

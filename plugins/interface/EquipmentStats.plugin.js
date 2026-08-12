@@ -1,6 +1,5 @@
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
 
-const OPEN_EQUIPMENT_STATS_BUTTON = 27653;
+const OPEN_EQUIPMENT_STATS_BUTTON = (387 << 16) | 1; // component.wornitems:equipment
 
 function openEquipmentStats(player) {
   // Java parity: close modal/blocking interfaces before opening equipment stats.
@@ -12,10 +11,13 @@ function openEquipmentStats(player) {
   return true;
 }
 
+let BonusManager;
+
 module.exports = {
   name: "EquipmentStats",
   register(api) {
-    api.onButton(OPEN_EQUIPMENT_STATS_BUTTON, ({ player }) =>
+    BonusManager = api.getBonusManager();
+    api.onInterfaceActionButton(OPEN_EQUIPMENT_STATS_BUTTON, ({ player }) =>
       openEquipmentStats(player)
     );
   },

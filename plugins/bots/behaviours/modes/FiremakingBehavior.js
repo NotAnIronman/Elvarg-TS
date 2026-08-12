@@ -1,6 +1,4 @@
-const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
-const { ObjectManager } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { Bank } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { ObjectIds } = require("../../../../src/main/typescript/elvarg/util/IdEnums");
@@ -46,6 +44,7 @@ class FiremakingBehavior {
   constructor(botStatesByName, api, options) {
     this.botStatesByName = botStatesByName;
     this.api = api;
+    this.ObjectManager = api.getObjectManager();
     this.behaviorMode = options.behaviorMode;
     this.objectSearch = options.objectSearch ?? null;
     this.bankBoothSearchCacheByArea = new Map();
@@ -480,7 +479,7 @@ class FiremakingBehavior {
         const fireState = state.firemaking;
         const boothLoc = bankBooth.getLocation();
         player.setPositionToFace(boothLoc);
-        const handled = PluginManager.emitObjectInteraction({
+        const handled = this.api.emitObjectInteraction({
           player,
           object: bankBooth,
           objectId: bankBooth.getId(),
@@ -684,7 +683,7 @@ class FiremakingBehavior {
   }
 
   isTileLightable(x, y, z) {
-    return !ObjectManager.existsLocation(new Location(x, y, z));
+    return !this.ObjectManager.existsLocation(new Location(x, y, z));
   }
 
   isAtTarget(player, target) {

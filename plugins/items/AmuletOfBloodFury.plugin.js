@@ -1,5 +1,3 @@
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatType } = require("../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const { CombatMethod } = require("../../src/main/typescript/elvarg/game/content/combat/method/CombatMethod");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
@@ -199,9 +197,14 @@ function getWrappedMethod(baseMethod) {
   return wrapped;
 }
 
+let BonusManager;
+let CombatFactory;
+
 module.exports = {
   name: "AmuletOfBloodFury",
   register(api) {
+    BonusManager = api.getBonusManager();
+    CombatFactory = api.getCombatFactory();
     api.onItemOnItem((event) => {
       const {
         player,

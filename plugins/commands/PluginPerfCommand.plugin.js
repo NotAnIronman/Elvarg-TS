@@ -1,9 +1,10 @@
 const fs = require("fs");
 const path = require("path");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
-const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
-const { ServerPerf } = require("../../src/main/typescript/elvarg/util/ServerPerf");
+
+let pluginApi;
+let World;
+let ServerPerf;
 
 const PLUGIN_PERF_LOG_FILE = path.join(process.cwd(), "logs", "plugin-performance.log");
 const PLUGIN_PERF_LATEST_FILE = path.join(
@@ -53,7 +54,7 @@ function appendPluginPerfLog(lines) {
 }
 
 function streamPluginPerfToPlayer(player, limit = DEFAULT_LIMIT) {
-  const rows = PluginManager.getPluginPerformanceSnapshot(limit);
+  const rows = pluginApi.getPluginPerformanceSnapshot(limit);
   const timestamp = new Date().toISOString();
   const logLines = [];
 
@@ -124,6 +125,9 @@ function streamServerPerfToPlayer(player, limitTicks = 60) {
 module.exports = {
   name: "PluginPerfCommand",
   register(api) {
+    pluginApi = api;
+    World = api.getWorld();
+    ServerPerf = api.getServerPerf();
     api.onPlayerDisconnect(({ username }) => {
       if (username) {
         stopPluginPerfStream(username);
@@ -157,7 +161,7 @@ module.exports = {
       const username = player.getUsername();
 
       if (sub === "reset") {
-        PluginManager.resetPluginPerformanceStats();
+        pluginApi.resetPluginPerformanceStats();
         player.getPacketSender().sendMessage("[pluginperf] Stats reset.");
         return true;
       }
@@ -165,24 +169,24 @@ module.exports = {
       if (sub === "off") {
         stopPluginPerfStream(username);
         if (pluginPerfStreams.size === 0) {
-          PluginManager.setPluginPerformanceProfilingEnabled(false);
+          pluginApi.setPluginPerformanceProfilingEnabled(false);
         }
         player
           .getPacketSender()
           .sendMessage(
-            `[pluginperf] Live stream disabled. profiling=${PluginManager.isPluginPerformanceProfilingEnabled()}`
+            `[pluginperf] Live stream disabled. profiling=${pluginApi.isPluginPerformanceProfilingEnabled()}`
           );
         return true;
       }
 
       if (sub === "on") {
-        PluginManager.setPluginPerformanceProfilingEnabled(true);
+        pluginApi.setPluginPerformanceProfilingEnabled(true);
         stopPluginPerfStream(username);
         const timer = setInterval(() => {
           if (!World.isPlayerSessionConnected(player)) {
             stopPluginPerfStream(username);
             if (pluginPerfStreams.size === 0) {
-              PluginManager.setPluginPerformanceProfilingEnabled(false);
+              pluginApi.setPluginPerformanceProfilingEnabled(false);
             }
             return;
           }
@@ -199,11 +203,11 @@ module.exports = {
       }
 
       if (sub === "once") {
-        const wasEnabled = PluginManager.isPluginPerformanceProfilingEnabled();
-        PluginManager.setPluginPerformanceProfilingEnabled(true);
+        const wasEnabled = pluginApi.isPluginPerformanceProfilingEnabled();
+        pluginApi.setPluginPerformanceProfilingEnabled(true);
         streamPluginPerfToPlayer(player, limit);
         if (!wasEnabled && pluginPerfStreams.size === 0) {
-          PluginManager.setPluginPerformanceProfilingEnabled(false);
+          pluginApi.setPluginPerformanceProfilingEnabled(false);
         }
         return true;
       }

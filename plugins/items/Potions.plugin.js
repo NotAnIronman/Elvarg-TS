@@ -5,13 +5,15 @@ const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { EffectTimer } = require("../../src/main/typescript/elvarg/game/model/EffectTimer");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
-const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const {
   DragonfireProtectionTier,
   processDragonfireProtection,
   setDragonfireProtection,
+  initDragonfireProtectionCoreAccess,
 } = require("../combat/DragonfireProtection");
+
+let pluginApi;
 
 const DRINK_ANIMATION = new Animation(829);
 const DEFAULT_EMPTY_ITEM = ItemIds.VIAL;
@@ -232,7 +234,7 @@ function applyMix(baseEffect) {
 }
 
 function canDrink(player, itemId) {
-  const hookResult = PluginManager.emitCanDrink(player, itemId);
+  const hookResult = pluginApi.emitCanDrink(player, itemId);
   if (hookResult === false) {
     return false;
   }
@@ -243,7 +245,7 @@ function canDrink(player, itemId) {
 }
 
 function canEat(player, itemId) {
-  const hookResult = PluginManager.emitCanEat(player, itemId);
+  const hookResult = pluginApi.emitCanEat(player, itemId);
   if (hookResult === false) {
     return false;
   }
@@ -782,6 +784,8 @@ function handlePotionDrink(player, itemId, slot) {
 module.exports = {
   name: "Potions",
   register(api) {
+    pluginApi = api;
+    initDragonfireProtectionCoreAccess(api);
     api.onItemFirstAction((event) => {
       const { player, itemId, slot } = event;
       return handlePotionDrink(player, itemId, slot);

@@ -1,12 +1,10 @@
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
-const { PrayerData, PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
+const { PrayerData } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { CombatSpells } = require("../../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells");
 const { Autocasting } = require("../../src/main/typescript/elvarg/game/content/combat/magic/Autocasting");
 const { Presetable } = require("../../src/main/typescript/elvarg/game/content/presets/Presetable");
 const { PredefinedPresets } = require("../../src/main/typescript/elvarg/game/content/presets/PredefinedPresets");
-const { SkillManager } = require("../../src/main/typescript/elvarg/game/content/skill/SkillManager");
 const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
 const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
@@ -14,7 +12,6 @@ const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const {
   isPresetActive,
@@ -23,6 +20,7 @@ const {
   commitPresetState,
   markPresetActiveWithSnapshot,
   restorePresetSnapshot,
+  initPresetsStateCoreAccess,
 } = require("./PresetsState");
 
 const MAX_PRESETS = 10;
@@ -734,6 +732,11 @@ function applyPresetItemDropPolicy(event) {
   commitPresetIfNeeded(event.player);
 }
 
+let PrayerHandler;
+let CombatFactory;
+let SkillManager;
+let TaskManager;
+
 module.exports = {
   name: "Presets",
   applyPreset,
@@ -741,6 +744,11 @@ module.exports = {
   getGlobalPresetByName,
   getGlobalPresetPool,
   register(api) {
+    PrayerHandler = api.getPrayerHandler();
+    CombatFactory = api.getCombatFactory();
+    SkillManager = api.getSkillManager();
+    TaskManager = api.getTaskManager();
+    initPresetsStateCoreAccess(api);
     api.onPlayerLogin(({ player }) => {
       if (isPresetActive(player) && !hasPresetSnapshot(player)) {
         clearPresetState(player);

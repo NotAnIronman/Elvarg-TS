@@ -2,7 +2,6 @@ const { Boundary } = require("../../src/main/typescript/elvarg/game/model/Bounda
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { PrivateArea } = require("../../src/main/typescript/elvarg/game/model/areas/impl/PrivateArea");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
@@ -223,9 +222,12 @@ function exitInstanceToHome(player, area) {
   player.moveTo(GameConstants.DEFAULT_LOCATION.clone());
 }
 
+let World;
+
 module.exports = {
   name: "CountDraynor",
   register(api) {
+    World = api.getWorld();
     api.onPlayerProcess(({ player }) => {
       if (!player) {
         return;

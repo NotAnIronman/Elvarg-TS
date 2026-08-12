@@ -3,7 +3,6 @@ const path = require("path");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { PacketBuilder } = require("../../src/main/typescript/elvarg/net/packet/PacketBuilder");
 const { PacketType } = require("../../src/main/typescript/elvarg/net/packet/PacketType");
-const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { generateBuildingsForRegion, generateSingleHouseForRegion } = require("./BuildingUtil");
@@ -17,6 +16,7 @@ const {
   decodeRegionObjects,
   decodeRegionTerrainData,
   HOUSE_DUMP_DIRECTORY,
+  initRegionBuildingAnalysisCoreAccess,
 } = require("./RegionBuildingAnalysisUtil");
 const { dumpTerrainBiome, loadTerrainBiome } = require("./TerrainBiomeUtil");
 
@@ -1618,9 +1618,13 @@ function buildGeneratedTerrainPayloadAtPlayer(player, biomeArg, seed) {
   };
 }
 
+let RegionManager;
+
 module.exports = {
   name: "ProceduralRegionStream",
   register(api) {
+    RegionManager = api.getRegionManager();
+    initRegionBuildingAnalysisCoreAccess(api);
     api.registerCommand("procregion", ({ player, parts }) => {
       if (!isDev(player)) {
         player.getPacketSender().sendMessage("Developer rights required.");

@@ -1,10 +1,6 @@
 const { GameConstants } = require("../../../src/main/typescript/elvarg/game/GameConstants");
-const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Wilderness } = require("../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
-const { PluginManager } = require("../../../src/main/typescript/elvarg/plugins/PluginManager");
-const { TaskManager } = require("../../../src/main/typescript/elvarg/game/task/TaskManager");
-const { World } = require("../../../src/main/typescript/elvarg/game/World");
 const { Misc } = require("../../../src/main/typescript/elvarg/util/Misc");
 const { BotController } = require("../../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { createTraversalAssist } = require("../lib/TraversalAssist");
@@ -60,7 +56,7 @@ const {
 
 const WILDERNESS_RESPAWN_TILE_PROBE_LIMIT = 64;
 
-function chooseWalkableTileInBounds(roamBounds, fallbackLocation) {
+function chooseWalkableTileInBounds(regionManager, roamBounds, fallbackLocation) {
   if (
     !roamBounds ||
     !Number.isFinite(roamBounds.minX) ||
@@ -84,7 +80,7 @@ function chooseWalkableTileInBounds(roamBounds, fallbackLocation) {
     );
     if (
       Wilderness.isInLocation(candidate) &&
-      !RegionManager.blocked(candidate, null)
+      !regionManager.blocked(candidate, null)
     ) {
       return candidate;
     }
@@ -120,6 +116,9 @@ function collectTrackedObjectIdsFromModes({ modeHandlers, api }) {
 function bootPlayerBotsRuntime(options = {}) {
   const api = options.api;
   const botApi = options.botApi ?? api;
+  const RegionManager = botApi.getRegionManager();
+  const TaskManager = botApi.getTaskManager();
+  const World = botApi.getWorld();
   const config = options.config ?? {};
   const behaviorMode = config.behaviorMode;
   const recentBotLogsByUsername = options.recentBotLogsByUsername ?? new Map();
@@ -149,6 +148,7 @@ function bootPlayerBotsRuntime(options = {}) {
     options: config.modeBehaviorOptions ?? {},
   });
   modeHandlers[behaviorMode.FOLLOW_BACK] = new FollowBackModeHandler({
+    api: botApi,
     behaviorMode,
     followBlockedRetryMs: config.followBlockedRetryMs,
   });
@@ -178,7 +178,7 @@ function bootPlayerBotsRuntime(options = {}) {
     traversalAssist,
     objectId: config.wildernessDitchObjectId,
     emitObjectInteraction: (interaction) =>
-      PluginManager.emitObjectInteraction(interaction),
+      botApi.emitObjectInteraction(interaction),
     options: {
       behaviorMode,
       modeHandlers,
@@ -223,11 +223,13 @@ function bootPlayerBotsRuntime(options = {}) {
   });
   const pvpJumpOnKillPolicy = new PvpJumpOnKillPolicy({
     botStatesByName,
+    api: botApi,
     behaviorMode,
     config: config.pvp ?? {},
   });
   const avengeOpponentPolicy = new AvengeOpponentPolicy({
     botStatesByName,
+    api: botApi,
     behaviorMode,
     config: config.pvp ?? {},
   });
@@ -286,6 +288,7 @@ function bootPlayerBotsRuntime(options = {}) {
           if (isPvpOnlyBotState(state)) {
             const roamBounds = state?.roaming?.roamBounds ?? null;
             const respawnTile = chooseWalkableTileInBounds(
+              RegionManager,
               roamBounds,
               player.getLocation?.()?.clone?.() ?? null
             );
@@ -366,7 +369,7 @@ function bootPlayerBotsRuntime(options = {}) {
       }),
     createController,
     ensureBehaviorTaskStarted,
-    emitPlayerLogin: (event) => PluginManager.emitPlayerLogin(event),
+    emitPlayerLogin: (event) => botApi.emitPlayerLogin(event),
     worldGetPlayerByName: (name) => World.getPlayerByName(name),
     formatText: (value) => Misc.formatText(value),
     resetMovementState,

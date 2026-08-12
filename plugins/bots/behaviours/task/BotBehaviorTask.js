@@ -1,15 +1,10 @@
 const { Task } = require("../../../../src/main/typescript/elvarg/game/task/Task");
-const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
-const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
-const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const {
-  CombatFactory,
   CanAttackResponse,
 } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
-const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const {
   chooseNextTarget,
   peekMovementRequest,
@@ -38,6 +33,11 @@ class BotBehaviorTask extends Task {
     this.entries = entries;
     this.traversalService = traversalService;
     this.api = options.api ?? null;
+    this.World = this.api?.getWorld();
+    this.RegionManager = this.api?.getRegionManager();
+    this.CombatFactory = this.api?.getCombatFactory();
+    this.AreaManager = this.api?.getAreaManager();
+    this.ServerPerf = this.api?.getServerPerf();
     this.behaviorMode = options.behaviorMode ?? null;
     this.modeHandlers = options.modeHandlers ?? {};
     this.autonomy = {
@@ -351,11 +351,11 @@ class BotBehaviorTask extends Task {
       );
     }
 
-    World.getPlayers().forEach((candidatePlayer) => {
+    this.World.getPlayers().forEach((candidatePlayer) => {
       if (!candidatePlayer || candidatePlayer.isPlayerBot?.() === true) {
         return;
       }
-      if (!World.isPlayerSessionConnected(candidatePlayer)) {
+      if (!this.World.isPlayerSessionConnected(candidatePlayer)) {
         return;
       }
       if (!candidatePlayer.isRegistered?.()) {
@@ -435,11 +435,11 @@ class BotBehaviorTask extends Task {
 
     const buckets = new Map();
     let observerCount = 0;
-    World.getPlayers().forEach((candidate) => {
+    this.World.getPlayers().forEach((candidate) => {
       if (!candidate || candidate.isPlayerBot?.() === true) {
         return;
       }
-      if (!World.isPlayerSessionConnected(candidate)) {
+      if (!this.World.isPlayerSessionConnected(candidate)) {
         return;
       }
       const location = candidate.getLocation?.();
@@ -600,7 +600,7 @@ class BotBehaviorTask extends Task {
         continue;
       }
       const other = entity.getAsPlayer?.();
-      if (other && other.isPlayerBot?.() !== true && World.isPlayerSessionConnected(other)) {
+      if (other && other.isPlayerBot?.() !== true && this.World.isPlayerSessionConnected(other)) {
         return true;
       }
     }
@@ -1170,7 +1170,7 @@ class BotBehaviorTask extends Task {
         const location = new Location(candidate.x, candidate.y, candidate.z);
         return (
           Wilderness.isInLocation(location) &&
-          !RegionManager.blocked(location, privateArea)
+          !this.RegionManager.blocked(location, privateArea)
         );
       },
     });
@@ -1199,7 +1199,7 @@ class BotBehaviorTask extends Task {
     }
     state.blockedTileCheckAt = nowMs + BLOCKED_TILE_CHECK_INTERVAL_MS;
     const privateArea = player.getPrivateArea?.() ?? null;
-    if (!RegionManager.blocked(location, privateArea)) {
+    if (!this.RegionManager.blocked(location, privateArea)) {
       return false;
     }
 
@@ -1327,7 +1327,7 @@ class BotBehaviorTask extends Task {
     if (attacker.getPrivateArea?.() !== privateArea) {
       return false;
     }
-    const isMultiEngagement = AreaManager.inMulti(player) && AreaManager.inMulti(attacker);
+    const isMultiEngagement = this.AreaManager.inMulti(player) && this.AreaManager.inMulti(attacker);
     if (!isMultiEngagement) {
       const attackerCombat = attacker.getCombat?.();
       const attackerTarget = attackerCombat?.getTarget?.();
@@ -1349,9 +1349,9 @@ class BotBehaviorTask extends Task {
       if (occupiedByOther) {
         return false;
       }
-      const combatMethod = CombatFactory.getMethod(player);
+      const combatMethod = this.CombatFactory.getMethod(player);
       if (
-        CombatFactory.canAttack(player, combatMethod, attacker) !==
+        this.CombatFactory.canAttack(player, combatMethod, attacker) !==
         CanAttackResponse.CAN_ATTACK
       ) {
         return false;
@@ -1854,7 +1854,7 @@ class BotBehaviorTask extends Task {
         autonomyStartNs = process.hrtime.bigint();
       }
       if (urgentPhasePrefix) {
-        ServerPerf.measurePhase(`${urgentPhasePrefix}.autonomy`, () =>
+        this.ServerPerf.measurePhase(`${urgentPhasePrefix}.autonomy`, () =>
           this.processAutonomousMode(entry, entryNow, sharedCycleState)
         );
       } else {
@@ -1880,7 +1880,7 @@ class BotBehaviorTask extends Task {
           pvpState.currentCyclePvpIndex = sharedCycleState?.pvpIndex ?? null;
         }
         try {
-          ServerPerf.measurePhase(`${urgentPhasePrefix}.controller`, () =>
+          this.ServerPerf.measurePhase(`${urgentPhasePrefix}.controller`, () =>
             entry.controller.tick(entryNow)
           );
         } finally {
@@ -1931,12 +1931,12 @@ class BotBehaviorTask extends Task {
     }
 
     const startedAtMs = Date.now();
-    const sharedCycleState = ServerPerf.measurePhase(
+    const sharedCycleState = this.ServerPerf.measurePhase(
       "task.bot_behavior.build_cycle_state",
       () => this.buildPvpCycleState(now)
     );
     const urgentEntries = new Set();
-    ServerPerf.measurePhase("task.bot_behavior.urgent_entries", () => {
+    this.ServerPerf.measurePhase("task.bot_behavior.urgent_entries", () => {
       for (let index = 0; index < totalEntries; index++) {
         const entry = this.entries[index];
         if (!this.isUrgentEntry(entry, now)) {
@@ -1951,7 +1951,7 @@ class BotBehaviorTask extends Task {
 
     const startIndex = this._entryCursor % totalEntries;
     let processedRegularEntries = 0;
-    const budgetYielded = ServerPerf.measurePhase(
+    const budgetYielded = this.ServerPerf.measurePhase(
       "task.bot_behavior.regular_entries",
       () => {
         for (let offset = 0; offset < totalEntries; offset++) {

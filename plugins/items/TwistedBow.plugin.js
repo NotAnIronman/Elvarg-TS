@@ -1,4 +1,3 @@
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
 const { CombatType } = require("../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
@@ -65,9 +64,12 @@ function applyPercent(base, percent) {
   return Math.max(0, Math.floor((Math.max(0, base) * Math.max(0, percent)) / 100));
 }
 
+let BonusManager;
+
 module.exports = {
   name: "TwistedBow",
   register(api) {
+    BonusManager = api.getBonusManager();
     api.registerRangedCombatModifier({
       modifyMaxHit(attacker, target, maxHit) {
         if (!isUsingTwistedBow(attacker)) {

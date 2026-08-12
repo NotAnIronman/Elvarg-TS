@@ -1,9 +1,6 @@
 "use strict";
 
-const { World } = require("../../../../../src/main/typescript/elvarg/game/World");
 const { GameConstants } = require("../../../../../src/main/typescript/elvarg/game/GameConstants");
-const { AreaManager } = require("../../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
-const { RegionManager } = require("../../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Misc } = require("../../../../../src/main/typescript/elvarg/util/Misc");
 const {
   ClanChatManager,
@@ -28,6 +25,9 @@ class ClanRecruitActionNode {
   constructor(botStatesByName, api, options) {
     this.botStatesByName = botStatesByName;
     this.api = api;
+    this.World = api.getWorld();
+    this.AreaManager = api.getAreaManager();
+    this.RegionManager = api.getRegionManager();
     this.behaviorMode = options.behaviorMode;
   }
 
@@ -42,7 +42,7 @@ class ClanRecruitActionNode {
       return "failure";
     }
 
-    const owner = World.getPlayerByName(ownerUsername);
+    const owner = this.World.getPlayerByName(ownerUsername);
     if (!owner || owner.isRegistered?.() !== true) {
       const missingSince =
         Number(player.getAttribute?.(ATTR_RECRUIT_OWNER_MISSING_SINCE) ?? 0) || nowMs;
@@ -217,7 +217,7 @@ class ClanRecruitActionNode {
   }
 
   resolveAssistTarget(bot, owner) {
-    if (!AreaManager.inMulti(owner) || !AreaManager.inMulti(bot)) {
+    if (!this.AreaManager.inMulti(owner) || !this.AreaManager.inMulti(bot)) {
       return null;
     }
 
@@ -264,7 +264,7 @@ class ClanRecruitActionNode {
 
     const tiles = [];
     for (const tile of follower.outterTiles?.() ?? []) {
-      if (RegionManager.blocked?.(tile, follower.getPrivateArea?.())) {
+      if (this.RegionManager.blocked?.(tile, follower.getPrivateArea?.())) {
         continue;
       }
       tiles.push(tile);

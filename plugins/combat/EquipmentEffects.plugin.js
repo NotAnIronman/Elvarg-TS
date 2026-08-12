@@ -6,9 +6,9 @@ const registerMagicStaffEffects = require("./effects/MagicStaves");
 module.exports = {
   name: "EquipmentEffects",
   register(api) {
-    registerDharoksArmourEffects();
-    registerVoidSetEffects();
-    registerObsidianEffects();
-    registerMagicStaffEffects();
+    registerDharoksArmourEffects(api);
+    registerVoidSetEffects(api);
+    registerObsidianEffects(api);
+    registerMagicStaffEffects(api);
   },
 };

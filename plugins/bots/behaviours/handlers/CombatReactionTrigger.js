@@ -1,8 +1,4 @@
-const { World } = require("../../../../src/main/typescript/elvarg/game/World");
-const { Packet } = require("../../../../src/main/typescript/elvarg/net/packet/Packet");
-const { PacketConstants } = require("../../../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const {
-  CombatFactory,
   CanAttackResponse,
 } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { callModeHook } = require("../hooks/ModeHookContract");
@@ -24,25 +20,12 @@ class CombatReactionTrigger {
     this.behaviorMode = options.behaviorMode;
   }
 
-  resolveTargetedPlayer(opcode, packet) {
-    const payload = packet?.getBuffer?.();
-    if (!payload || payload.length < 2) {
-      return null;
-    }
-    const parsed = new Packet(opcode, payload);
-    const targetIndex = parsed.readLEShort();
-    if (targetIndex < 0) {
-      return null;
-    }
-    return World.getPlayers().get(targetIndex) ?? null;
-  }
-
-  handleEstablishedPacket({ opcode, packet, player }, nowMs = Date.now()) {
-    if (opcode !== PacketConstants.ATTACK_PLAYER_OPCODE || !packet || !player) {
+  handlePlayerAttack({ player, target }, nowMs = Date.now()) {
+    if (!player) {
       return;
     }
 
-    const followed = this.resolveTargetedPlayer(opcode, packet);
+    const followed = target;
     const followedUsername = followed?.getUsername?.();
     if (
       !followed ||
@@ -59,9 +42,10 @@ class CombatReactionTrigger {
       return;
     }
 
-    const combatMethod = CombatFactory.getMethod(player);
+    const combatFactory = this.api.getCombatFactory();
+    const combatMethod = combatFactory.getMethod(player);
     if (
-      CombatFactory.canAttack(player, combatMethod, followed) !==
+      combatFactory.canAttack(player, combatMethod, followed) !==
       CanAttackResponse.CAN_ATTACK
     ) {
       return;

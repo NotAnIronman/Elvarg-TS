@@ -1,4 +1,3 @@
-const { RegionManager } = require("../../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { ActionNode } = require("../../../../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { Location } = require("../../../../../src/main/typescript/elvarg/game/model/Location");
 const {GameConstants} = require("../../../../../src/main/typescript/elvarg/game/GameConstants");
@@ -97,13 +96,14 @@ class PvpUnstackActionNode extends ActionNode {
       new Location(current.getX(), current.getY() + 1, current.getZ()),
     ];
 
+    const regionManager = this.api.getRegionManager();
     let bestTile = null;
     let bestDistance = Number.POSITIVE_INFINITY;
     for (const tile of candidates) {
-      if (RegionManager.blocked(tile, privateArea)) {
+      if (regionManager.blocked(tile, privateArea)) {
         continue;
       }
-      if (!RegionManager.canMovestart(current, tile, size, size, privateArea)) {
+      if (!regionManager.canMovestart(current, tile, size, size, privateArea)) {
         continue;
       }
       if (this.isOccupiedByOtherPlayer(tile, player, target)) {

@@ -1,9 +1,7 @@
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Chance } = require("../../src/main/typescript/elvarg/util/Chance");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
@@ -279,9 +277,14 @@ class FishingTask extends Task {
   }
 }
 
+let TaskManager;
+let World;
+
 module.exports = {
   name: "Fishing",
   register(api) {
+    TaskManager = api.getTaskManager();
+    World = api.getWorld();
     const activeSessions = new Map();
     TaskManager.submit(new FishingTask(activeSessions));
 

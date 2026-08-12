@@ -1,14 +1,5 @@
 const { CombatEquipment } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
 const { CombatType } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatType");
-const {
-  registerMeleeHitModifier,
-  registerMeleeAttackAccuracyModifier,
-  registerMeleeDefenseModifier,
-  registerRangedHitModifier,
-  registerRangedAttackAccuracyModifier,
-  registerMagicHitModifier,
-  registerMagicAttackAccuracyModifier,
-} = require("../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
 
 const VOID_BONUS = 0.10;
 const VOID_MAGIC_MULTIPLIER = 1.45;
@@ -72,12 +63,12 @@ function applyVoidMagicAccuracy(entity, value) {
   return value;
 }
 
-module.exports = function registerVoidSetEffects() {
-  registerMeleeHitModifier(applyVoidMeleeDamage);
-  registerRangedHitModifier(applyVoidRangedDamage);
-  registerMagicHitModifier(applyVoidMagicDamage);
-  registerMeleeAttackAccuracyModifier(applyVoidMeleeAccuracy);
-  registerMeleeDefenseModifier(applyVoidMeleeDefense);
-  registerRangedAttackAccuracyModifier(applyVoidRangedAccuracy);
-  registerMagicAttackAccuracyModifier(applyVoidMagicAccuracy);
+module.exports = function registerVoidSetEffects(api) {
+  api.registerMeleeHitModifier(applyVoidMeleeDamage);
+  api.registerRangedHitModifier(applyVoidRangedDamage);
+  api.registerMagicHitModifier(applyVoidMagicDamage);
+  api.registerMeleeAttackAccuracyModifier(applyVoidMeleeAccuracy);
+  api.registerMeleeDefenseModifier(applyVoidMeleeDefense);
+  api.registerRangedAttackAccuracyModifier(applyVoidRangedAccuracy);
+  api.registerMagicAttackAccuracyModifier(applyVoidMagicAccuracy);
 };

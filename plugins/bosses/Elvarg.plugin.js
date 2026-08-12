@@ -2,7 +2,6 @@ const { Boundary } = require("../../src/main/typescript/elvarg/game/model/Bounda
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { PrivateArea } = require("../../src/main/typescript/elvarg/game/model/areas/impl/PrivateArea");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 const { CombatMethod } = require("../../src/main/typescript/elvarg/game/content/combat/method/CombatMethod");
@@ -11,13 +10,13 @@ const { PendingHit } = require("../../src/main/typescript/elvarg/game/content/co
 const { Projectile } = require("../../src/main/typescript/elvarg/game/model/Projectile");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
-const { PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatEquipment } = require("../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const {
   DragonfireProtectionTier,
   getDragonfireProtectionTier,
+  initDragonfireProtectionCoreAccess,
 } = require("../combat/DragonfireProtection");
 
 const ATTR_PENDING_INSTANCE = "elvarg:pending_instance";
@@ -416,9 +415,15 @@ function cleanupOnLogoutOrDisconnect(player) {
   exitInstanceToHome(player, area);
 }
 
+let World;
+let PrayerHandler;
+
 module.exports = {
   name: "Elvarg",
   register(api) {
+    World = api.getWorld();
+    PrayerHandler = api.getPrayerHandler();
+    initDragonfireProtectionCoreAccess(api);
     api.onPlayerProcess(({ player }) => {
       if (!player) {
         return;

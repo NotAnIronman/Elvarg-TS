@@ -1,4 +1,3 @@
-const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
 const { Equipment } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
@@ -311,7 +310,7 @@ class MiningBehavior {
     const targetLocation = targetRock.getLocation();
     player.getMovementQueue().walkToObject(targetRock, {
       execute: () => {
-        PluginManager.emitObjectInteraction({
+        this.api.emitObjectInteraction({
           player,
           object: targetRock,
           objectId: targetRock.getId(),

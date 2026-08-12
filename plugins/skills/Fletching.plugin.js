@@ -4,7 +4,6 @@ const { Animation } = require("../../src/main/typescript/elvarg/game/model/Anima
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { CreationMenu } = require("../../src/main/typescript/elvarg/game/model/menu/CreationMenu");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
@@ -776,9 +775,12 @@ function resolveBoltRecipe(itemA, itemB) {
   return BOLT_RECIPES_BY_UNFINISHED.get(unfId) || null;
 }
 
+let TaskManager;
+
 module.exports = {
   name: "Fletching",
   register(api) {
+    TaskManager = api.getTaskManager();
     const activeSessions = new Map();
     TaskManager.submit(new FletchingTask(activeSessions));
 

@@ -1,4 +1,3 @@
-const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const {
   setModeFollowBack,
   setModeReturnHome,
@@ -6,13 +5,14 @@ const {
 
 class FollowBackModeHandler {
   constructor(options = {}) {
+    this.World = options.api.getWorld();
     this.behaviorMode = options.behaviorMode;
     this.followBlockedRetryMs = options.followBlockedRetryMs ?? 200;
   }
 
   resolveTarget(state) {
     const username = state?.followTargetUsername;
-    return username ? World.getPlayerByName(username) : null;
+    return username ? this.World.getPlayerByName(username) : null;
   }
 
   isModeStateValid({ player, state }) {

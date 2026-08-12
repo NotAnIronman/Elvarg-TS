@@ -1,5 +1,4 @@
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
 
 const TRAINING_SKELETON_ID = NpcIdentifiers.SKELETON_13; // 82
@@ -21,9 +20,12 @@ function isTrainingSkeletonAtTarget(npc) {
   );
 }
 
+let World;
+
 module.exports = {
   name: "TrainingSkeleton",
   register(api) {
+    World = api.getWorld();
     api.onNpcDeath(({ npc }) => {
       if (!isTrainingSkeletonAtTarget(npc)) {
         return;

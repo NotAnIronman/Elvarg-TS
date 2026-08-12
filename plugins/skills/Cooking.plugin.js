@@ -1,5 +1,4 @@
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
@@ -201,9 +200,12 @@ class CookingTask extends Task {
   }
 }
 
+let TaskManager;
+
 module.exports = {
   name: "Cooking",
   register(api) {
+    TaskManager = api.getTaskManager();
     const activeSessions = new Map();
     TaskManager.submit(new CookingTask(activeSessions));
 

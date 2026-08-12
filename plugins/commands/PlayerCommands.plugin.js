@@ -1,13 +1,9 @@
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { PasswordUtil } = require("../../src/main/typescript/elvarg/util/PasswordUtil");
 const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
-const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { SkullType } = require("../../src/main/typescript/elvarg/game/model/SkullType");
-const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
 const { DonatorRights } = require("../../src/main/typescript/elvarg/game/model/rights/DonatorRights");
 
 const INAPPROPRIATE_TITLES = ["nigger", "ass", "boobs"];
@@ -67,9 +63,18 @@ function yellDelaySeconds(player) {
   return DonatorRights.getYellDelay(player.getDonatorRights?.());
 }
 
+let World;
+let ItemOnGroundManager;
+let CombatFactory;
+let PlayerPunishment;
+
 module.exports = {
   name: "PlayerCommands",
   register(api) {
+    World = api.getWorld();
+    ItemOnGroundManager = api.getItemOnGroundManager();
+    CombatFactory = api.getCombatFactory();
+    PlayerPunishment = api.getPlayerPunishment();
     api.registerCommand("players", ({ player }) => {
       sendOnlinePlayers(player);
       return true;

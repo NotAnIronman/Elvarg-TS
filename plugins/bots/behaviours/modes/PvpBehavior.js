@@ -1,15 +1,10 @@
-const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { PrayerHandler } = require("../../../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const {
-  CombatFactory,
   CanAttackResponse,
 } = require("../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
-const { RegionManager } = require("../../../../src/main/typescript/elvarg/game/collision/RegionManager");
-const { AreaManager } = require("../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
 const { Skill } = require("../../../../src/main/typescript/elvarg/game/model/Skill");
-const { ServerPerf } = require("../../../../src/main/typescript/elvarg/util/ServerPerf");
 const {
   queueRouteAndFlagAppearance,
   randomInRange,
@@ -37,6 +32,7 @@ const {
   maybeUseSpecialAttack,
 } = require("../policies/PvpSpecialAttackPolicy");
 const {
+  initPvpPressureCombatPolicyCoreAccess,
   maybeRunPressureCombatScript,
 } = require("../policies/PvpPressureCombatPolicy");
 const {
@@ -134,7 +130,7 @@ function isInDitchNonWildStrip(player) {
   );
 }
 
-function chooseWalkableWildernessReturnTile(player, state) {
+function chooseWalkableWildernessReturnTile(regionManager, player, state) {
   const location = player?.getLocation?.();
   if (!location) {
     return null;
@@ -166,7 +162,7 @@ function chooseWalkableWildernessReturnTile(player, state) {
         if (!Wilderness.isInLocation(tile)) {
           continue;
         }
-        if (RegionManager.blocked(tile, privateArea)) {
+        if (regionManager.blocked(tile, privateArea)) {
           continue;
         }
         return { x: tile.getX(), y: tile.getY() };
@@ -187,7 +183,7 @@ function chooseWalkableWildernessReturnTile(player, state) {
         if (!Wilderness.isInLocation(tile)) {
           continue;
         }
-        if (RegionManager.blocked(tile, privateArea)) {
+        if (regionManager.blocked(tile, privateArea)) {
           continue;
         }
         return { x, y };
@@ -201,8 +197,14 @@ class PvpBehavior {
   constructor(botStatesByName, api, options) {
     this.botStatesByName = botStatesByName;
     this.api = api;
+    this.World = api.getWorld();
+    this.CombatFactory = api.getCombatFactory();
+    this.AreaManager = api.getAreaManager();
+    this.ServerPerf = api.getServerPerf();
+    initPvpPressureCombatPolicyCoreAccess(api);
     this.behaviorMode = options.behaviorMode;
     this.validateEngagementNode = new PvpValidateEngagementNode({
+      api,
       behaviorMode: this.behaviorMode,
       setPhase: (state, phase) => this.setPhase(state, phase),
       stopPvp: (player, state, nowMs, reason) =>
@@ -254,6 +256,7 @@ class PvpBehavior {
     });
     this.replenishAfterKillNode = new ReplenishAfterKillNode(botStatesByName, api);
     this.combatExecutionNode = new PvpCombatExecutionNode({
+      api,
       setPhase: (state, phase) => this.setPhase(state, phase),
       maybeSwitchBackToPrimaryWeapon,
       maybeUseSpecialAttack,
@@ -338,9 +341,10 @@ class PvpBehavior {
     if (!player) {
       return;
     }
+    const prayerHandler = this.api.getPrayerHandler();
     for (const prayerId of MANAGED_PVP_PRAYERS) {
-      if (PrayerHandler.isActivated(player, prayerId)) {
-        PrayerHandler.deactivatePrayer(player, prayerId);
+      if (prayerHandler.isActivated(player, prayerId)) {
+        prayerHandler.deactivatePrayer(player, prayerId);
       }
     }
   }
@@ -413,7 +417,11 @@ class PvpBehavior {
     if (!this.isPvpOnly(state) || !isInDitchNonWildStrip(player)) {
       return false;
     }
-    const returnTile = chooseWalkableWildernessReturnTile(player, state);
+    const returnTile = chooseWalkableWildernessReturnTile(
+      this.api.getRegionManager(),
+      player,
+      state
+    );
     if (!returnTile) {
       return false;
     }
@@ -474,8 +482,8 @@ class PvpBehavior {
 
   isSingleWayEngagement(player, target) {
     return !(
-      AreaManager.inMulti(player) &&
-      AreaManager.inMulti(target)
+      this.AreaManager.inMulti(player) &&
+      this.AreaManager.inMulti(target)
     );
   }
 
@@ -815,7 +823,7 @@ class PvpBehavior {
         ? isInCombat
         : (candidate) => this.isInCombat(candidate);
 
-    const realPlayerOpponent = ServerPerf.measurePhase(
+    const realPlayerOpponent = this.ServerPerf.measurePhase(
       "bot.pvp.try_start.real_player_scan",
       () =>
         this.resolvePreferredRealPlayerOpponent({
@@ -846,7 +854,7 @@ class PvpBehavior {
     }
 
     if (
-      !ServerPerf.measurePhase("bot.pvp.try_start.hotspot_decision", () =>
+      !this.ServerPerf.measurePhase("bot.pvp.try_start.hotspot_decision", () =>
         this.resolveHotspotEngagementDecision(sourcePlayer, sourceState, nowMs)
       )
     ) {
@@ -884,7 +892,7 @@ class PvpBehavior {
         return false;
       }
     }
-    const opponentEntry = ServerPerf.measurePhase(
+    const opponentEntry = this.ServerPerf.measurePhase(
       "bot.pvp.try_start.bot_opponent_selection",
       () =>
         pickPvpOpponent({
@@ -1266,7 +1274,7 @@ class PvpBehavior {
     }
 
     const sourceProfile = this.getProfile(sourceState);
-    const sourceMethod = CombatFactory.getMethod(sourcePlayer);
+    const sourceMethod = this.CombatFactory.getMethod(sourcePlayer);
     const sourceUsername = sourcePlayer.getUsername?.() ?? null;
     const topCandidates = [];
     const indexedCandidates = this.getNearbyIndexedRealPlayers(
@@ -1276,7 +1284,7 @@ class PvpBehavior {
     );
     const realPlayerCandidates = Array.isArray(indexedCandidates)
       ? indexedCandidates
-      : World.getPlayers();
+      : this.World.getPlayers();
 
     realPlayerCandidates.forEach((candidatePlayer) => {
       if (!candidatePlayer || candidatePlayer === sourcePlayer) {
@@ -1285,7 +1293,7 @@ class PvpBehavior {
       if (candidatePlayer.isPlayerBot?.() === true) {
         return;
       }
-      if (!World.isPlayerSessionConnected(candidatePlayer)) {
+      if (!this.World.isPlayerSessionConnected(candidatePlayer)) {
         return;
       }
       if (!candidatePlayer.isRegistered?.()) {
@@ -1358,7 +1366,7 @@ class PvpBehavior {
 
     for (const candidate of topCandidates) {
       if (
-        CombatFactory.canAttack(sourcePlayer, sourceMethod, candidate.player) ===
+        this.CombatFactory.canAttack(sourcePlayer, sourceMethod, candidate.player) ===
         CanAttackResponse.CAN_ATTACK
       ) {
         return candidate.player;
@@ -1383,7 +1391,7 @@ class PvpBehavior {
       return cachedTarget;
     }
 
-    const resolved = World.getPlayerByName(pvp.targetUsername);
+    const resolved = this.World.getPlayerByName(pvp.targetUsername);
     pvp.targetPlayer = resolved ?? null;
     return resolved ?? null;
   }
@@ -1431,7 +1439,7 @@ class PvpBehavior {
   }
 
   tick(context) {
-    const resolved = ServerPerf.measurePhase("bot.pvp.tick.resolve_context", () =>
+    const resolved = this.ServerPerf.measurePhase("bot.pvp.tick.resolve_context", () =>
       resolveBotNodeContext(context, this.botStatesByName, {
         requiredMode: this.behaviorMode.PVP,
         requireNotInCombat: false,
@@ -1444,7 +1452,7 @@ class PvpBehavior {
 
     const { player, state, nowMs } = resolved;
 
-    const replenish = ServerPerf.measurePhase("bot.pvp.tick.replenish", () =>
+    const replenish = this.ServerPerf.measurePhase("bot.pvp.tick.replenish", () =>
       this.replenishAfterKillNode.tick({
         player,
         state,
@@ -1455,7 +1463,7 @@ class PvpBehavior {
       return replenish.status ?? "failure";
     }
 
-    const jump = ServerPerf.measurePhase("bot.pvp.tick.jump", () =>
+    const jump = this.ServerPerf.measurePhase("bot.pvp.tick.jump", () =>
       this.jumpKilledTargetNode.tick({
         player,
         state,
@@ -1468,7 +1476,7 @@ class PvpBehavior {
       return jump.status ?? "failure";
     }
 
-    const validation = ServerPerf.measurePhase("bot.pvp.tick.validate", () =>
+    const validation = this.ServerPerf.measurePhase("bot.pvp.tick.validate", () =>
       this.validateEngagementNode.tick({
         player,
         state,
@@ -1480,7 +1488,7 @@ class PvpBehavior {
     }
 
     const target = validation?.target ?? null;
-    const defensive = ServerPerf.measurePhase("bot.pvp.tick.defensive", () =>
+    const defensive = this.ServerPerf.measurePhase("bot.pvp.tick.defensive", () =>
       this.defensiveActionNode.tick({
         player,
         state,
@@ -1492,7 +1500,7 @@ class PvpBehavior {
       return defensive.status ?? "failure";
     }
 
-    const freeze = ServerPerf.measurePhase("bot.pvp.tick.freeze", () =>
+    const freeze = this.ServerPerf.measurePhase("bot.pvp.tick.freeze", () =>
       this.freezeAndKiteNode.tick({
         player,
         state,
@@ -1504,7 +1512,7 @@ class PvpBehavior {
       return freeze.status ?? "failure";
     }
 
-    const vengeance = ServerPerf.measurePhase("bot.pvp.tick.vengeance", () =>
+    const vengeance = this.ServerPerf.measurePhase("bot.pvp.tick.vengeance", () =>
       this.vengeanceNode.tick({
         player,
         state,
@@ -1516,7 +1524,7 @@ class PvpBehavior {
       return vengeance.status ?? "failure";
     }
 
-    return ServerPerf.measurePhase("bot.pvp.tick.combat_execution", () =>
+    return this.ServerPerf.measurePhase("bot.pvp.tick.combat_execution", () =>
       this.combatExecutionNode.tick({
         player,
         state,

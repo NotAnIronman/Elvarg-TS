@@ -4,10 +4,7 @@ const path = require("path");
 const { promisify } = require("util");
 const { PrayerData } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { FightType } = require("../../src/main/typescript/elvarg/game/content/combat/FightType");
-const {
-  SkillManager,
-  Skills,
-} = require("../../src/main/typescript/elvarg/game/content/skill/SkillManager");
+const { Skills } = require("../../src/main/typescript/elvarg/game/content/skill/SkillManager");
 const { PlayerPersistence } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerPersistence");
 const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
@@ -749,9 +746,12 @@ class JsonPlayerPersistence extends PlayerPersistence {
   }
 }
 
+let SkillManager;
+
 module.exports = {
   name: "JsonPlayerPersistence",
   register(api) {
+    SkillManager = api.getSkillManager();
     api.setPlayerPersistence(new JsonPlayerPersistence());
     api.log("registered", {
       saveDirectory: path.join("data", "saves", "characters"),

@@ -1,6 +1,4 @@
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
@@ -420,9 +418,14 @@ class ToxicBlowpipeCombatMethod extends RangedCombatMethod {
 const REGULAR_COMBAT_METHOD = new ToxicBlowpipeCombatMethod(false);
 const SPECIAL_COMBAT_METHOD = new ToxicBlowpipeCombatMethod(true);
 
+let BonusManager;
+let CombatFactory;
+
 module.exports = {
   name: "ToxicBlowpipe",
   register(api) {
+    BonusManager = api.getBonusManager();
+    CombatFactory = api.getCombatFactory();
     api.registerRangedAmmoResolver({
       resolve(player) {
         const blowpipeItem = BlowpipeState.equipped(player);

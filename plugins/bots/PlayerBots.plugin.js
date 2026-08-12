@@ -1,11 +1,15 @@
 const path = require("path");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Wilderness } = require("../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
-const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
-const { resetMovementState } = require("./behaviours/state/PlayerBotState");
+const {
+  resetMovementState,
+  initPlayerBotStateCoreAccess,
+} = require("./behaviours/state/PlayerBotState");
+const {
+  initBotRecruitRuntimeCoreAccess,
+} = require("./runtime/BotRecruitRuntime");
 const { registerBotCommands } = require("./runtime/registerBotCommands");
 const { registerBotEvents } = require("./runtime/registerBotEvents");
 const { createBotPluginLogging } = require("./runtime/BotPluginLogging");
@@ -28,14 +32,6 @@ const BOT_BEHAVIOR_MODE = Object.freeze({
   FOLLOW_BACK: "follow_back",
   RETURN_HOME: "return_home",
 });
-const MANUAL_CONTROL_PACKET_OPCODES = new Set([
-  PacketConstants.OBJECT_FIRST_CLICK_OPCODE,
-  PacketConstants.OBJECT_SECOND_CLICK_OPCODE,
-  PacketConstants.OBJECT_THIRD_CLICK_OPCODE,
-  PacketConstants.OBJECT_FOURTH_CLICK_OPCODE,
-  PacketConstants.OBJECT_FIFTH_CLICK_OPCODE,
-]);
-
 function parseEnvInt(name, fallback, min = 0) {
   const value = Number(process.env[name]);
   if (!Number.isFinite(value)) {
@@ -150,7 +146,6 @@ const BOT_CONFIG = Object.freeze({
     farStride: 12,
   }),
   wildernessDitchObjectId: ObjectIds.WILDERNESS_DITCH,
-  manualControlPacketOpcodes: MANUAL_CONTROL_PACKET_OPCODES,
   logging: Object.freeze({
     logPath: path.join(process.cwd(), "logs", "player-bots.log"),
     runtimeEventLoggingEnabled:
@@ -231,8 +226,9 @@ const BOT_CONFIG = Object.freeze({
 
 module.exports = {
   name: "PlayerBots",
-  dependsOn: ["ReplaceMapRegions"],
   register(api) {
+    initPlayerBotStateCoreAccess(api);
+    initBotRecruitRuntimeCoreAccess(api);
     const { botApi, recentBotLogsByUsername } = createBotPluginLogging({
       api,
       logPath: BOT_CONFIG.logging.logPath,
@@ -272,7 +268,7 @@ module.exports = {
       assignableBehaviors: boot.modeRegistries.assignableBehaviors,
       modeHandlers: boot.modeHandlers,
       resetMovementState,
-      taskManager: TaskManager,
+      taskManager: api.getTaskManager(),
       flashHintArrowTaskFactory: boot.flashHintArrowTaskFactory,
     });
 
@@ -282,7 +278,6 @@ module.exports = {
       runtime: boot.runtime,
       behaviorMode: BOT_CONFIG.behaviorMode,
       playerPersistence: GameConstants.PLAYER_PERSISTENCE,
-      manualControlPacketOpcodes: BOT_CONFIG.manualControlPacketOpcodes,
       followBackTrigger: boot.followBackTrigger,
       combatReactionTrigger: boot.combatReactionTrigger,
       pathBlockedHandler: boot.pathBlockedHandler,

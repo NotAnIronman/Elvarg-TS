@@ -1,5 +1,4 @@
-const { CombatFactory, CanAttackResponse } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
-const { AreaManager } = require("../../src/main/typescript/elvarg/game/model/areas/AreaManager");
+const { CanAttackResponse } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
 const AGGRESSION_DISTANCE = 1;
@@ -219,9 +218,14 @@ function processRockCrab(npc, player, tracker, nowMs, api) {
   }
 }
 
+let CombatFactory;
+let AreaManager;
+
 module.exports = {
   name: "RockCrabs",
   register(api) {
+    CombatFactory = api.getCombatFactory();
+    AreaManager = api.getAreaManager();
     const npcState = new WeakMap();
     const playerProcessAt = new WeakMap();
     const wakeAttemptAt = new WeakMap();

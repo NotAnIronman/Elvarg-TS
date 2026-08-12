@@ -1,5 +1,4 @@
 const { CombatEquipment } = require("../../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
-const { registerMeleeHitModifier } = require("../../../src/main/typescript/elvarg/game/content/combat/EquipmentEffects");
 
 const OBSIDIAN_MULTIPLIER = 1.20;
 
@@ -13,6 +12,6 @@ function applyObsidianDamage(entity, baseHit) {
   return baseHit;
 }
 
-module.exports = function registerObsidianEffects() {
-  registerMeleeHitModifier(applyObsidianDamage);
+module.exports = function registerObsidianEffects(api) {
+  api.registerMeleeHitModifier(applyObsidianDamage);
 };

@@ -3,11 +3,17 @@ const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameCon
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
 const { Autocasting } = require("../../src/main/typescript/elvarg/game/content/combat/magic/Autocasting");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
 const {
   PlayerFlags,
   PlayerFlagAttributes,
 } = require("../../src/main/typescript/elvarg/game/entity/flags/PlayerFlags");
+
+let BonusManager;
+
+/** Called from each plugin that uses this module, before any preset state runs. */
+function initPresetsStateCoreAccess(api) {
+  BonusManager = api.getBonusManager();
+}
 
 function hasPresetSnapshot(player) {
   const snapshot = player?.getAttribute?.(PlayerFlagAttributes.PRESET_SNAPSHOT);
@@ -130,6 +136,7 @@ function restorePresetSnapshot(player, options = {}) {
 }
 
 module.exports = {
+  initPresetsStateCoreAccess,
   isPresetActive,
   hasPresetSnapshot,
   clearPresetState,

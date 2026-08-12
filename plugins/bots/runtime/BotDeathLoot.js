@@ -1,7 +1,5 @@
 "use strict";
 
-const { World } = require("../../../src/main/typescript/elvarg/game/World");
-const { ItemOnGroundManager } = require("../../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { Item } = require("../../../src/main/typescript/elvarg/game/model/Item");
 const { ItemIdentifiers } = require("../../../src/main/typescript/elvarg/util/ItemIdentifiers");
 const {
@@ -11,6 +9,15 @@ const {
 } = require("./BotRecruitConstants");
 const { PvpProfileId } = require("../behaviours/pvp/PvpProfileRegistry");
 const { buildPvpEquipmentDropPlan } = require("./BotPvpDeathDropFormula");
+
+let World = null;
+let ItemOnGroundManager = null;
+
+/** Called once from registerBotEvents.js, before any death-loot event fires. */
+function initBotDeathLootCoreAccess(api) {
+  World = api.getWorld();
+  ItemOnGroundManager = api.getItemOnGroundManager();
+}
 
 const PROFILE_LOOT_RULES = Object.freeze({
   [PvpProfileId.NOVICE]: Object.freeze({
@@ -172,6 +179,7 @@ function clearBotDeathLootPlan(victim) {
 }
 
 module.exports = {
+  initBotDeathLootCoreAccess,
   clearBotDeathLootPlan,
   handleBotDeathItemDrop,
 };

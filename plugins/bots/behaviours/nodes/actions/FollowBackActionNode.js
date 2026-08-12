@@ -1,6 +1,4 @@
-const { World } = require("../../../../../src/main/typescript/elvarg/game/World");
 const { GameConstants } = require("../../../../../src/main/typescript/elvarg/game/GameConstants");
-const { RegionManager } = require("../../../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Misc } = require("../../../../../src/main/typescript/elvarg/util/Misc");
 const { clearMovementRequest } = require("../../navigation/BotNavigation");
 const { setModeReturnHome } = require("../../state/PlayerBotState");
@@ -13,6 +11,8 @@ class FollowBackActionNode {
   constructor(botStatesByName, api, options) {
     this.botStatesByName = botStatesByName;
     this.api = api;
+    this.World = api.getWorld();
+    this.RegionManager = api.getRegionManager();
     this.behaviorMode = options.behaviorMode;
   }
 
@@ -36,7 +36,7 @@ class FollowBackActionNode {
       return "success";
     }
 
-    const followTarget = World.getPlayerByName(targetUsername);
+    const followTarget = this.World.getPlayerByName(targetUsername);
     if (!followTarget || !followTarget.isRegistered()) {
       setModeReturnHome(player, state, this.behaviorMode);
       this.api.log("follow_back_target_lost", {
@@ -83,7 +83,7 @@ class FollowBackActionNode {
 
     const tiles = [];
     for (const tile of followTarget.outterTiles?.() ?? []) {
-      if (RegionManager.blocked?.(tile, followTarget.getPrivateArea?.())) {
+      if (this.RegionManager.blocked?.(tile, followTarget.getPrivateArea?.())) {
         continue;
       }
       tiles.push(tile);

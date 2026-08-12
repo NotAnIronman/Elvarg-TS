@@ -1,4 +1,3 @@
-const { PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatType } = require("../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const { CombatEquipment } = require("../../src/main/typescript/elvarg/game/content/combat/CombatEquipment");
 const { AccuracyFormulasDpsCalc } = require("../../src/main/typescript/elvarg/game/content/combat/formula/AccuracyFormulasDpsCalc");
@@ -16,6 +15,13 @@ const DragonfireProtectionTier = Object.freeze({
 const PARTIAL_RESIST_MESSAGE = "You manage to resist some of the dragon fire.";
 const FULL_BURN_MESSAGE = "You're horribly burnt by the dragon fire!";
 const FULL_PROTECTION_MESSAGE = "You are completely protected from the dragon fire.";
+
+let PrayerHandler;
+
+/** Called from each plugin that uses this module, before any dragonfire logic runs. */
+function initDragonfireProtectionCoreAccess(api) {
+  PrayerHandler = api.getPrayerHandler();
+}
 
 function normalizeState(player, options = {}) {
   if (!player) {
@@ -152,6 +158,7 @@ function resolveChromaticDragonfireDamage(attacker, player, options = {}) {
 }
 
 module.exports = {
+  initDragonfireProtectionCoreAccess,
   ATTR_DRAGONFIRE_STATE,
   DragonfireProtectionTier,
   setDragonfireProtection,

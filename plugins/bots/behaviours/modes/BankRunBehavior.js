@@ -1,4 +1,3 @@
-const { PluginManager } = require("../../../../src/main/typescript/elvarg/plugins/PluginManager");
 const { MapObjects } = require("../../../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { Bank } = require("../../../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { Location } = require("../../../../src/main/typescript/elvarg/game/model/Location");
@@ -358,7 +357,7 @@ class BankRunBehavior {
         }
         const boothLoc = bankBooth.getLocation();
         player.setPositionToFace(boothLoc);
-        const handled = PluginManager.emitObjectInteraction({
+        const handled = this.api.emitObjectInteraction({
           player,
           object: bankBooth,
           objectId: bankBooth.getId(),

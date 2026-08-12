@@ -1,33 +1,26 @@
 const fs = require("fs");
 const path = require("path");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
-const { World } = require("../../src/main/typescript/elvarg/game/World");
 const { Server } = require("../../src/main/typescript/elvarg/Server");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
-const { SkillManager } = require("../../src/main/typescript/elvarg/game/content/skill/SkillManager");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
-const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ClanChatManager } = require("../interface/ClanChat.plugin");
 const { NpcDropDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader");
-const { RegionManager } = require("../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
 const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
-const { PlayerPunishment } = require("../../src/main/typescript/elvarg/util/PlayerPunishment");
 const { ServerLogger } = require("../../src/main/typescript/elvarg/util/ServerLogger");
 const {
   DefinitionLoader,
@@ -354,9 +347,24 @@ class UpdateTask extends Task {
   }
 }
 
+let World;
+let SkillManager;
+let ObjectManager;
+let CombatFactory;
+let TaskManager;
+let RegionManager;
+let PlayerPunishment;
+
 module.exports = {
   name: "AdminCommands",
   register(api) {
+    World = api.getWorld();
+    SkillManager = api.getSkillManager();
+    ObjectManager = api.getObjectManager();
+    CombatFactory = api.getCombatFactory();
+    TaskManager = api.getTaskManager();
+    RegionManager = api.getRegionManager();
+    PlayerPunishment = api.getPlayerPunishment();
     api.registerCommand("tele", ({ player, parts }) => {
       if (!requireRights(player, adminOrAbove)) {
         return true;

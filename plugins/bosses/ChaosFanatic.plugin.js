@@ -9,12 +9,10 @@ const { PendingHit } = require("../../src/main/typescript/elvarg/game/content/co
 const { HitDamage } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitDamage");
 const { HitMask } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitMask");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
-const { BonusManager } = require("../../src/main/typescript/elvarg/game/model/equipment/BonusManager");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
@@ -166,9 +164,14 @@ class ChaosFanaticCombatMethod extends CombatMethod {
   }
 }
 
+let TaskManager;
+let BonusManager;
+
 module.exports = {
   name: "ChaosFanatic",
   register(api) {
+    TaskManager = api.getTaskManager();
+    BonusManager = api.getBonusManager();
     api.registerNpcCombatMethodProvider(
       [NpcIdentifiers.CHAOS_FANATIC],
       ChaosFanaticCombatMethod,

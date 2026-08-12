@@ -2,11 +2,8 @@ const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
-const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
-const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
@@ -63,7 +60,15 @@ const TREES = [
     xpReward: 25,
     logId: ItemIds.LOGS,
     objectIds: [
-      ObjectIds.EVERGREEN_3,
+      ObjectIds.EVERGREEN_TREE,
+      ObjectIds.EVERGREEN_TREE_2,
+      ObjectIds.EVERGREEN_TREE_3,
+      ObjectIds.EVERGREEN_TREE_4,
+      ObjectIds.EVERGREEN_TREE_5,
+      ObjectIds.EVERGREEN_TREE_6,
+      ObjectIds.EVERGREEN_TREE_7,
+      ObjectIds.EVERGREEN_TREE_8,
+      ObjectIds.EVERGREEN_TREE_9,
       ObjectIds.JUNGLE_TREE_3,
       ObjectIds.TREE,
       ObjectIds.TREE_2,
@@ -613,9 +618,16 @@ class WoodcuttingTask extends Task {
   }
 }
 
+let TaskManager;
+let ObjectManager;
+let ItemOnGroundManager;
+
 module.exports = {
   name: "Woodcutting",
   register(api) {
+    TaskManager = api.getTaskManager();
+    ObjectManager = api.getObjectManager();
+    ItemOnGroundManager = api.getItemOnGroundManager();
     const activeSessions = new Map();
     activeSessionsRef = activeSessions;
 

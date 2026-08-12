@@ -9,7 +9,6 @@ const { HitDamage } = require("../../src/main/typescript/elvarg/game/content/com
 const { HitMask } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitMask");
 const { CombatType } = require("../../src/main/typescript/elvarg/game/content/combat/CombatType");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 
@@ -184,9 +183,12 @@ class CrazyArchaeologistCombatMethod extends CombatMethod {
   }
 }
 
+let TaskManager;
+
 module.exports = {
   name: "CrazyArchaeologist",
   register(api) {
+    TaskManager = api.getTaskManager();
     api.registerNpcCombatMethodProvider(
       [NpcIdentifiers.CRAZY_ARCHAEOLOGIST],
       CrazyArchaeologistCombatMethod,

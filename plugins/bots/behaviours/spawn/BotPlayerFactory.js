@@ -1,4 +1,3 @@
-const { World } = require("../../../../src/main/typescript/elvarg/game/World");
 const { Flag } = require("../../../../src/main/typescript/elvarg/game/model/Flag");
 const { Appearance } = require("../../../../src/main/typescript/elvarg/game/model/Appearance");
 const { Player } = require("../../../../src/main/typescript/elvarg/game/entity/impl/player/Player");
@@ -68,6 +67,7 @@ function buildRandomAppearanceLook() {
 function createBotPlayer(username, spawn, options = {}) {
   const loadPersistence = options.loadPersistence !== false;
   const saveRandomizedAppearance = options.saveRandomizedAppearance !== false;
+  const World = options.api.getWorld();
   const existing =
     World.getPlayerByName(username) ||
     World.getAddPlayerQueue().find((p) => p && p.getUsername() === username);

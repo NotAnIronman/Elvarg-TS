@@ -2,12 +2,60 @@
 
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
-const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
+const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
+const { CacheDefinitions } = require("../../src/main/typescript/elvarg/game/cache/CacheDefinitions");
 
-const CLOSED_DOOR_IDS = new Set([1535, 11727, 14749, 14751, 11775]);
+let ObjectManager;
+let TaskManager;
+
+// OSRS: an opened door/gate that nobody interacts with reverts on its own after
+// 300 seconds (500 ticks @ 600ms/tick). Cross-checked against rsmod/OpenRune-Server
+// (DoorConstants.DURATION = 500) and a from-scratch OSRS-parity server (DOOR_AUTO_CLOSE_TICKS).
+const DOOR_AUTO_CLOSE_TICKS = 500;
+
+// Single-door closed/open pairs are discovered from this server's own cache instead of a
+// hand-picked ID list: OSRS models every plain door as two consecutive loc ids where the
+// closed variant offers "Open" and closedId+1 offers "Close" (verified live against this
+// cache: e.g. 23972 "Door" Open -> 23973 "Door" Close). A hardcoded whitelist can only ever
+// cover the handful of doors someone happened to test; this covers all of them.
+function hasAction(actions, keyword) {
+  return Array.isArray(actions) && actions.some((action) => typeof action === "string" && action.toLowerCase() === keyword);
+}
+
+let DOOR_CATALOG = null;
+
+function buildDoorCatalog() {
+  const closedToOpen = new Map();
+  const openToClosed = new Map();
+  const total = CacheDefinitions.getCounts().objects;
+  for (let id = 0; id < total; id++) {
+    const def = CacheDefinitions.getObject(id);
+    if (!def || !hasAction(def.actions, "open")) {
+      continue;
+    }
+    const partner = CacheDefinitions.getObject(id + 1);
+    if (!partner || partner.name !== def.name) {
+      continue;
+    }
+    if (hasAction(partner.actions, "open") || !hasAction(partner.actions, "close")) {
+      continue;
+    }
+    closedToOpen.set(id, id + 1);
+    openToClosed.set(id + 1, id);
+  }
+  return { closedToOpen, openToClosed };
+}
+
+function getDoorCatalog() {
+  if (!DOOR_CATALOG) {
+    DOOR_CATALOG = buildDoorCatalog();
+  }
+  return DOOR_CATALOG;
+}
+
 const OPEN_OBJECT_STATES = new Map();
 const DOOR_RESYNC_TICKS_ATTR = "doors:resyncTicks";
 const DOUBLE_DOOR_ID_FAMILIES = Object.freeze([
@@ -100,8 +148,12 @@ function objectFromSnapshot(snapshot, privateArea = null) {
 }
 
 function resolveClosedId(objectId) {
-  const closedId = CLOSED_DOOR_IDS.has(objectId) ? objectId : objectId - 1;
-  return CLOSED_DOOR_IDS.has(closedId) ? closedId : null;
+  const catalog = getDoorCatalog();
+  if (catalog.closedToOpen.has(objectId)) {
+    return objectId;
+  }
+  const closedId = catalog.openToClosed.get(objectId);
+  return closedId ?? null;
 }
 
 function findOpenDoorState(closedId, location) {
@@ -128,10 +180,47 @@ function rememberOpenObjects(anchorKey, closedObjects, currentObjects) {
     closed: closedObjects.map(toObjectSnapshot),
     current: currentObjects.map(toObjectSnapshot),
   });
+  scheduleAutoClose(anchorKey);
 }
 
 function clearOpenDoor(anchorKey) {
   OPEN_OBJECT_STATES.delete(anchorKey);
+  TaskManager?.cancelTasks?.(anchorKey);
+}
+
+// Reverts every object tracked under an anchor back to its closed snapshot. Shared by
+// the auto-close task and (indirectly, via clearOpenDoor's cancellation) manual closes.
+class AutoCloseDoorTask extends Task {
+  constructor(delayTicks, anchorKey) {
+    super(Math.max(1, delayTicks), anchorKey);
+    this.anchorKey = anchorKey;
+  }
+
+  execute() {
+    const state = OPEN_OBJECT_STATES.get(this.anchorKey);
+    if (state) {
+      for (const snapshot of state.current ?? []) {
+        ObjectManager.deregister(objectFromSnapshot(snapshot), true);
+      }
+      for (const snapshot of state.closed ?? []) {
+        ObjectManager.register(objectFromSnapshot(snapshot), true);
+      }
+      OPEN_OBJECT_STATES.delete(this.anchorKey);
+      const closedSample = state.closed?.[0];
+      if (closedSample) {
+        Sounds.sendSound(objectFromSnapshot(closedSample), Sound.DOOR_CLOSE);
+      }
+    }
+    this.stop();
+  }
+}
+
+function scheduleAutoClose(anchorKey) {
+  if (!TaskManager) {
+    return;
+  }
+  TaskManager.cancelTasks(anchorKey);
+  TaskManager.submit(new AutoCloseDoorTask(DOOR_AUTO_CLOSE_TICKS, anchorKey));
 }
 
 function stateMatchesPlayer(player, state) {
@@ -240,6 +329,13 @@ function handleMappedDoor(player, object, objectId, location) {
   ObjectManager.register(nextObject, true);
   ObjectManager.deregister(previousObject, true);
   requestDoorResync(player);
+
+  console.warn(
+    `[door-debug] ${open ? "CLOSE" : "OPEN"} click id=${objectId} closedId=${closedId} ` +
+    `prev(id=${previousObject.getId()},loc=${previousObject.getLocation().getX()},${previousObject.getLocation().getY()},${previousObject.getLocation().getZ()},face=${previousObject.getFace()}) ` +
+    `next(id=${nextObject.getId()},loc=${nextObject.getLocation().getX()},${nextObject.getLocation().getY()},${nextObject.getLocation().getZ()},face=${nextObject.getFace()}) ` +
+    `postCheck=${MapObjects.get(nextObject.getId(), nextObject.getLocation(), privateArea) ? "FOUND" : "MISSING"}`
+  );
 
   if (open) {
     clearOpenDoor(anchorKey);
@@ -677,10 +773,14 @@ function handleDoubleDoor(player, object, objectId, location) {
 module.exports = {
   name: "Doors",
   register: (api) => {
+    ObjectManager = api.getObjectManager();
+    TaskManager = api.getTaskManager();
+    const catalog = getDoorCatalog();
     const doubleDoorIds = new Set(DOUBLE_DOOR_ID_FAMILIES.flat());
     const objectIds = [
       ...new Set([
-        ...[...CLOSED_DOOR_IDS].flatMap((closedId) => [closedId, closedId + 1]),
+        ...catalog.closedToOpen.keys(),
+        ...catalog.openToClosed.keys(),
         ...doubleDoorIds,
       ]),
     ];

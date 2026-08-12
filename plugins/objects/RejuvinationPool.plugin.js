@@ -2,7 +2,6 @@ const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
 const POOL_IDS = [
@@ -101,9 +100,12 @@ function restoreFromPool(player) {
   clearBleed(player);
 }
 
+let TaskManager;
+
 module.exports = {
   name: "RejuvinationPool",
   register(api) {
+    TaskManager = api.getTaskManager();
     api.onObjectFirstClick(POOL_IDS, (event) => {
       if (isRecentPvpCombat(event.player)) {
         event.player

@@ -1,5 +1,4 @@
 const { Location } = require("../../../src/main/typescript/elvarg/game/model/Location");
-const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Wilderness } = require("../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
 const {
   getEnabledWildernessHotspots,
@@ -55,6 +54,7 @@ function createBotRegistry(options) {
     entries: providedEntries,
     entriesByUsername: providedEntriesByUsername,
   } = options;
+  const RegionManager = botApi.getRegionManager();
   const applyForcedModeForDiagnosis =
     typeof applyForcedModeForDiagnosisFn === "function"
       ? applyForcedModeForDiagnosisFn
@@ -523,6 +523,7 @@ function createBotRegistry(options) {
     }
 
     const bot = createBotPlayer(username, botSpawn, {
+      api: botApi,
       loadPersistence: false,
       saveRandomizedAppearance: false,
     });
@@ -885,7 +886,7 @@ function createBotRegistry(options) {
       });
       const botSpawn = spawnLocationForIndex(spawn, spawnOffsets, i - 1);
       pendingSpawns.push(() => {
-        const bot = createBotPlayer(username, botSpawn);
+        const bot = createBotPlayer(username, botSpawn, { api: botApi });
         if (!bot) {
           return;
         }

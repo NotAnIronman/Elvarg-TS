@@ -1,9 +1,8 @@
 "use strict";
 
-const { AreaManager } = require("../../../../../src/main/typescript/elvarg/game/model/areas/AreaManager");
-
 class PvpValidateEngagementNode {
   constructor(options = {}) {
+    this.AreaManager = options.api.getAreaManager();
     this.behaviorMode = options.behaviorMode;
     this.setPhase = options.setPhase;
     this.stopPvp = options.stopPvp;
@@ -68,7 +67,7 @@ class PvpValidateEngagementNode {
     const targetTarget = targetCombat?.getTarget?.();
     const targetAttacker = targetCombat?.getAttacker?.();
     const targetFollowing = target.getCombatFollowing?.();
-    const isMultiEngagement = AreaManager.inMulti(player) && AreaManager.inMulti(target);
+    const isMultiEngagement = this.AreaManager.inMulti(player) && this.AreaManager.inMulti(target);
     const hasOtherOccupant =
       (!targetTarget || targetTarget === player
         ? false

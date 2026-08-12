@@ -1,6 +1,3 @@
-const { Packet } = require("../../src/main/typescript/elvarg/net/packet/Packet");
-const { PacketConstants } = require("../../src/main/typescript/elvarg/net/packet/PacketConstants");
-const { Inventory } = require("../../src/main/typescript/elvarg/game/model/container/impl/Inventory");
 const { ItemContainer } = require("../../src/main/typescript/elvarg/game/model/container/ItemContainer");
 const { StackType } = require("../../src/main/typescript/elvarg/game/model/container/StackType");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
@@ -9,30 +6,24 @@ const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 
-const OPEN_PRICE_CHECKER_BUTTON = 27651;
-const PRICE_CHECKER_WITHDRAW_ALL_BUTTON = 18255;
-const PRICE_CHECKER_DEPOSIT_ALL_BUTTON = 18252;
-const PRICE_CHECKER_INTERFACE_ID = 42000;
-const PRICE_CHECKER_CONTAINER_ID = 18500;
-const PRICE_CHECKER_INVENTORY_CONTAINER_ID = 3322;
-const PRICE_CHECKER_TEXT_START_ROW_1 = 18300;
-const PRICE_CHECKER_TEXT_START_ROW_2 = 18400;
-
-const CONTAINER_ACTION_OPCODES = [
-  PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.FOURTH_ITEM_CONTAINER_ACTION_OPCODE,
-  PacketConstants.FIFTH_ITEM_CONTAINER_ACTION_OPCODE,
-];
+// OpenRune cache names: interface.ge_pricechecker and interface.ge_pricechecker_side.
+const PRICE_CHECKER_INTERFACE_ID = 464;
+const PRICE_CHECKER_SIDE_INTERFACE_ID = 238;
+const PRICE_CHECKER_CONTAINER_ID = (PRICE_CHECKER_INTERFACE_ID << 16) | 2;
+const PRICE_CHECKER_INVENTORY_CONTAINER_ID = (PRICE_CHECKER_SIDE_INTERFACE_ID << 16) | 0;
+const OPEN_PRICE_CHECKER_BUTTON = (387 << 16) | 3; // component.wornitems:pricechecker
+const PRICE_CHECKER_DEPOSIT_ALL_BUTTON = (PRICE_CHECKER_INTERFACE_ID << 16) | 10; // component.ge_pricechecker:all
+const PRICE_CHECKER_OUTPUT = (PRICE_CHECKER_INTERFACE_ID << 16) | 12; // component.ge_pricechecker:output
+const PRICE_CHECKER_SLOTS = 28;
+const PRICE_CHECKER_ITEM_FLAGS = 1086; // Op1-5 and Op10, as interface.ge_pricechecker configures.
 
 class PriceCheckerContainer extends ItemContainer {
   constructor(player) {
-    super(player, 24);
+    super(player, PRICE_CHECKER_SLOTS);
   }
 
   capacity() {
-    return 24;
+    return PRICE_CHECKER_SLOTS;
   }
 
   stackType() {
@@ -53,61 +44,27 @@ class PriceCheckerContainer extends ItemContainer {
   }
 
   refreshItems() {
-    const items_ = this.getValidItems();
-    if (items_.length > 0) {
-      this.player
-        .getPacketSender()
-        .sendString("", 18355)
-        .sendString(Misc.insertCommasToNumber(this.getTotalValue()), 18351);
-
-      for (let i = 0; i < this.capacity(); i++) {
-        let itemPrice = "";
-        let totalPrice = "";
-
-        if (this.getItems()[i].isValid()) {
-          const value = this.getItems()[i].getDefinition().getValue();
-          const amount = this.getItems()[i].getAmount();
-          const total_price = value * amount;
-
-          if (total_price >= Number.MAX_SAFE_INTEGER) {
-            totalPrice = "Too High!";
-          } else {
-            totalPrice = " = " + Misc.insertCommasToNumber(String(total_price));
-          }
-
-          itemPrice =
-            "" + Misc.insertCommasToNumber(String(value)) + " x" + String(amount);
-        }
-
-        this.player
-          .getPacketSender()
-          .sendString(itemPrice, PRICE_CHECKER_TEXT_START_ROW_1 + i);
-        this.player
-          .getPacketSender()
-          .sendString(totalPrice, PRICE_CHECKER_TEXT_START_ROW_2 + i);
+    const prices = [];
+    let total = 0;
+    for (const item of this.getItems()) {
+      if (!item?.isValid?.()) {
+        prices.push(0);
+        continue;
       }
-    } else {
-      this.player
-        .getPacketSender()
-        .sendString(
-          "Click an item in your inventory to check it's wealth.",
-          18355
-        )
-        .sendString("0", 18351);
-
-      for (let i = 0; i < this.capacity(); i++) {
-        this.player
-          .getPacketSender()
-          .sendString("", PRICE_CHECKER_TEXT_START_ROW_1 + i);
-        this.player
-          .getPacketSender()
-          .sendString("", PRICE_CHECKER_TEXT_START_ROW_2 + i);
-      }
+      const value = Math.max(0, Math.min(0x7fffffff, Number(item.getDefinition().getValue()) || 0));
+      prices.push(value);
+      total += value * item.getAmount();
     }
-
     this.player
       .getPacketSender()
-      .sendInterfaceSet(PRICE_CHECKER_INTERFACE_ID, 3321);
+      .sendInterfaceSet(PRICE_CHECKER_INTERFACE_ID, PRICE_CHECKER_SIDE_INTERFACE_ID)
+      .sendInterfaceFlagsRange(PRICE_CHECKER_CONTAINER_ID, 0, PRICE_CHECKER_SLOTS - 1, PRICE_CHECKER_ITEM_FLAGS)
+      .sendInterfaceFlagsRange(PRICE_CHECKER_INVENTORY_CONTAINER_ID, 0, PRICE_CHECKER_SLOTS - 1, PRICE_CHECKER_ITEM_FLAGS)
+      .sendInterfaceScript(785, prices)
+      .sendString(
+        `Total guide price:<br><col=ffffff>${Misc.insertCommasToNumber(Math.min(total, Number.MAX_SAFE_INTEGER))}</col>`,
+        PRICE_CHECKER_OUTPUT
+      );
     this.player
       .getPacketSender()
       .sendItemContainer(this, PRICE_CHECKER_CONTAINER_ID);
@@ -125,24 +82,6 @@ class PriceCheckerContainer extends ItemContainer {
       .getPacketSender()
       .sendMessage("The pricechecker cannot hold any more items.");
     return this;
-  }
-
-  withdrawAll() {
-    if (
-      this.player.getStatus() == PlayerStatus.PRICE_CHECKING &&
-      this.player.getInterfaceId() == PRICE_CHECKER_INTERFACE_ID
-    ) {
-      let movedAny = false;
-      for (const item of this.getValidItems()) {
-        this.switchItems(this.player.getInventory(), item.clone(), false, false);
-        movedAny = true;
-      }
-      this.refreshItems();
-      this.player.getInventory().refreshItems();
-      if (movedAny) {
-        Sounds.sendSound(this.player, Sound.PICK_UP_ITEM);
-      }
-    }
   }
 
   depositAll() {
@@ -241,9 +180,6 @@ function handlePriceCheckerButton(player, buttonId) {
       }
       getPriceChecker(player)?.open();
       return true;
-    case PRICE_CHECKER_WITHDRAW_ALL_BUTTON:
-      getPriceChecker(player)?.withdrawAll();
-      return true;
     case PRICE_CHECKER_DEPOSIT_ALL_BUTTON:
       getPriceChecker(player)?.depositAll();
       return true;
@@ -252,331 +188,104 @@ function handlePriceCheckerButton(player, buttonId) {
   }
 }
 
-function handlePriceCheckerInterfaceAction(player, buttonId, action) {
+// Deposit quantity per right-click option, matching OSRS's Deposit-1/5/10/All/X
+// convention. clickType 5 (X) prompts for a custom amount instead of a fixed one.
+// This is the same clickType numbering ItemActionPacketListener.handleAction and
+// InterfaceActionClickOpcode.handle both use for "which of the 5 right-click
+// options was chosen" - see BankDepositBooth.plugin.js for the identical pattern.
+const AMOUNT_BY_CLICK_TYPE = { 1: 1, 2: 5, 3: 10, 4: Number.MAX_SAFE_INTEGER };
+
+function handlePriceCheckerDeposit(player, itemId, slot, clickType) {
   if (player?.getInterfaceId?.() !== PRICE_CHECKER_INTERFACE_ID) {
     return false;
   }
-
-  if (buttonId !== PRICE_CHECKER_INTERFACE_ID) {
+  const item = player.getInventory()?.getItems?.()[slot];
+  if (!item || item.getId() !== itemId) {
     return false;
   }
 
-  if (action === 0 || action === 1) {
-    getPriceChecker(player)?.depositAll();
-    return true;
-  }
-
-  if (action === 2) {
-    getPriceChecker(player)?.withdrawAll();
-    return true;
-  }
-
-  return false;
-}
-
-function decodeContainerAction(opcode, payload) {
-  const packet = new Packet(opcode, payload);
-  switch (opcode) {
-    case PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        interfaceId: packet.readInt(),
-        slot: packet.readShortA(),
-        itemId: packet.readShortA(),
-        amountType: "fixed",
-        amount: 1,
-      };
-    case PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        interfaceId: packet.readInt(),
-        itemId: packet.readLEShortA(),
-        slot: packet.readLEShort(),
-        amountType: "fixed",
-        amount: 5,
-      };
-    case PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        interfaceId: packet.readInt(),
-        itemId: packet.readShortA(),
-        slot: packet.readShortA(),
-        amountType: "fixed",
-        amount: 10,
-      };
-    case PacketConstants.FOURTH_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        slot: packet.readShortA(),
-        interfaceId: packet.readInt(),
-        itemId: packet.readShortA(),
-        amountType: "all",
-      };
-    case PacketConstants.FIFTH_ITEM_CONTAINER_ACTION_OPCODE:
-      return {
-        interfaceId: packet.readInt(),
-        slot: packet.readLEShort(),
-        itemId: packet.readLEShort(),
-        amountType: "x",
-      };
-    default:
-      return null;
-  }
-}
-
-function normalizeItemId(itemId) {
-  if (!Number.isInteger(itemId)) {
-    return -1;
-  }
-  return itemId < 0 ? itemId + 0x10000 : itemId;
-}
-
-function readShortVariants(payload, offset) {
-  if (!Buffer.isBuffer(payload) || payload.length < offset + 2) {
-    return [];
-  }
-
-  const be = payload.readInt16BE(offset);
-  const le = payload.readInt16LE(offset);
-  const shortA = (((payload[offset] & 0xff) << 8) | ((payload[offset + 1] - 128) & 0xff));
-  const shortASigned = shortA > 32767 ? shortA - 0x10000 : shortA;
-  const leShortA = (((payload[offset] - 128) & 0xff) | ((payload[offset + 1] & 0xff) << 8));
-  const leShortASigned = leShortA > 32767 ? leShortA - 0x10000 : leShortA;
-
-  return [...new Set([be, le, shortASigned, leShortASigned])];
-}
-
-function matchSlotAndItem(container, candidates) {
-  const items = container?.getItems?.();
-  const capacity = container?.capacity?.();
-  if (!items || !Number.isInteger(capacity) || capacity <= 0) {
-    return null;
-  }
-
-  for (const candidate of candidates) {
-    const slot = candidate.slot;
-    const itemId = normalizeItemId(candidate.itemId);
-    if (!Number.isInteger(slot) || slot < 0 || slot >= capacity || itemId <= 0) {
-      continue;
-    }
-    const slotItemId = items?.[slot]?.getId?.();
-    if (slotItemId === itemId || slotItemId === candidate.itemId) {
-      return { slot, itemId };
-    }
-  }
-
-  return null;
-}
-
-function buildContainerCandidates(opcode, payload, fallback) {
-  const slotOffsetsByOpcode = {
-    [PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE]: 4,
-    [PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-    [PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-    [PacketConstants.FOURTH_ITEM_CONTAINER_ACTION_OPCODE]: 0,
-    [PacketConstants.FIFTH_ITEM_CONTAINER_ACTION_OPCODE]: 4,
-  };
-  const itemOffsetsByOpcode = {
-    [PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-    [PacketConstants.SECOND_ITEM_CONTAINER_ACTION_OPCODE]: 4,
-    [PacketConstants.THIRD_ITEM_CONTAINER_ACTION_OPCODE]: 4,
-    [PacketConstants.FOURTH_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-    [PacketConstants.FIFTH_ITEM_CONTAINER_ACTION_OPCODE]: 6,
-  };
-
-  const slotOffset = slotOffsetsByOpcode[opcode];
-  const itemOffset = itemOffsetsByOpcode[opcode];
-  const candidates = [];
-  const seen = new Set();
-  const pushCandidate = (slot, itemId) => {
-    const key = `${slot}:${itemId}`;
-    if (seen.has(key)) {
-      return;
-    }
-    seen.add(key);
-    candidates.push({ slot, itemId });
-  };
-
-  pushCandidate(fallback.slot, fallback.itemId);
-  if (!Number.isInteger(slotOffset) || !Number.isInteger(itemOffset)) {
-    return candidates;
-  }
-
-  const slotVariants = readShortVariants(payload, slotOffset);
-  const itemVariants = readShortVariants(payload, itemOffset);
-  for (const slot of slotVariants) {
-    for (const itemId of itemVariants) {
-      pushCandidate(slot, itemId);
-      if (opcode === PacketConstants.FIRST_ITEM_CONTAINER_ACTION_OPCODE) {
-        pushCandidate(itemId, slot);
-      }
-    }
-  }
-
-  return candidates;
-}
-
-function resolveContainerForInterface(player, interfaceId) {
-  if (interfaceId === PRICE_CHECKER_CONTAINER_ID) {
-    return getPriceChecker(player);
-  }
-
-  const isPriceCheckerInventoryInterface =
-    interfaceId === PRICE_CHECKER_INVENTORY_CONTAINER_ID ||
-    (interfaceId === Inventory.INTERFACE_ID &&
-      player?.getInterfaceId?.() === PRICE_CHECKER_INTERFACE_ID);
-  if (isPriceCheckerInventoryInterface) {
-    return player.getInventory();
-  }
-
-  return null;
-}
-
-function resolveContainerSlotAndItem(player, interfaceId, opcode, payload, fallback) {
-  const container = resolveContainerForInterface(player, interfaceId);
-  const candidates = buildContainerCandidates(opcode, payload, fallback);
-  if (!container) {
-    return {
-      slot: fallback.slot,
-      itemId: normalizeItemId(fallback.itemId),
-      matched: null,
-    };
-  }
-
-  const matched = matchSlotAndItem(container, candidates);
-  if (matched) {
-    return { ...matched, matched: true };
-  }
-
-  return {
-    slot: fallback.slot,
-    itemId: normalizeItemId(fallback.itemId),
-    matched: false,
-  };
-}
-
-function handlePriceCheckerContainerAction(player, opcode, payload) {
-  const decoded = decodeContainerAction(opcode, payload);
-  if (!decoded) {
-    return false;
-  }
-
-  const resolved = resolveContainerSlotAndItem(
-    player,
-    decoded.interfaceId,
-    opcode,
-    payload,
-    { slot: decoded.slot, itemId: decoded.itemId }
-  );
-  decoded.slot = resolved.slot;
-  decoded.itemId = resolved.itemId;
-
-  let isInventorySide =
-    decoded.interfaceId === PRICE_CHECKER_INVENTORY_CONTAINER_ID ||
-    (decoded.interfaceId === Inventory.INTERFACE_ID &&
-      player?.getInterfaceId?.() === PRICE_CHECKER_INTERFACE_ID);
-  let isCheckerSide = decoded.interfaceId === PRICE_CHECKER_CONTAINER_ID;
-
-  if (!isInventorySide && !isCheckerSide && player?.getInterfaceId?.() === PRICE_CHECKER_INTERFACE_ID) {
-    const fallbackCandidates = buildContainerCandidates(opcode, payload, {
-      slot: decoded.slot,
-      itemId: decoded.itemId,
-    });
-    const inventoryMatch = matchSlotAndItem(player.getInventory(), fallbackCandidates);
-    const checkerMatch = matchSlotAndItem(
-      getPriceChecker(player),
-      fallbackCandidates
-    );
-    if (inventoryMatch && !checkerMatch) {
-      isInventorySide = true;
-      decoded.slot = inventoryMatch.slot;
-      decoded.itemId = inventoryMatch.itemId;
-    } else if (checkerMatch && !inventoryMatch) {
-      isCheckerSide = true;
-      decoded.slot = checkerMatch.slot;
-      decoded.itemId = checkerMatch.itemId;
-    }
-  }
-
-  if (!isInventorySide && !isCheckerSide) {
-    return false;
-  }
-  if (!Number.isInteger(decoded.slot) || decoded.slot < 0 || decoded.itemId <= 0) {
-    return false;
-  }
-
-  if (decoded.amountType === "x") {
+  const fixedAmount = AMOUNT_BY_CLICK_TYPE[clickType];
+  if (fixedAmount === undefined) {
     player.setEnteredAmountAction({
-      execute: (amount) => {
-        if (!Number.isInteger(amount) || amount <= 0) {
-          return;
+      execute: (entered) => {
+        if (Number.isInteger(entered) && entered > 0) {
+          getPriceChecker(player)?.deposit(itemId, entered, slot);
         }
-        const priceChecker = getPriceChecker(player);
-        if (!priceChecker) {
-          return;
-        }
-        if (isInventorySide) {
-          priceChecker.deposit(decoded.itemId, amount, decoded.slot);
-          return;
-        }
-        priceChecker.withdraw(decoded.itemId, amount, decoded.slot);
       },
     });
-    player
-      .getPacketSender()
-      .sendEnterAmountPrompt(
-        isInventorySide
-          ? "How many would you like to deposit?"
-          : "How many would you like to withdraw?"
-      );
+    player.getPacketSender().sendEnterAmountPrompt("How many would you like to deposit?");
     return true;
   }
 
-  let amount = decoded.amount;
-  if (decoded.amountType === "all") {
-    amount = isInventorySide
-      ? player.getInventory().getAmount(decoded.itemId)
-      : getPriceChecker(player)?.getAmount?.(decoded.itemId) ?? 0;
+  const amount = Math.min(fixedAmount, item.getAmount());
+  if (amount > 0) {
+    getPriceChecker(player)?.deposit(itemId, amount, slot);
   }
-  if (!Number.isInteger(amount) || amount <= 0) {
+  return true;
+}
+
+function handlePriceCheckerWithdraw(player, itemId, slot, clickType) {
+  if (player?.getInterfaceId?.() !== PRICE_CHECKER_INTERFACE_ID) {
+    return false;
+  }
+  const priceChecker = getPriceChecker(player);
+  const item = priceChecker?.getItems?.()[slot];
+  if (!item || item.getId() !== itemId) {
+    return false;
+  }
+
+  const fixedAmount = AMOUNT_BY_CLICK_TYPE[clickType];
+  if (fixedAmount === undefined) {
+    player.setEnteredAmountAction({
+      execute: (entered) => {
+        if (Number.isInteger(entered) && entered > 0) {
+          getPriceChecker(player)?.withdraw(itemId, entered, slot);
+        }
+      },
+    });
+    player.getPacketSender().sendEnterAmountPrompt("How many would you like to withdraw?");
     return true;
   }
 
-  if (isInventorySide) {
-    getPriceChecker(player)?.deposit(decoded.itemId, amount, decoded.slot);
-    return true;
+  const amount = Math.min(fixedAmount, item.getAmount());
+  if (amount > 0) {
+    priceChecker.withdraw(itemId, amount, slot);
   }
-
-  getPriceChecker(player)?.withdraw(decoded.itemId, amount, decoded.slot);
   return true;
 }
 
 module.exports = {
   name: "PriceChecker",
   register(api) {
-    const PRICE_CHECKER_BUTTONS = [
-      OPEN_PRICE_CHECKER_BUTTON,
-      PRICE_CHECKER_WITHDRAW_ALL_BUTTON,
-      PRICE_CHECKER_DEPOSIT_ALL_BUTTON,
-    ];
-
-    api.onButton(
-      PRICE_CHECKER_BUTTONS,
+    api.onInterfaceActionButton(
+      [OPEN_PRICE_CHECKER_BUTTON, PRICE_CHECKER_DEPOSIT_ALL_BUTTON],
       ({ player, buttonId }) => handlePriceCheckerButton(player, buttonId)
     );
 
-    api.onInterfaceActionButton(
-      PRICE_CHECKER_BUTTONS,
-      ({ player, buttonId }) => handlePriceCheckerButton(player, buttonId)
-    );
-
-    api.onInterfaceActionButton(
-      PRICE_CHECKER_INTERFACE_ID,
-      ({ player, buttonId, action }) =>
-        handlePriceCheckerInterfaceAction(player, buttonId, action)
-    );
-
-    api.onEstablishedPacket(({ opcode, packet, player }) => {
-      if (!CONTAINER_ACTION_OPCODES.includes(opcode)) {
+    // Clicking an item in the price checker's own inventory-mirror panel
+    // (widget PRICE_CHECKER_INVENTORY_CONTAINER_ID) always matches the
+    // player's real inventory slot-for-slot, so the live widget_action
+    // dispatch (NetworkBuilder.ts) routes it through the same inventory
+    // item-click path as any other inventory click.
+    api.onItemAction((event) => {
+      if (event.interfaceId !== PRICE_CHECKER_INVENTORY_CONTAINER_ID) {
         return;
       }
-      handlePriceCheckerContainerAction(player, opcode, packet.getBuffer());
+      if (handlePriceCheckerDeposit(event.player, event.itemId, event.slot, event.clickType)) {
+        event.handled = true;
+      }
     });
+
+    // The price checker's own container never matches a real inventory slot,
+    // so those clicks fall through to the generic interface-action path instead.
+    api.onInterfaceActionButton(
+      PRICE_CHECKER_CONTAINER_ID,
+      ({ player, action, itemId, slot }) => {
+        if (itemId == null || slot == null) {
+          return false;
+        }
+        return handlePriceCheckerWithdraw(player, itemId, slot, action);
+      }
+    );
   },
 };

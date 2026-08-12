@@ -2,10 +2,8 @@ const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
-const { ObjectManager } = require("../../src/main/typescript/elvarg/game/entity/impl/object/ObjectManager");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
@@ -244,6 +242,9 @@ class MiningTask extends Task {
   }
 }
 
+let TaskManager;
+let ObjectManager;
+
 module.exports = {
   name: "Mining",
   PICKAXES,
@@ -254,6 +255,8 @@ module.exports = {
     return ACTIVE_MINERS.has(player);
   },
   register(api) {
+    TaskManager = api.getTaskManager();
+    ObjectManager = api.getObjectManager();
     const activeSessions = new Map();
     TaskManager.submit(new MiningTask(activeSessions));
 

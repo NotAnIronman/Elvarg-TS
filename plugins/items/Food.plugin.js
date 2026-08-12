@@ -4,7 +4,7 @@ const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
-const { PluginManager } = require("../../src/main/typescript/elvarg/plugins/PluginManager");
+let pluginApi;
 const { ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
@@ -65,7 +65,7 @@ function getAnglerfishHeal(currentHp) {
 }
 
 function canEat(player, itemId) {
-  const pluginDecision = PluginManager.emitCanEat(player, itemId);
+  const pluginDecision = pluginApi.emitCanEat(player, itemId);
   if (pluginDecision === false) {
     return false;
   }
@@ -83,6 +83,7 @@ module.exports = {
     return FOOD.has(itemId);
   },
   register(api) {
+    pluginApi = api;
     api.onItemFirstAction((event) => {
       const { player, itemId, slot } = event;
       const food = FOOD.get(itemId);

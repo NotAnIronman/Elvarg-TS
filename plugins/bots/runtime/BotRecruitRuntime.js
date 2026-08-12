@@ -1,7 +1,6 @@
 "use strict";
 
 const { GameConstants } = require("../../../src/main/typescript/elvarg/game/GameConstants");
-const { RegionManager } = require("../../../src/main/typescript/elvarg/game/collision/RegionManager");
 const { Misc } = require("../../../src/main/typescript/elvarg/util/Misc");
 const {
   isPvpOnlyBotState,
@@ -13,6 +12,13 @@ const {
   ATTR_RECRUIT_RETURN_AFTER_DEATH_AT,
   ATTR_RECRUIT_OWNER_MISSING_SINCE,
 } = require("./BotRecruitConstants");
+
+let RegionManager = null;
+
+/** Called once from PlayerBots.plugin.js's register(api), before any bot behavior runs. */
+function initBotRecruitRuntimeCoreAccess(api) {
+  RegionManager = api.getRegionManager();
+}
 
 function alignBotToOwnerArea(bot, owner) {
   if (!bot || !owner || bot.getPrivateArea?.() === owner.getPrivateArea?.()) {
@@ -142,6 +148,7 @@ function releaseRecruitedBotToAutonomy(
 }
 
 module.exports = {
+  initBotRecruitRuntimeCoreAccess,
   alignBotToOwnerArea,
   armRecruitFollowBack,
   recallRecruitedBot,

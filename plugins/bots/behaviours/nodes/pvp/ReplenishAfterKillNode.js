@@ -2,8 +2,6 @@
 
 const { PvpProfileId } = require("../../pvp/PvpProfileRegistry");
 const { isVisibleRealPlayer } = require("../../pvp/PvpTargetFilters");
-const { PrayerHandler } = require("../../../../../src/main/typescript/elvarg/game/content/PrayerHandler");
-const { CombatFactory } = require("../../../../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { EatFoodActionNode } = require("../actions/EatFoodActionNode");
 
 const PROTECTION_DURATION_MS = 10_000;
@@ -11,6 +9,9 @@ const RUNNING = Object.freeze({ handled: false, status: "running" });
 
 class ReplenishAfterKillNode {
   constructor(botStatesByName, api) {
+    this.api = api;
+    this.PrayerHandler = api.getPrayerHandler();
+    this.CombatFactory = api.getCombatFactory();
     this.eatFoodActionNode = new EatFoodActionNode(botStatesByName, api);
   }
 
@@ -41,9 +42,9 @@ class ReplenishAfterKillNode {
     const prayerId =
       profileId === PvpProfileId.ELITE
         ? this.resolveProtectPrayerForTarget(closestRealPlayer)
-        : PrayerHandler.PROTECT_FROM_MELEE;
+        : this.PrayerHandler.PROTECT_FROM_MELEE;
 
-    PrayerHandler.activatePrayerPrayerId(player, prayerId);
+    this.PrayerHandler.activatePrayerPrayerId(player, prayerId);
     pvp.replenishPrayerId = prayerId;
     pvp.replenishPrayerUntil = Date.now() + PROTECTION_DURATION_MS;
     return RUNNING;
@@ -55,8 +56,8 @@ class ReplenishAfterKillNode {
       return;
     }
     const prayerId = Number(pvp?.replenishPrayerId);
-    if (Number.isInteger(prayerId) && PrayerHandler.isActivated(player, prayerId)) {
-      PrayerHandler.deactivatePrayer(player, prayerId);
+    if (Number.isInteger(prayerId) && this.PrayerHandler.isActivated(player, prayerId)) {
+      this.PrayerHandler.deactivatePrayer(player, prayerId);
     }
     pvp.replenishPrayerId = null;
     pvp.replenishPrayerUntil = 0;
@@ -84,10 +85,10 @@ class ReplenishAfterKillNode {
   }
 
   resolveProtectPrayerForTarget(target) {
-    const combatType = CombatFactory.getMethod(target)?.type?.();
+    const combatType = this.CombatFactory.getMethod(target)?.type?.();
     return Number.isInteger(combatType)
-      ? PrayerHandler.getProtectingPrayer(combatType)
-      : PrayerHandler.PROTECT_FROM_MELEE;
+      ? this.PrayerHandler.getProtectingPrayer(combatType)
+      : this.PrayerHandler.PROTECT_FROM_MELEE;
   }
 }
 

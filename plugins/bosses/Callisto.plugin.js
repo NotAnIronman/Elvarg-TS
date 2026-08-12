@@ -8,9 +8,7 @@ const { PendingHit } = require("../../src/main/typescript/elvarg/game/content/co
 const { Projectile } = require("../../src/main/typescript/elvarg/game/model/Projectile");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
-const { CombatFactory } = require("../../src/main/typescript/elvarg/game/content/combat/CombatFactory");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
-const { TaskManager } = require("../../src/main/typescript/elvarg/game/task/TaskManager");
 const { ForceMovementTask } = require("../../src/main/typescript/elvarg/game/task/impl/ForceMovementTask");
 const { ForceMovement } = require("../../src/main/typescript/elvarg/game/model/ForceMovement");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
@@ -101,9 +99,14 @@ class CallistoCombatMethod extends CombatMethod {
   }
 }
 
+let CombatFactory;
+let TaskManager;
+
 module.exports = {
   name: "Callisto",
   register(api) {
+    CombatFactory = api.getCombatFactory();
+    TaskManager = api.getTaskManager();
     api.registerNpcCombatMethodProvider(
       [NpcIdentifiers.CALLISTO],
       CallistoCombatMethod,

@@ -1,5 +1,4 @@
 const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
-const { ItemOnGroundManager } = require("../../src/main/typescript/elvarg/game/entity/impl/grounditem/ItemOnGroundManager");
 const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 
@@ -36,9 +35,12 @@ function toLocation(rawLocation, fallbackLocation) {
   return fallbackLocation ?? null;
 }
 
+let ItemOnGroundManager;
+
 module.exports = {
   name: "Emblems",
   register(api) {
+    ItemOnGroundManager = api.getItemOnGroundManager();
     api.onShouldKeepItemOnDeath((event) => {
       const itemId = event.item?.getId?.();
       if (!isEmblemItemId(itemId)) {
