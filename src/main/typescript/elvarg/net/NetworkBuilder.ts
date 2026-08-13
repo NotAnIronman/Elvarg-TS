@@ -15,6 +15,11 @@ import { WebSocketBinaryChannel } from "./BinaryChannel";
 import { PlayerSession } from "./PlayerSession";
 import { CachePipeline } from "../game/cache/CachePipeline";
 import { CacheDefinitions } from "../game/cache/CacheDefinitions";
+import {
+  CREATION_MENU_GROUP_ID,
+  CREATION_MENU_FIRST_ITEM_COMPONENT,
+  CREATION_MENU_MAX_QUANTITY,
+} from "./packet/PacketSender";
 import { MapRegionReplacementManager } from "../game/collision/MapRegionReplacementManager";
 import {
   decodeClientPackets,
@@ -278,7 +283,30 @@ class ClientConnection {
             ChatPacketListener.handleText(this.player, packet.text);
           }
           continue;
-        case "dialogue_continue":
+        case "dialogue_continue": {
+          // Skillmulti item clicks (smelting, creation menus, ...) route through this packet
+          // rather than widget_action - childIndex carries the literal chosen quantity
+          // (confirmed against the client's skillmulti_itembutton_triggered script, which
+          // sends get_varc_int 200 as the resume_pausebutton argument), not an op index.
+          const creationMenu = this.player?.getCreationMenu?.();
+          const creationGroupId = packet.widgetId >>> 16;
+          const creationChildId = packet.widgetId & 0xffff;
+          if (
+            this.player &&
+            creationMenu &&
+            creationGroupId === CREATION_MENU_GROUP_ID &&
+            creationChildId >= CREATION_MENU_FIRST_ITEM_COMPONENT
+          ) {
+            const itemId = creationMenu.getItems()[creationChildId - CREATION_MENU_FIRST_ITEM_COMPONENT];
+            if (Number.isInteger(itemId)) {
+              const amount = Number.isInteger(packet.childIndex) && packet.childIndex > 0
+                ? Math.min(packet.childIndex, CREATION_MENU_MAX_QUANTITY)
+                : 1;
+              this.player.getPacketSender().closeCreationMenu();
+              creationMenu.execute(itemId, amount);
+              continue;
+            }
+          }
           if (this.player && PluginManager.emitInterfaceActionClick({
             player: this.player,
             buttonId: packet.widgetId,
@@ -293,6 +321,7 @@ class ClientConnection {
             this.player.getDialogueManager().advance();
           }
           continue;
+        }
         case "dialogue_amount": {
           const action = this.player?.getEnteredAmountAction();
           if (action && packet.amount > 0) action.execute(packet.amount);

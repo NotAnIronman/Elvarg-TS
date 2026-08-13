@@ -58,7 +58,18 @@ import {
   WORLD_MAP_GROUP_ID,
   WORLD_MAP_TARGET_UID,
 } from "../protocol/WorldMapProtocol";
+import { CacheDefinitions } from "../../game/cache/CacheDefinitions";
 const CHATBOX_MODAL_TARGET_UID = (162 << 16) | 567;
+// The native OSRS "skillmulti" production list (clientscript 2046, group 270) mounted into
+// the chatbox modal slot - same interface smelting/smithing use. Exported so NetworkBuilder
+// can recognize clicks against it without duplicating these numbers.
+export const CREATION_MENU_GROUP_ID = 270;
+export const CREATION_MENU_FIRST_ITEM_COMPONENT = 15;
+export const CREATION_MENU_MAX_QUANTITY = 28;
+export const CREATION_MENU_CHATMODAL_UNCLAMP_VARBIT = 10670;
+// Widget transmit flags: bit (opIndex+1) must be set for that op to reach the server (see
+// WidgetActionRouter.shouldTransmitAction on the client) - ops 1-5 are Make 1/5/10/X/All.
+const CREATION_MENU_OP_FLAGS = (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5);
 
 export class PacketSender {
   private groundItemSerial = 0;
@@ -821,6 +832,10 @@ export class PacketSender {
     return this;
   }
 
+  // Mounts the same native "skillmulti" production list (clientscript 2046, group 270) that
+  // smelting/smithing already use successfully - the previous implementation wrote a raw
+  // legacy opcode via PlayerSession.write(), which is an unported no-op stub, so the menu
+  // never reached the client at all.
   sendCreationMenu(menu: any): this {
     if (
       !menu ||
@@ -831,23 +846,40 @@ export class PacketSender {
     }
 
     const rawItems = menu.getItems();
-    const items = Array.isArray(rawItems)
-      ? rawItems.filter((id: unknown) => Number.isInteger(id))
-      : [];
+    const items = (Array.isArray(rawItems) ? rawItems.filter((id: unknown) => Number.isInteger(id)) : [])
+      .slice(0, 18);
     if (items.length <= 0) {
       return this;
     }
 
     this.player.setCreationMenu?.(menu);
-    this.sendString(String(menu.getTitle() ?? "What would you like to make?"), 31104);
+    const names = items.map((id: number) => CacheDefinitions.getItem(id)?.name || "null");
+    const paddedIds = [...items];
+    while (paddedIds.length < 18) paddedIds.push(-1);
 
-    const out = new PacketBuilder(167, PacketType.VARIABLE);
-    out.put(items.length);
-    for (const itemId of items) {
-      out.putInt(itemId);
+    this.sendInterfaceScript(2379)
+      .sendVarbit(CREATION_MENU_CHATMODAL_UNCLAMP_VARBIT, 1)
+      .sendInterfaceDisplayState(CHATBOX_MODAL_TARGET_UID, false)
+      .sendSubInterface(CHATBOX_MODAL_TARGET_UID, CREATION_MENU_GROUP_ID, 0);
+    for (let i = 0; i < items.length; i++) {
+      const buttonId = (CREATION_MENU_GROUP_ID << 16) | (CREATION_MENU_FIRST_ITEM_COMPONENT + i);
+      this.sendInterfaceFlagsRange(buttonId, 0, CREATION_MENU_MAX_QUANTITY, CREATION_MENU_OP_FLAGS);
     }
-    this.player.getSession().write(out);
+    this.sendInterfaceScript(2046, [
+      13,
+      [String(menu.getTitle() ?? "What would you like to make?"), ...names].join("|"),
+      CREATION_MENU_MAX_QUANTITY,
+      ...paddedIds,
+      CREATION_MENU_MAX_QUANTITY,
+    ]);
     return this;
+  }
+
+  closeCreationMenu(): this {
+    this.player.setCreationMenu?.(null);
+    return this
+      .closeSubInterface(CHATBOX_MODAL_TARGET_UID)
+      .sendInterfaceDisplayState(CHATBOX_MODAL_TARGET_UID, true);
   }
 
   alterGroundItem(item: any): this {
