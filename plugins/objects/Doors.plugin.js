@@ -331,7 +331,7 @@ function handleMappedDoor(player, object, objectId, location) {
   requestDoorResync(player);
 
   console.warn(
-    `[door-debug] ${open ? "CLOSE" : "OPEN"} click id=${objectId} closedId=${closedId} ` +
+    `[door-debug] user=${player.isPlayerBot?.() ? "BOT:" + player.getUsername?.() : player.getUsername?.()} ${open ? "CLOSE" : "OPEN"} click id=${objectId} closedId=${closedId} ` +
     `prev(id=${previousObject.getId()},loc=${previousObject.getLocation().getX()},${previousObject.getLocation().getY()},${previousObject.getLocation().getZ()},face=${previousObject.getFace()}) ` +
     `next(id=${nextObject.getId()},loc=${nextObject.getLocation().getX()},${nextObject.getLocation().getY()},${nextObject.getLocation().getZ()},face=${nextObject.getFace()}) ` +
     `postCheck=${MapObjects.get(nextObject.getId(), nextObject.getLocation(), privateArea) ? "FOUND" : "MISSING"}`
