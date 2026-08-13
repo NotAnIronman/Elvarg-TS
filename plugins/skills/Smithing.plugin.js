@@ -45,6 +45,22 @@ const SMITHING_BUTTON_IDS = new Set(
     (component) => (SMITHING_INTERFACE_ID << 16) | component
   )
 );
+// Widget transmit flags: bit (opIndex+1) must be set for that right-click op to reach the
+// server (see WidgetActionRouter.shouldTransmitAction on the client). The skillmulti list
+// exposes 5 ops per item - Make 1/5/10/X/All - so ops 1-5 (bits 1-5) all need to be enabled;
+// leaving only bit 1 set (as before) silently dropped every click except plain "Make 1".
+const SMELTING_SKILLMULTI_OP_FLAGS = (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5);
+// This list is routed through the mesLayer "continue" packet (cc_resume_pausebutton, per the
+// cache's skillmulti_itembutton_triggered script). Disassembly shows that opcode's childIndex
+// argument is `get_varc_int 200` - the client's own "currently selected quantity" var - sent
+// as the literal number, not an op/menu index. The quantity-mode buttons (1/5/10/All) and the
+// native X text box (if_setonkey) all just write that var client-side; by the time an item is
+// clicked, `action` already is the exact quantity to make. A bare/no-mode click sends 0.
+function quantityForSmeltAction(action) {
+  return Number.isInteger(action) && action > 0
+    ? Math.min(action, SMELTING_SKILLMULTI_MAX_QUANTITY)
+    : 1;
+}
 const SMELTING_INTERVAL_TICKS = 5;
 const SMITHING_INTERVAL_TICKS = 5;
 const CANNONBALL_SMITHING_INTERVAL_TICKS = 8;
@@ -400,7 +416,7 @@ function openSmeltingInterface(player) {
       0
   );
   for (const buttonId of SMELTING_SKILLMULTI_BUTTON_IDS) {
-    sender.sendInterfaceFlagsRange(buttonId, 0, SMELTING_SKILLMULTI_MAX_QUANTITY, 2);
+    sender.sendInterfaceFlagsRange(buttonId, 0, SMELTING_SKILLMULTI_MAX_QUANTITY, SMELTING_SKILLMULTI_OP_FLAGS);
   }
   sender.sendInterfaceScript(2046, [
     13,
@@ -788,6 +804,8 @@ let TaskManager;
 module.exports = {
   name: "Smithing",
   SMITHING_BAR_TYPE_BY_ITEM_ID,
+  SMELTING_SKILLMULTI_OP_FLAGS,
+  quantityForSmeltAction,
   FURNACE_OBJECT_IDS,
   SMELTING_RECIPES,
   startBotSmelting,
@@ -829,8 +847,14 @@ module.exports = {
             (buttonId & 0xffff) - SMELTING_SKILLMULTI_FIRST_ITEM_COMPONENT
           ];
         if (!recipe) return false;
+
         closeSmeltingInterface(player);
-        return startSmeltingSession(ACTIVE_SMITHING_SESSIONS, player, recipe, action);
+        return startSmeltingSession(
+          ACTIVE_SMITHING_SESSIONS,
+          player,
+          recipe,
+          quantityForSmeltAction(action)
+        );
       }
     );
 
