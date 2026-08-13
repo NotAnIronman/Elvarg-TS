@@ -17,15 +17,16 @@ const SMELTING_CHATMODAL_UNCLAMP_VARBIT = 10670;
 // OpenRune cache names: interface.smithing and varbit.smithing_bar_type.
 const SMITHING_INTERFACE_ID = 312;
 const MAIN_MODAL_TARGET_UID = (161 << 16) | 16;
-const MAIN_MODAL_OPEN_SCRIPT = 2524;
 const SMITHING_BAR_TYPE_VARBIT = 3216;
+// Keys of enum 1253 (varbit value -> bar obj), dumped from the cache. 1-based, not 0-based.
 const SMITHING_BAR_TYPE_BY_ITEM_ID = new Map([
-  [2349, 0], // Bronze
-  [2351, 1], // Iron
-  [2353, 2], // Steel
-  [2359, 3], // Mithril
-  [2361, 4], // Adamantite
-  [2363, 5], // Runite
+  [2349, 1], // Bronze
+  [2351, 2], // Iron
+  [2353, 3], // Steel
+  [2359, 4], // Mithril
+  [2361, 5], // Adamantite
+  [2363, 6], // Runite
+  [13354, 7], // Blurite
 ]);
 const SMITHING_COMPONENT_BY_PRODUCT = new Map([
   ["Dagger", 9], ["Sword", 10], ["Scimitar", 11], ["Long sword", 12],
@@ -671,11 +672,15 @@ function openEquipmentCreationInterface(player, preferredBarId = null) {
 
   ACTIVE_SMITHING_MENUS.set(player, selectedBar.barId);
   player.setInterfaceId(SMITHING_INTERFACE_ID);
+  // Matches OpenRune's AnvilSmithingScript.openSmithingInterface: set the bar-type varbit,
+  // then open the modal. Interface 312 populates its own product icons - its onLoad script
+  // chain (415 -> 430) reads varbit 3216 itself, verified by disassembling the cache - so
+  // pushing items per-component from here would just draw a second, overlapping set.
   player
     .getPacketSender()
     .sendVarbit(SMITHING_BAR_TYPE_VARBIT, barType)
-    .sendInterfaceScript(MAIN_MODAL_OPEN_SCRIPT, [-1, -1])
     .sendSubInterface(MAIN_MODAL_TARGET_UID, SMITHING_INTERFACE_ID, 0);
+
   for (const buttonId of SMITHING_BUTTON_IDS) {
     player.getPacketSender().sendInterfaceFlags(buttonId, 2);
   }
@@ -782,6 +787,7 @@ let TaskManager;
 
 module.exports = {
   name: "Smithing",
+  SMITHING_BAR_TYPE_BY_ITEM_ID,
   FURNACE_OBJECT_IDS,
   SMELTING_RECIPES,
   startBotSmelting,
