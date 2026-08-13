@@ -682,6 +682,10 @@ export class Player extends Mobile {
         this.setResetMovementQueue(true);
         this.getCombat().reset();
         this.getSkillManager().ensureCombatBaseline();
+        // Equipment is restored from the save without going through the equip
+        // packet path, so the weapon interface/fight-styles/attack animation
+        // (all driven by player.weapon, set here) are never assigned on login.
+        WeaponInterfaces.assign(this);
         const autocastSpell = this.getCombat().getAutocastSpell();
         if (autocastSpell != null && autocastSpell.getSpellbook?.() !== this.getSpellbook()) {
             Autocasting.setAutocast(this, null);
