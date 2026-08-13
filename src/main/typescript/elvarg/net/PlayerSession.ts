@@ -52,6 +52,14 @@ export class PlayerSession {
   private lastMusicRegion = -1;
   private lastMusicTrack = -1;
   private lastGroundItemRegion = -1;
+  // The first tick after login sends encodeInitialPlayerSync (no appearance/anim data at
+  // all), but World's end-of-tick resetUpdating() still unconditionally clears
+  // Flag.APPEARANCE for every player that tick - so by the next tick, when createPlayerView
+  // first runs for the local player, the flag is already false and appearanceDirty never
+  // gets set. Unlike remote players (who go through the forceAppearance "new player" path),
+  // the local player is pre-seeded into createPlayerSyncState's `active` list, so it's never
+  // treated as newly-added and never gets that forced send. Track it explicitly instead.
+  private pendingInitialLocalAppearance = true;
 
   constructor(channel: SessionChannel) {
     this.channel = channel;
@@ -131,8 +139,9 @@ export class PlayerSession {
       if (localX < 16 || localX >= 88) this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
       if (localY < 16 || localY >= 88) this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
       const views: PlayerView[] = [player, ...player.getLocalPlayers()].map((target) =>
-        this.createPlayerView(target)
+        this.createPlayerView(target, target === player && this.pendingInitialLocalAppearance)
       );
+      this.pendingInitialLocalAppearance = false;
       playerSync = encodePlayerSync(
         player.getIndex(),
         this.sceneBaseX,
@@ -178,9 +187,9 @@ export class PlayerSession {
     }
   }
 
-  private createPlayerView(player: Player): PlayerView {
+  private createPlayerView(player: Player, forceAppearance = false): PlayerView {
     const location = player.getLocation();
-    const dirty = player.getUpdateFlag().flagged(Flag.APPEARANCE);
+    const dirty = forceAppearance || player.getUpdateFlag().flagged(Flag.APPEARANCE);
     const cached = this.appearanceCache.get(player.getIndex());
     let payload = cached?.player === player && !dirty ? cached.payload : undefined;
     if (!payload) {
