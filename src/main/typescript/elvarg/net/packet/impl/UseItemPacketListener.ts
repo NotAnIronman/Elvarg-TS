@@ -50,8 +50,20 @@ export class UseItemPacketListener {
       return;
     }
 
-    const position = new Location(objectX, objectY, player.getLocation().getZ());
-    const object = MapObjects.getPrivateArea(player, objectId, position);
+    const z = player.getLocation().getZ();
+    let object = MapObjects.getPrivateArea(player, objectId, new Location(objectX, objectY, z));
+    if (!object) {
+      // The client's 3D pick for "use item on loc" is occasionally a tile off from the
+      // object's true registered tile (e.g. several same-model objects placed tightly
+      // together) - verified live: exact-tile lookups intermittently miss an anvil that
+      // sits one tile away. Fall back to the nearest matching id within interaction range
+      // before giving up, same as a normal click would still land on it.
+      object = MapObjects.get(objectId, new Location(objectX - 1, objectY, z), player.getPrivateArea())
+        ?? MapObjects.get(objectId, new Location(objectX + 1, objectY, z), player.getPrivateArea())
+        ?? MapObjects.get(objectId, new Location(objectX, objectY - 1, z), player.getPrivateArea())
+        ?? MapObjects.get(objectId, new Location(objectX, objectY + 1, z), player.getPrivateArea())
+        ?? null;
+    }
     if (!object) {
       return;
     }

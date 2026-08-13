@@ -561,7 +561,8 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
       const x = reader.shortAdd();
       const y = reader.shortLE();
       reader.byteNeg();
-      return { type: "object_option", id: reader.shortAddLE(), x, y, clickType: 1 };
+      const id = reader.shortAddLE();
+      return { type: "object_option", id, x, y, clickType: 1 };
     }
     case ClientPacket.OBJECT_OPTION_2: {
       const x = reader.shortAddLE();
