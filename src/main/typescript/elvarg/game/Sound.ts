@@ -13,6 +13,8 @@ export class Sound {
 
     // runecrafting sounds
 
+    // Confirmed wrong for this cache (207 = waterblast_cast_and_fire per OpenRune's
+    // synth.rscm), but no correct replacement id found there - left as-is rather than guessing.
     public static CRAFT_RUNES = new Sound(207, 0, 0, 0)
 
     // mining sounds
@@ -31,15 +33,15 @@ export class Sound {
 
     // woodcutting sounds
 
+    // No explicit WOODCUTTING_CHOP: every axe swing animation has sound 2735 baked
+    // into frame 3 in the cache, so the client already plays it when the animation
+    // renders - an explicit server send here was a duplicate, out-of-phase trigger.
 
-
-    public static readonly WOODCUTTING_CHOP = new Sound(472, 1, 10, 0);
-
-    public static WOODCUTTING_TREE_DOWN = new Sound(473, 1, 0, 0)
+    public static WOODCUTTING_TREE_DOWN = new Sound(2734, 1, 0, 0)
 
     // Getting hit
-    public static MALE_GETTING_HIT = new Sound(510, 1, 0, 0)
-    public static FEMALE_GETTING_HIT = new Sound(510, 1, 0, 0)
+    public static MALE_GETTING_HIT = new Sound(512, 1, 0, 0)
+    public static FEMALE_GETTING_HIT = new Sound(506, 1, 0, 0)
     public static DEFENCE_BLOCK = new Sound(511, 1, 0, 0)
 
     // weapon sounds
@@ -102,7 +104,7 @@ export class Sound {
     // Spell sounds
 
     public static SPELL_FAIL_SPLASH = new Sound(227, 1, 0, 0)
-    public static TELEKINETIC_GRAB = new Sound(3006, 1, 0, 0)
+    public static TELEKINETIC_GRAB = new Sound(192, 1, 0, 0)
     public static HIGH_ALCHEMY = new Sound(97, 1, 0, 0)
     public static LOW_ALCHEMY = new Sound(98, 1, 0, 0)
     public static SUPERHEAT_ITEM = new Sound(190, 1, 0, 0)
@@ -110,19 +112,19 @@ export class Sound {
 
     public static ICE_BARRAGE_IMPACT = new Sound(168, 1, 0, 0)
     public static ICA_BARRAGE_IMPACT = Sound.ICE_BARRAGE_IMPACT // legacy alias
-    public static BLOOD_BLITZ_CAST = new Sound(6589, 1, 0, 0)
-    public static ICE_BLITZ_CAST = new Sound(6589, 1, 0, 0)
+    public static BLOOD_BLITZ_CAST = new Sound(103, 1, 0, 0)
+    public static ICE_BLITZ_CAST = new Sound(169, 1, 0, 0)
 
     public static DROP_ITEM = new Sound(2739, 1, 0, 0)
     public static PICK_UP_ITEM = new Sound(2582, 1, 0, 0)
-    public static CONTAINER_OPEN = new Sound(326, 1, 0, 0)
+    public static CONTAINER_OPEN = new Sound(2021, 1, 0, 0)
     public static CONTAINER_CLOSE = new Sound(326, 1, 0, 0)
     public static DOOR_OPEN = new Sound(62, 1, 0, 0)
     public static DOOR_CLOSE = new Sound(60, 1, 0, 0)
     public static EQUIPMENT_ON = new Sound(358, 1, 0, 0)
     public static EQUIPMENT_OFF = new Sound(376, 1, 0, 0)
 
-    public static FIRE_LIGHT = new Sound(375, 1, 0, 0)
+    public static FIRE_LIGHT = new Sound(2599, 1, 0, 0)
     public static FIRE_SUCCESSFUL = new Sound(2596, 1, 0, 0)
     public static FIRE_FIRST_ATTEMPT = new Sound(2584, 1, 0, 0)
     public static POTION_MIX = new Sound(373, 1, 0, 0)
@@ -132,7 +134,6 @@ export class Sound {
     public static DRINK = new Sound(2401, 1, 0, 0)
     public static PICK_LOCK = new Sound(2402, 1, 0, 0)
     public static GENIE_LAMP = new Sound(430, 1, 0, 0)
-    public static WOODCUTTING_START = new Sound(471, 1, 0, 0)
     public static BURY_BONES = new Sound(2738, 1, 0, 0)
     public static WILDERNESS_DITCH_JUMP = new Sound(2462, 1, 0, 0)
     public static THIEVING_STUNNED = new Sound(2727, 1, 0, 0)

@@ -13,7 +13,6 @@ const { Pets } = require("../npcs/Pets.plugin");
 const TREE_STUMP_OBJECT_ID = ObjectIds.TREE_STUMP_3;
 const WOODCUTTING_ACTION_INTERVAL_TICKS = 4;
 const CHOP_ANIMATION_INTERVAL_TICKS = 4;
-const CHOP_SOUND_INTERVAL_TICKS = 2;
 const MULTI_TREE_DEPLETION_ROLL_MAX = 15;
 const MULTI_TREE_DEPLETION_THRESHOLD = 2;
 const BIRD_NEST_DROP_CHANCE = 256;
@@ -470,6 +469,7 @@ function startWoodcutting(player, treeObject, tree, activeSessions) {
 
   player.getSkillManager()?.stopSkillable?.();
   stopWoodcutting(activeSessions, player, false);
+  player.getCombat()?.reset?.();
 
   activeSessions.set(player, {
     tree,
@@ -480,12 +480,9 @@ function startWoodcutting(player, treeObject, tree, activeSessions) {
     cyclesUntilReward: calculateCyclesRequired(player, tree, axe),
     nextActionTick: woodcuttingTick + WOODCUTTING_ACTION_INTERVAL_TICKS,
     nextAnimationTick: woodcuttingTick + CHOP_ANIMATION_INTERVAL_TICKS,
-    nextSoundTick: woodcuttingTick + CHOP_SOUND_INTERVAL_TICKS,
   });
 
   player.getPacketSender().sendMessage("You swing your axe at the tree..");
-  Sounds.sendSound(player, Sound.WOODCUTTING_START);
-  Sounds.sendSound(player, Sound.WOODCUTTING_CHOP);
   player.performAnimation(new Animation(axe.animationId));
   return true;
 }
@@ -561,13 +558,7 @@ function processWoodcuttingTick(activeSessions, currentTick) {
       continue;
     }
 
-    if (currentTick >= state.nextSoundTick) {
-      Sounds.sendSound(player, Sound.WOODCUTTING_CHOP);
-      state.nextSoundTick = currentTick + CHOP_SOUND_INTERVAL_TICKS;
-    }
-
     if (currentTick >= state.nextAnimationTick) {
-      Sounds.sendSound(player, Sound.WOODCUTTING_CHOP);
       player.performAnimation(new Animation(state.axe.animationId));
       state.nextAnimationTick = currentTick + CHOP_ANIMATION_INTERVAL_TICKS;
     }

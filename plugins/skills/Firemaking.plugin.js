@@ -275,7 +275,9 @@ function startFiremakingAttempt(player, log, source, activeSessions) {
     player.performAnimation(BONFIRE_ANIMATION);
   } else {
     player.getPacketSender().sendMessage("You attempt to light the logs..");
-    Sounds.sendSound(player, Sound.FIRE_LIGHT);
+    // No explicit FIRE_LIGHT here: animation 733 has sound 2597 baked into
+    // frames 8 and 10 in the cache, so sending it too made lighting a fire
+    // play three overlapping "strike" sounds instead of one.
     player.performAnimation(LIGHT_FIRE_ANIMATION);
   }
 
