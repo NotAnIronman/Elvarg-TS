@@ -45,6 +45,28 @@ const SMITHING_BUTTON_IDS = new Set(
     (component) => (SMITHING_INTERFACE_ID << 16) | component
   )
 );
+// Anvil quantity mode row (components 3-8, left of the product grid). Confirmed live:
+// component 3="1", 4="5", 6="X", 7="all" (5="10" by position - unconfirmed but matches the
+// standard 1/5/10/X/All ordering used everywhere else in this codebase). These are plain
+// static widgets, not per-item right-click ops - clicking one just selects a mode; the
+// selection is applied to whichever product is clicked next. Only the presets you can afford
+// are shown/enabled (e.g. with 1-2 bronze bars, only "1" and "All" render) - matches every
+// other OSRS production list, not a bug.
+const SMITHING_QUANTITY_MODE_COMPONENTS = new Map([
+  [3, 1],
+  [4, 5],
+  [5, 10],
+  [6, "x"],
+  [7, "all"],
+]);
+const SMITHING_QUANTITY_MODE_BUTTON_IDS = new Set(
+  [...SMITHING_QUANTITY_MODE_COMPONENTS.keys()].map(
+    (component) => (SMITHING_INTERFACE_ID << 16) | component
+  )
+);
+const SMITHING_ALL_QUANTITY_CAP = 28;
+// player -> selected quantity ("all" or a number); defaults to 1 when unset.
+const ACTIVE_SMITHING_QUANTITY = new Map();
 // Widget transmit flags: bit (opIndex+1) must be set for that right-click op to reach the
 // server (see WidgetActionRouter.shouldTransmitAction on the client). The skillmulti list
 // exposes 5 ops per item - Make 1/5/10/X/All - so ops 1-5 (bits 1-5) all need to be enabled;
@@ -538,6 +560,7 @@ function closeSmithingInterface(player) {
     return;
   }
   ACTIVE_SMITHING_MENUS.delete(player);
+  ACTIVE_SMITHING_QUANTITY.delete(player);
   player.setInterfaceId(-1);
   player.getPacketSender().closeSubInterface(MAIN_MODAL_TARGET_UID);
 }
@@ -687,6 +710,7 @@ function openEquipmentCreationInterface(player, preferredBarId = null) {
   }
 
   ACTIVE_SMITHING_MENUS.set(player, selectedBar.barId);
+  ACTIVE_SMITHING_QUANTITY.delete(player);
   player.setInterfaceId(SMITHING_INTERFACE_ID);
   // Matches OpenRune's AnvilSmithingScript.openSmithingInterface: set the bar-type varbit,
   // then open the modal. Interface 312 populates its own product icons - its onLoad script
@@ -779,6 +803,26 @@ class SmithingTask extends Task {
   }
 }
 
+function handleSmithingQuantityModeAction(player, buttonId) {
+  const mode = SMITHING_QUANTITY_MODE_COMPONENTS.get(buttonId & 0xffff);
+  if (mode === undefined) return false;
+
+  if (mode === "x") {
+    player.setEnteredAmountAction({
+      execute: (amount) => {
+        if (Number.isInteger(amount) && amount > 0) {
+          ACTIVE_SMITHING_QUANTITY.set(player, amount);
+        }
+      },
+    });
+    player.getPacketSender().sendEnterAmountPrompt("How many would you like to make?");
+    return true;
+  }
+
+  ACTIVE_SMITHING_QUANTITY.set(player, mode);
+  return true;
+}
+
 function handleSmithingInterfaceAction(activeSessions, player, buttonId) {
   const barId = ACTIVE_SMITHING_MENUS.get(player);
   if (player.getInterfaceId() !== SMITHING_INTERFACE_ID || barId == null) {
@@ -791,8 +835,12 @@ function handleSmithingInterfaceAction(activeSessions, player, buttonId) {
     ?.find((entry) => entry.name === product);
   if (!smithable) return false;
 
+  const selected = ACTIVE_SMITHING_QUANTITY.get(player) ?? 1;
+  const amount = selected === "all" ? SMITHING_ALL_QUANTITY_CAP : selected;
+
   ACTIVE_SMITHING_MENUS.delete(player);
-  const started = startSmithingSession(activeSessions, player, smithable, 1);
+  ACTIVE_SMITHING_QUANTITY.delete(player);
+  const started = startSmithingSession(activeSessions, player, smithable, amount);
   if (started) {
     closeSmithingInterfaceNextTick(player);
   }
@@ -818,6 +866,7 @@ module.exports = {
       stopSmithingSession(ACTIVE_SMITHING_SESSIONS, player, false);
       ACTIVE_SMELTING_MENUS.delete(player);
       ACTIVE_SMITHING_MENUS.delete(player);
+      ACTIVE_SMITHING_QUANTITY.delete(player);
     });
     api.onPlayerLevelUp(({ player }) => {
       stopSmithingSession(ACTIVE_SMITHING_SESSIONS, player, false);
@@ -856,6 +905,11 @@ module.exports = {
           quantityForSmeltAction(action)
         );
       }
+    );
+
+    api.onInterfaceActionButton(
+      [...SMITHING_QUANTITY_MODE_BUTTON_IDS],
+      ({ player, buttonId }) => handleSmithingQuantityModeAction(player, buttonId)
     );
 
     api.onInterfaceActionButton(
