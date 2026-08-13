@@ -86,6 +86,10 @@ function quantityForSmeltAction(action) {
 const SMELTING_INTERVAL_TICKS = 5;
 const SMITHING_INTERVAL_TICKS = 5;
 const CANNONBALL_SMITHING_INTERVAL_TICKS = 8;
+// Matches OpenRune's SmeltingScript/AnvilSmithingScript: the first item in a batch produces
+// almost immediately (1 tick), only repeats wait the full interval. Using the full interval
+// for the first one too made every batch open with what looked like a stalled/doubled pause.
+const SMITHING_BATCH_INITIAL_DELAY_TICKS = 1;
 
 const FURNACE_OBJECT_IDS = new Set(
   [
@@ -593,7 +597,7 @@ function startSmeltingSession(activeSessions, player, recipe, amount) {
     recipe,
     remaining: amount,
     interval: SMELTING_INTERVAL_TICKS,
-    nextActionTick: smithingTick + SMELTING_INTERVAL_TICKS,
+    nextActionTick: smithingTick + SMITHING_BATCH_INITIAL_DELAY_TICKS,
   });
   ACTIVE_SMELTERS.add(player);
   Sounds.sendSound(player, Sound.SMELTING);
@@ -639,7 +643,7 @@ function startSmithingSession(activeSessions, player, smithable, amount) {
     smithable,
     remaining: amount,
     interval: smithingInterval,
-    nextActionTick: smithingTick + smithingInterval,
+    nextActionTick: smithingTick + SMITHING_BATCH_INITIAL_DELAY_TICKS,
   });
   ACTIVE_SMELTERS.delete(player);
   Sounds.sendSound(player, Sound.SMITHING);
