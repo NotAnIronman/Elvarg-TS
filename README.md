@@ -55,6 +55,28 @@ yarn dev
 
 See [docs/setup.md](docs/setup.md) for details.
 
+## This fork
+
+[`server/`](server/) is [elvarg-web-server](https://github.com/tobywisener/elvarg-web-server)
+(`xrsps` branch), imported here via `git subtree` with full history preserved.
+`git log server/` shows every elvarg commit.
+
+Pulling client updates from upstream `xrsps/xrsps-typescript` and opening PRs
+back still works normally. Run this once per clone so `server/` conflicts in
+future `git merge origin/main` auto-resolve to this fork's version instead of
+upstream's server (see `.gitattributes`):
+
+```bash
+git config merge.ours.driver true
+```
+
+To pull further elvarg-web-server updates into `server/`:
+
+```bash
+git fetch elvarg xrsps   # remote: tobywisener/elvarg-web-server
+git subtree pull --prefix=server elvarg xrsps -m "Update server/ from elvarg-web-server"
+```
+
 ---
 
 Fan project. Not affiliated with, endorsed by, or connected to Jagex Ltd.

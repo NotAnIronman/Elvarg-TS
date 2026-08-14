@@ -6,9 +6,9 @@
     "node": ">=22.16.0"
   },
   "scripts": {
-    "setup": "yarn install --frozen-lockfile && yarn --cwd server install --frozen-lockfile && yarn --cwd client install --frozen-lockfile && yarn --cwd server ensure-cache && yarn --cwd server build-collision",
-    "start": "yarn concurrently --kill-others --names server,client \"yarn --cwd server start\" \"yarn --cwd client start\"",
-    "server": "yarn --cwd server start",
+    "setup": "yarn install --frozen-lockfile && yarn --cwd server install --frozen-lockfile && yarn --cwd client install --frozen-lockfile",
+    "start": "yarn concurrently --kill-others --names server,client \"yarn --cwd server dev\" \"yarn --cwd client start\"",
+    "server": "yarn --cwd server dev",
     "client": "yarn --cwd client start"
   },
   "devDependencies": {
