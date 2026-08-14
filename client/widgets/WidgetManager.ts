@@ -130,6 +130,7 @@ export class WidgetManager {
     /** Current canvas dimensions for resizing root widgets */
     canvasWidth: number = 0;
     canvasHeight: number = 0;
+    private pendingRootOnLoad: number = -1;
 
     /** Reference to the main client */
     osrsClient: any = null;
@@ -485,6 +486,18 @@ export class WidgetManager {
             for (const group of this.groups.values()) {
                 if (group.root) {
                     this.invalidateWidget(group.root, "resize");
+                }
+            }
+            if (
+                this.pendingRootOnLoad === this.rootInterface &&
+                this.canvasWidth > 0 &&
+                this.canvasHeight > 0
+            ) {
+                const pending = this.groups.get(this.pendingRootOnLoad);
+                this.pendingRootOnLoad = -1;
+                if (pending) {
+                    this.initializeRoot(pending);
+                    this.triggerOnSubChange();
                 }
             }
             // Also mark all render regions as dirty
@@ -1146,6 +1159,7 @@ export class WidgetManager {
 
         // Reset root interface
         this.rootInterface = -1;
+        this.pendingRootOnLoad = -1;
 
         // Reset root widget tracking arrays
         this.rootWidgetCount = 0;
@@ -1457,40 +1471,34 @@ export class WidgetManager {
         this.invalidateAll();
 
         this.rootInterface = groupId;
+        this.pendingRootOnLoad = -1;
 
         const instance = this.getGroup(groupId);
         if (!instance) {
             return undefined;
         }
 
-        // Layout ALL root widgets (those with parentUid=-1) to canvas dimensions
-        // OSRS interfaces can have multiple independent root widget trees
         if (this.canvasWidth > 0 && this.canvasHeight > 0) {
-            const allRoots = this.getAllGroupRoots(groupId);
-            // Pass static children callback for
-            const getStaticChildren = (uid: number) => this.getStaticChildrenByParentUid(uid);
-
-            // First pass: initial layout before onLoad scripts run
-            for (const root of allRoots) {
-                layoutWidgets(root, this.canvasWidth, this.canvasHeight, getStaticChildren);
-            }
-
-            // Trigger onLoad for ALL root widgets
-            // onLoad scripts (like toplevel_init) may modify widget positions/sizes
-            // via if_setposition, if_setsize, etc.
-            for (const root of allRoots) {
-                this.triggerOnLoad(root);
-            }
-
-            // Second pass: re-layout after onLoad scripts have modified raw values
-            // This ensures CS2-set positions (like hud_container_front being moved to top-left)
-            // are applied to the computed x/y/width/height values
-            for (const root of allRoots) {
-                layoutWidgets(root, this.canvasWidth, this.canvasHeight, getStaticChildren);
-            }
+            this.initializeRoot(instance);
+        } else {
+            this.pendingRootOnLoad = groupId;
         }
 
         return instance;
+    }
+
+    private initializeRoot(instance: WidgetGroupInstance): void {
+        const roots = this.getAllGroupRoots(instance.groupId);
+        const getStaticChildren = (uid: number) => this.getStaticChildrenByParentUid(uid);
+        for (const root of roots) {
+            layoutWidgets(root, this.canvasWidth, this.canvasHeight, getStaticChildren);
+        }
+        for (const root of roots) {
+            this.triggerOnLoad(root);
+        }
+        for (const root of roots) {
+            layoutWidgets(root, this.canvasWidth, this.canvasHeight, getStaticChildren);
+        }
     }
 
     /**
