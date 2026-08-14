@@ -1,0 +1,13 @@
+node_modules
+dist/*
+.idea/*
+.DS_Store
+dist
+.yarn/*
+
+# Runtime/server state
+data/saves/characters
+logs/
+caches/
+Function
+Server

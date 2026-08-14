@@ -1,0 +1,59 @@
+import { CombatMethod } from "../../CombatMethod";
+import { CombatType } from "../../../CombatType";
+import { PendingHit } from "../../../hit/PendingHit";
+import { Mobile } from "../../../../../entity/impl/Mobile";
+import { CombatSpecial } from "../../../CombatSpecial";
+import { Skill } from "../../../../../model/Skill";
+import { BonusManager } from "../../../../../model/equipment/BonusManager";
+import { Animation } from "../../../../../model/Animation";
+import { Misc } from "../../../../../../util/Misc";
+import { ItemIdentifiers } from "../../../../../../util/ItemIdentifiers";
+
+export class VolatileNightmareStaffCombatMethod extends CombatMethod {
+    private static readonly CAST_ANIMATION = new Animation(8532);
+
+    hits(character: Mobile, target: Mobile): PendingHit[] {
+        const hit = new PendingHit(character, target, this, 2);
+        if (hit.isAccurate() && character.isPlayer()) {
+            const player = character.getAsPlayer();
+            const maxHit = Math.min(
+                Math.floor((player.getSkillManager().getCurrentLevel(Skill.MAGIC) * 263) / 449 + 1),
+                58
+            );
+            const multiplier = 1 + (player.getBonusManager().getOtherBonus()[BonusManager.MAGIC_STRENGTH] / 100);
+            const hitRoll = Misc.randomInclusive(1, maxHit);
+            hit.setTotalDamage(Math.floor(hitRoll * multiplier));
+        }
+        return [hit];
+    }
+
+    canAttack(character: Mobile, target: Mobile): boolean {
+        if (!character.isPlayer()) {
+            return false;
+        }
+        return character.getAsPlayer().getEquipment().getWeapon().getId() === ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF;
+    }
+
+    type(): CombatType {
+        return CombatType.MAGIC;
+    }
+
+    start(character: Mobile, target: Mobile): void {
+        CombatSpecial.drain(character, CombatSpecial.VOLATILE_NIGHTMARE_STAFF.getDrainAmount());
+        character.performAnimation(VolatileNightmareStaffCombatMethod.CAST_ANIMATION);
+    }
+
+    attackSpeed(character: Mobile): number {
+        return 5;
+    }
+
+    attackDistance(character: Mobile): number {
+        return 10;
+    }
+
+    finished(character: Mobile, target: Mobile): void {
+        character.getCombat().reset();
+        character.setMobileInteraction(target);
+        character.getMovementQueue().reset();
+    }
+}

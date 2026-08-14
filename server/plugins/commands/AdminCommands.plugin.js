@@ -1,0 +1,1452 @@
+const fs = require("fs");
+const path = require("path");
+const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
+const { Server } = require("../../src/main/typescript/elvarg/Server");
+const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
+const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
+const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
+const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
+const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
+const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
+const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
+const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
+const { ItemDefinition } = require("../../src/main/typescript/elvarg/game/definition/ItemDefinition");
+const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
+const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
+const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
+const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
+const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
+const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
+const { ClanChatManager } = require("../interface/ClanChat.plugin");
+const { NpcDropDefinitionLoader } = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcDropDefinitionLoader");
+const { PlayerSave } = require("../../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave");
+const { DamageFormulas } = require("../../src/main/typescript/elvarg/game/content/combat/formula/DamageFormulas");
+const { ServerLogger } = require("../../src/main/typescript/elvarg/util/ServerLogger");
+const {
+  DefinitionLoader,
+} = require("../../src/main/typescript/elvarg/game/definition/loader/DefinitionLoader");
+const {
+  NpcSpawnDefinitionLoader,
+} = require("../../src/main/typescript/elvarg/game/definition/loader/impl/NpcSpawnDefinitionLoader");
+const {
+  ShopDefinitionLoader,
+} = require("../../src/main/typescript/elvarg/game/definition/loader/impl/ShopDefinitionLoader");
+const {
+  ShopManager,
+} = require("../../src/main/typescript/elvarg/game/model/container/shop/ShopManager");
+
+const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
+const MAX_NPC_COMMAND_SPAWNS = 20;
+const NPC_SPAWN_FILE_CANDIDATES = [
+  path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
+];
+const NPC_FACING_BY_NAME = Object.freeze({
+  NORTH_WEST: 5,
+  NORTH: 6,
+  NORTH_EAST: 7,
+  WEST: 3,
+  EAST: 4,
+  SOUTH_WEST: 0,
+  SOUTH: 1,
+  SOUTH_EAST: 2,
+});
+const NPC_FACING_ALIASES = Object.freeze({
+  N: "NORTH",
+  NORTH: "NORTH",
+  S: "SOUTH",
+  SOUTH: "SOUTH",
+  E: "EAST",
+  EAST: "EAST",
+  W: "WEST",
+  WEST: "WEST",
+  NW: "NORTH_WEST",
+  NORTHWEST: "NORTH_WEST",
+  NORTH_WEST: "NORTH_WEST",
+  NE: "NORTH_EAST",
+  NORTHEAST: "NORTH_EAST",
+  NORTH_EAST: "NORTH_EAST",
+  SW: "SOUTH_WEST",
+  SOUTHWEST: "SOUTH_WEST",
+  SOUTH_WEST: "SOUTH_WEST",
+  SE: "SOUTH_EAST",
+  SOUTHEAST: "SOUTH_EAST",
+  SOUTH_EAST: "SOUTH_EAST",
+});
+const GLOW_PRESET_ATTRIBUTE = "visual:glowPreset";
+const GLOW_INTENSITY_ATTRIBUTE = "visual:glowIntensity";
+const GLOW_CYCLE_TASK_KEY_ATTRIBUTE = "visual:glowCycleTaskKey";
+const GLOW_CYCLE_PRESETS = Object.freeze([
+  "blood",
+  "toxic",
+  "ice",
+  "gold",
+  "royal",
+  "infernal",
+]);
+const GLOW_CYCLE_STEP_TICKS = 5;
+const GLOW_CYCLE_INTENSITY = 2;
+const GLOW_PRESETS = Object.freeze({
+  off: 0,
+  none: 0,
+  blood: 1,
+  gold: 2,
+  toxic: 3,
+  ice: 4,
+  royal: 5,
+  infernal: 6,
+});
+
+function cancelGlowCycle(target) {
+  const cycleTaskKey = target?.getAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE);
+  if (!cycleTaskKey) {
+    return false;
+  }
+  TaskManager.cancelTasks(cycleTaskKey);
+  target.setAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE, null);
+  return true;
+}
+
+function applyGlowState(target, glowPreset, glowIntensity) {
+  target.setAttribute(GLOW_PRESET_ATTRIBUTE, glowPreset);
+  target.setAttribute(GLOW_INTENSITY_ATTRIBUTE, glowIntensity);
+  target.getUpdateFlag().flag(Flag.APPEARANCE);
+}
+
+function startGlowCycle(target) {
+  cancelGlowCycle(target);
+  const cycleTaskKey = {};
+  target.setAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE, cycleTaskKey);
+
+  let presetIndex = 0;
+  const applyCurrentPreset = () => {
+    const presetName = GLOW_CYCLE_PRESETS[presetIndex % GLOW_CYCLE_PRESETS.length];
+    const glowPreset = GLOW_PRESETS[presetName] ?? GLOW_PRESETS.off;
+    applyGlowState(target, glowPreset, GLOW_CYCLE_INTENSITY);
+    presetIndex++;
+  };
+
+  applyCurrentPreset();
+
+  TaskManager.submit(
+    new (class extends Task {
+      constructor() {
+        super(GLOW_CYCLE_STEP_TICKS, cycleTaskKey, false);
+      }
+
+      execute() {
+        if (!target?.isRegistered?.() || target.getAttribute?.(GLOW_CYCLE_TASK_KEY_ATTRIBUTE) !== cycleTaskKey) {
+          this.stop();
+          return;
+        }
+        applyCurrentPreset();
+      }
+    })()
+  );
+}
+
+function parseIntArg(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function normalizeFacingToken(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (normalized.length === 0) {
+    return null;
+  }
+  return NPC_FACING_ALIASES[normalized] ?? null;
+}
+
+function parseFacingArg(value) {
+  if (value == null) {
+    return { id: -1, label: "default" };
+  }
+  const parsedNumeric = parseIntArg(value);
+  if (parsedNumeric !== null && parsedNumeric >= -1 && parsedNumeric <= 7) {
+    return {
+      id: parsedNumeric,
+      label: parsedNumeric === -1 ? "default" : String(parsedNumeric),
+    };
+  }
+  const directionName = normalizeFacingToken(value);
+  if (!directionName) {
+    return null;
+  }
+  return { id: NPC_FACING_BY_NAME[directionName], label: directionName.toLowerCase() };
+}
+
+function resolveNpcSpawnFileForWrite() {
+  for (const candidate of NPC_SPAWN_FILE_CANDIDATES) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return NPC_SPAWN_FILE_CANDIDATES[0];
+}
+
+function appendPersistentNpcSpawn(spawnEntry) {
+  const file = resolveNpcSpawnFileForWrite();
+  const directory = path.dirname(file);
+  fs.mkdirSync(directory, { recursive: true });
+
+  let existing = [];
+  if (fs.existsSync(file)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (Array.isArray(parsed)) {
+        existing = parsed;
+      }
+    } catch (error) {
+      throw new Error(`Failed to parse npc spawns file (${file}): ${error?.message ?? error}`);
+    }
+  }
+
+  existing.push(spawnEntry);
+  fs.writeFileSync(file, `${JSON.stringify(existing, null, 2)}\n`, "utf8");
+  return file;
+}
+
+function parseCsvArgs(parts, start = 1) {
+  return parts
+    .slice(start)
+    .join(" ")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
+
+function commandTail(raw, parts) {
+  return raw.substring(parts[0].length).trim();
+}
+
+function normalizePlayerCommandName(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().replace(/^\[+|\]+$/g, "");
+}
+
+function resolvePlayerByCommandTail(raw, parts) {
+  const targetName = normalizePlayerCommandName(commandTail(raw, parts));
+  if (!targetName) {
+    return null;
+  }
+  const exact = World.getPlayerByName(targetName);
+  if (exact) {
+    return exact;
+  }
+
+  const formatted = String(targetName).trim().toLowerCase();
+  let prefixMatch = null;
+  let prefixCount = 0;
+  World.getPlayers().forEach((player) => {
+    const username = player?.getUsername?.();
+    if (typeof username !== "string" || username.length === 0) {
+      return;
+    }
+    const candidate = username.toLowerCase();
+    if (candidate === formatted) {
+      prefixMatch = player;
+      prefixCount = 1;
+      return;
+    }
+    if (candidate.startsWith(formatted)) {
+      prefixMatch = player;
+      prefixCount++;
+    }
+  });
+
+  return prefixCount === 1 ? prefixMatch : null;
+}
+
+function ownerOrDev(player) {
+  const rights = player?.getRights?.();
+  return rights === PlayerRights.OWNER || rights === PlayerRights.DEVELOPER;
+}
+
+function devOnly(player) {
+  return player?.getRights?.() === PlayerRights.DEVELOPER;
+}
+
+function adminOrAbove(player) {
+  return PlayerRights.hasAdminRights(player);
+}
+
+function deny(player) {
+  player.getPacketSender().sendMessage("You do not have permission to use this command.");
+}
+
+function requireRights(player, predicate) {
+  if (!predicate(player)) {
+    deny(player);
+    return false;
+  }
+  return true;
+}
+
+function queueNpcSpawn(player, id, amount = 1) {
+  const origin = player.getLocation().clone();
+  const spawnCount = Math.min(Math.max(1, amount), MAX_NPC_COMMAND_SPAWNS);
+  let spawned = 0;
+
+  for (let i = 0; i < spawnCount; i++) {
+    const spawn = origin.clone();
+    if (i > 0) {
+      const offsetX = (i % 3) - 1;
+      const offsetY = ((Math.floor(i / 3)) % 3) - 1;
+      spawn.setX(origin.getX() + offsetX);
+      spawn.setY(origin.getY() + offsetY);
+    }
+
+    const npc = NPC.create(id, spawn);
+    const currentHp = npc.getHitpoints?.();
+    if (!Number.isFinite(currentHp) || currentHp <= 0) {
+      npc.setHitpoints(10);
+    }
+
+    World.getAddNPCQueue().push(npc);
+    if (player.getPrivateArea()) {
+      player.getPrivateArea().add(npc);
+    }
+    spawned++;
+  }
+
+  return spawned;
+}
+
+function fallbackSaveFilePathForUsername(username) {
+  const raw = String(username ?? "").trim().toLowerCase();
+  const safe = raw
+    .replace(/[^a-z0-9]/gi, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const normalized = safe.length > 0 ? safe : "player";
+  return path.join(process.cwd(), "data", "saves", "characters", `${normalized}.json`);
+}
+
+function resolveSaveFilePathForUsername(username) {
+  const persistence = GameConstants.PLAYER_PERSISTENCE;
+  if (persistence && typeof persistence.resolveFilePath === "function") {
+    return persistence.resolveFilePath(username);
+  }
+  return fallbackSaveFilePathForUsername(username);
+}
+
+class UpdateTask extends Task {
+  constructor(ticks, fn) {
+    super(ticks);
+    this.fn = fn;
+  }
+
+  execute() {
+    this.fn();
+    this.stop();
+  }
+}
+
+let World;
+let SkillManager;
+let ObjectManager;
+let CombatFactory;
+let TaskManager;
+let RegionManager;
+let PlayerPunishment;
+
+module.exports = {
+  name: "AdminCommands",
+  register(api) {
+    World = api.getWorld();
+    SkillManager = api.getSkillManager();
+    ObjectManager = api.getObjectManager();
+    CombatFactory = api.getCombatFactory();
+    TaskManager = api.getTaskManager();
+    RegionManager = api.getRegionManager();
+    PlayerPunishment = api.getPlayerPunishment();
+    api.registerCommand("tele", ({ player, parts }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      if (parts.length < 3 || parts.length > 4) {
+        player.getPacketSender().sendMessage("Usage: ::tele x y [z]");
+        return true;
+      }
+      const x = parseIntArg(parts[1]);
+      const y = parseIntArg(parts[2]);
+      const z = parts.length === 4 ? parseIntArg(parts[3]) : player.getLocation().getZ();
+      if (x === null || y === null || z === null) {
+        player.getPacketSender().sendMessage("Usage: ::tele x y [z]");
+        return true;
+      }
+      player.moveTo(new Location(x, y, z));
+      return true;
+    });
+
+    api.registerCommand("coords", ({ player }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      const location = player.getLocation();
+      player
+        .getPacketSender()
+        .sendMessage(`Coords: ${location.getX()}, ${location.getY()}, ${location.getZ()}`);
+      return true;
+    });
+
+    api.registerCommand("glow", ({ player, raw, parts }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      const presetToken = String(parts[1] ?? "").trim().toLowerCase();
+      if (!presetToken) {
+        player
+          .getPacketSender()
+          .sendMessage("Usage: ::glow off|blood|gold|toxic|ice|royal|infernal|cycle [1-5] [player]");
+        return true;
+      }
+
+      if (presetToken === "cycle") {
+        cancelGlowCycle(player);
+        startGlowCycle(player);
+        player
+          .getPacketSender()
+          .sendMessage("You are now cycling through the killstreak glows every 3 seconds.");
+        return true;
+      }
+
+      let glowPreset = GLOW_PRESETS[presetToken];
+      if (glowPreset === undefined) {
+        const parsedPreset = parseIntArg(presetToken);
+        if (parsedPreset === null || parsedPreset < 0 || parsedPreset > 6) {
+          player
+            .getPacketSender()
+            .sendMessage("Glow presets: off, blood, gold, toxic, ice, royal, infernal, cycle");
+          return true;
+        }
+        glowPreset = parsedPreset;
+      }
+
+      let glowIntensity = 5;
+      let target = player;
+      const rawTail = commandTail(raw, parts);
+      let targetTail = rawTail.substring(presetToken.length).trim();
+      if (targetTail.length > 0) {
+        const firstTailToken = String(targetTail.split(/\s+/)[0] ?? "").trim();
+        const parsedIntensity = parseIntArg(firstTailToken);
+        if (parsedIntensity !== null) {
+          if (parsedIntensity < 1 || parsedIntensity > 5) {
+            player.getPacketSender().sendMessage("Glow intensity must be between 1 and 5.");
+            return true;
+          }
+          glowIntensity = parsedIntensity;
+          targetTail = targetTail.substring(firstTailToken.length).trim();
+        }
+      }
+      if (targetTail.length > 0) {
+        target = resolvePlayerByCommandTail(`glow ${targetTail}`, ["glow"]);
+        if (!target) {
+          player.getPacketSender().sendMessage(`Player ${targetTail} is not online.`);
+          return true;
+        }
+      }
+
+      cancelGlowCycle(target);
+      applyGlowState(target, glowPreset, glowIntensity);
+
+      const targetLabel = target === player ? "You" : target.getUsername();
+      const presetLabel =
+        Object.keys(GLOW_PRESETS).find((key) => GLOW_PRESETS[key] === glowPreset && key !== "none") ??
+        String(glowPreset);
+      player
+        .getPacketSender()
+        .sendMessage(
+          `${targetLabel} ${
+            glowPreset === 0
+              ? "no longer have a glow"
+              : `now use ${presetLabel} glow at intensity ${glowIntensity}`
+          }.`
+        );
+      return true;
+    });
+
+    api.registerCommand("teleto", ({ player, raw, parts }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      const target = resolvePlayerByCommandTail(raw, parts);
+      if (!target) {
+        player.getPacketSender().sendMessage("Usage: ::teleto [playername]");
+        return true;
+      }
+      player.moveTo(target.getLocation().clone());
+      return true;
+    });
+
+    api.registerCommand("teletome", ({ player, raw, parts }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      const target = resolvePlayerByCommandTail(raw, parts);
+      if (!target) {
+        player.getPacketSender().sendMessage("Usage: ::teletome [playername]");
+        return true;
+      }
+      target.moveTo(player.getLocation().clone());
+      return true;
+    });
+
+    api.registerCommand("kick", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const target = World.getPlayerByName(commandTail(raw, parts));
+      if (target) {
+        target.requestLogout();
+      }
+      return true;
+    });
+
+    api.registerCommand("exit", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      const target = World.getPlayerByName(targetName);
+      if (!target) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is not online.`);
+        return true;
+      }
+      if (CombatFactory.inCombat(target)) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is in combat!`);
+        return true;
+      }
+      target.getPacketSender().sendExit();
+      player.getPacketSender().sendMessage("Closed other player's client.");
+      return true;
+    });
+
+    api.registerCommand("copybank", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const target = World.getPlayerByName(commandTail(raw, parts));
+      if (!target) {
+        return true;
+      }
+      for (let i = 0; i < Bank.TOTAL_BANK_TABS; i++) {
+        player.getBank(i).resetItems();
+      }
+      for (let i = 0; i < Bank.TOTAL_BANK_TABS; i++) {
+        for (const item of target.getBank(i).getValidItems()) {
+          player.getBank(i).add(item, false);
+        }
+      }
+      return true;
+    });
+
+    api.registerCommand("bank", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.getBank(player.getCurrentBankTab()).open();
+      return true;
+    });
+
+    api.registerCommand("runes", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565].forEach((rune) => {
+        player.getInventory().adds(rune, 1000);
+      });
+      return true;
+    });
+
+    api.registerCommand("master", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      for (const skill of Skill.values()) {
+        const level = SkillManager.getMaxAchievingLevel(skill);
+        player
+          .getSkillManager()
+          .setCurrentLevels(skill, level)
+          .setMaxLevel(skill, level)
+          .setExperience(skill, SkillManager.getExperienceForLevel(level));
+      }
+      WeaponInterfaces.assign(player);
+      player.getUpdateFlag().flag(Flag.APPEARANCE);
+      return true;
+    });
+
+    api.registerCommand("reset", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      for (const skill of Skill.values()) {
+        const level = skill === Skill.HITPOINTS ? 10 : 1;
+        player
+          .getSkillManager()
+          .setCurrentLevels(skill, level)
+          .setMaxLevel(skill, level)
+          .setExperience(skill, SkillManager.getExperienceForLevel(level));
+      }
+      WeaponInterfaces.assign(player);
+      return true;
+    });
+
+    api.registerCommand("pnpc", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      if (id !== null) {
+        player.setNpcTransformationId(id);
+      }
+      return true;
+    });
+
+    api.registerCommand("npc", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      const amount = parts.length >= 3 ? parseIntArg(parts[2]) : 1;
+      if (id === null || id < 0 || amount === null || amount < 1) {
+        player.getPacketSender().sendMessage("Usage: ::npc id [amount]");
+        return true;
+      }
+      const spawned = queueNpcSpawn(player, id, amount);
+      player.getPacketSender().sendMessage(
+        `Queued ${spawned} NPC${spawned === 1 ? "" : "s"} (id=${id}).`
+      );
+      return true;
+    });
+
+    api.registerCommand("npcperm", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+
+      const id = parseIntArg(parts[1]);
+      let radiusArg = null;
+      let facingArg = null;
+      if (parts.length >= 3) {
+        const maybeRadius = parseIntArg(parts[2]);
+        if (maybeRadius !== null) {
+          radiusArg = maybeRadius;
+          facingArg = parts.length >= 4 ? parts[3] : null;
+        } else {
+          facingArg = parts[2];
+        }
+      }
+      if (id === null || id < 0) {
+        player.getPacketSender().sendMessage("Usage: ::npcperm id [radius] [north|south|east|west|0-7]");
+        return true;
+      }
+
+      if (radiusArg !== null && radiusArg < 0) {
+        player.getPacketSender().sendMessage("Radius must be 0 or higher.");
+        return true;
+      }
+
+      const facing = parseFacingArg(facingArg);
+      if (facingArg != null && facing == null) {
+        player
+          .getPacketSender()
+          .sendMessage("Invalid facing. Use north/south/east/west (or north_east etc) or -1..7.");
+        return true;
+      }
+
+      const location = player.getLocation();
+      const spawnEntry = {
+        id,
+        x: location.getX(),
+        y: location.getY(),
+        level: location.getZ(),
+        wanderRadius: radiusArg == null ? 0 : radiusArg,
+        ...(facing?.id == null || facing.id < 0 ? {} : { direction: facing.id }),
+      };
+
+      let file;
+      try {
+        file = appendPersistentNpcSpawn(spawnEntry);
+      } catch (error) {
+        console.error(error);
+        player.getPacketSender().sendMessage("Failed to append persistent npc spawn.");
+        return true;
+      }
+
+      const spawned = queueNpcSpawn(player, id, 1);
+      player
+        .getPacketSender()
+        .sendMessage(
+          `Spawned ${spawned} NPC (id=${id}) and appended to ${file} at ${location.getX()},${location.getY()},${location.getZ()} (radius=${spawnEntry.wanderRadius}, facing=${facing?.label ?? "default"}).`
+        );
+      return true;
+    });
+
+    api.registerCommand("object", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      const type = parts.length >= 3 ? parseIntArg(parts[2]) : 10;
+      const face = parts.length >= 4 ? parseIntArg(parts[3]) : 0;
+      if (id === null || type === null || face === null) {
+        return true;
+      }
+      const gameObject = new GameObject(id, player.getLocation().clone(), type, face, player.getPrivateArea());
+      ObjectManager.register(gameObject, true);
+      return true;
+    });
+
+    api.registerCommand("mypos", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.getPacketSender().sendMessage(player.getLocation().toString());
+      return true;
+    });
+
+    api.registerCommand("config", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      const state = parseIntArg(parts[2]);
+      if (id === null || state === null) {
+        return true;
+      }
+      player.getPacketSender().sendConfig(id, state);
+      player.getPacketSender().sendMessage("Sent config");
+      return true;
+    });
+
+    api.registerCommand("spec", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const amount = parts.length > 1 ? parseIntArg(parts[1]) : 100;
+      player.setSpecialPercentage(amount ?? 100);
+      CombatSpecial.updateBar(player);
+      return true;
+    });
+
+    api.registerCommand("gfx", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      if (id !== null) {
+        player.performGraphic(new Graphic(id, 0));
+      }
+      return true;
+    });
+
+    api.registerCommand("sound", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const input = parts[1];
+      if (!input) {
+        player
+          .getPacketSender()
+          .sendMessage("Usage: ::sound <id|SOUND_NAME> [volume=1] [delay=0] [loop=1]");
+        return true;
+      }
+
+      const directId = parseIntArg(input);
+      const resolvedSound =
+        directId !== null ? Sounds.resolveKnownSound(directId) : Sounds.resolveKnownSound(input);
+      const id = resolvedSound ? resolvedSound.getId() : directId;
+      if (id === null) {
+        player
+          .getPacketSender()
+          .sendMessage("Unknown sound id/name. Example: ::sound 386 or ::sound MAGIC_SHORTBOW_SPECIAL");
+        return true;
+      }
+
+      const volume = parts.length > 2 ? parseIntArg(parts[2]) : 1;
+      const delay = parts.length > 3 ? parseIntArg(parts[3]) : 0;
+      const loopType = parts.length > 4 ? parseIntArg(parts[4]) : 1;
+      player
+        .getPacketSender()
+        .sendSoundEffect(
+          id,
+          Number.isInteger(loopType) ? loopType : 1,
+          Number.isInteger(delay) ? delay : 0,
+          Number.isInteger(volume) ? volume : 1
+        );
+      if (resolvedSound) {
+        const soundName =
+          Object.entries(Sound).find(([, value]) => value === resolvedSound)?.[0] ?? "UNKNOWN";
+        player.getPacketSender().sendMessage(`Played ${soundName} (${id}).`);
+      }
+      return true;
+    });
+
+    api.registerCommand("anim", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      if (id !== null) {
+        player.performAnimation(new Animation(id));
+      }
+      return true;
+    });
+
+    api.registerCommand("interface", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      if (id !== null) {
+        player.getPacketSender().sendInterface(id);
+      }
+      return true;
+    });
+
+    api.registerCommand("chatboxinterface", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      if (id !== null) {
+        player.getPacketSender().sendChatboxInterface(id);
+      }
+      return true;
+    });
+
+    api.registerCommand("update", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const ticks = parseIntArg(parts[1]);
+      if (ticks === null || ticks <= 0) {
+        return true;
+      }
+      Server.setUpdating(true);
+      for (const p of World.getPlayers()) {
+        if (p) {
+          p.getPacketSender().sendSystemUpdate(ticks);
+        }
+      }
+      TaskManager.submit(
+        new UpdateTask(ticks, () => {
+          for (const p of World.getPlayers()) {
+            if (p) {
+              p.requestLogout();
+            }
+          }
+          ClanChatManager.save();
+          Server.getLogger().info("Update task finished!");
+        })
+      );
+      return true;
+    });
+
+    api.registerCommand("area", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      if (player.getArea()) {
+        player.getPacketSender().sendMessage("");
+        player.getPacketSender().sendMessage(`Area: ${player.getArea().constructor.name}`);
+      } else {
+        player.getPacketSender().sendMessage("No area found for your coordinates.");
+      }
+      return true;
+    });
+
+    api.registerCommand("infhp", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.setInfiniteHealth(!player.hasInfiniteHealth());
+      player.getPacketSender().sendMessage(`Invulnerable: ${player.hasInfiniteHealth()}`);
+      return true;
+    });
+
+    api.registerCommand("poisonme", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+
+      const typeToken = String(parts?.[1] ?? "super").trim().toLowerCase();
+      const poisonSeverity =
+        typeToken === "veryweak" || typeToken === "very_weak" || typeToken === "vw"
+          ? 6
+          : typeToken === "weak" || typeToken === "w"
+            ? 11
+            : typeToken === "mild" || typeToken === "m"
+              ? 20
+              : typeToken === "extra" || typeToken === "e"
+                ? 25
+                : typeToken === "venom" || typeToken === "v"
+                  ? 12
+                  : 30;
+
+      player.setPoisonDamage(0);
+      CombatFactory.poisonEntity(player, poisonSeverity, typeToken === "venom" || typeToken === "v" ? 2 : 1);
+      player.getPacketSender().sendMessage(`Poison test applied: ${typeToken}.`);
+      return true;
+    });
+
+    api.registerCommand("taskdebug", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.getPacketSender().sendMessage(`Active tasks :${TaskManager.getTaskAmount()}.`);
+      return true;
+    });
+
+    api.registerCommand("noclip", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.getPacketSender().sendEnableNoclip();
+      player.getPacketSender().sendMessage("Noclip enabled.");
+      return true;
+    });
+
+    api.registerCommand("up", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.moveTo(player.getLocation().clone().setZ(player.getLocation().getZ() + 1));
+      return true;
+    });
+
+    api.registerCommand("down", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const next = player.getLocation().clone().setZ(player.getLocation().getZ() - 1);
+      if (next.getZ() < 0) {
+        next.setZ(0);
+        player.getPacketSender().sendMessage("You cannot move to a negative plane!");
+      }
+      player.moveTo(next);
+      return true;
+    });
+
+    api.registerCommand("save", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      GameConstants.PLAYER_PERSISTENCE.save(player);
+      player.getPacketSender().sendMessage("Queued player save.");
+      return true;
+    });
+
+    api.registerCommand("reprocorruptsave", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+
+      const requested = commandTail(raw, parts);
+      const targetName = requested.length > 0 ? requested : player.getUsername();
+      if (!targetName) {
+        player.getPacketSender().sendMessage("Usage: ::reprocorruptsave [username]");
+        return true;
+      }
+
+      const corruptTargetSave = (overrideJson = null) => {
+        const filePath = resolveSaveFilePathForUsername(targetName);
+        if (!fs.existsSync(filePath)) {
+          player
+            .getPacketSender()
+            .sendMessage(`No save file found for ${targetName} at ${filePath}.`);
+          return;
+        }
+
+        const backupPath = `${filePath}.repro.bak.${Date.now()}`;
+        const original = fs.readFileSync(filePath, "utf8");
+        if (original.length < 4) {
+          player
+            .getPacketSender()
+            .sendMessage(`Save file is too small to corrupt safely: ${filePath}`);
+          return;
+        }
+
+        fs.writeFileSync(backupPath, original, "utf8");
+        const sourceJson = overrideJson ?? original;
+        const partialLength = Math.max(1, Math.floor(sourceJson.length * 0.45));
+        const partialJson = sourceJson.slice(0, partialLength);
+        // Simulate legacy non-atomic truncate+partial write interruption.
+        const fd = fs.openSync(filePath, "w");
+        try {
+          fs.writeFileSync(fd, partialJson, "utf8");
+          fs.fsyncSync(fd);
+        } finally {
+          fs.closeSync(fd);
+        }
+
+        ServerLogger.info(
+          `[admin] reprocorruptsave target=${targetName} mode=partial_non_atomic file=${filePath} backup=${backupPath} bytes=${partialLength}/${sourceJson.length}`
+        );
+
+        player.getPacketSender().sendMessage(
+          `Simulated interrupted save for ${targetName}. Backup: ${backupPath}`
+        );
+        player.getPacketSender().sendMessage(
+          "Relog target to reproduce persistence_load_failed from partial JSON."
+        );
+      };
+
+      const onlineTarget = World.getPlayerByName(targetName);
+      if (onlineTarget) {
+        const serializedLiveSave = JSON.stringify(PlayerSave.fromPlayer(onlineTarget), null, 2);
+        player
+          .getPacketSender()
+          .sendMessage(
+            `Forcing ${targetName} logout, then simulating interrupted non-atomic save write...`
+          );
+        onlineTarget.requestLogout();
+        TaskManager.submit(
+          new UpdateTask(2, () => {
+            if (World.getPlayerByName(targetName)) {
+              player
+                .getPacketSender()
+                .sendMessage(
+                  `Target ${targetName} is still online. Run ::reprocorruptsave again in a moment.`
+                );
+              return;
+            }
+            corruptTargetSave(serializedLiveSave);
+          })
+        );
+        return true;
+      }
+
+      corruptTargetSave();
+      return true;
+    });
+
+    api.registerCommand("saveall", ({ player }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      World.savePlayers();
+      player.getPacketSender().sendMessage("Queued save for all players.");
+      return true;
+    });
+
+    api.registerCommand("cwar", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const x = parseIntArg(parts[1]);
+      const y = parseIntArg(parts[2]);
+      if (x === null || y === null) {
+        return true;
+      }
+      player.getPacketSender().sendInterface(11169);
+      player.getPacketSender().sendInterfaceComponentMoval(x, y, 11332);
+      player.getPacketSender().sendMessage(`Sending RedX to X=${x}, Y=${y}`);
+      return true;
+    });
+
+    api.registerCommand("listsizes", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player
+        .getPacketSender()
+        .sendMessage(
+          `Players: ${Array.from(World.getPlayers()).length}, NPCs: ${World.getNpcs().sizeReturn()}, Objects: ${World.getObjects().length}, GroundItems: ${World.getItems().length}.`
+        );
+      return true;
+    });
+
+    const attackRangeFn = ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const distance = parts.length === 2 ? parseIntArg(parts[1]) : CombatFactory.getMethod(player).attackDistance(player);
+      if (distance === null) {
+        return true;
+      }
+      const playerLocation = player.getLocation().clone();
+      const start = player.getLocation().clone().translate(-(distance + 5), -(distance + 5), 0);
+      const end = player.getLocation().clone().translate(distance + 5, distance + 5, 0);
+      const deltas = new Set();
+
+      for (let x = start.getX(); x <= end.getX(); x++) {
+        for (let y = start.getY(); y <= end.getY(); y++) {
+          const tile = new Location(x, y);
+          if (tile.getDistance(playerLocation) !== distance) {
+            continue;
+          }
+          deltas.add(Location.delta(playerLocation, tile));
+          player.getPacketSender().sendGraphic(ATTACK_RANGE_DEBUG_GRAPHIC, tile);
+        }
+      }
+
+      if (devOnly(player)) {
+        console.log(`Deltas for distance of ${distance}:`);
+        console.log(deltas);
+      }
+      return true;
+    };
+
+    api.registerCommand("atkrange", attackRangeFn);
+    api.registerCommand("attackrange", attackRangeFn);
+
+    api.registerCommand("item", ({ player, parts }) => {
+      if (!requireRights(player, adminOrAbove)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      const amount = parts.length > 2 ? parseIntArg(parts[2]) : 1;
+      if (id === null || amount === null || id < 0 || amount <= 0) {
+        player.getPacketSender().sendMessage("Usage: ::item id [amount]");
+        return true;
+      }
+      const cappedAmount = Math.min(amount, Number.MAX_SAFE_INTEGER);
+      player.getInventory().adds(id, cappedAmount);
+      player
+        .getPacketSender()
+        .sendMessage(`Spawned item ${id} x${cappedAmount}.`);
+      return true;
+    });
+
+    api.registerCommand("unlockprayers", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const type = parseIntArg(parts[1]);
+      if (type === 0) {
+        player.setPreserveUnlocked(true);
+      } else if (type === 1) {
+        player.setRigourUnlocked(true);
+      } else if (type === 2) {
+        player.setAuguryUnlocked(true);
+      }
+      player.getPacketSender().sendConfig(709, player.isPreserveUnlocked() ? 1 : 0);
+      player.getPacketSender().sendConfig(711, player.isRigourUnlocked() ? 1 : 0);
+      player.getPacketSender().sendConfig(713, player.getAuguryUnlocked() ? 1 : 0);
+      return true;
+    });
+
+    api.registerCommand("gesell", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const id = parseIntArg(parts[1]);
+      if (id === null) {
+        return true;
+      }
+      const def = ItemDefinition.forId(id);
+      player
+        .getPacketSender()
+        .sendItemOnInterfaces(24780, id, 1)
+        .sendString(def.getName(), 24769)
+        .sendString(def.getExamine(), 24770);
+      return true;
+    });
+
+    api.registerCommand("flood", ({ player, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const amount = parseIntArg(parts[1]);
+      if (amount !== null) {
+        Server.getFlooder().login(amount);
+      }
+      return true;
+    });
+
+    api.registerCommand("reloadpunishments", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      PlayerPunishment.init();
+      player.getPacketSender().sendMessage("Reloaded");
+      return true;
+    });
+
+    api.registerCommand("reloadshops", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      try {
+        const loaded = new ShopDefinitionLoader().load();
+        const shopCount = ShopManager.reload();
+        if (loaded === false) {
+          player.getPacketSender().sendMessage(
+            "Some plugin shop definition sources failed to reload."
+          );
+        }
+        player.getPacketSender().sendMessage(`Reloaded shops (${shopCount}).`);
+      } catch (error) {
+        console.error(error);
+        player.getPacketSender().sendMessage("Error reloading shops.");
+      }
+      return true;
+    });
+
+    api.registerCommand("reloaddrops", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      try {
+        new NpcDropDefinitionLoader().load();
+        player.getPacketSender().sendMessage("Reloaded drops.");
+      } catch (error) {
+        console.error(error);
+        player.getPacketSender().sendMessage("Error reloading npc drops.");
+      }
+      return true;
+    });
+
+    api.registerCommand("reloadnpcspawns", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      try {
+        const loader = new NpcSpawnDefinitionLoader();
+        const loaded = loader.load();
+        if (loaded === false) {
+          player.getPacketSender().sendMessage("Error reloading npc spawns.");
+          return true;
+        }
+
+        const source = DefinitionLoader.getSourceNames(
+          NpcSpawnDefinitionLoader.DEFINITION_TYPE
+        ).join("+") || "none";
+        player
+          .getPacketSender()
+          .sendMessage(`Reloaded npc spawns from: ${source}.`);
+      } catch (error) {
+        console.error(error);
+        player.getPacketSender().sendMessage("Error reloading npc spawns.");
+      }
+      return true;
+    });
+
+    api.registerCommand("reloadnpcdefs", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.getPacketSender().sendMessage("Reloaded npc defs.");
+      return true;
+    });
+
+    api.registerCommand("logstatus", ({ player }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const levels = ServerLogger.getEnabledLevels().join(",") || "(none)";
+      const enabledTypes = ServerLogger.getEnabledTypes().join(",") || "(none)";
+      const disabledTypes = ServerLogger.getDisabledTypes().join(",") || "(none)";
+      player.getPacketSender().sendMessage(`Log levels: ${levels}`);
+      player.getPacketSender().sendMessage(`Enabled types: ${enabledTypes}`);
+      player.getPacketSender().sendMessage(`Disabled types: ${disabledTypes}`);
+      return true;
+    });
+
+    api.registerCommand("loglevels", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const values = parseCsvArgs(parts, 1);
+      if (values.length === 0) {
+        player.getPacketSender().sendMessage("Usage: ::loglevels debug,info,warn,error");
+        return true;
+      }
+      const valid = values.filter((value) =>
+        value === "debug" || value === "info" || value === "warn" || value === "error"
+      );
+      ServerLogger.setEnabledLevels(valid);
+      player.getPacketSender().sendMessage(`Updated log levels: ${valid.join(",") || "(none)"}`);
+      return true;
+    });
+
+    api.registerCommand("logtypeon", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const values = parseCsvArgs(parts, 1);
+      if (values.length === 0) {
+        player.getPacketSender().sendMessage("Usage: ::logtypeon plugin,packet.out,world");
+        return true;
+      }
+      const merged = new Set([...(ServerLogger.getEnabledTypes() || []), ...values]);
+      ServerLogger.setEnabledTypes(Array.from(merged));
+      player.getPacketSender().sendMessage(`Enabled log types: ${Array.from(merged).join(",")}`);
+      return true;
+    });
+
+    api.registerCommand("logtypeoff", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const values = parseCsvArgs(parts, 1);
+      if (values.length === 0) {
+        player.getPacketSender().sendMessage("Usage: ::logtypeoff plugin,packet.out,world");
+        return true;
+      }
+      const merged = new Set([...(ServerLogger.getDisabledTypes() || []), ...values]);
+      ServerLogger.setDisabledTypes(Array.from(merged));
+      player.getPacketSender().sendMessage(`Disabled log types: ${Array.from(merged).join(",")}`);
+      return true;
+    });
+
+    api.registerCommand("logtypeclear", ({ player, parts }) => {
+      if (!requireRights(player, devOnly)) {
+        return true;
+      }
+      const mode = String(parts[1] || "all").toLowerCase();
+      if (mode === "enabled" || mode === "all") {
+        ServerLogger.setEnabledTypes([]);
+      }
+      if (mode === "disabled" || mode === "all") {
+        ServerLogger.setDisabledTypes([]);
+      }
+      player.getPacketSender().sendMessage(
+        `Cleared log type filters (${mode}). Enabled: ${ServerLogger.getEnabledTypes().join(",") || "(none)"} Disabled: ${ServerLogger.getDisabledTypes().join(",") || "(none)"}`
+      );
+      return true;
+    });
+
+    api.registerCommand("reloaditems", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      player.getPacketSender().sendMessage("Reloaded item defs");
+      return true;
+    });
+
+    api.registerCommand("mute", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      const target = World.getPlayerByName(targetName);
+      if (!GameConstants.PLAYER_PERSISTENCE.exists(targetName) && !target) {
+        player.getPacketSender().sendMessage(`Player ${targetName} does not exist.`);
+      }
+      return true;
+    });
+
+    api.registerCommand("unmute", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      const target = World.getPlayerByName(targetName);
+      if (!GameConstants.PLAYER_PERSISTENCE.exists(targetName) && !target) {
+        player.getPacketSender().sendMessage(`Player ${targetName} does not exist.`);
+        return true;
+      }
+      if (!PlayerPunishment.muted(targetName)) {
+        player.getPacketSender().sendMessage(`Player ${targetName} does not have an active mute.`);
+      }
+      return true;
+    });
+
+    api.registerCommand("ipmute", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      const target = World.getPlayerByName(targetName);
+      if (!target) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is not online.`);
+      }
+      return true;
+    });
+
+    api.registerCommand("unipmute", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      const target = World.getPlayerByName(targetName);
+      if (!target) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is not online.`);
+        return true;
+      }
+      if (CombatFactory.inCombat(target)) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is in combat!`);
+      }
+      return true;
+    });
+
+    api.registerCommand("ban", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      const target = World.getPlayerByName(targetName);
+      if (!GameConstants.PLAYER_PERSISTENCE.exists(targetName) && !target) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is not a valid online player.`);
+        return true;
+      }
+      if (PlayerPunishment.banned(targetName)) {
+        player.getPacketSender().sendMessage(`Player ${targetName} already has an active ban.`);
+        if (target) {
+          target.requestLogout();
+        }
+      }
+      return true;
+    });
+
+    api.registerCommand("unban", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      if (!GameConstants.PLAYER_PERSISTENCE.exists(targetName)) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is not online.`);
+        return true;
+      }
+      if (!PlayerPunishment.banned(targetName)) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is not banned!`);
+      }
+      return true;
+    });
+
+    api.registerCommand("ipban", ({ player, raw, parts }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      const targetName = commandTail(raw, parts);
+      const target = World.getPlayerByName(targetName);
+      if (!target) {
+        player.getPacketSender().sendMessage(`Player ${targetName} is not online.`);
+      }
+      return true;
+    });
+
+    if (!Server.PRODUCTION) {
+      api.registerCommand("t", ({ player }) => {
+        if (!requireRights(player, devOnly)) {
+          return true;
+        }
+        console.log(RegionManager.wallsExist(player.getLocation().clone(), player.getPrivateArea()));
+        return true;
+      });
+    }
+
+    // Legacy no-op command stubs from previous command package.
+    api.registerCommand("barrage", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      return true;
+    });
+
+    api.registerCommand("dialogue", ({ player }) => {
+      if (!requireRights(player, ownerOrDev)) {
+        return true;
+      }
+      return true;
+    });
+  },
+};
