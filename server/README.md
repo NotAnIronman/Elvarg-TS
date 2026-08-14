@@ -1,28 +1,6 @@
 ﻿# Elvarg Web Server
  
- This is a TypeScript port of the the Java Server. The ultimate end goal is to have this running in a web browser tab (using webTRC for networking with the game client).
-
-## Why TypeScript over Java
-
-The original server behavior comes from Java, but this project runs in a web-first stack and targets browser-adjacent networking/runtime.
-
-Primary reasons:
-
-1. Shared language/tooling with the web client  
-Using TypeScript across client and server reduces context switching and integration friction.
-
-2. Faster protocol iteration  
-Packet compatibility work and gameplay parity fixes are easier to ship quickly in the Node/TS workflow.
-
-3. Plugin-driven development  
-Most custom behavior in this repo is plugin-based; TS/JS keeps extension and experimentation lightweight.
-
-4. Long-term platform alignment  
-The goal is web-oriented deployment, so TypeScript keeps architecture aligned with that direction.
-
-Tradeoff:
-
-Java remains the behavior reference. The TS server prioritizes parity with Java mechanics while optimizing for faster web-focused development.
+ This is a TypeScript port of the the Java Server https://github.com/RSPSApp/elvarg-rsps. The goal of this server is to have a modular/plugin based RSPS built in typescript with some accurate OSRS content (Combat, minigames etc) and highly intelligent player bots. The server is designed to be extensible via plugins. Combat should stay core, but any new content e.g. special attacks and effects should bolt on as plugins.
  
 ## Getting started
  

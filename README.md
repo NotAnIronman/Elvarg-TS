@@ -8,7 +8,7 @@ OSRS in the browser with a React/WebGL client and TypeScript WebSocket server.
 This repository contains:
 
 - [`client/`](client/) — `@xrsps/client` (browser app)
-- [`server/`](server/) — `@xrsps/server` (game server)
+- [`server/`](server/) — `@tobywisener/elvarg-web-server` (typescript upgrade of `@RSPSApp/elvarg-rsps`)
 - [`docs/`](docs/) — documentation site
 
 ## Quick Start
