@@ -270,7 +270,7 @@ export class Camera {
                 Camera.deltaTemp,
                 Camera.deltaTemp,
                 Camera.moveCameraRotOrigin,
-                this.getScenePitchRadians(),
+                -this.getScenePitchRadians(),
             );
         }
         vec3.rotateY(

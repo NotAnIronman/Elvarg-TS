@@ -308,7 +308,7 @@ export abstract class GameRenderer<T extends MapSquare = MapSquare> extends Rend
                     camera.move(0, clamp(-deltaMouseY, -100, 100) * 0.004, 0);
                 } else {
                     camera.updatePitch(camera.pitch, deltaMouseY * 0.9);
-                    camera.updateYaw(camera.yaw, deltaMouseX * -0.9);
+                    camera.updateYaw(camera.yaw, deltaMouseX * 0.9);
                 }
             }
         }
@@ -318,7 +318,7 @@ export abstract class GameRenderer<T extends MapSquare = MapSquare> extends Rend
         const deltaCamY = inputManager.getDeltaCameraY();
         if (deltaCamX !== 0 || deltaCamY !== 0) {
             camera.updatePitch(camera.pitch, deltaCamY * -0.9);
-            camera.updateYaw(camera.yaw, deltaCamX * -0.9);
+            camera.updateYaw(camera.yaw, deltaCamX * 0.9);
         }
 
         // Middle-mouse held + scroll: rotate camera (RuneLite parity).
