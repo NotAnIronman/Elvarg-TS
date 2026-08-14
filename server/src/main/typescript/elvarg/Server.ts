@@ -188,6 +188,19 @@ export class Server {
         process.env.DISABLE_PLAYER_BOTS = "1";
         console.info("[Server] --disablePlayerBots enabled");
       }
+      const stressTestArg = args.find((arg) => arg.startsWith("--stressTest"));
+      if (stressTestArg) {
+        const [, rawCount] = stressTestArg.split("=");
+        const count = rawCount ? Number(rawCount) : 2000;
+        process.env.STRESS_TEST_BOT_COUNT = String(
+          Number.isFinite(count) && count > 0 ? Math.floor(count) : 2000
+        );
+        // Stress-test bots replace the normal PvP/economy bot population.
+        process.env.DISABLE_PLAYER_BOTS = "1";
+        console.info(
+          `[Server] --stressTest enabled (${process.env.STRESS_TEST_BOT_COUNT} bots, PlayerBots disabled)`
+        );
+      }
 
       const cache = await CachePipeline.initialize();
       console.info(`[cache] active ${cache.name} (revision ${cache.revision})`);

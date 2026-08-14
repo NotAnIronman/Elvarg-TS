@@ -23,7 +23,10 @@ import { HitQueue } from './content/combat/hit/HitQueue';
 const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
 
 export class World {
-    private static readonly MAX_PLAYERS = 1024;
+    // 2048 leaves headroom above the 2000-bot stress-test mode (see
+    // StressTestBots.plugin.js) plus real players; protocol player-index
+    // encoding uses 16 bits, so this is nowhere near the wire limit.
+    private static readonly MAX_PLAYERS = 2048;
     private static readonly MAX_NPCS = 32768;
     private static readonly IDLE_BOT_PROCESS_STRIDE = 2;
     private static readonly BOT_PROCESS_LOD_CHUNK_SIZE_TILES = 32;
