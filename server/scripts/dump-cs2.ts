@@ -7,7 +7,7 @@ import { CacheIndexDat2 } from "../src/main/typescript/elvarg/game/cache/codec/r
 import { IndexType } from "../src/main/typescript/elvarg/game/cache/codec/rs/cache/IndexType";
 import { ByteBuffer } from "../src/main/typescript/elvarg/game/cache/codec/rs/io/ByteBuffer";
 
-const OPCODES_TS = "/Users/toby/rsps/xrsps-typescript/client/rs/cs2/Opcodes.ts";
+const OPCODES_TS = path.resolve(__dirname, "../../client/rs/cs2/Opcodes.ts");
 const opNames = new Map<number, string>();
 for (const line of fs.readFileSync(OPCODES_TS, "utf8").split("\n")) {
     const m = /^\s*([A-Z0-9_]+)\s*=\s*(\d+),/.exec(line);
