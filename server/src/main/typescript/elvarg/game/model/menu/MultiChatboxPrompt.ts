@@ -1,7 +1,4 @@
-import {
-  PluginButtonClickEvent,
-  PluginInterfaceActionClickEvent,
-} from "../../../plugins/PluginTypes";
+import { PluginInterfaceActionClickEvent } from "../../../plugins/PluginTypes";
 
 type MultiChatboxPromptCallback = (
   player: any,
@@ -16,25 +13,14 @@ type MultiChatboxPromptOption = {
 
 type PendingMultiChatboxPrompt = {
   pluginName: string;
-  title: string;
-  interfaceId: number;
-  firstOptionButtonId: number;
   options: MultiChatboxPromptOption[];
   expiresAt: number;
 };
 
 export class MultiChatboxPrompt {
   private static pendingPrompts = new WeakMap<any, PendingMultiChatboxPrompt>();
-  private static readonly LAYOUTS = new Map<
-    number,
-    { interfaceId: number; firstOptionButtonId: number }
-  >([
-    [1, { interfaceId: 13758, firstOptionButtonId: 13760 }],
-    [2, { interfaceId: 2459, firstOptionButtonId: 2461 }],
-    [3, { interfaceId: 2469, firstOptionButtonId: 2471 }],
-    [4, { interfaceId: 2480, firstOptionButtonId: 2482 }],
-    [5, { interfaceId: 2492, firstOptionButtonId: 2494 }],
-  ]);
+  private static readonly INTERFACE_ID = 219;
+  private static readonly OPTIONS_WIDGET_ID = (219 << 16) | 1;
   private static readonly PROMPT_TTL_MS = 30_000;
 
   public static showPrompt(
@@ -80,8 +66,7 @@ export class MultiChatboxPrompt {
       options.push({ text: optionText, callback });
     }
 
-    const layout = MultiChatboxPrompt.LAYOUTS.get(options.length);
-    if (!layout) {
+    if (options.length > 5) {
       console.warn(
         `[plugins] ${pluginName} attempted unsupported sendMultiChatboxPrompt option count=${options.length}`
       );
@@ -89,36 +74,22 @@ export class MultiChatboxPrompt {
     }
 
     const sender = player.getPacketSender();
-    sender.sendString(title, layout.firstOptionButtonId - 1);
-    for (let i = 0; i < options.length; i++) {
-      sender.sendString(options[i].text, layout.firstOptionButtonId + i);
-    }
-    sender.sendChatboxInterface(layout.interfaceId);
+    sender.sendChatboxInterface(MultiChatboxPrompt.INTERFACE_ID);
+    sender.sendClientScript(58, title, options.map((option) => option.text).join("|"));
+    sender.sendInterfaceFlagsRange(
+      MultiChatboxPrompt.OPTIONS_WIDGET_ID,
+      1,
+      options.length,
+      1
+    );
 
     MultiChatboxPrompt.pendingPrompts.set(player, {
       pluginName,
-      title,
-      interfaceId: layout.interfaceId,
-      firstOptionButtonId: layout.firstOptionButtonId,
       options,
       expiresAt: Date.now() + MultiChatboxPrompt.PROMPT_TTL_MS,
     });
 
     return true;
-  }
-
-  public static handleButtonClick(event: PluginButtonClickEvent): boolean {
-    const pending = MultiChatboxPrompt.pendingPrompts.get(event.player);
-    if (!pending) {
-      return false;
-    }
-    if (!Number.isInteger(pending.expiresAt) || pending.expiresAt < Date.now()) {
-      MultiChatboxPrompt.pendingPrompts.delete(event.player);
-      return false;
-    }
-
-    const optionIndex = event.buttonId - pending.firstOptionButtonId;
-    return MultiChatboxPrompt.selectOption(event.player, optionIndex);
   }
 
   public static handleInterfaceActionClick(
@@ -132,31 +103,11 @@ export class MultiChatboxPrompt {
       MultiChatboxPrompt.pendingPrompts.delete(event.player);
       return false;
     }
-    if (event.buttonId !== pending.interfaceId) {
+    if (event.buttonId !== MultiChatboxPrompt.OPTIONS_WIDGET_ID) {
       return false;
     }
 
-    const optionIndex = MultiChatboxPrompt.resolveOptionIndexFromAction(
-      event.action,
-      pending.options.length
-    );
-    return MultiChatboxPrompt.selectOption(event.player, optionIndex);
-  }
-
-  private static resolveOptionIndexFromAction(
-    action: number,
-    optionCount: number
-  ): number {
-    if (!Number.isInteger(action) || optionCount <= 0) {
-      return -1;
-    }
-    if (action >= 0 && action < optionCount) {
-      return action;
-    }
-    if (action >= 1 && action <= optionCount) {
-      return action - 1;
-    }
-    return -1;
+    return MultiChatboxPrompt.selectOption(event.player, event.action - 1);
   }
 
   private static selectOption(player: any, optionIndex: number): boolean {

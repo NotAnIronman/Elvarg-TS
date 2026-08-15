@@ -1022,11 +1022,6 @@ export class PluginManager {
       return false;
     }
 
-    if (MultiChatboxPrompt.handleButtonClick(event)) {
-      event.handled = true;
-      return true;
-    }
-
     for (const hook of PluginManager.buttonClickHooks) {
       if (event.handled) {
         break;

@@ -2,6 +2,7 @@ import * as assert from "node:assert/strict";
 import "../src/main/typescript/elvarg/game/content/combat/FightType";
 import "../src/main/typescript/elvarg/game/content/combat/WeaponProfile";
 import { Bank } from "../src/main/typescript/elvarg/game/model/container/impl/Bank";
+import { MultiChatboxPrompt } from "../src/main/typescript/elvarg/game/model/menu/MultiChatboxPrompt";
 
 const plugin = require("../plugins/objects/BankDepositBooth.plugin.js");
 
@@ -21,9 +22,9 @@ plugin.register({
   onItemAction: (handler: typeof itemHandler) => { itemHandler = handler; },
   onInterfaceActionButton: (_ids: number[], handler: typeof buttonHandler) => { buttonHandler = handler; },
   onItemOnObject: (handler: typeof itemOnObjectHandler) => { itemOnObjectHandler = handler; },
-  sendMultiChatboxPrompt: (_player: any, title: string, ...pairs: any[]) => {
+  sendMultiChatboxPrompt: (player: any, title: string, ...pairs: any[]) => {
     prompt = { title, pairs };
-    return true;
+    return MultiChatboxPrompt.showPrompt("BankDepositBooth", player, title, pairs);
   },
 });
 
@@ -47,6 +48,9 @@ const sent = {
   containers: [] as number[],
   flags: [] as number[][],
   animations: [] as number[],
+  chatboxes: [] as number[],
+  scripts: [] as any[][],
+  removals: 0,
 };
 const sender: any = {
   sendSubInterface: (...args: number[]) => { sent.subInterfaces.push(args); return sender; },
@@ -58,6 +62,9 @@ const sender: any = {
   sendSoundEffect: () => sender,
   sendEnterAmountPrompt: () => sender,
   sendMessage: () => sender,
+  sendChatboxInterface: (id: number) => { sent.chatboxes.push(id); return sender; },
+  sendClientScript: (...args: any[]) => { sent.scripts.push(args); return sender; },
+  sendInterfaceRemoval: () => { sent.removals++; return sender; },
 };
 let interfaceId = -1;
 const player: any = {
@@ -99,8 +106,23 @@ try {
   itemOnObjectHandler(useEvent);
   assert.strictEqual(useEvent.handled, true);
   assert.deepStrictEqual(prompt?.pairs.filter((_: any, index: number) => index % 2 === 0), ["1", "5", "10", "X", "All"]);
-  prompt?.pairs[3]();
+  assert.strictEqual(sent.chatboxes.at(-1), 219, "item-on-box must open the native chatmenu");
+  assert.deepStrictEqual(
+    sent.scripts.at(-1),
+    [58, "How many would you like to deposit?", "1|5|10|X|All"],
+    "item-on-box must populate the native chatmenu",
+  );
+  assert.deepStrictEqual(sent.flags.at(-1), [(219 << 16) | 1, 1, 5, 1]);
+  assert.strictEqual(MultiChatboxPrompt.handleInterfaceActionClick({
+    player,
+    buttonId: (219 << 16) | 1,
+    action: 2,
+    groupId: 219,
+    childId: 1,
+    handled: false,
+  }), true);
   assert.strictEqual(deposits.at(-1)?.[3], 5, "item-on-box quantity choice must be deposited");
+  assert.strictEqual(sent.removals, 1, "quantity choice must close the chatmenu");
   assert.ok(sent.animations.includes(834), "successful deposits must play the OSRS lever animation");
 } finally {
   Bank.deposit = originalDeposit;
