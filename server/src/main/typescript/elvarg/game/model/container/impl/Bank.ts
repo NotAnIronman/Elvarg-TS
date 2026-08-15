@@ -2,8 +2,6 @@ import { Player } from "../../../entity/impl/player/Player";
 import { Item } from "../../Item";
 import { ItemContainer } from "../ItemContainer";
 import { PlayerStatus } from "../../PlayerStatus";
-import { DialogueChainBuilder } from "../../dialogues/builders/DialogueChainBuilder";
-import { OptionDialogue } from "../../dialogues/entries/impl/OptionDialogue";
 import { ItemDefinition } from "../../../definition/ItemDefinition";
 import { StackType } from "../StackType";
 import { Equipment } from "./Equipment";
@@ -12,10 +10,7 @@ import { WeaponInterfaces } from "../../../content/combat/WeaponInterfaces";
 import { Inventory } from "./Inventory";
 import { Flag } from "../../Flag";
 import { BonusManager } from "../../equipment/BonusManager";
-import { GameObject } from "../../../entity/impl/object/GameObject";
-import { DialogueOption } from "../../dialogues/DialogueOption";
 import { EnteredSyntaxAction } from "../../EnteredSyntaxAction";
-import { DialogueOptionAction } from "../../dialogues/DialogueOptionAction";
 import { Sound } from "../../../Sound";
 import { Sounds } from "../../../Sounds";
 const getPluginManager = () =>
@@ -133,60 +128,6 @@ export class Bank extends ItemContainer {
         }
     }
 
-    private static DEPOSIT_BOX_OBJECT_IDS = [9398, 6948];
-
-    public static useItemOnDepositBox(player: Player, item: Item, slot: number, object: GameObject): boolean {
-        if (!this.DEPOSIT_BOX_OBJECT_IDS.includes(object.getId())) {
-            return false;
-        }
-
-        if (player.getInventory().getAmount(item.getId()) === 1) {
-            Bank.deposit(player, item.getId(), slot, 1, true);
-            return true;
-        }
-
-        const builder = new DialogueChainBuilder();
-
-        if (player.getInventory().getAmount(item.getId()) <= 5) {
-            builder.add(new OptionDialogue(0, new bankAction((option) => {
-                if (option === DialogueOption.FIRST_OPTION) {
-                    Bank.deposit(player, item.getId(), slot, 1, true);
-                } else {
-                    Bank.deposit(player, item.getId(), slot, 5, true);
-                }
-                player.getPacketSender().sendInterfaceRemoval();
-            }), "One", "Five"));
-        } else if (player.getInventory().getAmount(item.getId()) <= 10) {
-            builder.add(new OptionDialogue(0, new bankAction((option) => {
-                if (option === DialogueOption.FIRST_OPTION) {
-                    Bank.deposit(player, item.getId(), slot, 1, true);
-                } else if (option === DialogueOption.SECOND_OPTION) {
-                    Bank.deposit(player, item.getId(), slot, 5, true);
-                } else {
-                    Bank.deposit(player, item.getId(), slot, 10, true);
-                }
-                player.getPacketSender().sendInterfaceRemoval();
-            }), "One", "Five", "Ten"));
-        } else {
-            builder.add(new OptionDialogue(0, new bankAction((option) => {
-                if (option === DialogueOption.FIRST_OPTION) {
-                    Bank.deposit(player, item.getId(), slot, 1, true);
-                } else if (option === DialogueOption.SECOND_OPTION) {
-                    Bank.deposit(player, item.getId(), slot, 5, true);
-                } else if (option === DialogueOption.THIRD_OPTION) {
-                    Bank.deposit(player, item.getId(), slot, 10, true);
-                } else {
-                    Bank.deposit(player, item.getId(), slot, player.getInventory().getAmount(item.getId()), true);
-                }
-                player.getPacketSender().sendInterfaceRemoval();
-            }), "One", "Five", "Ten", "All"));
-        }
-
-        // TODO: Fix dialogues
-        //player.getDialogueManager().startDialogues(builder);
-        return true;
-    }
-
     public static deposits(player: Player, item: number, slot: number, amount: number) {
         this.deposit(player, item, slot, amount, false);
     }
@@ -201,7 +142,7 @@ export class Bank extends ItemContainer {
      */
 
     public static deposit(player: Player, item: number, slot: number, amount: number, ignore: boolean) {
-        if (ignore || Bank.isOpen(player) || player.getInterfaceId() === 4465 /* Bank deposit booth */) {
+        if (ignore || Bank.isOpen(player)) {
             if (player.getInventory().getItems()[slot].getId() !== item) {
                 return;
             }
@@ -840,16 +781,6 @@ export class Bank extends ItemContainer {
         }
 
         return this;
-    }
-
-}
-
-class bankAction implements DialogueOptionAction{
-    constructor(private readonly execFunc: Function){
-
-    }
-    executeOption(option: DialogueOption): void {
-        this.execFunc();
     }
 
 }

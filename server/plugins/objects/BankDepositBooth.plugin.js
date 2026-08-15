@@ -1,33 +1,35 @@
 const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/impl/Bank");
+const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Sound } = require("../../src/main/typescript/elvarg/game/Sound");
 const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
-let pluginApi;
 const { ObjectIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 
-// OpenRune cache names: interface.bank_depositbox and its inventory controls.
-const IFACE = 192;
-const CONTAINER = (IFACE << 16) | 24; // component.bank_depositbox:inventory
-const BTN_DEPOSIT = new Set([
-  (IFACE << 16) | 31, // component.bank_depositbox:deposit_inv
-  (IFACE << 16) | 30, // component.bank_depositbox:deposit_worn
-]);
-// Deposit quantity per right-click option on a container item, matching
-// OSRS's Deposit-1/5/10/All/X convention. clickType 5 (X) prompts for a
-// custom amount instead of having a fixed one.
-const DEPOSIT_AMOUNT_BY_CLICK_TYPE = { 1: 1, 2: 5, 3: 10, 4: Number.MAX_SAFE_INTEGER };
+let pluginApi;
 
-const DEPOSIT_BOX_IDS = [
-  ObjectIds.BANK_DEPOSIT_BOX,
-  ObjectIds.BANK_DEPOSIT_BOX_2,
-  ObjectIds.BANK_DEPOSIT_BOX_3,
-  ObjectIds.BANK_DEPOSIT_BOX_4,
-  ObjectIds.BANK_DEPOSIT_BOX_5,
-  ObjectIds.BANK_DEPOSIT_BOX_6,
-  ObjectIds.BANK_DEPOSIT_BOX_7,
-  ObjectIds.BANK_DEPOSIT_BOX_8,
-  ObjectIds.BANK_DEPOSIT_BOX_9,
-  ObjectIds.DOOR_223,
-].filter((id) => Number.isInteger(id));
+// RuneLite/OpenRune: interface.bank_depositbox and its cache-native components.
+const IFACE = 192;
+const MAIN_MODAL = (161 << 16) | 16;
+const uid = (child) => (IFACE << 16) | child;
+const CONTAINER = uid(24);
+const BTN_DEPOSIT_WORN = uid(30);
+const BTN_DEPOSIT_INV = uid(31);
+const BTN_QUANTITY_X = uid(38);
+const BTN_QUANTITIES = new Map([
+  [uid(35), 1],
+  [uid(36), 5],
+  [uid(37), 10],
+  [uid(39), Number.MAX_SAFE_INTEGER],
+]);
+const BUTTONS = [BTN_DEPOSIT_WORN, BTN_DEPOSIT_INV, BTN_QUANTITY_X, ...BTN_QUANTITIES.keys()];
+const QUANTITY_MODE_VARBIT = 4430;
+const QUANTITY_INPUT_VARP = 1794;
+const QUANTITY_ATTRIBUTE = "bank-deposit-box:quantity";
+const DEPOSIT_ANIMATION = new Animation(834); // seq.human_leverdown
+const CONTAINER_FLAGS = 0x2047e; // Op1-6, Op10, Depth1
+
+const DEPOSIT_BOX_IDS = Object.entries(ObjectIds)
+  .filter(([name, id]) => /^BANK_DEPOSIT_BOX(?:_\d+)?$/.test(name) && Number.isInteger(id))
+  .map(([, id]) => id);
 
 function refresh(player) {
   const sender = player?.getPacketSender?.();
@@ -36,10 +38,29 @@ function refresh(player) {
   sender.sendItemContainer(player.getInventory(), CONTAINER);
 }
 
+function getQuantity(player) {
+  const amount = player?.getAttribute?.(QUANTITY_ATTRIBUTE);
+  return Number.isInteger(amount) && amount > 0 ? amount : 1;
+}
+
+function setQuantity(player, amount) {
+  const mode = amount === 1 ? 0
+    : amount === 5 ? 1
+      : amount === 10 ? 4
+        : amount === Number.MAX_SAFE_INTEGER ? 2 : 3;
+  player.setAttribute?.(QUANTITY_ATTRIBUTE, amount);
+  const sender = player.getPacketSender();
+  if (mode === 3) sender.sendConfig(QUANTITY_INPUT_VARP, Math.min(amount, 0x7fffffff));
+  sender.sendVarbit(QUANTITY_MODE_VARBIT, mode);
+}
+
 function open(player) {
   const sender = player?.getPacketSender?.();
   if (!sender) return;
-  sender.sendInterface(IFACE);
+  player.setInterfaceId(IFACE);
+  sender.sendSubInterface(MAIN_MODAL, IFACE, 0);
+  sender.sendInterfaceFlagsRange(CONTAINER, 0, 27, CONTAINER_FLAGS);
+  setQuantity(player, getQuantity(player));
   refresh(player);
   Sounds.sendSound(player, Sound.CONTAINER_OPEN);
 }
@@ -47,54 +68,72 @@ function open(player) {
 function deposit(player, slot, itemId, amount) {
   const inv = player?.getInventory?.();
   const slotItem = inv?.forSlot?.(slot);
-  if (!inv || !slotItem || slotItem.getId() !== itemId) return;
+  if (!inv || !slotItem || slotItem.getId() !== itemId) return false;
 
-  const max = inv.getAmount(itemId);
-  const finalAmount = Math.max(0, Math.min(amount, max));
-  if (finalAmount <= 0) return;
+  const before = inv.getAmount(itemId);
+  const finalAmount = Math.max(0, Math.min(amount, before));
+  if (finalAmount <= 0) return false;
 
-  Bank.deposits(player, itemId, slot, finalAmount);
+  Bank.deposit(player, itemId, slot, finalAmount, true);
+  if (inv.getAmount(itemId) >= before) return false;
+  player.performAnimation?.(DEPOSIT_ANIMATION);
   refresh(player);
+  return true;
 }
 
-// interfaceId/itemId/slot/clickType are already decoded for us here - the
-// live ItemActionPacketListener.handleAction (called from NetworkBuilder.ts
-// for every inventory/container item click) parses the packet once and
-// fires pluginApi.emitItemAction with the result, for every clickType
-// (1 through 5) uniformly. Filtering on interfaceId === CONTAINER is the
-// same scoping the old raw-opcode iface check used to do.
+function promptAmount(player, callback) {
+  player.setEnteredAmountAction({ execute: callback });
+  player.getPacketSender().sendEnterAmountPrompt("How many would you like to deposit?");
+}
+
 function handleDepositContainerAction(player, interfaceId, itemId, slot, clickType) {
-  if (interfaceId !== CONTAINER) return false;
-  if (pluginApi.emitCanBank(player) === false) {
-    return true;
-  }
+  if (interfaceId !== CONTAINER || player.getInterfaceId?.() !== IFACE) return false;
+  if (pluginApi.emitCanBank(player) === false) return true;
 
-  const amount = DEPOSIT_AMOUNT_BY_CLICK_TYPE[clickType];
-  if (amount === undefined) {
-    player.setEnteredAmountAction({
-      execute: (entered) => deposit(player, slot, itemId, entered),
-    });
-    player.getPacketSender().sendEnterAmountPrompt("How many would you like to deposit?");
-    return true;
+  // cache script bank_depositbox_drawslot: op1 is selected quantity,
+  // op2-6 are 1/5/10/X/All, and op10 is Examine.
+  const amount = {
+    1: getQuantity(player),
+    2: 1,
+    3: 5,
+    4: 10,
+    6: Number.MAX_SAFE_INTEGER,
+  }[clickType];
+  if (amount !== undefined) {
+    deposit(player, slot, itemId, amount);
+  } else if (clickType === 5) {
+    promptAmount(player, (entered) => deposit(player, slot, itemId, entered));
+  } else if (clickType === 10) {
+    const definition = player.getInventory().forSlot(slot)?.getDefinition?.();
+    player.getPacketSender().sendMessage(
+      definition?.getExamine?.() || definition?.getName?.() || "Nothing interesting happens."
+    );
+  } else {
+    return false;
   }
-
-  deposit(player, slot, itemId, amount);
   return true;
 }
 
 function handleDepositButton(player, button) {
   if (!player || player.getInterfaceId?.() !== IFACE) return false;
-  if (pluginApi.emitCanBank(player) === false) {
+  if (pluginApi.emitCanBank(player) === false) return true;
+
+  const quantity = BTN_QUANTITIES.get(button);
+  if (quantity) {
+    setQuantity(player, quantity);
     return true;
   }
-  if (BTN_DEPOSIT.has(button)) {
-    Bank.depositItems(
-      player,
-      button === ((IFACE << 16) | 30)
-        ? player.getEquipment()
-        : player.getInventory(),
-      true
-    );
+  if (button === BTN_QUANTITY_X) {
+    promptAmount(player, (entered) => {
+      if (entered > 0) setQuantity(player, entered);
+    });
+    return true;
+  }
+  if (button === BTN_DEPOSIT_WORN || button === BTN_DEPOSIT_INV) {
+    const from = button === BTN_DEPOSIT_WORN ? player.getEquipment() : player.getInventory();
+    const itemCount = from.getValidItems().length;
+    Bank.depositItems(player, from, true);
+    if (from.getValidItems().length < itemCount) player.performAnimation?.(DEPOSIT_ANIMATION);
     refresh(player);
     return true;
   }
@@ -107,18 +146,34 @@ function isDepositBooth(event) {
   return typeof name === "string" && name.trim().toLowerCase() === "bank deposit box";
 }
 
+function promptItemOnBooth(event) {
+  const { player, itemId, itemSlot } = event;
+  const count = player.getInventory().getAmount(itemId);
+  if (count <= 0) return;
+  if (count === 1) {
+    deposit(player, itemSlot, itemId, 1);
+    return;
+  }
+
+  const choose = (amount) => () => deposit(player, itemSlot, itemId, amount);
+  const x = () => promptAmount(player, (amount) => deposit(player, itemSlot, itemId, amount));
+  const options = count > 10
+    ? ["1", choose(1), "5", choose(5), "10", choose(10), "X", x, "All", choose(Number.MAX_SAFE_INTEGER)]
+    : count > 5
+      ? ["1", choose(1), "5", choose(5), "X", x, "All", choose(Number.MAX_SAFE_INTEGER)]
+      : ["1", choose(1), "X", x, "All", choose(Number.MAX_SAFE_INTEGER)];
+  pluginApi.sendMultiChatboxPrompt(player, "How many would you like to deposit?", ...options);
+}
+
 module.exports = {
   name: "BankDepositBooth",
   register(api) {
     pluginApi = api;
     api.onObjectFirstClick(DEPOSIT_BOX_IDS, (event) => {
       if (!isDepositBooth(event)) return;
-      if (pluginApi.emitCanBank(event.player) === false) {
-        event.handled = true;
-        return;
-      }
-      open(event.player);
       event.handled = true;
+      if (pluginApi.emitCanBank(event.player) === false) return;
+      open(event.player);
     });
 
     api.onItemAction((event) => {
@@ -127,11 +182,15 @@ module.exports = {
       }
     });
 
-    api.onInterfaceActionButton([...BTN_DEPOSIT], (event) => {
-      if (handleDepositButton(event.player, event.buttonId)) {
-        return true;
-      }
-      return false;
+    api.onInterfaceActionButton(BUTTONS, (event) =>
+      handleDepositButton(event.player, event.buttonId)
+    );
+
+    api.onItemOnObject((event) => {
+      if (!isDepositBooth(event)) return;
+      event.handled = true;
+      if (pluginApi.emitCanBank(event.player) === false) return;
+      promptItemOnBooth(event);
     });
   },
 };
