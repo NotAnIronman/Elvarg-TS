@@ -355,7 +355,7 @@ export class PacketSender {
     // decoding group 162 directly from the cache. Child 9 of 161 is an
     // unrelated 0x0 icon-cluster anchor nested under the sidebar tree.
     this.chatboxGroupId = id;
-    if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub(CHATBOX_MODAL_TARGET_UID, id))) return this;
+    if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub(CHATBOX_MODAL_TARGET_UID, id, 0))) return this;
   }
 
   public sendInterfaceSet(interfaceId: number, sidebarInterfaceId: number) {

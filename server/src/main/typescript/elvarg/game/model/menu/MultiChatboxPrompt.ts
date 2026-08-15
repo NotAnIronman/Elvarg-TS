@@ -74,6 +74,8 @@ export class MultiChatboxPrompt {
     }
 
     const sender = player.getPacketSender();
+    sender.sendInterfaceScript(2379);
+    sender.sendVarbit(10670, 1);
     sender.sendChatboxInterface(MultiChatboxPrompt.INTERFACE_ID);
     sender.sendClientScript(58, title, options.map((option) => option.text).join("|"));
     sender.sendInterfaceFlagsRange(

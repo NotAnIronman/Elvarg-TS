@@ -50,13 +50,15 @@ const sent = {
   animations: [] as number[],
   chatboxes: [] as number[],
   scripts: [] as any[][],
+  interfaceScripts: [] as any[][],
+  varbits: [] as number[][],
   removals: 0,
 };
 const sender: any = {
   sendSubInterface: (...args: number[]) => { sent.subInterfaces.push(args); return sender; },
   sendInterfaceFlagsRange: (...args: number[]) => { sent.flags.push(args); return sender; },
   sendConfig: () => sender,
-  sendVarbit: () => sender,
+  sendVarbit: (...args: number[]) => { sent.varbits.push(args); return sender; },
   clearItemOnInterface: () => sender,
   sendItemContainer: (_container: any, id: number) => { sent.containers.push(id); return sender; },
   sendSoundEffect: () => sender,
@@ -64,6 +66,7 @@ const sender: any = {
   sendMessage: () => sender,
   sendChatboxInterface: (id: number) => { sent.chatboxes.push(id); return sender; },
   sendClientScript: (...args: any[]) => { sent.scripts.push(args); return sender; },
+  sendInterfaceScript: (...args: any[]) => { sent.interfaceScripts.push(args); return sender; },
   sendInterfaceRemoval: () => { sent.removals++; return sender; },
 };
 let interfaceId = -1;
@@ -106,6 +109,8 @@ try {
   itemOnObjectHandler(useEvent);
   assert.strictEqual(useEvent.handled, true);
   assert.deepStrictEqual(prompt?.pairs.filter((_: any, index: number) => index % 2 === 0), ["1", "5", "10", "X", "All"]);
+  assert.deepStrictEqual(sent.interfaceScripts.at(-1), [2379], "item-on-box must reset the full chatbox background");
+  assert.deepStrictEqual(sent.varbits.at(-1), [10670, 1], "item-on-box must unclamp the chatbox modal");
   assert.strictEqual(sent.chatboxes.at(-1), 219, "item-on-box must open the native chatmenu");
   assert.deepStrictEqual(
     sent.scripts.at(-1),
