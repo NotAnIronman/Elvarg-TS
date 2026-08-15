@@ -544,7 +544,8 @@ export class CombatFactory {
         // Add this hit to the target's hitQueue.
         target.getCombat().getHitQueue().addPendingHit(
             qHit,
-            World.getProcessCycle() + qHit.getDelay(),
+            World.getProcessCycle() + qHit.getDelay() +
+                (attacker.isPlayer() && qHit.getCombatType() === CombatType.MELEE ? 1 : 0),
         );
     }
 
@@ -578,8 +579,14 @@ export class CombatFactory {
         const combatType = resolvedHit.getCombatType();
         const damage = resolvedHit.getTotalDamage();
 
-        // Do block animation.
-        target.performAnimation(new Animation(target.getBlockAnim()));
+        // Melee blocks play when the attack is launched; projectiles block on a non-fatal impact.
+        if (
+            combatType !== CombatType.MELEE &&
+            target.getHitpoints() >
+                target.getCombat().getHitQueue().getQueuedDamage() + damage
+        ) {
+            target.performAnimation(new Animation(target.getBlockAnim()));
+        }
 
         // Target-side player effects.
         if (target.isPlayer()) {
@@ -967,6 +974,18 @@ export class CombatFactory {
 
             if (target.getMovementQueue) {
                 target.getMovementQueue().reset();
+            }
+            if (
+                target.isNpc() &&
+                (currentTarget == null ||
+                    currentTarget.getHitpoints() <= 0 ||
+                    !currentTarget.isRegistered())
+            ) {
+                const attackSpeed = Math.max(
+                    1,
+                    CombatFactory.getMethod(target).attackSpeed(target) | 0,
+                );
+                target.getCombat().extendAttackDelay(Math.floor(attackSpeed / 2));
             }
             TaskManager.submit(new CombatFactoryTask(1, target, false, () => {
                 target.getCombat().attack(attacker);

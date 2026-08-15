@@ -23,7 +23,7 @@ export class NPCDeathTask extends Task {
      * @param npc The npc being killed.
      */
     constructor(npc: NPC) {
-        super(2);
+        super(1);
         this.npc = npc;
         this.ticks = 1;
     }
@@ -37,7 +37,9 @@ export class NPCDeathTask extends Task {
                 const deathSound = this.npc.getCurrentDefinition().getDeathSound();
                 if (deathSound > 0) Sounds.sendSound(this.npc, new Sound(deathSound, 1, 0, 0));
                 this.npc.getCombat().reset();
+                this.npc.getCombat().setUnderAttack(null);
                 this.npc.setMobileInteraction(null);
+                this.setDelay(2);
                 break;
             case 0:
                 if (this.killer != null) {

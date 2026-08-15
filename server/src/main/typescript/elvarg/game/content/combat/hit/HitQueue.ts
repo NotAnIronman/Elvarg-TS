@@ -68,6 +68,10 @@ export class HitQueue {
         return this.pendingHits.length > 0 || this.pendingDamage.length > 0;
     }
 
+    getQueuedDamage(): number {
+        return this.pendingDamage.reduce((total, hit) => total + hit.getDamage(), 0);
+    }
+
     getAccumulatedDamage(): number {
         let damage = 0;
         const imminentCycle = World.getProcessCycle() + 2;

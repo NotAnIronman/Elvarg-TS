@@ -12,10 +12,12 @@ import { CombatConstants } from "./CombatConstants";
 import { CombatFactory, CanAttackResponse } from "./CombatFactory";
 import { CombatRange } from "./CombatRange";
 import { CombatSpecial } from "./CombatSpecial";
+import { CombatType } from "./CombatType";
 import type { CombatSpell } from "./magic/CombatSpell";
 import type { CombatMethod } from "./method/CombatMethod";
 import { GraniteMaulCombatMethod } from "./method/impl/specials/GraniteMaulCombatMethod";
 import { Ammunition, RangedData, RangedWeapon } from "./ranged/RangedData";
+import { Animation } from "../../model/Animation";
 
 type RouteState = {
     target: Mobile;
@@ -139,6 +141,9 @@ export class Combat {
                 method.start(this.character, target);
                 const hits = method.hits(this.character, target);
                 if (hits == null) return false;
+                if (hits.length > 0 && method.type() === CombatType.MELEE) {
+                    target.performAnimation(new Animation(target.getBlockAnim()));
+                }
                 for (const hit of hits) CombatFactory.addPendingHit(hit);
                 method.finished(this.character, target);
 
