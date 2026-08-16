@@ -1,13 +1,24 @@
-// Network stress-testing mode: spawns a large number of bare-bones player
-// bots that just randomly walk around. No PvP, no economy behaviors -
-// this exists purely to generate player-count and movement-packet load.
+// Network stress-testing mode: spawns a large number of equipped player
+// bots that occasionally walk, chat, and emote. No PvP or economy behaviors -
+// this exists purely to generate realistic player-update load.
 // Enabled via `--stressTest[=count]` (see Server.ts), off by default.
+const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
-const { MovementQueue } = require("../../src/main/typescript/elvarg/game/model/movement/MovementQueue");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { createBotPlayer } = require("./behaviours/spawn/BotPlayerFactory");
 const { randomInRange } = require("./behaviours/navigation/BotNavigation");
 const { ATTR_SKIP_PERSISTENCE } = require("./runtime/BotPersistenceConstants");
+const {
+  buildRoamingPvpMetadata,
+} = require("./behaviours/pvp/PvpAssignment");
+const {
+  applyGeneratedPvpLoadout,
+} = require("./behaviours/policies/PvpLoadoutPolicy");
+const {
+  nextStressBotActivityTick,
+  randomClippedStepWithinBounds,
+  shouldTakeStressBotStep,
+} = require("./StressTestBotMovement");
 
 const GRAND_EXCHANGE_BOUNDS = Object.freeze({
   minX: 3152,
@@ -19,7 +30,23 @@ const GRAND_EXCHANGE_BOUNDS = Object.freeze({
 const SPAWN_TILE_PROBE_LIMIT = 40;
 const SPAWN_BATCH_SIZE = 50;
 const SPAWN_BATCH_DELAY_MS = 20;
-const WALK_STEP_SIZE = 1;
+const CHAT_DELAY_TICKS = Object.freeze({ min: 14, max: 40 });
+const EMOTE_DELAY_TICKS = Object.freeze({ min: 20, max: 60 });
+const CHAT_MESSAGES = Object.freeze([
+  "Anyone want to fight?",
+  "Good luck!",
+  "Nice gear.",
+  "Selling loot!",
+  "Buying supplies.",
+  "What are you training?",
+  "Anyone doing Castle Wars?",
+  "That was close.",
+  "Need food.",
+  "Back in a minute.",
+]);
+const EMOTES = Object.freeze([855, 856, 858, 857, 863, 862, 864, 861, 866, 865].map(
+  (id) => new Animation(id)
+));
 
 function parseStressBotCount() {
   const raw = process.env.STRESS_TEST_BOT_COUNT;
@@ -61,6 +88,8 @@ module.exports = {
 
     const RegionManager = api.getRegionManager();
     const players = [];
+    let loadoutFailures = 0;
+    let activityTick = 0;
 
     const spawnOne = (index) => {
       const location = findWalkableTile(RegionManager, GRAND_EXCHANGE_BOUNDS);
@@ -76,8 +105,25 @@ module.exports = {
         return;
       }
       bot.setPlayerBot?.(true);
+      try {
+        if (!applyGeneratedPvpLoadout(
+          bot,
+          { pvp: buildRoamingPvpMetadata({ excludeF2p: true }) }
+        )) {
+          loadoutFailures += 1;
+        }
+      } catch (error) {
+        loadoutFailures += 1;
+        if (loadoutFailures === 1) {
+          api.log("stress_test_bot_loadout_failed", { error: String(error) });
+        }
+      }
       bot.setAttribute?.(ATTR_SKIP_PERSISTENCE, true);
-      players.push(bot);
+      players.push({
+        player: bot,
+        nextChatTick: nextStressBotActivityTick(activityTick, 1, CHAT_DELAY_TICKS.max),
+        nextEmoteTick: nextStressBotActivityTick(activityTick, 2, EMOTE_DELAY_TICKS.max),
+      });
     };
 
     let cursor = 0;
@@ -94,6 +140,7 @@ module.exports = {
       api.log("stress_test_bots_spawned", {
         requested: requestedCount,
         spawned: players.length,
+        loadoutFailures,
       });
     };
     setTimeout(spawnBatch, 0);
@@ -101,11 +148,31 @@ module.exports = {
     api.getTaskManager().submit(
       new (class extends Task {
         execute() {
-          for (const player of players) {
+          activityTick += 1;
+          for (const activity of players) {
+            const { player } = activity;
             if (!player.isRegistered?.()) {
               continue;
             }
-            MovementQueue.randomClippedStep(player, WALK_STEP_SIZE);
+            if (shouldTakeStressBotStep()) {
+              randomClippedStepWithinBounds(player, GRAND_EXCHANGE_BOUNDS);
+            }
+            if (activityTick >= activity.nextChatTick) {
+              player.forceChat(CHAT_MESSAGES[randomInRange(0, CHAT_MESSAGES.length - 1)]);
+              activity.nextChatTick = nextStressBotActivityTick(
+                activityTick,
+                CHAT_DELAY_TICKS.min,
+                CHAT_DELAY_TICKS.max
+              );
+            }
+            if (activityTick >= activity.nextEmoteTick) {
+              player.performAnimation(EMOTES[randomInRange(0, EMOTES.length - 1)]);
+              activity.nextEmoteTick = nextStressBotActivityTick(
+                activityTick,
+                EMOTE_DELAY_TICKS.min,
+                EMOTE_DELAY_TICKS.max
+              );
+            }
           }
         }
       })(1)
