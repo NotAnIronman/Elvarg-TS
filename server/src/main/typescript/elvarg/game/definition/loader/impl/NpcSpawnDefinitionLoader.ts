@@ -122,7 +122,6 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
                 describedNpc.setDescription(definition.getDescription());
             }
             if (World.getNpcs().add(npc)) {
-                World.registerNpcPosition(npc);
                 NpcSpawnDefinitionLoader.spawnedNpcs.add(npc);
                 applied++;
             }
@@ -152,7 +151,6 @@ export class NpcSpawnDefinitionLoader extends DefinitionLoader {
                 removeQueue.splice(index, 1);
             }
             if (npc.isRegistered()) {
-                World.unregisterNpcPosition(npc);
                 World.getNpcs().remove(npc);
             }
         }

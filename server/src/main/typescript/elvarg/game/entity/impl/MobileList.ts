@@ -54,9 +54,13 @@ export class MobileList<E extends Mobile> implements Iterable<E> {
     private capacity: number;
     public characters: E[];
     private size: number;
+    private onAdded?: (mobile: E) => void;
+    private onRemoved?: (mobile: E) => void;
 
-    constructor(capacity: number) {
+    constructor(capacity: number, onAdded?: (mobile: E) => void, onRemoved?: (mobile: E) => void) {
         this.capacity = ++capacity;
+        this.onAdded = onAdded;
+        this.onRemoved = onRemoved;
         // Pre-fill with null so iteration skips empty slots cleanly.
         this.characters = new Array(capacity).fill(null as any);
         this.size = 0;
@@ -82,6 +86,7 @@ export class MobileList<E extends Mobile> implements Iterable<E> {
               this.characters[index] = e;
               e.onAdd();
               this.size++;
+              this.onAdded?.(e);
               return true;
             }
           }
@@ -97,6 +102,7 @@ export class MobileList<E extends Mobile> implements Iterable<E> {
             e.setRegistered(false);
             this.characters[e.getIndex()] = null;
             this.slotQueue.push(e.getIndex());
+            this.onRemoved?.(e);
             e.onRemove();
             this.size--;
             return true;
@@ -177,6 +183,7 @@ export class MobileList<E extends Mobile> implements Iterable<E> {
             item.setRegistered(false);
             this.characters[item.getIndex()] = null as any;
             this.slotQueue.push(item.getIndex());
+            this.onRemoved?.(item);
             item.onRemove();
             this.size--;
         }

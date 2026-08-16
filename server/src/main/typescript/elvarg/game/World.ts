@@ -39,7 +39,11 @@ export class World {
     private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
-    private static npcs: MobileList<NPC> = new MobileList<NPC>(World.MAX_NPCS);
+    private static npcs: MobileList<NPC> = new MobileList<NPC>(
+        World.MAX_NPCS,
+        (npc) => World.registerNpcPosition(npc),
+        (npc) => World.unregisterNpcPosition(npc)
+    );
     private static items: ItemOnGround[] = [];
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];
@@ -852,7 +856,6 @@ export class World {
                     });
                     continue;
                 }
-                World.registerNpcPosition(npc);
                 if (typeof npc.isPet === "function" && npc.isPet()) {
                     const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;
                     const ownerName = owner && typeof owner.getUsername === "function"
@@ -877,7 +880,6 @@ export class World {
                 const wasRegistered =
                     typeof npc.isRegistered === "function" ? npc.isRegistered() : null;
                 const indexBefore = typeof npc.getIndex === "function" ? npc.getIndex() : null;
-                World.unregisterNpcPosition(npc);
                 World.npcs.remove(npc);
                 if (typeof npc.isPet === "function" && npc.isPet()) {
                     const owner: any = typeof npc.getOwner === "function" ? npc.getOwner() : null;

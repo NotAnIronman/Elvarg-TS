@@ -403,13 +403,9 @@ export class MovementQueue {
         if (walkPoint != null && walkPoint.direction != Direction.NONE) {
             let next: Location = walkPoint.position;
             if (ServerPerf.measurePhase("movement.process.walk_check", () => this.canWalkTo(next))) {
-                const previousLocation = this.character.getLocation();
                 this.followX = oldPosition.getX();
                 this.followY = oldPosition.getY();
                 this.character.setLocation(next);
-                if (this.character.isNpc()) {
-                    World.onNpcMoved(this.character as NPC, previousLocation, next);
-                }
                 this.character.setWalkingDirection(walkPoint.direction);
                 moved = true;
             } else {
@@ -422,14 +418,10 @@ export class MovementQueue {
         if (runPoint != null && runPoint.direction != Direction.NONE) {
             let next: Location = runPoint.position;
             if (ServerPerf.measurePhase("movement.process.run_check", () => this.canWalkTo(next))) {
-                const previousLocation = this.character.getLocation();
                 this.followX = oldPosition.getX();
                 this.followY = oldPosition.getY();
                 oldPosition = next;
                 this.character.setLocation(next);
-                if (this.character.isNpc()) {
-                    World.onNpcMoved(this.character as NPC, previousLocation, next);
-                }
                 this.character.setRunningDirection(runPoint.direction);
                 moved = true;
             } else {

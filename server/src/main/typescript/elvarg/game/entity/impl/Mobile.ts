@@ -113,6 +113,15 @@ export abstract class Mobile extends Entity {
 
     public abstract manipulateHit(hit: PendingHit): PendingHit;
 
+    public override setLocation(location: Location): Mobile {
+        const previousLocation = this.getLocation();
+        super.setLocation(location);
+        if (this.isNpc() && this.isRegistered() && !previousLocation.equals(location)) {
+            getWorld().onNpcMoved(this.getAsNpc(), previousLocation, location);
+        }
+        return this;
+    }
+
     /**
      * Teleports the character to a target location
      *
@@ -120,12 +129,8 @@ export abstract class Mobile extends Entity {
      * @return
      */
     public moveTo(teleportTarget: Location): Mobile {
-        const previousLocation = this.getLocation();
         this.getMovementQueue().reset();
         this.setLocation(teleportTarget.clone());
-        if (this.isNpc()) {
-            getWorld().onNpcMoved(this.getAsNpc(), previousLocation, this.getLocation());
-        }
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
@@ -152,12 +157,8 @@ export abstract class Mobile extends Entity {
             }
         }
 
-        const previousLocation = this.getLocation();
         this.getMovementQueue().reset();
         this.setLocation(chosen.clone());
-        if (this.isNpc()) {
-            getWorld().onNpcMoved(this.getAsNpc(), previousLocation, this.getLocation());
-        }
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
@@ -180,12 +181,8 @@ export abstract class Mobile extends Entity {
                 break;
             }
         }
-        const previousLocation = this.getLocation();
         this.getMovementQueue().reset();
         this.setLocation(chosen.clone());
-        if (this.isNpc()) {
-            getWorld().onNpcMoved(this.getAsNpc(), previousLocation, this.getLocation());
-        }
         this.setNeedsPlacement(true);
         this.setResetMovementQueue(true);
         this.setMobileInteraction(null);
