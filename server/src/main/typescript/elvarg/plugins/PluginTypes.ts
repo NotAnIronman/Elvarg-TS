@@ -211,6 +211,32 @@ export interface PluginCanEquipEvent {
   allow: boolean | null;
 }
 
+export interface PluginCanUnequipEvent {
+  player: any;
+  slot: number;
+  item: any;
+  allow: boolean | null;
+}
+
+export interface PluginPlayerDeathEvent {
+  player: any;
+  killer: any;
+  handled: boolean;
+}
+
+export interface PluginPlayerOptionEvent {
+  player: any;
+  target: any;
+  option: number;
+  handled: boolean;
+}
+
+export interface PluginPlayerDealtDamageEvent {
+  player: any;
+  target: any;
+  hit: any;
+}
+
 export interface PluginSpellDisabledEvent {
   player: any;
   spellbook: any;
@@ -473,6 +499,12 @@ export interface PluginApi {
     handler: (event: PluginPlayerDeathItemDropEvent) => void
   ): void;
   onCanEquip(handler: (event: PluginCanEquipEvent) => void): void;
+  onCanUnequip(handler: (event: PluginCanUnequipEvent) => void): void;
+  onPlayerDeath(handler: (event: PluginPlayerDeathEvent) => void): void;
+  onPlayerOption(handler: (event: PluginPlayerOptionEvent) => void): void;
+  onPlayerDealtDamage(
+    handler: (event: PluginPlayerDealtDamageEvent) => void
+  ): void;
   onSpellDisabled(handler: (event: PluginSpellDisabledEvent) => void): void;
   onSpellRuneBypass(handler: (event: PluginSpellRuneBypassEvent) => void): void;
   onNpcAggressionTolerance(

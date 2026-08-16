@@ -33,42 +33,8 @@ class KingBlackDragonArea extends Area {
     super([KingBlackDragonBoundary]);
   }
 
-  process() {}
-
-  canTeleport() {
-    return true;
-  }
-
-  canTrade() {
-    return true;
-  }
-
   isMulti() {
     return true;
-  }
-
-  canEat() {
-    return true;
-  }
-
-  canDrink() {
-    return true;
-  }
-
-  dropItemsOnDeath() {
-    return true;
-  }
-
-  handleDeath() {
-    return false;
-  }
-
-  onPlayerRightClick() {}
-
-  defeated() {}
-
-  handleObjectClick() {
-    return false;
   }
 }
 

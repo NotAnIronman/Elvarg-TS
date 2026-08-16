@@ -53,6 +53,10 @@ import {
   PluginShouldDropItemsOnDeathEvent,
   PluginShouldKeepItemOnDeathEvent,
   PluginPlayerDeathItemDropEvent,
+  PluginPlayerDeathEvent,
+  PluginPlayerOptionEvent,
+  PluginPlayerDealtDamageEvent,
+  PluginCanUnequipEvent,
   PluginCombatDamageProvider,
   PluginCombatEngine,
   PluginCombatMethodResolver,
@@ -132,6 +136,10 @@ export class PluginManager {
   private static shouldKeepItemOnDeathHooks: PluginHook<PluginShouldKeepItemOnDeathEvent>[] = [];
   private static playerDeathItemDropHooks: PluginHook<PluginPlayerDeathItemDropEvent>[] = [];
   private static canEquipHooks: PluginHook<PluginCanEquipEvent>[] = [];
+  private static canUnequipHooks: PluginHook<PluginCanUnequipEvent>[] = [];
+  private static playerDeathHooks: PluginHook<PluginPlayerDeathEvent>[] = [];
+  private static playerOptionHooks: PluginHook<PluginPlayerOptionEvent>[] = [];
+  private static playerDealtDamageHooks: PluginHook<PluginPlayerDealtDamageEvent>[] = [];
   private static spellDisabledHooks: PluginHook<PluginSpellDisabledEvent>[] = [];
   private static spellRuneBypassHooks: PluginHook<PluginSpellRuneBypassEvent>[] = [];
   private static npcAggressionToleranceHooks: PluginHook<PluginNpcAggressionToleranceEvent>[] = [];
@@ -830,6 +838,57 @@ export class PluginManager {
       }
     }
     return null;
+  }
+
+  public static emitCanUnequip(player: any, slot: number, item: any): boolean | null {
+    const event: PluginCanUnequipEvent = { player, slot, item, allow: null };
+    for (const hook of PluginManager.canUnequipHooks) {
+      PluginManager.executeHook(hook, event, "can_unequip", "can_unequip");
+      if (event.allow !== null) {
+        return event.allow;
+      }
+    }
+    return null;
+  }
+
+  public static emitPlayerDeath(event: PluginPlayerDeathEvent): boolean {
+    if (!event || !event.player || event.handled) {
+      return false;
+    }
+    for (const hook of PluginManager.playerDeathHooks) {
+      if (event.handled) {
+        break;
+      }
+      PluginManager.executeHook(hook, event, "player_death", "player_death");
+    }
+    return event.handled === true;
+  }
+
+  public static emitPlayerOption(event: PluginPlayerOptionEvent): boolean {
+    if (!event || !event.player || !event.target || event.handled) {
+      return false;
+    }
+    for (const hook of PluginManager.playerOptionHooks) {
+      if (event.handled) {
+        break;
+      }
+      PluginManager.executeHook(hook, event, "player_option", "player_option");
+    }
+    return event.handled === true;
+  }
+
+  public static emitPlayerDealtDamage(event: PluginPlayerDealtDamageEvent): void {
+    if (!event || !event.player || !event.target || !event.hit) {
+      return;
+    }
+    for (const hook of PluginManager.playerDealtDamageHooks) {
+      PluginManager.executeHook(
+        hook,
+        event,
+        "player_dealt_damage",
+        "player_dealt_damage"
+      );
+    }
   }
 
   public static emitSpellDisabled(
@@ -2042,6 +2101,73 @@ export class PluginManager {
               !event.item ||
               !Number.isInteger(event.slot)
             ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onCanUnequip: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.canUnequipHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !event.item ||
+              !Number.isInteger(event.slot)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerDeath: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerDeathHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || event.handled) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerOption: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerOptionHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (
+              !event ||
+              !event.player ||
+              !event.target ||
+              event.handled ||
+              !Number.isInteger(event.option)
+            ) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onPlayerDealtDamage: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.playerDealtDamageHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || !event.player || !event.target || !event.hit) {
               return;
             }
             handler(event);

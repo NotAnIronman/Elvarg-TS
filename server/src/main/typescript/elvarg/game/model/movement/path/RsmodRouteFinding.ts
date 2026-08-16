@@ -96,6 +96,7 @@ function rotateDimensions(angle: number, a: number, b: number): number {
 }
 
 function rotateBlockAccess(angle: number, blockAccessFlags: number): number {
+  blockAccessFlags &= 0xf;
   if (angle === 0) {
     return blockAccessFlags;
   }

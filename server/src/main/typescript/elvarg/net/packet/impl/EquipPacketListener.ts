@@ -135,13 +135,6 @@ export class EquipPacketListener {
     if (PluginManager.emitCanEquip(player, equipmentSlot, item) === false) {
       return;
     }
-    if (
-      PluginManager.emitCanEquip(player, equipmentSlot, item) === null &&
-      player.getArea() &&
-      !player.getArea().canEquipItem(player, equipmentSlot, item)
-    ) {
-      return;
-    }
 
     const currentlyEquipped = equipment.forSlot(equipmentSlot).clone();
     const stackableAndSameItem =
@@ -233,7 +226,7 @@ export class EquipPacketListener {
 
     const item = equipment.getItems()[slot];
     if (!item || item.getId() < 0) return false;
-    if (player.getArea() && !player.getArea().canUnequipItem(player, slot, item)) return false;
+    if (PluginManager.emitCanUnequip(player, slot, item) === false) return false;
 
     const inventory = player.getInventory();
     const stackIntoExisting =

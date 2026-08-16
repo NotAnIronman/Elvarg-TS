@@ -234,25 +234,11 @@ function applyMix(baseEffect) {
 }
 
 function canDrink(player, itemId) {
-  const hookResult = pluginApi.emitCanDrink(player, itemId);
-  if (hookResult === false) {
-    return false;
-  }
-  if (hookResult === null && player.getArea() && !player.getArea().canDrink(player, itemId)) {
-    return false;
-  }
-  return true;
+  return pluginApi.emitCanDrink(player, itemId) !== false;
 }
 
 function canEat(player, itemId) {
-  const hookResult = pluginApi.emitCanEat(player, itemId);
-  if (hookResult === false) {
-    return false;
-  }
-  if (hookResult === null && player.getArea() && !player.getArea().canEat(player, itemId)) {
-    return false;
-  }
-  return true;
+  return pluginApi.emitCanEat(player, itemId) !== false;
 }
 
 function registerPotion(definition) {

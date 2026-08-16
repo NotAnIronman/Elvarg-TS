@@ -1,4 +1,4 @@
-const { Area, BasicAttackResponse } = require("../../src/main/typescript/elvarg/game/model/areas/Area");
+const { Area } = require("../../src/main/typescript/elvarg/game/model/areas/Area");
 const { Boundary } = require("../../src/main/typescript/elvarg/game/model/Boundary");
 const { PolygonalBoundary } = require("../../src/main/typescript/elvarg/game/model/PolygonalBoundary");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
@@ -8,30 +8,35 @@ const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
+const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
 const { CountdownTask } = require("../../src/main/typescript/elvarg/game/task/impl/CountdownTask");
 const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
+const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 const { ObjectIdentifiers } = require("../../src/main/typescript/elvarg/util/ObjectIdentifiers");
 const FoodPlugin = require("../items/Food.plugin");
+const { createBotPlayer } = require("../bots/behaviours/spawn/BotPlayerFactory");
+const { ATTR_SKIP_PERSISTENCE } = require("../bots/runtime/BotPersistenceConstants");
 
 const loc = (x, y, z) => new Location(x, y, z);
 const box = (...args) => new Boundary(...args);
 const START_TASK_KEY = "cw.start";
 const END_TASK_KEY = "cw.end";
 const TRANSITION_TO_GAME_KEY = {};
+const CASTLE_WARS_BOT_KEY = {};
 const TAKE_SUPPLY_ANIM = new Animation(881);
 const LOBBY_TELEPORT = loc(2440, 3089, 0);
-const BARRICADE_ITEM_ID = 4053;
+const BARRICADE_ITEM_ID = ItemIdentifiers.BARRICADE;
 const RAW_OBJECT_1747 = 1747;
 const TEAM = { SARADOMIN: "saradomin", ZAMORAK: "zamorak" };
 const TEAM_DATA = {
-  [TEAM.SARADOMIN]: { id: TEAM.SARADOMIN, name: "Saradomin", capeId: ItemIdentifiers.HOODED_CLOAK, bannerId: ItemIdentifiers.SARADOMIN_BANNER, waitingRoom: loc(2381, 9489, 0), startRoom: loc(2426, 3076, 1), respawnBounds: box(2423, 2431, 3072, 3080, 1), standLocation: loc(2429, 3074, 3), safeStandId: ObjectIdentifiers.SARADOMIN_STANDARD_2, emptyStandId: ObjectIdentifiers.STANDARD_STAND, droppedFlagObjectId: ObjectIdentifiers.SARADOMIN_STANDARD, waitingBounds: [box(2368, 2392, 9481, 9497, 0)] },
-  [TEAM.ZAMORAK]: { id: TEAM.ZAMORAK, name: "Zamorak", capeId: ItemIdentifiers.HOODED_CLOAK_2, bannerId: ItemIdentifiers.ZAMORAK_BANNER, waitingRoom: loc(2421, 9524, 0), startRoom: loc(2372, 3131, 1), respawnBounds: box(2368, 2376, 3127, 3135, 1), standLocation: loc(2370, 3133, 3), safeStandId: ObjectIdentifiers.ZAMORAK_STANDARD_2, emptyStandId: ObjectIdentifiers.STANDARD_STAND_2, droppedFlagObjectId: ObjectIdentifiers.ZAMORAK_STANDARD, waitingBounds: [box(2408, 2432, 9512, 9535, 0)] },
+  [TEAM.SARADOMIN]: { id: TEAM.SARADOMIN, name: "Saradomin", capeId: ItemIdentifiers.SARADOMIN_CLOAK_3, hoodId: ItemIdentifiers.CASTLEWARS_HOOD, bannerId: ItemIdentifiers.SARADOMIN_BANNER, waitingRoom: loc(2381, 9489, 0), startRoom: loc(2426, 3076, 1), respawnBounds: box(2423, 2431, 3072, 3080, 1), standLocation: loc(2429, 3074, 3), safeStandId: ObjectIdentifiers.SARADOMIN_STANDARD_2, emptyStandId: ObjectIdentifiers.STANDARD_STAND, droppedFlagObjectId: ObjectIdentifiers.SARADOMIN_STANDARD, waitingBounds: [box(2368, 2392, 9481, 9497, 0)] },
+  [TEAM.ZAMORAK]: { id: TEAM.ZAMORAK, name: "Zamorak", capeId: ItemIdentifiers.ZAMORAK_CLOAK_3, hoodId: ItemIdentifiers.CASTLEWARS_HOOD_2, bannerId: ItemIdentifiers.ZAMORAK_BANNER, waitingRoom: loc(2421, 9524, 0), startRoom: loc(2372, 3131, 1), respawnBounds: box(2368, 2376, 3127, 3135, 1), standLocation: loc(2370, 3133, 3), safeStandId: ObjectIdentifiers.ZAMORAK_STANDARD_2, emptyStandId: ObjectIdentifiers.STANDARD_STAND_2, droppedFlagObjectId: ObjectIdentifiers.ZAMORAK_STANDARD, waitingBounds: [box(2408, 2432, 9512, 9535, 0)] },
 };
 const LOBBY_BOUNDS = [box(2435, 2446, 3081, 3098, 0)];
 const GAME_BOUNDS = [box(2365, 2404, 9500, 9530, 0), box(2394, 2431, 9474, 9499, 0), box(2405, 2424, 9500, 9509, 0), new PolygonalBoundary([[2377, 3079], [2368, 3079], [2368, 3136], [2416, 3136], [2432, 3120], [2432, 3080], [2432, 3072], [2384, 3072]])];
-const CLEANUP_ITEM_IDS = new Set([ItemIdentifiers.BANDAGES, ItemIdentifiers.BRONZE_PICKAXE, ItemIdentifiers.EXPLOSIVE_POTION, BARRICADE_ITEM_ID, ItemIdentifiers.HOODED_CLOAK, ItemIdentifiers.HOODED_CLOAK_2, ItemIdentifiers.CASTLEWARS_HOOD, ItemIdentifiers.CASTLEWARS_HOOD_2, ItemIdentifiers.SARADOMIN_BANNER, ItemIdentifiers.ZAMORAK_BANNER, ItemIdentifiers.ROCK_5, ItemIdentifiers.TINDERBOX, ItemIdentifiers.ROPE, ItemIdentifiers.TOOLKIT_2]);
+const CLEANUP_ITEM_IDS = new Set([ItemIdentifiers.BANDAGES, ItemIdentifiers.BRONZE_PICKAXE, ItemIdentifiers.EXPLOSIVE_POTION, BARRICADE_ITEM_ID, ItemIdentifiers.SARADOMIN_CLOAK_3, ItemIdentifiers.ZAMORAK_CLOAK_3, ItemIdentifiers.CASTLEWARS_HOOD, ItemIdentifiers.CASTLEWARS_HOOD_2, ItemIdentifiers.SARADOMIN_BANNER, ItemIdentifiers.ZAMORAK_BANNER, ItemIdentifiers.ROCK_5, ItemIdentifiers.TINDERBOX, ItemIdentifiers.ROPE, ItemIdentifiers.TOOLKIT_2]);
 const DEATH_REMOVE_ITEM_IDS = new Set([ItemIdentifiers.BANDAGES, ItemIdentifiers.BRONZE_PICKAXE, ItemIdentifiers.EXPLOSIVE_POTION, BARRICADE_ITEM_ID, ItemIdentifiers.ROCK_5, ItemIdentifiers.TINDERBOX, ItemIdentifiers.ROPE, ItemIdentifiers.TOOLKIT_2, ItemIdentifiers.SARADOMIN_BANNER, ItemIdentifiers.ZAMORAK_BANNER]);
 const FOOD_ITEM_IDS = Array.isArray(FoodPlugin.FOOD_ITEM_IDS) ? FoodPlugin.FOOD_ITEM_IDS : [];
 const TEAM_COLOUR_MESSAGE = "You can't remove your team's colours.";
@@ -43,8 +48,8 @@ const GAME_EXIT_IDS = new Set([ObjectIdentifiers.PORTAL_10, ObjectIdentifiers.PO
 const STAND_TEAMS = { [ObjectIdentifiers.SARADOMIN_STANDARD_2]: TEAM.SARADOMIN, [ObjectIdentifiers.STANDARD_STAND]: TEAM.SARADOMIN, [ObjectIdentifiers.ZAMORAK_STANDARD_2]: TEAM.ZAMORAK, [ObjectIdentifiers.STANDARD_STAND_2]: TEAM.ZAMORAK };
 const TRAPDOOR_ROUTES = { [ObjectIdentifiers.TRAPDOOR_16]: { blockedTeam: TEAM.ZAMORAK, to: [2429, 3075, 1] }, [ObjectIdentifiers.TRAPDOOR_17]: { blockedTeam: TEAM.SARADOMIN, to: [2370, 3132, 1] } };
 const ENERGY_BARRIERS = {
-  [ObjectIdentifiers.ENERGY_BARRIER]: { team: TEAM.SARADOMIN, branches: [[[2426, 3080, 1], "y", 3080, [2426, 3081, 1]], [[2426, 3080, 1], "y", 3081, [2426, 3080, 1]], [[2422, 3076, 1], "x", 2422, [2423, 3076, 1]], [[2422, 3076, 1], "x", 2423, [2422, 3076, 1]]] },
-  [ObjectIdentifiers.ENERGY_BARRIER_2]: { team: TEAM.ZAMORAK, branches: [[[2373, 3126, 1], "y", 3126, [2373, 3127, 1]], [[2373, 3126, 1], "y", 3127, [2373, 3126, 1]], [[2377, 3131, 1], "x", 2376, [2377, 3131, 1]], [[2377, 3131, 1], "x", 2377, [2376, 3131, 1]]] },
+  [ObjectIdentifiers.ENERGY_BARRIER]: { team: TEAM.SARADOMIN, branches: [[[2426, 3080, 1], "y", 3080, [2426, 3081, 1]], [[2426, 3080, 1], "y", 3081, [2426, 3080, 1]], [[2423, 3076, 1], "x", 2422, [2423, 3076, 1]], [[2423, 3076, 1], "x", 2423, [2422, 3076, 1]]] },
+  [ObjectIdentifiers.ENERGY_BARRIER_2]: { team: TEAM.ZAMORAK, branches: [[[2373, 3127, 1], "y", 3126, [2373, 3127, 1]], [[2373, 3127, 1], "y", 3127, [2373, 3126, 1]], [[2376, 3131, 1], "x", 2376, [2377, 3131, 1]], [[2376, 3131, 1], "x", 2377, [2376, 3131, 1]]] },
 };
 const TELEPORT_ROUTES = {
   [ObjectIdentifiers.STAIRCASE_15]: [[[2428, 3081, 1], [2430, 3080, 2]], [[2425, 3074, 2], [2426, 3074, 3]], [[2419, 3078, 0], [2420, 3080, 1]]],
@@ -57,7 +62,7 @@ const TELEPORT_ROUTES = {
   [ObjectIdentifiers.STAIRCASE_16]: [[[2380, 3127, 0], [2379, 3127, 1]], [[2369, 3126, 1], [2369, 3127, 2]], [[2374, 3131, 2], [2373, 3133, 3]]],
 };
 const FIXED_MOVES = { [ObjectIdentifiers.LADDER_64]: [2370, 3132, 2], [ObjectIdentifiers.LADDER_63]: [2429, 3075, 2] };
-const SUPPLY_TABLES = { [ObjectIdentifiers.TABLE_41]: [ItemIdentifiers.BANDAGES, "You get some bandages."], [ObjectIdentifiers.TABLE_44]: [BARRICADE_ITEM_ID, "You get a barricade."], [ObjectIdentifiers.TABLE_46]: [ItemIdentifiers.EXPLOSIVE_POTION, "You get an explosive potion."], [ObjectIdentifiers.TABLE_47]: [ItemIdentifiers.BRONZE_PICKAXE, "You get a bronze pickaxe for mining."], [ObjectIdentifiers.TABLE_42]: [ItemIdentifiers.TINDERBOX, "You get a tinderbox."], [ObjectIdentifiers.TABLE_45]: [ItemIdentifiers.ROPE, "You get some rope."], [ObjectIdentifiers.TABLE_43]: [ItemIdentifiers.ROCK_5, "You get a rock."] };
+const SUPPLY_TABLES = { [ObjectIdentifiers.TABLE_450]: [ItemIdentifiers.BANDAGES, "You get some bandages."], [ObjectIdentifiers.TABLE_451]: [ItemIdentifiers.BANDAGES, "You get some bandages."], [ObjectIdentifiers.TABLE_44]: [BARRICADE_ITEM_ID, "You get a barricade."], [ObjectIdentifiers.TABLE_46]: [ItemIdentifiers.EXPLOSIVE_POTION, "You get an explosive potion."], [ObjectIdentifiers.TABLE_47]: [ItemIdentifiers.BRONZE_PICKAXE, "You get a bronze pickaxe for mining."], [ObjectIdentifiers.TABLE_42]: [ItemIdentifiers.TINDERBOX, "You get a tinderbox."], [ObjectIdentifiers.TABLE_45]: [ItemIdentifiers.ROPE, "You get some rope."], [ObjectIdentifiers.TABLE_43]: [ItemIdentifiers.ROCK_5, "You get a rock."] };
 const DROPPED_FLAG_TEAMS = { [ObjectIdentifiers.SARADOMIN_STANDARD]: TEAM.SARADOMIN, [ObjectIdentifiers.ZAMORAK_STANDARD]: TEAM.ZAMORAK };
 const ALTAR_SPAWNS = [[411, [2431, 3076, 1], 1], [411, [2373, 3135, 1], 0]];
 
@@ -75,10 +80,12 @@ function createCastleWars(api) {
     [TEAM.SARADOMIN]: null,
     [TEAM.ZAMORAK]: null,
   };
+  const barricades = new Set();
 
   let phase = "idle";
   let startTask = null;
   let endTask = null;
+  let botSerial = 0;
 
   function secondsToTicks(seconds) {
     return Math.max(1, Math.ceil(Misc.getTicks(seconds)));
@@ -160,8 +167,9 @@ function createCastleWars(api) {
     player.getUpdateFlag().flag(Flag.APPEARANCE);
   }
 
-  function equipCape(player, capeId) {
-    player.getEquipment().setItem(Equipment.CAPE_SLOT, new Item(capeId, 1));
+  function equipTeamColours(player, team) {
+    player.getEquipment().setItem(Equipment.CAPE_SLOT, new Item(team.capeId, 1));
+    player.getEquipment().setItem(Equipment.HEAD_SLOT, new Item(team.hoodId, 1));
     refreshPlayerAppearance(player);
   }
 
@@ -275,7 +283,36 @@ function createCastleWars(api) {
     endTask = null;
   }
 
+  function releaseBarricade(npc) {
+    if (!barricades.delete(npc)) {
+      return;
+    }
+    const location = npc.getLocation();
+    RegionManager.removeClipping(
+      location.getX(),
+      location.getY(),
+      location.getZ(),
+      RegionManager.BLOCKED_TILE,
+      npc.getPrivateArea()
+    );
+  }
+
+  function clearBarricades() {
+    const addQueue = World.getAddNPCQueue();
+    const removeQueue = World.getRemoveNPCQueue();
+    for (const npc of [...barricades]) {
+      releaseBarricade(npc);
+      const pendingIndex = addQueue.indexOf(npc);
+      if (pendingIndex !== -1) {
+        addQueue.splice(pendingIndex, 1);
+      } else if (npc.isRegistered?.() && !removeQueue.includes(npc)) {
+        removeQueue.push(npc);
+      }
+    }
+  }
+
   function resetMatchState() {
+    clearBarricades();
     score[TEAM.SARADOMIN] = 0;
     score[TEAM.ZAMORAK] = 0;
     restoreFlagToBase(TEAM.SARADOMIN);
@@ -326,6 +363,11 @@ function createCastleWars(api) {
   function returnToLobby(player, message = null) {
     if (message) {
       player.getPacketSender().sendMessage(message);
+    }
+    if (player.getAttribute(CASTLE_WARS_BOT_KEY) === true) {
+      player.getForcedLogoutTimer().start(0);
+      player.requestLogout();
+      return;
     }
     player.smartMove(LOBBY_TELEPORT, 4);
   }
@@ -391,6 +433,38 @@ function createCastleWars(api) {
     }
   }
 
+  function moveToWaitingRoom(player, teamId) {
+    setTeamId(player, teamId);
+    player
+      .getPacketSender()
+      .sendMessage(`You have been added to the ${getTeamData(teamId).name} team.`);
+    player.smartMove(getTeamData(teamId).waitingRoom, 8);
+  }
+
+  function spawnCastleWarsBot(teamId) {
+    const username = `CWBot${++botSerial}`;
+    const bot = createBotPlayer(username, LOBBY_TELEPORT, {
+      api,
+      loadPersistence: false,
+      saveRandomizedAppearance: false,
+    });
+    if (!bot) {
+      return;
+    }
+    bot.setPlayerBot(true);
+    bot.setAttribute(ATTR_SKIP_PERSISTENCE, true);
+    bot.setAttribute(CASTLE_WARS_BOT_KEY, true);
+    api.emitPlayerLogin({ player: bot, username });
+    moveToWaitingRoom(bot, teamId);
+  }
+
+  function seedCastleWarsBots(teamId) {
+    const opposingTeam = teamId === TEAM.SARADOMIN ? TEAM.ZAMORAK : TEAM.SARADOMIN;
+    spawnCastleWarsBot(teamId);
+    spawnCastleWarsBot(opposingTeam);
+    spawnCastleWarsBot(opposingTeam);
+  }
+
   function joinWaitingRoom(player, requestedTeam) {
     if (!player) {
       return;
@@ -443,11 +517,10 @@ function createCastleWars(api) {
       return;
     }
 
-    setTeamId(player, teamId);
-    player
-      .getPacketSender()
-      .sendMessage(`You have been added to the ${getTeamData(teamId).name} team.`);
-    player.smartMove(getTeamData(teamId).waitingRoom, 8);
+    moveToWaitingRoom(player, teamId);
+    if (player.isPlayerBot() !== true) {
+      seedCastleWarsBots(teamId);
+    }
   }
 
   function requireFreeWeapon(player, message) {
@@ -637,14 +710,52 @@ function createCastleWars(api) {
     return true;
   }
 
-  function takeSupply(player, itemId, message) {
+  function takeSupply(player, itemId, message, amount) {
     if (player.getTimers().has(TimerKey.CASTLEWARS_TAKE_ITEM)) {
       return true;
     }
     player.performAnimation(TAKE_SUPPLY_ANIM);
-    player.getInventory().adds(itemId, 1);
+    player.getInventory().adds(itemId, amount);
     player.getPacketSender().sendMessage(message);
     player.getTimers().extendOrRegister(TimerKey.CASTLEWARS_TAKE_ITEM, 2);
+    return true;
+  }
+
+  function setupBarricade(event) {
+    const { player, itemId, slot } = event;
+    if (itemId !== BARRICADE_ITEM_ID) {
+      return false;
+    }
+
+    const location = player.getLocation();
+    if (!GAME_BOUNDS.some((boundary) => boundary.inside(location))) {
+      player
+        .getPacketSender()
+        .sendMessage("You can only set up barricades during a Castle Wars game.");
+      return true;
+    }
+
+    if (
+      RegionManager.blocked(location, player.getPrivateArea()) ||
+      ObjectManager.existsLocation(location) ||
+      World.isNpcOccupyingTile(location)
+    ) {
+      player.getPacketSender().sendMessage("You can't set up a barricade here.");
+      return true;
+    }
+
+    const barricade = new NPC(NpcIdentifiers.BARRICADE, location.clone());
+    barricade.__skipDefaultRespawn = true;
+    barricades.add(barricade);
+    RegionManager.addClipping(
+      location.getX(),
+      location.getY(),
+      location.getZ(),
+      RegionManager.BLOCKED_TILE,
+      player.getPrivateArea()
+    );
+    World.getAddNPCQueue().push(barricade);
+    player.getInventory().deleteAtSlot(slot, 1);
     return true;
   }
 
@@ -652,7 +763,7 @@ function createCastleWars(api) {
     return routes.some(([from, to]) => teleportFromObject(object, player, from, to));
   }
 
-  function handleSharedGameObjectClick(player, object) {
+  function handleSharedGameObjectClick(player, object, clickType) {
     const id = object.getId();
     const barrier = ENERGY_BARRIERS[id];
     if (barrier) {
@@ -666,7 +777,7 @@ function createCastleWars(api) {
 
     const supply = SUPPLY_TABLES[id];
     if (supply) {
-      return takeSupply(player, supply[0], supply[1]);
+      return takeSupply(player, supply[0], supply[1], clickType === 2 ? 5 : 1);
     }
 
     const droppedFlagTeam = DROPPED_FLAG_TEAMS[id];
@@ -724,14 +835,56 @@ function createCastleWars(api) {
     return false;
   }
 
-  class TeamColourArea extends Area {
-    canEquipItem(player, slot) {
-      return protectTeamColours(player, slot);
+  function handleLobbyObjectClick(player, object, clickType) {
+    const id = object.getId();
+    if (id === ObjectIdentifiers.BANK_CHEST_2) {
+      if (clickType === 1) {
+        openLobbyBank(player);
+      } else {
+        player.getPacketSender().sendMessage("The Grand Exchange is not available here.");
+      }
+      return true;
     }
 
-    canUnequipItem(player, slot) {
-      return protectTeamColours(player, slot);
+    if (Object.prototype.hasOwnProperty.call(LOBBY_TEAMS, id)) {
+      joinWaitingRoom(player, LOBBY_TEAMS[id] || null);
+      return true;
     }
+
+    return false;
+  }
+
+  function handleWaitingObjectClick(player, object) {
+    if (!WAITING_EXIT_IDS.has(object.getId())) {
+      return false;
+    }
+    returnToLobby(player);
+    return true;
+  }
+
+  function handleGameObjectClick(player, object, clickType) {
+    const id = object.getId();
+    if (GAME_EXIT_IDS.has(id)) {
+      returnToLobby(player, "The Castle Wars game has ended for you.");
+      return true;
+    }
+
+    const standTeam = STAND_TEAMS[id];
+    if (standTeam) {
+      return handleStandClick(player, standTeam);
+    }
+
+    const trapdoor = TRAPDOOR_ROUTES[id];
+    if (trapdoor) {
+      if (getTeamId(player) === trapdoor.blockedTeam) {
+        player.getPacketSender().sendMessage(ENEMY_SPAWN_MESSAGE);
+        return true;
+      }
+      moveTo(player, trapdoor.to);
+      return true;
+    }
+
+    return handleSharedGameObjectClick(player, object, clickType);
   }
 
   class CastleWarsLobbyArea extends Area {
@@ -742,28 +895,9 @@ function createCastleWars(api) {
     getName() {
       return "Castle Wars Lobby";
     }
-
-    handleObjectClick(player, object, clickType) {
-      const id = object.getId();
-      if (id === ObjectIdentifiers.BANK_CHEST_2) {
-        if (clickType === 1) {
-          openLobbyBank(player);
-        } else {
-          player.getPacketSender().sendMessage("The Grand Exchange is not available here.");
-        }
-        return true;
-      }
-
-      if (Object.prototype.hasOwnProperty.call(LOBBY_TEAMS, id)) {
-        joinWaitingRoom(player, LOBBY_TEAMS[id] || null);
-        return true;
-      }
-
-      return false;
-    }
   }
 
-  class CastleWarsWaitingArea extends TeamColourArea {
+  class CastleWarsWaitingArea extends Area {
     constructor(teamId) {
       super(getTeamData(teamId).waitingBounds);
       this.teamId = teamId;
@@ -783,7 +917,7 @@ function createCastleWars(api) {
         setTeamId(player, this.teamId);
       }
 
-      equipCape(player, getTeamData(this.teamId).capeId);
+      equipTeamColours(player, getTeamData(this.teamId));
       beginStartCountdown();
       const secondsLeft = startTask?.isRunning?.()
         ? Math.ceil((startTask.getRemainingTicks() | 0) * 0.6)
@@ -804,6 +938,9 @@ function createCastleWars(api) {
       }
 
       if (logout) {
+        if (player.getAttribute(CASTLE_WARS_BOT_KEY) === true) {
+          return;
+        }
         returnToLobby(player);
       }
 
@@ -842,16 +979,9 @@ function createCastleWars(api) {
       player.getPacketSender().sendWalkableInterface(11479);
     }
 
-    handleObjectClick(player, object) {
-      if (!WAITING_EXIT_IDS.has(object.getId())) {
-        return false;
-      }
-      returnToLobby(player);
-      return true;
-    }
   }
 
-  class CastleWarsGameArea extends TeamColourArea {
+  class CastleWarsGameArea extends Area {
     constructor() {
       super(GAME_BOUNDS);
     }
@@ -953,69 +1083,6 @@ function createCastleWars(api) {
       }
     }
 
-    canAttack(attacker, target) {
-      const playerAttacker = attacker?.getAsPlayer?.();
-      const playerTarget = target?.getAsPlayer?.();
-      if (!playerAttacker || !playerTarget) {
-        return super.canAttack(attacker, target);
-      }
-
-      if (getTeamId(playerAttacker) === getTeamId(playerTarget)) {
-        playerAttacker
-          .getPacketSender()
-          .sendMessage("You can't attack your own team in Castle Wars.");
-        return BasicAttackResponse.CANT_ATTACK_IN_AREA;
-      }
-
-      return BasicAttackResponse.CAN_ATTACK;
-    }
-
-    canTeleport(player) {
-      player.getPacketSender().sendMessage("You can't leave just like that!");
-      return false;
-    }
-
-    handleDeath(player, killer) {
-      const teamId = getTeamId(player);
-      if (!teamId) {
-        return false;
-      }
-
-      dropCarriedFlag(player);
-      player.resetCastlewarsIdleTime();
-      player.smartMoves(getTeamData(teamId).respawnBounds);
-      player.castlewarsDeaths = (player.castlewarsDeaths | 0) + 1;
-
-      if (killer?.isPlayer?.() === true) {
-        killer.castlewarsKills = (killer.castlewarsKills | 0) + 1;
-      }
-      return true;
-    }
-
-    handleObjectClick(player, object) {
-      const id = object.getId();
-      if (GAME_EXIT_IDS.has(id)) {
-        returnToLobby(player, "The Castle Wars game has ended for you.");
-        return true;
-      }
-
-      const standTeam = STAND_TEAMS[id];
-      if (standTeam) {
-        return handleStandClick(player, standTeam);
-      }
-
-      const trapdoor = TRAPDOOR_ROUTES[id];
-      if (trapdoor) {
-        if (getTeamId(player) === trapdoor.blockedTeam) {
-          player.getPacketSender().sendMessage(ENEMY_SPAWN_MESSAGE);
-          return true;
-        }
-        moveTo(player, trapdoor.to);
-        return true;
-      }
-
-      return handleSharedGameObjectClick(player, object);
-    }
   }
 
   const lobbyArea = new CastleWarsLobbyArea();
@@ -1023,6 +1090,69 @@ function createCastleWars(api) {
   const zamorakWaitingArea = new CastleWarsWaitingArea(TEAM.ZAMORAK);
   const gameArea = new CastleWarsGameArea();
   const castleWarsAreas = new Set([gameArea, saradominWaitingArea, zamorakWaitingArea]);
+
+  function handleTeamColourChange(event) {
+    if (!castleWarsAreas.has(event.player?.getArea?.())) {
+      return;
+    }
+    event.allow = protectTeamColours(event.player, event.slot);
+  }
+
+  function handleCanAttack(event) {
+    const attacker = event.attacker?.getAsPlayer?.();
+    const target = event.target?.getAsPlayer?.();
+    if (attacker?.getArea?.() !== gameArea || target?.getArea?.() !== gameArea) {
+      return;
+    }
+    if (getTeamId(attacker) === getTeamId(target)) {
+      attacker
+        .getPacketSender()
+        .sendMessage("You can't attack your own team in Castle Wars.");
+      event.allow = false;
+      return;
+    }
+    event.allow = true;
+  }
+
+  function handleCanTeleport(event) {
+    if (event.player?.getArea?.() !== gameArea) {
+      return;
+    }
+    event.player.getPacketSender().sendMessage("You can't leave just like that!");
+    event.allow = false;
+  }
+
+  function handlePlayerDeath(event) {
+    const { player, killer } = event;
+    const teamId = player?.getArea?.() === gameArea ? getTeamId(player) : null;
+    if (!teamId) {
+      return;
+    }
+    dropCarriedFlag(player);
+    player.resetCastlewarsIdleTime();
+    player.smartMoves(getTeamData(teamId).respawnBounds);
+    player.castlewarsDeaths = (player.castlewarsDeaths | 0) + 1;
+    if (killer?.isPlayer?.() === true) {
+      killer.castlewarsKills = (killer.castlewarsKills | 0) + 1;
+    }
+    event.handled = true;
+  }
+
+  function handleObjectInteraction(event) {
+    const { player, object, clickType } = event;
+    const location = object.getLocation();
+    const handled = LOBBY_BOUNDS.some((boundary) => boundary.inside(location))
+      ? handleLobbyObjectClick(player, object, clickType)
+      : [...TEAM_DATA[TEAM.SARADOMIN].waitingBounds, ...TEAM_DATA[TEAM.ZAMORAK].waitingBounds]
+          .some((boundary) => boundary.inside(location))
+        ? handleWaitingObjectClick(player, object)
+        : GAME_BOUNDS.some((boundary) => boundary.inside(location))
+          ? handleGameObjectClick(player, object, clickType)
+          : false;
+    if (handled) {
+      event.handled = true;
+    }
+  }
 
   function handleDeathItemDrop(event) {
     const player = event?.player;
@@ -1039,6 +1169,14 @@ function createCastleWars(api) {
     }
 
     event.handled = true;
+  }
+
+  function handleNpcDeath({ npc }) {
+    if (!barricades.has(npc)) {
+      return;
+    }
+    npc.__skipDefaultRespawn = true;
+    releaseBarricade(npc);
   }
 
   function handleItemOnPlayer(event) {
@@ -1086,13 +1224,27 @@ function createCastleWars(api) {
     restorePlayerFromInvalidLogin(player);
   });
   api.onPlayerDeathItemDrop(handleDeathItemDrop);
+  api.onNpcDeath(handleNpcDeath);
+  api.onItemAction((event) => {
+    if (event.clickType === 2 && setupBarricade(event)) {
+      event.handled = true;
+    }
+  });
   api.onItemOnPlayer(handleItemOnPlayer);
+  api.onObjectInteraction(handleObjectInteraction);
+  api.onCanEquip(handleTeamColourChange);
+  api.onCanUnequip(handleTeamColourChange);
+  api.onCanAttack(handleCanAttack);
+  api.onCanTeleport(handleCanTeleport);
+  api.onPlayerDeath(handlePlayerDeath);
 }
 
 let AreaManager;
 let BonusManager;
 let ObjectManager;
+let RegionManager;
 let TaskManager;
+let World;
 
 module.exports = {
   name: "CastleWars",
@@ -1101,7 +1253,9 @@ module.exports = {
     AreaManager = api.getAreaManager();
     BonusManager = api.getBonusManager();
     ObjectManager = api.getObjectManager();
+    RegionManager = api.getRegionManager();
     TaskManager = api.getTaskManager();
+    World = api.getWorld();
     createCastleWars(api);
   },
 };

@@ -18,7 +18,7 @@ export class PlayerOptionPacketListener {
     if (option === 2) return TradeRequestPacketListener.request(player, index);
     if (option === 3) return FollowPlayerPacketListener.request(player, index);
     player.getMovementQueue().walkToEntity(target, () => {
-      player.getArea()?.onPlayerRightClick(player, target, option);
+      PluginManager.emitPlayerOption({ player, target, option, handled: false });
     });
   }
 }

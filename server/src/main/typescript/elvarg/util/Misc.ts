@@ -992,7 +992,7 @@ export class Misc {
   }
 
   public static random(minRange: number, maxRange: number): number {
-    return minRange + Misc.random(maxRange, minRange);
+    return minRange + Misc.randoms(maxRange - minRange);
   }
 
   /**

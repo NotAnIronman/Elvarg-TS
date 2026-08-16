@@ -66,7 +66,7 @@ export abstract class Entity {
     }
 
     public getPrivateArea(): any {
-        return this.area ?? null;
+        return typeof (this.area as any)?.getObjects === "function" ? this.area : null;
     }
 
     public hasFlag(flag: string): boolean {

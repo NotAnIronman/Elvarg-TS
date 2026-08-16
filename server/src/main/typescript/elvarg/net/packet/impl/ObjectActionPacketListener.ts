@@ -33,47 +33,54 @@ export class ObjectActionPacketListener {
     }
     if (clickType < 1 || clickType > 5) return;
 
+    const option = object.getDefinition()?.getInteractions()?.[clickType - 1]?.toLowerCase();
+    const executeInteraction = () => {
+      player.getMovementQueue().reset();
+      player.getMovementQueue().walkToReset();
+      player.setPositionToFace(object.getLocation());
+
+      if (option === "bank") {
+        player.getBank(player.getCurrentBankTab()).open();
+        return;
+      }
+
+      const pluginHandled = PluginManager.emitObjectInteraction({
+        player,
+        object,
+        objectId: object.getId(),
+        clickType,
+        location: {
+          x: object.getLocation().getX(),
+          y: object.getLocation().getY(),
+          z: object.getLocation().getZ(),
+        },
+        sourceLocation: {
+          x: sourceLocation.getX(),
+          y: sourceLocation.getY(),
+          z: sourceLocation.getZ(),
+        },
+        handled: false,
+      });
+      if (pluginHandled) {
+        return;
+      }
+
+      console.warn(
+        `[object-click-debug] unhandled id=${object.getId()} name="${object.getDefinition()?.getName() ?? "?"}" ` +
+        `type=${object.getType()} face=${object.getFace()} loc=${object.getLocation().getX()},${object.getLocation().getY()},${object.getLocation().getZ()} ` +
+        `action="${object.getDefinition()?.getInteractions()?.[clickType - 1] ?? "?"}"`
+      );
+    };
+
+    const dx = Math.abs(player.getLocation().getX() - object.getLocation().getX());
+    const dy = Math.abs(player.getLocation().getY() - object.getLocation().getY());
+    if (option === "pass" && dx + dy <= 1) {
+      executeInteraction();
+      return;
+    }
+
     player.getMovementQueue().walkToObject(object, {
-      execute: () => {
-        player.getMovementQueue().reset();
-        player.getMovementQueue().walkToReset();
-        player.setPositionToFace(object.getLocation());
-
-        const option = object.getDefinition()?.getInteractions()?.[clickType - 1]?.toLowerCase();
-        if (option === "bank") {
-          player.getBank(player.getCurrentBankTab()).open();
-          return;
-        }
-
-        const pluginHandled = PluginManager.emitObjectInteraction({
-          player,
-          object,
-          objectId: object.getId(),
-          clickType,
-          location: {
-            x: object.getLocation().getX(),
-            y: object.getLocation().getY(),
-            z: object.getLocation().getZ(),
-          },
-          sourceLocation: {
-            x: sourceLocation.getX(),
-            y: sourceLocation.getY(),
-            z: sourceLocation.getZ(),
-          },
-          handled: false,
-        });
-        if (pluginHandled) {
-          return;
-        }
-
-        console.warn(
-          `[object-click-debug] unhandled id=${object.getId()} name="${object.getDefinition()?.getName() ?? "?"}" ` +
-          `type=${object.getType()} face=${object.getFace()} loc=${object.getLocation().getX()},${object.getLocation().getY()},${object.getLocation().getZ()} ` +
-          `action="${object.getDefinition()?.getInteractions()?.[clickType - 1] ?? "?"}"`
-        );
-
-        player.getArea()?.handleObjectClick(player, object, clickType);
-      },
+      execute: executeInteraction,
     });
   }
 }

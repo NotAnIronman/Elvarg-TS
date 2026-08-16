@@ -43,9 +43,6 @@ export class NPCDeathTask extends Task {
                 break;
             case 0:
                 if (this.killer != null) {
-                    if (this.killer.getArea() !== null) {
-                        this.killer.getArea().defeated(this.killer, this.npc);
-                    }
                     PluginManager.emitNpcDeath({
                         killer: this.killer,
                         npc: this.npc,

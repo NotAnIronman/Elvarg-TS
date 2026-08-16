@@ -38,7 +38,10 @@ import {
   encodeWidgetOpen,
   encodeWidgetOpenSub,
   encodeWidgetRunScript,
+  encodeWidgetSetFlagsRange,
   encodeWidgetSetText,
+  MAIN_INVENTORY_SLOT_FLAGS,
+  MAIN_INVENTORY_WIDGET_UID,
 } from "../src/main/typescript/elvarg/net/protocol/ClientProtocol";
 import { ServerPacketId } from "../src/main/typescript/elvarg/net/protocol/ServerPackets";
 import { Music } from "../src/main/typescript/elvarg/game/Music";
@@ -240,6 +243,17 @@ new PacketSender({
   }),
 }).sendTabInterface(0, 593);
 assert.deepStrictEqual(combatTabPackets.map((packet) => packet[0]), [104, 103, 106, 106]);
+const inventoryPackets: Buffer[] = [];
+new PacketSender({
+  getSession: () => ({
+    sendClientPacket: (packet: Buffer) => inventoryPackets.push(packet),
+  }),
+}).sendSubInterface((161 << 16) | 79, 149);
+assert.deepStrictEqual(inventoryPackets.map((packet) => packet[0]), [103, 109]);
+assert.deepStrictEqual(
+  inventoryPackets[1],
+  encodeWidgetSetFlagsRange(MAIN_INVENTORY_WIDGET_UID, 0, 27, MAIN_INVENTORY_SLOT_FLAGS)
+);
 assert.deepStrictEqual(decodeClientPacket(Buffer.from([191, 0, 43, 0, 0, 0, 2])), {
   type: "varp_transmit", varpId: 43, value: 2,
 });
@@ -322,12 +336,16 @@ assert.strictEqual(Music.forRegion(12850), 76);
 const gameframe = encodeGameframeBootstrap("Toby");
 assert.deepStrictEqual(gameframe.map((packet) => packet[0]), [
   170, 102, 103, 103, 103, 103, 103, 103, 103, 103, 103, 103,
-  103, 103, 103, 103, 103, 103, 103, 103, 103, 110,
+  103, 103, 103, 103, 103, 103, 103, 103, 103, 109, 110,
 ]);
 assert.deepStrictEqual([...gameframe[0]], [170, 0, 3, 2, 114, 0]);
 assert.deepStrictEqual([...gameframe[1]], [102, 0, 161]);
 assert.strictEqual(gameframe[2].readInt32BE(3), (161 << 16) | 96);
 assert.strictEqual(gameframe[2].readUInt16BE(7), 162);
+assert.deepStrictEqual(
+  gameframe[gameframe.length - 2],
+  encodeWidgetSetFlagsRange(MAIN_INVENTORY_WIDGET_UID, 0, 27, MAIN_INVENTORY_SLOT_FLAGS)
+);
 const appearance = encodePlayerAppearance(
   { gender: 0, colors: [2, 14, 5, 4, 0], kits: [3, 14, 18, 26, 34, 38, 42], equip: [] },
   "Toby",

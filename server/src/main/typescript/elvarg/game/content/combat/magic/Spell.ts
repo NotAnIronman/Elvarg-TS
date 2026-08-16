@@ -39,19 +39,6 @@ export abstract class Spell {
             player.getCombat().reset();
             return false;
         }
-        if (
-            PluginManager.emitSpellDisabled(
-                player,
-                this.getSpellbook(),
-                this.spellId()
-            ) === null &&
-            player.getArea() != null &&
-            player.getArea().isSpellDisabled(player, this.getSpellbook(), this.spellId())
-        ) {
-            player.getCombat().setCastSpell(null);
-            player.getCombat().reset();
-            return false;
-        }
 
         if (player.getSpellbook() !== this.getSpellbook()) {
             const { Autocasting } = require("./Autocasting");

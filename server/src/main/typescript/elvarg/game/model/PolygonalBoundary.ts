@@ -5,7 +5,7 @@ export class PolygonalBoundary extends Boundary {
     private readonly points: Array<[number, number]> = [];
 
     constructor(points: number[][]) {
-        super(0, 0, 0, 0, 0);
+        super(0, 0, 0, 0);
         this.points = points.map((p) => [p[0], p[1]]);
     }
 

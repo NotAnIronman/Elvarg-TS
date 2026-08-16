@@ -49,6 +49,9 @@ import {
   encodeWidgetSetPlayerHead,
   encodeWidgetSetRoot,
   encodeWidgetSetText,
+  MAIN_INVENTORY_GROUP_ID,
+  MAIN_INVENTORY_SLOT_FLAGS,
+  MAIN_INVENTORY_WIDGET_UID,
   SkillView,
   GroundItemView,
   BankSlotView,
@@ -643,7 +646,7 @@ export class PacketSender {
     const interfaceId = this.resetInterfaceState();
     if (this.closeTrackedInterfaces()) {
       if (interfaceId === 300 || interfaceId === 334 || interfaceId === 335) {
-        this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 79, 149, 1));
+        this.sendSubInterface((161 << 16) | 79, MAIN_INVENTORY_GROUP_ID, 1);
       }
       return this;
     }
@@ -999,6 +1002,11 @@ export class PacketSender {
   ): this {
     this.subInterfaceTargets.set(groupId, { targetUid, type });
     this.player.getSession().sendClientPacket(encodeWidgetOpenSub(targetUid, groupId, type, options));
+    if (groupId === MAIN_INVENTORY_GROUP_ID) {
+      this.player.getSession().sendClientPacket(
+        encodeWidgetSetFlagsRange(MAIN_INVENTORY_WIDGET_UID, 0, 27, MAIN_INVENTORY_SLOT_FLAGS)
+      );
+    }
     return this;
   }
 

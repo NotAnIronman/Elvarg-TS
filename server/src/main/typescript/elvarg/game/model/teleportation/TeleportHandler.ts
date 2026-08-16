@@ -126,12 +126,6 @@ export class TeleportHandler {
             return false;
         }
 
-        if (player.getArea() != null) {
-            if (!player.getArea().canTeleport(player)) {
-                return false;
-            }
-        }
-
         if (PluginManager.emitCanTeleport(player) === false) {
             return false;
         }

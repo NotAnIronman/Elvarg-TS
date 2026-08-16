@@ -27,7 +27,6 @@ import { Location } from "../../model/Location";
 import { Skill } from "../../model/Skill";
 import { SkullType } from "../../model/SkullType"
 import { AreaManager } from "../../model/areas/AreaManager";
-import { BasicAttackResponse } from "../../model/areas/Area";
 import { Equipment } from "../../model/container/impl/Equipment";
 import { BonusManager } from "../../model/equipment/BonusManager";
 import { PlayerRights } from "../../model/rights/PlayerRights";
@@ -57,16 +56,6 @@ import {
     isChargedCrystalBow,
     isEmptyCrystalBow,
 } from "./ranged/CrystalBow";
-
-const normalizeAreaResponse = (response: CanAttackResponse | BasicAttackResponse): CanAttackResponse => {
-    if (response === BasicAttackResponse.CAN_ATTACK) {
-        return CanAttackResponse.CAN_ATTACK;
-    }
-    if (response === BasicAttackResponse.CANT_ATTACK_IN_AREA) {
-        return CanAttackResponse.CANT_ATTACK_IN_AREA;
-    }
-    return response as CanAttackResponse;
-};
 
 const getPlayerCombatSpecial = (player: Player): CombatSpecial | null => {
     const accessor = (player as any)?.getCombatSpecial;
@@ -472,6 +461,9 @@ export class CombatFactory {
     }
 
     public static canAttackByPolicy(attacker: Mobile, target: Mobile): CanAttackResponse {
+        if (attacker.getPrivateArea() !== target.getPrivateArea()) {
+            return CanAttackResponse.CANT_ATTACK_IN_AREA;
+        }
         const pluginCanAttack = PluginManager.emitCanAttack(attacker, target);
         if (pluginCanAttack === true) {
             return CanAttackResponse.CAN_ATTACK;
@@ -479,7 +471,9 @@ export class CombatFactory {
         if (pluginCanAttack === false) {
             return CanAttackResponse.CANT_ATTACK_IN_AREA;
         }
-        return normalizeAreaResponse(AreaManager.canAttack(attacker, target));
+        return attacker.isPlayer() && target.isPlayer()
+            ? CanAttackResponse.CANT_ATTACK_IN_AREA
+            : CanAttackResponse.CAN_ATTACK;
     }
 
     /**
@@ -529,10 +523,11 @@ export class CombatFactory {
             // Reward the player experience for this attack..
             CombatFactory.rewardExp(attacker.getAsPlayer(), qHit);
 
-            const area: any = attacker.getAsPlayer().getArea();
-            if (area != null && typeof area.onPlayerDealtDamage === "function") {
-                area.onPlayerDealtDamage(attacker.getAsPlayer(), target, qHit);
-            }
+            PluginManager.emitPlayerDealtDamage({
+                player: attacker.getAsPlayer(),
+                target,
+                hit: qHit,
+            });
 
             // Java parity: apply skull at hit-queue time, before executeHit mutates
             // attacker/retaliation state (which can otherwise suppress skulling).

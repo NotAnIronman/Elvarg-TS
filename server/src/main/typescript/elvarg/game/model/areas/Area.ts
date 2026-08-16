@@ -1,16 +1,7 @@
 import { Boundary } from '../../../game/model/Boundary';
-import { Player } from '../../entity/impl/player/Player'
+import { Player } from '../../entity/impl/player/Player';
 import { NPC } from '../../entity/impl/npc/NPC';
-import { Mobile } from '../../entity/impl/Mobile'
-import { Item } from '../../../game/model/Item'
-
-export enum BasicAttackResponse {
-    CAN_ATTACK,
-    CANT_ATTACK_IN_AREA
-}
-import { GameObject } from '../../entity/impl/object/GameObject';
-import { MagicSpellbook } from '../MagicSpellbook';
-
+import { Mobile } from '../../entity/impl/Mobile';
 
 export abstract class Area {
     private boundaries: Boundary[];
@@ -20,11 +11,6 @@ export abstract class Area {
 
     constructor(boundaries?: Boundary[]) {
         this.boundaries = boundaries;
-    }
-
-
-    public isSpellDisabled(player: Player, spellbook: MagicSpellbook, spellId: number): boolean {
-        return false;
     }
 
     enter(character: Mobile) {
@@ -57,75 +43,9 @@ export abstract class Area {
         // By default, do nothing in process.
     }
 
-    canTeleport(player: Player): boolean {
-        // By default, Areas allow teleporting unless otherwise specified.
-        return true;
-    }
-
-    public canAttack(attacker: Mobile, target: Mobile): BasicAttackResponse {
-        if (attacker.isPlayer() && target.isPlayer()) {
-            return BasicAttackResponse.CANT_ATTACK_IN_AREA;
-        }
-
-        return BasicAttackResponse.CAN_ATTACK;
-    }
-
-    public defeated(player: Player, character: Mobile): void {
-        // By default, do nothing when a player is defeated.
-    }
-
-    public canTrade(player: Player, target: Player): boolean {
-        // By default, allow Players to trade in an Area.
-        return true;
-    }
-
     public isMulti(character: Mobile): boolean {
         // By default, Areas are single combat.
         return false;
-    }
-
-    public canEat(player: Player, itemId: number): boolean {
-        // By default, players can eat in an Area.
-        return true;
-    }
-
-    public canDrink(player: Player, itemId: number): boolean {
-        // By default, players can drink in an Area.
-        return true;
-    }
-
-    public dropItemsOnDeath(player: Player, killer?: Player): boolean {
-        // By default, players will drop items in an Area.
-        return true;
-    }
-
-    public handleDeath(player: Player, killer?: Player): boolean {
-        // By default, players Death will be handled by the main death handler.
-        return false;
-    }
-
-    public onPlayerRightClick(player: Player, rightClicked: Player, option: number): void {
-        // By default, players will have the default right click in Areas.
-    }
-
-    public handleObjectClick(player: Player, objectId: GameObject, type: number): boolean {
-        // By default, Areas don't need to handle any specific object clicking.
-        return false;
-    }
-
-    public overridesNpcAggressionTolerance(player: Player, npcId: number): boolean {
-        // By default, NPC tolerance works normally in Areas.
-        return false;
-    }
-
-    public canEquipItem(player: Player, slot: number, item: Item): boolean {
-        // By default, Players can equip items in all areas
-        return true;
-    }
-
-    public canUnequipItem(player: Player, slot: number, item: Item): boolean {
-        // By default, Players can unequip items in all areas
-        return true;
     }
 
     public getBoundaries(): Boundary[] {
@@ -142,9 +62,9 @@ export abstract class Area {
 
     public getPlayers(): Player[] {
         return Object.values(this.players);
-      }
-      
-      public getPlayerBots(): any[] {
-          return Object.values(this.playerBots);
-      }
+    }
+
+    public getPlayerBots(): any[] {
+        return Object.values(this.playerBots);
+    }
 }

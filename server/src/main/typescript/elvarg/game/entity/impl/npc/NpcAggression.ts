@@ -40,8 +40,7 @@ export class NpcAggression {
             }
 
             if (npcDefinition.buildsAggressionTolerance() && player.getAggressionTolerance().finished()
-                && PluginManager.emitNpcAggressionTolerance(player, npc) !== true
-                && (player.getArea() == null || !player.getArea().overridesNpcAggressionTolerance(player, npc.getId()))) {
+                && PluginManager.emitNpcAggressionTolerance(player, npc) !== true) {
                 // If Player has obtained tolerance to this NPC, don't be aggressive.
                 return;
             }

@@ -1,7 +1,6 @@
 import { Location } from "../Location";
 import { Mobile } from "../../entity/impl/Mobile";
-import { Area, BasicAttackResponse } from "./Area";
-import { CanAttackResponse } from "../../content/combat/CombatFactory";
+import { Area } from "./Area";
 import { Wilderness } from "../../content/wilderness/Wilderness";
 
 export class AreaManager {
@@ -84,30 +83,6 @@ export class AreaManager {
             return Wilderness.isMulti(location.getX(), location.getY());
         }
         return false;
-    }
-
-    /**
-     * Checks if a {@link Mobile} can attack another one.
-     *
-     * @param attacker
-     * @param target
-     * @return {CanAttackResponse}
-     */
-    public static canAttack(attacker: Mobile, target: Mobile): CanAttackResponse | BasicAttackResponse {
-        if (attacker.getPrivateArea() != target.getPrivateArea()) {
-            return CanAttackResponse.CANT_ATTACK_IN_AREA;
-        }
-
-        if (attacker.getArea() != null) {
-            return attacker.getArea().canAttack(attacker, target) as any;
-        }
-
-        // Don't allow PvP by default
-        if (attacker.isPlayer() && target.isPlayer()) {
-            return CanAttackResponse.CANT_ATTACK_IN_AREA;
-        }
-
-        return CanAttackResponse.CAN_ATTACK;
     }
 
     /**

@@ -7,9 +7,15 @@ const { MovementQueue } = require("../../src/main/typescript/elvarg/game/model/m
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { createBotPlayer } = require("./behaviours/spawn/BotPlayerFactory");
 const { randomInRange } = require("./behaviours/navigation/BotNavigation");
-const { WILDERNESS_ROAMING_BOUNDS } = require("./behaviours/spawn/WildernessRoamingBounds");
 const { ATTR_SKIP_PERSISTENCE } = require("./runtime/BotPersistenceConstants");
 
+const GRAND_EXCHANGE_BOUNDS = Object.freeze({
+  minX: 3152,
+  maxX: 3176,
+  minY: 3476,
+  maxY: 3500,
+  z: 0,
+});
 const SPAWN_TILE_PROBE_LIMIT = 40;
 const SPAWN_BATCH_SIZE = 50;
 const SPAWN_BATCH_DELAY_MS = 20;
@@ -54,11 +60,10 @@ module.exports = {
     }
 
     const RegionManager = api.getRegionManager();
-    const bounds = WILDERNESS_ROAMING_BOUNDS[0];
     const players = [];
 
     const spawnOne = (index) => {
-      const location = findWalkableTile(RegionManager, bounds);
+      const location = findWalkableTile(RegionManager, GRAND_EXCHANGE_BOUNDS);
       if (!location) {
         return;
       }

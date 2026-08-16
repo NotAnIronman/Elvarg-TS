@@ -57,15 +57,10 @@ export class PlayerDeathTask extends Task {
                     if (this.player.isPlayerBot && this.player.isPlayerBot()) {
                         (this.player as any).getCombatInteraction?.().handleDeath?.(this.killer);
                     }
-                    if (this.player.getArea() != null) {
-                        this.loseItems = this.player.getArea().dropItemsOnDeath(this.player, this.killer);
-                    }
                     const pluginShouldDropItems =
-                        this.loseItems
-                            ? PluginManager.emitShouldDropItemsOnDeath(this.player, this.killer ?? null)
-                            : null;
-                    const shouldDropItemsOnDeath =
-                        pluginShouldDropItems == null ? true : pluginShouldDropItems;
+                        PluginManager.emitShouldDropItemsOnDeath(this.player, this.killer ?? null);
+                    this.loseItems = pluginShouldDropItems ?? true;
+                    const shouldDropItemsOnDeath = this.loseItems;
                     const droppedItems: Item[] = [];
                     const deathPosition = this.player.getLocation();
                     // Always drop player bones on death, independent of item-drop policy.
@@ -129,9 +124,6 @@ export class PlayerDeathTask extends Task {
 
                         // Handle defeat..
                         if (this.killer) {
-                            if (this.killer.getArea() != null) {
-                                this.killer.getArea().defeated(this.killer, this.player);
-                            }
                             if (shouldDropItemsOnDeath && !dropped && !pluginHandledDrop) {
                                 this.killer.getPacketSender().sendMessage(`${this.player.getUsername()} had no valuable items to be dropped.`);
                             }
@@ -166,11 +158,11 @@ export class PlayerDeathTask extends Task {
                     PluginManager.emitPlayerDefeated(this.killer ?? null, this.player);
                     (this.player as any).__recentDeathDamagerEntries = null;
 
-                    let handledDeath: boolean = false;
-
-                    if (this.player.getArea() != null) {
-                        handledDeath = this.player.getArea().handleDeath(this.player, this.killer);
-                    }
+                    const handledDeath = PluginManager.emitPlayerDeath({
+                        player: this.player,
+                        killer: this.killer ?? null,
+                        handled: false,
+                    });
 
                     if (!handledDeath) {
                         const botRespawn = this.resolveBotRespawnLocation();

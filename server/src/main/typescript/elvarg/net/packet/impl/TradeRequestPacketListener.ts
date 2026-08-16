@@ -60,15 +60,6 @@ export class TradeRequestPacketListener {
       player.getPacketSender().sendMessage("You cannot trade here.");
       return;
     }
-    if (
-      pluginCanTrade == null &&
-      player.getArea() != null &&
-      !player.getArea().canTrade(player, target)
-    ) {
-      player.getPacketSender().sendMessage("You cannot trade here.");
-      return;
-    }
-
     if (player.getLocalPlayers().indexOf(target) !== -1) {
       player.getTrading().requestTrade(target);
     }

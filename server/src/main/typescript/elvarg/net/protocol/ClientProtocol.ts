@@ -1229,11 +1229,15 @@ function encodeOpenSub(root: number, child: number, group: number, postScript?: 
   return packet(ServerPacket.WIDGET_OPEN_SUB, Buffer.concat([fixed, script]), 2);
 }
 
+export const MAIN_INVENTORY_GROUP_ID = 149;
+export const MAIN_INVENTORY_WIDGET_UID = MAIN_INVENTORY_GROUP_ID << 16;
+export const MAIN_INVENTORY_SLOT_FLAGS = 0x1207fe;
+
 export function encodeGameframeBootstrap(playerName: string): Buffer[] {
   const root = 161;
   const mounts = [
     [96, 162], [9, 163], [22, 160], [7, 122], [6, 651, 5929],
-    [76, 593], [77, 320], [78, 629], [79, 149], [80, 387], [81, 541],
+    [76, 593], [77, 320], [78, 629], [79, MAIN_INVENTORY_GROUP_ID], [80, 387], [81, 541],
     [82, 218], [83, 7], [84, 109], [85, 429], [86, 182], [87, 116],
     [88, 216], [89, 239],
   ];
@@ -1247,6 +1251,7 @@ export function encodeGameframeBootstrap(playerName: string): Buffer[] {
     packet(ServerPacket.RUN_CLIENT_SCRIPT, cameraScript, 2),
     packet(ServerPacket.WIDGET_SET_ROOT, rootPayload, 0),
     ...mounts.map(([child, group, postScript]) => encodeOpenSub(root, child, group, postScript)),
+    encodeWidgetSetFlagsRange(MAIN_INVENTORY_WIDGET_UID, 0, 27, MAIN_INVENTORY_SLOT_FLAGS),
     packet(ServerPacket.WIDGET_RUN_SCRIPT, loginScript, 2),
   ];
 }

@@ -65,14 +65,7 @@ function getAnglerfishHeal(currentHp) {
 }
 
 function canEat(player, itemId) {
-  const pluginDecision = pluginApi.emitCanEat(player, itemId);
-  if (pluginDecision === false) {
-    return false;
-  }
-  if (pluginDecision === null && player.getArea() && !player.getArea().canEat(player, itemId)) {
-    return false;
-  }
-  return true;
+  return pluginApi.emitCanEat(player, itemId) !== false;
 }
 
 module.exports = {
