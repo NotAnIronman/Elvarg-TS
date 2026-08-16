@@ -44,6 +44,7 @@ export class World {
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];
     private static npcTileOccupants: Map<string, NPC[]> = new Map();
+    private static npcRegionOccupants: Map<string, Set<NPC>> = new Map();
     private static activeRegionIndex: ActiveRegionIndex = new ActiveRegionIndex(1);
     private static realPlayerObserverBuckets: Map<string, Array<{ x: number; y: number; z: number }>> = new Map();
     private static realPlayerObserverCount = 0;
@@ -256,12 +257,42 @@ export class World {
         World.npcTileOccupants.set(key, nextBucket);
     }
 
+    private static addNpcToRegionOccupants(npc: NPC, location: Location | null | undefined): void {
+        if (!npc || !location) {
+            return;
+        }
+        const key = World.getRegionKey(location.getX(), location.getY(), location.getZ());
+        const bucket = World.npcRegionOccupants.get(key);
+        if (bucket) {
+            bucket.add(npc);
+        } else {
+            World.npcRegionOccupants.set(key, new Set([npc]));
+        }
+    }
+
+    private static removeNpcFromRegionOccupants(npc: NPC, location: Location | null | undefined): void {
+        if (!npc || !location) {
+            return;
+        }
+        const key = World.getRegionKey(location.getX(), location.getY(), location.getZ());
+        const bucket = World.npcRegionOccupants.get(key);
+        if (!bucket) {
+            return;
+        }
+        bucket.delete(npc);
+        if (bucket.size === 0) {
+            World.npcRegionOccupants.delete(key);
+        }
+    }
+
     public static registerNpcPosition(npc: NPC, location: Location | null | undefined = npc?.getLocation?.()): void {
         World.addNpcToTileOccupants(npc, location);
+        World.addNpcToRegionOccupants(npc, location);
     }
 
     public static unregisterNpcPosition(npc: NPC, location: Location | null | undefined = npc?.getLocation?.()): void {
         World.removeNpcFromTileOccupants(npc, location);
+        World.removeNpcFromRegionOccupants(npc, location);
     }
 
     public static onNpcMoved(
@@ -277,6 +308,11 @@ export class World {
         }
         World.removeNpcFromTileOccupants(npc, previousLocation);
         World.addNpcToTileOccupants(npc, nextLocation);
+        if (World.getRegionKey(previousLocation.getX(), previousLocation.getY(), previousLocation.getZ()) !==
+            World.getRegionKey(nextLocation.getX(), nextLocation.getY(), nextLocation.getZ())) {
+            World.removeNpcFromRegionOccupants(npc, previousLocation);
+            World.addNpcToRegionOccupants(npc, nextLocation);
+        }
     }
 
     public static isNpcOccupyingTile(
@@ -329,6 +365,29 @@ export class World {
             }
             World.addToUpdateBucket(World.npcUpdateBuckets, npc);
         }
+    }
+
+    private static collectActiveNpcsForUpdate(): NPC[] {
+        if (!GameConstants.PROCESS_NPCS_BY_ACTIVE_REGIONS) {
+            const allNpcs: NPC[] = [];
+            World.npcs.forEach((npc) => allNpcs.push(npc));
+            return allNpcs;
+        }
+
+        const activeNpcs = new Set<NPC>();
+        for (const key of World.activeRegionIndex.getActiveRegionKeys()) {
+            const bucket = World.npcRegionOccupants.get(key);
+            if (bucket) {
+                for (const npc of bucket) activeNpcs.add(npc);
+            }
+        }
+        // Finish combat/death flows that began while the NPC's region was active.
+        for (const npc of World.activeNpcsForUpdate) {
+            if (npc.isRegistered() && (npc.getInteractingMobile() != null || npc.isDyingFunction?.())) {
+                activeNpcs.add(npc);
+            }
+        }
+        return Array.from(activeNpcs).sort((a, b) => a.getIndex() - b.getIndex());
     }
 
     private static rebuildRealPlayerObserverBuckets(): void {
@@ -488,29 +547,6 @@ export class World {
             Date.now()
         );
         PluginManager.emitActiveRegionsUpdated(snapshot);
-    }
-
-    private static shouldProcessNpc(npc: NPC): boolean {
-        if (!npc) {
-            return false;
-        }
-
-        if (!GameConstants.PROCESS_NPCS_BY_ACTIVE_REGIONS) {
-            return true;
-        }
-
-        // Keep active combat/death flows alive even if temporarily out of region focus.
-        if (npc.getInteractingMobile() != null || npc.isDyingFunction?.()) {
-            return true;
-        }
-
-        const activeRegionKeys = World.activeRegionIndex.getActiveRegionKeys();
-        if (activeRegionKeys.size === 0) {
-            return false;
-        }
-
-        const loc = npc.getLocation();
-        return activeRegionKeys.has(World.getRegionKey(loc.getX(), loc.getY(), loc.getZ()));
     }
 
     private static shouldRunNetworkUpdates(player: Player): boolean {
@@ -717,7 +753,6 @@ export class World {
 
     public static process() {
         World.processCycle = (World.processCycle + 1) & 0x7fffffff;
-        World.activeNpcsForUpdate = [];
         const timed = <T>(phase: string, fn: () => T): T =>
             ServerPerf.measurePhase(`world.${phase}`, fn);
 
@@ -896,17 +931,14 @@ export class World {
         });
 
         timed("process_npcs", () => {
-            World.npcs.forEach((npc) => {
+            World.activeNpcsForUpdate = World.collectActiveNpcsForUpdate();
+            for (const npc of World.activeNpcsForUpdate) {
                 try {
-                    World.activeNpcsForUpdate.push(npc);
-                    if (!World.shouldProcessNpc(npc)) {
-                        return;
-                    }
                     npc.process();
                 } catch (e) {
                     console.error(e);
                 }
-            });
+            }
         });
 
         timed("combat_hits", () => {
@@ -920,9 +952,11 @@ export class World {
         timed("update_players_npcs", () => {
             World.forEachNetworkPlayer((player) => {
                 try {
-                    const nearbyNpcs = World.getNearbyNpcsForUpdate(player);
-                    World.updateLocalPlayers(player);
-                    World.updateLocalNpcs(player, nearbyNpcs);
+                    const nearbyNpcs = timed("collect_nearby_npcs", () =>
+                        World.getNearbyNpcsForUpdate(player)
+                    );
+                    timed("update_local_players", () => World.updateLocalPlayers(player));
+                    timed("update_local_npcs", () => World.updateLocalNpcs(player, nearbyNpcs));
                 } catch (e) {
                     console.error("[World] Player/NPC updating failure", e);
                     player.requestLogout();
@@ -930,7 +964,7 @@ export class World {
             });
         });
 
-        timed("flush_players", () => {
+        timed("flush_network_players", () => {
             World.players.forEach((player) => {
                 try {
                     if (World.shouldRunNetworkUpdates(player)) {
@@ -941,6 +975,8 @@ export class World {
                     player.requestLogout();
                 }
             });
+        });
+        timed("reset_player_updates", () => {
             // A bot can appear before its human observer in the player list. Keep
             // its flags until every observer has built this tick's sync frame.
             World.players.forEach((player) => {
@@ -955,13 +991,13 @@ export class World {
         });
 
         timed("reset_npcs", () => {
-            World.npcs.forEach((npc) => {
+            for (const npc of World.activeNpcsForUpdate) {
                 try {
                     npc.resetUpdating();
                 } catch (e) {
                     console.log(e);
                 }
-            });
+            }
         });
     }
 

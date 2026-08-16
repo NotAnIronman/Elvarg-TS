@@ -15,13 +15,13 @@ import {
   encodePlayerSync,
   encodeTick,
   NpcSyncState,
-  NpcView,
   PlayerSyncState,
   PlayerView,
 } from "./protocol/ClientProtocol";
 import { Music } from "../game/Music";
 import { Skill } from "../game/model/Skill";
 import { HitMask } from "../game/content/combat/hit/HitMask";
+import { ServerPerf } from "../util/ServerPerf";
 
 type SessionChannel = {
   binaryTransport?: boolean;
@@ -38,12 +38,16 @@ type SessionChannel = {
 };
 
 const OUTBOUND_BACKPRESSURE_LOG_COOLDOWN_MS = 5000;
+const NETWORK_PERF_LOG_INTERVAL_MS = 10000;
 const WS_CLOSE_BACKPRESSURE = 1013;
 
 export class PlayerSession {
   private channel: SessionChannel;
   private player?: Player;
   private lastBackpressureLogAt = 0;
+  private networkPerfStartedAt = Date.now();
+  private networkPerfBytes = 0;
+  private networkPerfMaxBufferedBytes = 0;
   private sceneBaseX = -1;
   private sceneBaseY = -1;
   private playerSyncState?: PlayerSyncState;
@@ -111,26 +115,29 @@ export class PlayerSession {
       y: location.getY(),
       level: location.getZ(),
     };
-    const musicRegion = ((current.x >> 6) << 8) | (current.y >> 6);
-    if (musicRegion !== this.lastGroundItemRegion) {
-      this.lastGroundItemRegion = musicRegion;
-      require("../game/entity/impl/grounditem/ItemOnGroundManager")
-        .ItemOnGroundManager.onRegionChange(player);
-    }
-    if (musicRegion !== this.lastMusicRegion) {
-      this.lastMusicRegion = musicRegion;
-      const track = Music.forRegion(musicRegion);
-      if (track !== undefined && track !== this.lastMusicTrack) {
-        this.lastMusicTrack = track;
-        this.sendClientPacket(encodePlaySong(track));
+    ServerPerf.measurePhase("network.flush.region_updates", () => {
+      const musicRegion = ((current.x >> 6) << 8) | (current.y >> 6);
+      if (musicRegion !== this.lastGroundItemRegion) {
+        this.lastGroundItemRegion = musicRegion;
+        require("../game/entity/impl/grounditem/ItemOnGroundManager")
+          .ItemOnGroundManager.onRegionChange(player);
       }
-    }
+      if (musicRegion !== this.lastMusicRegion) {
+        this.lastMusicRegion = musicRegion;
+        const track = Music.forRegion(musicRegion);
+        if (track !== undefined && track !== this.lastMusicTrack) {
+          this.lastMusicTrack = track;
+          this.sendClientPacket(encodePlaySong(track));
+        }
+      }
+    });
     let playerSync: Buffer;
     if (!this.playerSyncState) {
       this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
       this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
-      playerSync = encodeInitialPlayerSync(
-        player.getIndex(), current.x, current.y, current.level, tick
+      playerSync = ServerPerf.measurePhase(
+        "network.flush.encode_player_sync",
+        () => encodeInitialPlayerSync(player.getIndex(), current.x, current.y, current.level, tick)
       );
       this.playerSyncState = createPlayerSyncState(player.getIndex(), current);
     } else {
@@ -138,36 +145,44 @@ export class PlayerSession {
       const localY = current.y - this.sceneBaseY;
       if (localX < 16 || localX >= 88) this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
       if (localY < 16 || localY >= 88) this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
-      const views: PlayerView[] = [player, ...player.getLocalPlayers()].map((target) =>
-        this.createPlayerView(target, target === player && this.pendingInitialLocalAppearance)
+      const views = ServerPerf.measurePhase(
+        "network.flush.build_player_views",
+        () => [player, ...player.getLocalPlayers()].map((target) =>
+          this.createPlayerView(target, target === player && this.pendingInitialLocalAppearance)
+        )
       );
       this.pendingInitialLocalAppearance = false;
-      playerSync = encodePlayerSync(
-        player.getIndex(),
-        this.sceneBaseX,
-        this.sceneBaseY,
-        tick,
-        views,
-        this.playerSyncState
+      playerSync = ServerPerf.measurePhase(
+        "network.flush.encode_player_sync",
+        () => encodePlayerSync(
+          player.getIndex(),
+          this.sceneBaseX,
+          this.sceneBaseY,
+          tick,
+          views,
+          this.playerSyncState!
+        )
       );
     }
 
-    const npcViews: NpcView[] = player.getLocalNpcs().map((npc) => {
-      const location = npc.getLocation();
-      const face = npc.getFace()?.getDirection?.();
-      return {
-        ...this.createActorUpdates(npc, npc.getDefinition().getHitpoints(), false),
-        interactionIndex: this.interactionIndex(npc.getInteractingMobile()),
-        index: npc.getIndex(),
-        typeId: npc.getId(),
-        x: location.getX(),
-        y: location.getY(),
-        level: location.getZ(),
-        rotation: this.clientDirection(face),
-        walkDirection: this.clientDirection(npc.getWalkingDirection()),
-        runDirection: this.clientDirection(npc.getRunningDirection()),
-      };
-    });
+    const npcViews = ServerPerf.measurePhase("network.flush.build_npc_views", () =>
+      player.getLocalNpcs().map((npc) => {
+        const location = npc.getLocation();
+        const face = npc.getFace()?.getDirection?.();
+        return {
+          ...this.createActorUpdates(npc, npc.getDefinition().getHitpoints(), false),
+          interactionIndex: this.interactionIndex(npc.getInteractingMobile()),
+          index: npc.getIndex(),
+          typeId: npc.getId(),
+          x: location.getX(),
+          y: location.getY(),
+          level: location.getZ(),
+          rotation: this.clientDirection(face),
+          walkDirection: this.clientDirection(npc.getWalkingDirection()),
+          runDirection: this.clientDirection(npc.getRunningDirection()),
+        };
+      })
+    );
     const localForceMovement = player.getForceMovement();
     const npcLocal = localForceMovement
       ? {
@@ -176,15 +191,26 @@ export class PlayerSession {
           level: current.level,
         }
       : current;
-    const npcSync = encodeNpcSync(tick, npcLocal, npcViews, this.npcSyncState);
+    const npcSync = ServerPerf.measurePhase(
+      "network.flush.encode_npc_sync",
+      () => encodeNpcSync(tick, npcLocal, npcViews, this.npcSyncState)
+    );
 
-    try {
-      this.channel.send?.(encodeTick(tick, Date.now()));
-      this.channel.send?.(playerSync);
-      this.channel.send?.(npcSync);
-    } catch (error) {
-      console.warn("[PlayerSession] client sync failed", error);
-    }
+    ServerPerf.measurePhase("network.flush.socket_send", () => {
+      try {
+        const tickFrame = encodeTick(tick, Date.now());
+        this.channel.send?.(tickFrame);
+        this.channel.send?.(playerSync);
+        this.channel.send?.(npcSync);
+        this.recordNetworkPerf(
+          tickFrame.length + playerSync.length + npcSync.length,
+          player.getLocalPlayers().length,
+          player.getLocalNpcs().length
+        );
+      } catch (error) {
+        console.warn("[PlayerSession] client sync failed", error);
+      }
+    });
   }
 
   private createPlayerView(player: Player, forceAppearance = false): PlayerView {
@@ -367,6 +393,25 @@ export class PlayerSession {
     return typeof amount === "number" && Number.isFinite(amount) && amount > 0
       ? amount
       : 0;
+  }
+
+  private recordNetworkPerf(bytes: number, localPlayers: number, localNpcs: number): void {
+    if (!ServerPerf.isPeriodicSnapshotEnabled()) return;
+    this.networkPerfBytes += bytes;
+    this.networkPerfMaxBufferedBytes = Math.max(this.networkPerfMaxBufferedBytes, this.getBufferedAmount());
+    const now = Date.now();
+    const elapsedMs = now - this.networkPerfStartedAt;
+    if (elapsedMs < NETWORK_PERF_LOG_INTERVAL_MS) return;
+    console.info("[network-perf]", {
+      player: this.player?.getUsername?.() ?? "unknown",
+      outboundKiBPerSecond: Number((this.networkPerfBytes / 1024 / (elapsedMs / 1000)).toFixed(1)),
+      maxBufferedBytes: this.networkPerfMaxBufferedBytes,
+      localPlayers,
+      localNpcs,
+    });
+    this.networkPerfStartedAt = now;
+    this.networkPerfBytes = 0;
+    this.networkPerfMaxBufferedBytes = 0;
   }
 
   private closeBackpressuredWebSocket(reason: string): void {

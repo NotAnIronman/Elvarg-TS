@@ -123,12 +123,16 @@ export class ServerPerf {
   }
 
   public static measurePhase<T>(phase: string, fn: () => T): T {
-    const started = Date.now();
+    const started = process.hrtime.bigint();
     try {
       return fn();
     } finally {
-      ServerPerf.addPhaseDuration(phase, Date.now() - started);
+      ServerPerf.addPhaseDuration(phase, Number(process.hrtime.bigint() - started) / 1_000_000);
     }
+  }
+
+  public static isPeriodicSnapshotEnabled(): boolean {
+    return ServerPerf.PERIODIC_SNAPSHOT_ENABLED;
   }
 
   public static endTick(
