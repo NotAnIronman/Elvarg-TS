@@ -358,6 +358,7 @@ export class PacketSender {
     // decoding group 162 directly from the cache. Child 9 of 161 is an
     // unrelated 0x0 icon-cluster anchor nested under the sidebar tree.
     this.chatboxGroupId = id;
+    this.player.getSession().sendClientPacket(encodeWidgetSetHidden(CHATBOX_MODAL_TARGET_UID, false));
     if (this.player.getSession().sendClientPacket(encodeWidgetOpenSub(CHATBOX_MODAL_TARGET_UID, id, 0))) return this;
   }
 
@@ -599,12 +600,14 @@ export class PacketSender {
     const closable = [...this.subInterfaceTargets.entries()]
       .filter(([, entry]) => entry.type === 0 || entry.type === 3);
     const targets = new Set(closable.map(([, entry]) => entry.targetUid));
-    if (this.chatboxGroupId >= 0) {
+    const hadChatbox = this.chatboxGroupId >= 0;
+    if (hadChatbox) {
       targets.add(CHATBOX_MODAL_TARGET_UID);
       this.chatboxGroupId = -1;
     }
     if (targets.size === 0) return false;
     for (const target of targets) this.player.getSession().sendClientPacket(encodeWidgetCloseSub(target));
+    if (hadChatbox) this.player.getSession().sendClientPacket(encodeWidgetSetHidden(CHATBOX_MODAL_TARGET_UID, true));
     for (const [groupId] of closable) this.subInterfaceTargets.delete(groupId);
     return true;
   }
@@ -632,6 +635,7 @@ export class PacketSender {
       this.chatboxGroupId = -1;
       this.player.getDialogueManager?.()?.reset?.();
       this.player.getSession().sendClientPacket(encodeWidgetCloseSub(CHATBOX_MODAL_TARGET_UID));
+      this.player.getSession().sendClientPacket(encodeWidgetSetHidden(CHATBOX_MODAL_TARGET_UID, true));
       return this;
     }
     const target = this.subInterfaceTargets.get(groupId);

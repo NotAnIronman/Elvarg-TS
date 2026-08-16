@@ -6,7 +6,10 @@ import { NpcDefinition } from "../../../../definition/NpcDefinition";
 import { DialogueAction } from '../../../../model/dialogues/DialogueAction'
 
 export class NpcDialogue extends Dialogue {
-    private static readonly CHATBOX_INTERFACES = [4885, 4890, 4896, 4903];
+    private static readonly GROUP_ID = 231;
+    private static readonly HEAD_UID = (NpcDialogue.GROUP_ID << 16) | 2;
+    private static readonly NAME_UID = (NpcDialogue.GROUP_ID << 16) | 4;
+    private static readonly TEXT_UID = (NpcDialogue.GROUP_ID << 16) | 6;
     private npcId: number;
     private text: string;
     private expression: DialogueExpression;
@@ -29,35 +32,19 @@ export class NpcDialogue extends Dialogue {
     }
     
     public static send(player: Player, npcId: number, text: string, expression: DialogueExpression): void {
-        const lines = Misc.wrapText(text, 53);
-        let length = lines.length;
-        if (length > 5) {
-            length = 5;
-        }
-        const startDialogueChildId = NpcDialogue.CHATBOX_INTERFACES[length - 1];
-        const headChildId = startDialogueChildId - 2;
-        player.getPacketSender().sendNpcHeadOnInterface(npcId, headChildId);
-        player.getPacketSender().sendInterfaceAnimation(headChildId, expression.getExpression());
-        player.getPacketSender().sendString(
-                NpcDefinition.forId(npcId) != null ? NpcDefinition.forId(npcId).getName().replace("_", " ") : "",startDialogueChildId - 1);
-        for (let i = 0; i < length; i++) {
-            player.getPacketSender().sendString(lines[i], startDialogueChildId + i);
-        }
-        player.getPacketSender().sendConfiguredInterface(startDialogueChildId - 3);
+        const sender = player.getPacketSender();
+        sender
+            .sendChatboxInterface(NpcDialogue.GROUP_ID)
+            .sendNpcHeadOnInterface(npcId, NpcDialogue.HEAD_UID)
+            .sendInterfaceAnimation(NpcDialogue.HEAD_UID, expression.getExpression())
+            .sendString(
+                NpcDefinition.forId(npcId)?.getName()?.replace(/_/g, " ") || "",
+                NpcDialogue.NAME_UID
+            )
+            .sendString(Misc.wrapText(text, 53).slice(0, 4).join("<br>"), NpcDialogue.TEXT_UID);
     }
 
     public static sendStatement(player: Player, npcId: number, lines: string[], expression: DialogueExpression): void {
-        const length = Math.min(lines.length, 5);
-        const startDialogueChildId = NpcDialogue.CHATBOX_INTERFACES[length - 1];
-        const headChildId = startDialogueChildId - 2;
-        player.getPacketSender().sendNpcHeadOnInterface(npcId, headChildId);
-        player.getPacketSender().sendInterfaceAnimation(headChildId, expression.getExpression());
-        player.getPacketSender().sendString(
-        NpcDefinition.forId(npcId)?.getName()?.replace("_", " ") || "", startDialogueChildId - 1
-        );
-        for (let i = 0; i < length; i++) {
-          player.getPacketSender().sendString(lines[i], startDialogueChildId + i);
-        }
-        player.getPacketSender().sendConfiguredInterface(startDialogueChildId - 3);
-      }
+        NpcDialogue.send(player, npcId, lines.join(" "), expression);
+    }
 }

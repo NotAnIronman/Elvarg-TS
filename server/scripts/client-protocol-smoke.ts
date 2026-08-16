@@ -232,7 +232,7 @@ const chatboxSender = new PacketSender({
 chatboxSender.sendChatboxInterface(2492);
 assert.strictEqual(chatboxSender.isChatboxInterface(2492), true);
 chatboxSender.closeInterface(2492);
-assert.deepStrictEqual(chatboxPackets.map((packet) => packet[0]), [103, 104]);
+assert.deepStrictEqual(chatboxPackets.map((packet) => packet[0]), [106, 103, 104, 106]);
 const combatTabPackets: Buffer[] = [];
 new PacketSender({
   getSession: () => ({
