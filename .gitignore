@@ -4,6 +4,8 @@
 /node_modules
 /client/node_modules
 /server/node_modules
+/.yarn/
+/client/.yarn/
 /.pnp
 .pnp.js
 
@@ -80,4 +82,3 @@ docs/node_modules/
 # Discord handoff notes (local only — not for the repo)
 .dev-notes/
 *.discord.md
-

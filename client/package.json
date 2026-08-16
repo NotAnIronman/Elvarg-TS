@@ -47,10 +47,14 @@
     "export-items": "tsx scripts/cache/export-items.ts"
   },
   "eslintConfig": {
-    "extends": ["react-app"],
+    "extends": [
+      "react-app"
+    ],
     "overrides": [
       {
-        "files": ["rs/**/*.{ts,js}"],
+        "files": [
+          "rs/**/*.{ts,js}"
+        ],
         "rules": {
           "@typescript-eslint/no-unused-vars": "off",
           "eqeqeq": "off",
@@ -58,7 +62,9 @@
         }
       },
       {
-        "files": ["game/OsrsClient.ts"],
+        "files": [
+          "game/OsrsClient.ts"
+        ],
         "rules": {
           "@typescript-eslint/no-unused-vars": "off",
           "no-useless-escape": "off"
@@ -83,8 +89,12 @@
         }
       },
       {
-        "files": ["common/utils/*.js"],
-        "rules": { "strict": "off" }
+        "files": [
+          "common/utils/*.js"
+        ],
+        "rules": {
+          "strict": "off"
+        }
       }
     ]
   },
@@ -115,5 +125,6 @@
     "threads-plugin": "^1.4.0",
     "ts-shader-loader": "^2.1.0",
     "tsx": "^4.22.4"
-  }
+  },
+  "packageManager": "yarn@4.12.0+sha512.f45ab632439a67f8bc759bf32ead036a1f413287b9042726b7cc4818b7b49e14e9423ba49b18f9e06ea4941c1ad062385b1d8760a8d5091a1a31e5f6219afca8"
 }

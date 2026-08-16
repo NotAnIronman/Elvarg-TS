@@ -1,83 +1,104 @@
-# XRSPS
+# elvarg-typescript
 
-A community-driven project inspired by Project Zanaris.
-OSRS in the browser with a React/WebGL client and TypeScript WebSocket server.
+A browser-based Old School RuneScape private server combining the
+[xRSPS](https://github.com/xrsps/xrsps-typescript) TypeScript/WebGL client with
+the [Elvarg](https://github.com/RSPSApp/elvarg-rsps) server, ported to TypeScript.
+
+## Credits
+
+This project builds on the work of both upstream communities:
+
+- [xRSPS](https://github.com/xrsps/xrsps-typescript) provides the browser client,
+  cache tooling, and the foundation of this repository.
+- [Elvarg](https://github.com/RSPSApp/elvarg-rsps) provides the game-server
+  foundation.
+- [`elvarg-web-server`](https://github.com/tobywisener/elvarg-web-server) is the
+  TypeScript server port used in this fork.
 
 ## Packages
 
-This repository contains:
+- [`client/`](client/) — the `@xrsps/client` browser application
+- [`server/`](server/) — the TypeScript Elvarg game server
+- [`docs/`](docs/) — the xRSPS documentation site
 
-- [`client/`](client/) — `@xrsps/client` (browser app)
-- [`server/`](server/) — `@tobywisener/elvarg-web-server` (typescript upgrade of `@RSPSApp/elvarg-rsps`)
-- [`docs/`](docs/) — documentation site
+## Requirements
 
-## Quick Start
+- Node.js 22.16 or newer
+- Corepack, included with Node.js 22
 
-Requires **Node.js v22.16+** and **Yarn**.
+The root, client, and server all use the repository-pinned Yarn 4.12.0. A
+separate global Yarn installation is not required.
 
-Install Yarn if it is not already installed:
-
-```bash
-npm install --global yarn
-```
-
-Install the server and client, then build collision data:
+## Quick start
 
 ```bash
+git clone https://github.com/tobywisener/elvarg-typescript.git
+cd elvarg-typescript
+corepack enable
 yarn setup
-```
-
-Start the server and client together:
-
-```bash
 yarn start
 ```
 
-Start only the server:
+`yarn setup` installs the root tools, Elvarg server, and browser client. It is
+safe to run again after pulling changes. `yarn start` launches both processes;
+the client is normally available at <http://localhost:3000>.
 
-```bash
-yarn server
+The first start downloads the OSRS cache from the OpenRS2 Archive. The selected
+cache is recorded in [`server/target.txt`](server/target.txt).
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `yarn setup` | Install root, server, and client dependencies |
+| `yarn start` | Start the Elvarg server and browser client together |
+| `yarn server` | Start only the Elvarg server |
+| `yarn client` | Start only the browser client |
+| `cd server && yarn ensure-cache` | Download or verify the selected OSRS cache |
+| `cd client && yarn test` | Run the client regression tests |
+| `cd client && yarn typecheck` | Type-check the client |
+
+### Recovering an older or interrupted install
+
+Normally, rerunning `yarn setup` is enough. If an older checkout left
+incompatible dependencies behind, remove only the dependency directories and
+run setup again.
+
+PowerShell:
+
+```powershell
+Remove-Item -Recurse -Force node_modules, client/node_modules, server/node_modules -ErrorAction SilentlyContinue
+yarn setup
 ```
 
-Start only the client:
+macOS/Linux:
 
 ```bash
-yarn client
+rm -rf node_modules client/node_modules server/node_modules
+yarn setup
 ```
 
-Start the documentation site (optional):
+Game caches, configuration, and player saves are not removed by either command.
 
-```bash
-cd docs
-yarn install
-yarn dev
-```
+## Maintaining this fork
 
-See [docs/setup.md](docs/setup.md) for details.
-
-## This fork
-
-[`server/`](server/) is [elvarg-web-server](https://github.com/tobywisener/elvarg-web-server)
-(`xrsps` branch), imported here via `git subtree` with full history preserved.
-`git log server/` shows every elvarg commit.
-
-Pulling client updates from upstream `xrsps/xrsps-typescript` and opening PRs
-back still works normally. Run this once per clone so `server/` conflicts in
-future `git merge origin/main` auto-resolve to this fork's version instead of
-upstream's server (see `.gitattributes`):
+The server is imported from the `xrsps` branch of `elvarg-web-server` with its
+history preserved. Configure the repository's existing merge driver once per
+clone before merging xRSPS client updates:
 
 ```bash
 git config merge.ours.driver true
 ```
 
-To pull further elvarg-web-server updates into `server/`:
+To import newer Elvarg server changes:
 
 ```bash
-git fetch elvarg xrsps   # remote: tobywisener/elvarg-web-server
+git fetch elvarg xrsps
 git subtree pull --prefix=server elvarg xrsps -m "Update server/ from elvarg-web-server"
 ```
 
----
+## Legal
 
-Fan project. Not affiliated with, endorsed by, or connected to Jagex Ltd.
-Old School RuneScape and related assets/trademarks belong to their respective owners.
+This is a fan project. It is not affiliated with, endorsed by, or connected to
+Jagex Ltd. Old School RuneScape and related assets and trademarks belong to
+their respective owners.
