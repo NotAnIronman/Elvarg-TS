@@ -290,6 +290,8 @@ export async function cleanUp(host: WebGLOsrsRendererHost, ): Promise<void> {
         host.interactHighlightOverlay = undefined;
         host.healthBarOverlay = undefined;
         host.tileMarkerOverlay = undefined;
+        host.playerRenderer.cleanupAppearanceCache();
+        host.clearPlayerGeometryRuntimeState();
         host.clearInteractHighlightActiveTarget();
         host.clearInteractHighlightHoverTarget();
         host.interactHighlightDrawTargets.length = 0;

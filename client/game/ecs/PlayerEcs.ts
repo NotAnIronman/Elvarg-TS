@@ -619,6 +619,10 @@ export class PlayerEcs {
         return this.count;
     }
 
+    getActiveCount(): number {
+        return this.serverIdToIndex.size;
+    }
+
     getX(i: number): number {
         return this.x[i] | 0;
     }

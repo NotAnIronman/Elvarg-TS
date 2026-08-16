@@ -654,6 +654,7 @@ export class WebGLOsrsRenderer extends GameRenderer<WebGLMapSquare> {
     playerInterleavedBuffer?: VertexBuffer;
     playerIndexBufferAlpha?: VertexBuffer;
     playerInterleavedBufferAlpha?: VertexBuffer;
+    playerSlotBuffer?: VertexBuffer;
     playerDrawCall?: DrawCall;
     playerDrawCallAlpha?: DrawCall;
     playerDrawRanges?: DrawRange[];
@@ -1229,6 +1230,10 @@ export class WebGLOsrsRenderer extends GameRenderer<WebGLMapSquare> {
 
     public clearDynamicNpcAnimRuntimeState(): void {
         return render.clearDynamicNpcAnimRuntimeState(this);
+    }
+
+    public clearPlayerGeometryRuntimeState(): void {
+        return render.clearPlayerGeometryRuntimeState(this);
     }
 
     public disposeDynamicNpcAnimState(): void {

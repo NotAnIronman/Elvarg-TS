@@ -33,6 +33,9 @@ uniform float u_modelYOffset;
 uniform mat4 u_worldEntityTransform;
 
 layout(location = 0) in uvec3 a_vertex;
+layout(location = 1) in int a_playerSlot;
+
+uniform bool u_usePlayerSlotAttribute;
 
 out vec4 v_color;
 out vec2 v_texCoord;
@@ -68,7 +71,8 @@ float decodeSignedU16(uint value) {
 }
 
 PlayerInfo decodePlayerInfo(int offset) {
-    int baseTexel = (offset + gl_InstanceID) * 2;
+    int actorOffset = offset + (u_usePlayerSlotAttribute ? a_playerSlot : gl_InstanceID);
+    int baseTexel = actorOffset * 2;
     uvec4 data = texelFetch(u_npcDataTexture, getDataTexCoordFromIndex(baseTexel), 0);
     uvec4 data1 = texelFetch(u_npcDataTexture, getDataTexCoordFromIndex(baseTexel + 1), 0);
 

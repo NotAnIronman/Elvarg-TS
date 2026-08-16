@@ -92,6 +92,7 @@ export { resolvePlayerIdleSeqMaxId } from "./overlays4";
 export { ensureActorTileSelectionForFrame } from "./overlays4";
 export { init } from "./init/core";
 export { clearDynamicNpcAnimRuntimeState } from "./init/npcAnimInit";
+export { clearPlayerGeometryRuntimeState } from "./init/npcAnimInit";
 export { disposeDynamicNpcAnimState } from "./init/npcAnimInit";
 export { initDynamicNpcAnimLoader } from "./init/npcAnimInit";
 export { initPlayerGeometry } from "./init/npcAnimInit";

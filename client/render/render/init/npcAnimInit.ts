@@ -213,6 +213,27 @@ export function disposeDynamicNpcAnimState(host: WebGLOsrsRendererHost, ): void 
     
 }
 
+export function clearPlayerGeometryRuntimeState(host: WebGLOsrsRendererHost): void {
+        host.playerDrawCall = undefined;
+        host.playerDrawCallAlpha = undefined;
+        host.playerDrawRanges = undefined;
+        host.playerDrawRangesAlpha = undefined;
+        host.playerVertexArray?.delete();
+        host.playerVertexArray = undefined;
+        host.playerVertexArrayAlpha?.delete();
+        host.playerVertexArrayAlpha = undefined;
+        host.playerInterleavedBuffer?.delete();
+        host.playerInterleavedBuffer = undefined;
+        host.playerIndexBuffer?.delete();
+        host.playerIndexBuffer = undefined;
+        host.playerInterleavedBufferAlpha?.delete();
+        host.playerInterleavedBufferAlpha = undefined;
+        host.playerIndexBufferAlpha?.delete();
+        host.playerIndexBufferAlpha = undefined;
+        host.playerSlotBuffer?.delete();
+        host.playerSlotBuffer = undefined;
+}
+
 export function initDynamicNpcAnimLoader(host: WebGLOsrsRendererHost, ): void {
 
         host.disposeDynamicNpcAnimState();
@@ -241,10 +262,17 @@ export async function initPlayerGeometry(host: WebGLOsrsRendererHost, ): Promise
         if (!host.playerProgram || !host.textureArray || !host.textureMaterials) {
             return;
         }
+        clearPlayerGeometryRuntimeState(host);
         // Prepare empty dynamic GPU resources for player rendering. Base-model building is
         // handled in PlayerEcs and PlayerRenderer uploads per-frame geometry.
         const interleavedBuffer = host.app.createInterleavedBuffer(12, new Int32Array(0));
         const indexBuffer = host.app.createIndexBuffer(PicoGL.UNSIGNED_INT, new Int32Array(0));
+        const playerSlotBuffer = host.app.createVertexBuffer(
+            PicoGL.INT,
+            1,
+            new Int32Array(2048),
+            PicoGL.DYNAMIC_DRAW,
+        );
         const vertexArray = host.app
             .createVertexArray()
             .vertexAttributeBuffer(0, interleavedBuffer, {
@@ -253,12 +281,18 @@ export async function initPlayerGeometry(host: WebGLOsrsRendererHost, ): Promise
                 stride: 12,
                 integer: true as any,
             })
+            .instanceAttributeBuffer(1, playerSlotBuffer, {
+                type: PicoGL.INT,
+                size: 1,
+                integer: true as any,
+            })
             .indexBuffer(indexBuffer);
 
         const drawCall = host.app
             .createDrawCall(host.playerProgramOpaque ?? host.playerProgram!, vertexArray)
             .uniformBlock("SceneUniforms", host.sceneUniformBuffer!)
             .uniform("u_timeLoaded", -1.0)
+            .uniform("u_usePlayerSlotAttribute", false)
             .texture("u_textures", host.textureArray!)
             .texture("u_textureMaterials", host.textureMaterials!);
 
@@ -273,11 +307,17 @@ export async function initPlayerGeometry(host: WebGLOsrsRendererHost, ): Promise
                 stride: 12,
                 integer: true as any,
             })
+            .instanceAttributeBuffer(1, playerSlotBuffer, {
+                type: PicoGL.INT,
+                size: 1,
+                integer: true as any,
+            })
             .indexBuffer(indexBufferAlpha);
         const drawCallAlpha = host.app
             .createDrawCall(host.playerProgram!, vertexArrayAlpha)
             .uniformBlock("SceneUniforms", host.sceneUniformBuffer!)
             .uniform("u_timeLoaded", -1.0)
+            .uniform("u_usePlayerSlotAttribute", false)
             .texture("u_textures", host.textureArray!)
             .texture("u_textureMaterials", host.textureMaterials!);
 
@@ -286,6 +326,7 @@ export async function initPlayerGeometry(host: WebGLOsrsRendererHost, ): Promise
         host.playerIndexBuffer = indexBuffer as any;
         host.playerInterleavedBufferAlpha = interleavedBufferAlpha as any;
         host.playerIndexBufferAlpha = indexBufferAlpha as any;
+        host.playerSlotBuffer = playerSlotBuffer as any;
         host.playerVertexArrayAlpha = vertexArrayAlpha;
         host.playerDrawCall = drawCall;
         host.playerDrawCallAlpha = drawCallAlpha;

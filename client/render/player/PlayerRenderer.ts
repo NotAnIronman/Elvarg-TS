@@ -1,5 +1,5 @@
 import { vec2 } from "gl-matrix";
-import PicoGL, { DrawCall, Texture } from "picogl";
+import PicoGL, { DrawCall, Texture, VertexBuffer } from "picogl";
 
 import { EquipmentSlot } from "../../rs/config/player/Equipment";
 import { PlayerAppearance } from "../../rs/config/player/PlayerAppearance";
@@ -20,14 +20,68 @@ import type { WebGLOsrsRenderer } from "../WebGLOsrsRenderer";
  * assembled by WebGLOsrsClientRenderer (dynamic or pre-baked).
  */
 const PLAYER_INTERACT_BASE = 0x8000;
+const UNANIMATED_PLAYER_COUNT = 200;
+
+export function shouldUseUnanimatedIdlePlayer(
+    activePlayerCount: number,
+    lowPriority: boolean,
+    moving: boolean,
+    actionActive: boolean,
+    movementSeqId: number,
+    idleSeqId: number,
+): boolean {
+    return (
+        activePlayerCount > UNANIMATED_PLAYER_COUNT &&
+        lowPriority &&
+        !moving &&
+        !actionActive &&
+        movementSeqId === idleSeqId
+    );
+}
+
+export function drawPlayerSlots(
+    draw: DrawCall,
+    slotBuffer: VertexBuffer,
+    slotScratch: Int32Array,
+    slots: number[],
+    elementCount: number,
+): void {
+    if (slots.length === 1) {
+        draw.uniform("u_usePlayerSlotAttribute", false).uniform("u_drawIdOverride", slots[0] | 0);
+        (draw as any).drawRanges([0, elementCount | 0, 1]);
+        draw.draw();
+        draw.uniform("u_drawIdOverride", -1);
+        return;
+    }
+    for (let index = 0; index < slots.length; index++) slotScratch[index] = slots[index] | 0;
+    slotBuffer.data(slotScratch.subarray(0, slots.length));
+    draw.uniform("u_usePlayerSlotAttribute", true).uniform("u_drawIdOverride", -1);
+    (draw as any).drawRanges([0, elementCount | 0, slots.length]);
+    draw.draw();
+    draw.uniform("u_usePlayerSlotAttribute", false);
+}
+
+type PlayerGpuPass = {
+    vao: any;
+    vb: VertexBuffer;
+    ib: VertexBuffer;
+    drawCall: DrawCall;
+    count: number;
+};
+
+type PlayerGpuGeometry = {
+    geometryKey: string;
+    opaque?: PlayerGpuPass;
+    alpha?: PlayerGpuPass;
+};
 
 export class PlayerRenderer {
     constructor(private renderer: WebGLOsrsRenderer) {}
 
     // Reusable buffers to avoid per-frame allocations
     private playerIndicesBuffer: number[] = [];
-    private drawRangesLocalBuffer: DrawRange[] = [];
     private slotsBuffer: number[] = [];
+    private playerSlotScratch: Int32Array = new Int32Array(2048);
     private frameRenderSelectionId: number = -1;
     private frameRenderPlayersByMap: Map<number, number[]> = new Map();
     // Per-frame alpha counts captured during opaque pass; used to gate alpha pass work.
@@ -77,6 +131,7 @@ export class PlayerRenderer {
     async initGeometry(): Promise<void> {
         const r: any = this.renderer as any;
         if (typeof r.initPlayerGeometry !== "function") return;
+        this.clearPlayerGpuGeometryCache();
         // Build player geometry once using the current animation mode.
         await r.initPlayerGeometry();
         this.lastUploadedOpaqueGeomKey = undefined;
@@ -249,10 +304,17 @@ export class PlayerRenderer {
                     this.geomCache.delete(key);
                 }
             }
+            for (const [key, geometry] of this.playerGpuGeometryCache) {
+                if (key.startsWith(appearanceHash + "|")) {
+                    this.deletePlayerGpuGeometry(geometry);
+                    this.playerGpuGeometryCache.delete(key);
+                }
+            }
             return;
         }
         this.appearanceBaseCache.clear();
         this.geomCache.clear();
+        this.clearPlayerGpuGeometryCache();
     }
 
     // Bounded geometry cache: (appearance|seqId|frameIdx) -> buffers
@@ -261,6 +323,7 @@ export class PlayerRenderer {
         string,
         { verts: Uint8Array; inds: Int32Array; vertsA: Uint8Array; indsA: Int32Array }
     > = new Map();
+    private playerGpuGeometryCache: Map<string, PlayerGpuGeometry> = new Map();
 
     private ensureBaseForAppearance(
         app: PlayerAppearance,
@@ -324,6 +387,115 @@ export class PlayerRenderer {
             app.getEquipKey?.() ??
             (Array.isArray(app.equip) ? app.equip.slice(0, 14).join(",") : "");
         return app.getCacheKey?.() ?? `${app.getHash?.().toString() ?? "0"}|${equipKey}`;
+    }
+
+    private getPlayerGpuGeometry(ownerKey: string, geometryKey: string): PlayerGpuGeometry | undefined {
+        let geometry = this.playerGpuGeometryCache.get(ownerKey);
+        if (geometry?.geometryKey === geometryKey) {
+            this.playerGpuGeometryCache.delete(ownerKey);
+            this.playerGpuGeometryCache.set(ownerKey, geometry);
+            return geometry;
+        }
+
+        const cached = this.geomCache.get(geometryKey);
+        if (!cached) return undefined;
+
+        geometry ??= { geometryKey };
+        geometry.opaque = this.updatePlayerGpuPass(
+            geometry.opaque,
+            cached.verts,
+            cached.inds,
+            (this.renderer as any).playerProgramOpaque ?? (this.renderer as any).playerProgram,
+        );
+        geometry.alpha = this.updatePlayerGpuPass(
+            geometry.alpha,
+            cached.vertsA,
+            cached.indsA,
+            (this.renderer as any).playerProgram,
+        );
+        geometry.geometryKey = geometryKey;
+        this.playerGpuGeometryCache.delete(ownerKey);
+        this.playerGpuGeometryCache.set(ownerKey, geometry);
+
+        while (this.playerGpuGeometryCache.size > PlayerRenderer.GEOM_CACHE_MAX_ENTRIES) {
+            const oldest = this.playerGpuGeometryCache.keys().next().value as string | undefined;
+            if (oldest === undefined) break;
+            const evicted = this.playerGpuGeometryCache.get(oldest);
+            if (evicted) this.deletePlayerGpuGeometry(evicted);
+            this.playerGpuGeometryCache.delete(oldest);
+        }
+        return geometry;
+    }
+
+    private updatePlayerGpuPass(
+        pass: PlayerGpuPass | undefined,
+        vertices: Uint8Array,
+        indices: Int32Array,
+        program: any,
+    ): PlayerGpuPass | undefined {
+        if (!program) return undefined;
+        if (
+            pass &&
+            pass.vb.byteLength >= vertices.byteLength &&
+            pass.ib.byteLength >= indices.byteLength
+        ) {
+            if (vertices.byteLength > 0) pass.vb.data(vertices);
+            if (indices.byteLength > 0) pass.ib.data(indices);
+            pass.count = indices.length | 0;
+            return pass;
+        }
+        if (pass) this.deletePlayerGpuPass(pass);
+        if (indices.length <= 0) return undefined;
+
+        const r: any = this.renderer as any;
+        const vb = r.app.createInterleavedBuffer(12, vertices, PicoGL.DYNAMIC_DRAW);
+        const ib = r.app.createIndexBuffer(
+            PicoGL.UNSIGNED_INT as number,
+            indices,
+            PicoGL.DYNAMIC_DRAW,
+        );
+        const vao = r.app
+            .createVertexArray()
+            .vertexAttributeBuffer(0, vb, {
+                type: PicoGL.UNSIGNED_INT,
+                size: 3,
+                stride: 12,
+                integer: true as any,
+            })
+            .instanceAttributeBuffer(1, r.playerSlotBuffer, {
+                type: PicoGL.INT,
+                size: 1,
+                integer: true as any,
+            })
+            .indexBuffer(ib);
+        const drawCall = r.app
+            .createDrawCall(program, vao)
+            .uniformBlock("SceneUniforms", r.sceneUniformBuffer)
+            .uniform("u_timeLoaded", -1.0)
+            .uniform("u_usePlayerSlotAttribute", false)
+            .texture("u_textures", r.textureArray)
+            .texture("u_textureMaterials", r.textureMaterials);
+        return { vao, vb, ib, drawCall, count: indices.length | 0 };
+    }
+
+    private deletePlayerGpuPass(pass: PlayerGpuPass): void {
+        try {
+            pass.vao.delete();
+            pass.vb.delete();
+            pass.ib.delete();
+        } catch {}
+    }
+
+    private deletePlayerGpuGeometry(geometry: PlayerGpuGeometry): void {
+        if (geometry.opaque) this.deletePlayerGpuPass(geometry.opaque);
+        if (geometry.alpha) this.deletePlayerGpuPass(geometry.alpha);
+    }
+
+    private clearPlayerGpuGeometryCache(): void {
+        for (const geometry of this.playerGpuGeometryCache.values()) {
+            this.deletePlayerGpuGeometry(geometry);
+        }
+        this.playerGpuGeometryCache.clear();
     }
 
     // ==== Spot GFX helpers (id 833) ====
@@ -1037,16 +1209,16 @@ export class PlayerRenderer {
         modeHint?: "idle" | "walk" | "run",
         overlaySeqId?: number,
         overlayFrameIdx?: number,
-        uploadTarget: "both" | "opaqueOnly" | "alphaOnly" = "both",
+        uploadTarget: "both" | "opaqueOnly" | "alphaOnly" | "cacheOnly" = "both",
     ): { countOpaque: number; countAlpha: number } {
         const r: any = this.renderer as any;
         if (!r.playerInterleavedBuffer || !r.playerIndexBuffer)
             return { countOpaque: 0, countAlpha: 0 };
         const controlled = this.isControlledPid(pid);
-        const opaqueUploadKey =
-            cacheKey && uploadTarget !== "alphaOnly" ? `opaque:${cacheKey}` : undefined;
-        const alphaUploadKey =
-            cacheKey && uploadTarget !== "opaqueOnly" ? `alpha:${cacheKey}` : undefined;
+        const uploadOpaque = uploadTarget === "both" || uploadTarget === "opaqueOnly";
+        const uploadAlpha = uploadTarget === "both" || uploadTarget === "alphaOnly";
+        const opaqueUploadKey = cacheKey && uploadOpaque ? `opaque:${cacheKey}` : undefined;
+        const alphaUploadKey = cacheKey && uploadAlpha ? `alpha:${cacheKey}` : undefined;
         // Hit cache
         if (cacheKey) {
             const c = this.geomCache.get(cacheKey);
@@ -1056,7 +1228,7 @@ export class PlayerRenderer {
                 this.geomCache.set(cacheKey, c);
                 const cachedOpaqueCount = c.inds.length | 0;
                 const cachedAlphaCount = c.indsA.length | 0;
-                if (uploadTarget !== "alphaOnly") {
+                if (uploadOpaque) {
                     this.ensurePlayerGpuCapacity(c.verts, c.inds);
                     if (this.lastUploadedOpaqueGeomKey !== opaqueUploadKey) {
                         r.playerInterleavedBuffer.data(c.verts);
@@ -1077,7 +1249,7 @@ export class PlayerRenderer {
                         this.dynamicIndicesCountAlpha = cachedAlphaCount;
                     }
                 }
-                if (uploadTarget !== "opaqueOnly") {
+                if (uploadAlpha) {
                     this.ensurePlayerGpuCapacityAlpha(c.vertsA, c.indsA);
                     if (this.lastUploadedAlphaGeomKey !== alphaUploadKey) {
                         r.playerInterleavedBufferAlpha?.data(c.vertsA);
@@ -1243,7 +1415,7 @@ export class PlayerRenderer {
         }
 
         // Ensure GPU buffers have enough capacity. Recreate and rebind VAO if needed.
-        if (uploadTarget !== "alphaOnly") {
+        if (uploadOpaque) {
             this.ensurePlayerGpuCapacity(vertices, indices);
             if (vertices.byteLength > 0) {
                 r.playerInterleavedBuffer.data(vertices);
@@ -1300,7 +1472,7 @@ export class PlayerRenderer {
                 verticesAlpha = sceneBufA.vertexBuf.byteArray();
                 indicesAlpha = new Int32Array(sceneBufA.indices);
             }
-            if (uploadTarget !== "opaqueOnly") {
+            if (uploadAlpha) {
                 this.ensurePlayerGpuCapacityAlpha(verticesAlpha, indicesAlpha);
                 r.playerInterleavedBufferAlpha?.data(verticesAlpha);
                 r.playerIndexBufferAlpha?.data(indicesAlpha);
@@ -1318,7 +1490,7 @@ export class PlayerRenderer {
             } catch {}
             this.dynamicIndicesCountAlpha = indicesAlpha.length | 0;
         } else {
-            if (uploadTarget !== "opaqueOnly") {
+            if (uploadAlpha) {
                 if (this.lastUploadedAlphaGeomKey !== alphaUploadKey) {
                     r.playerInterleavedBufferAlpha?.data(verticesAlpha);
                     r.playerIndexBufferAlpha?.data(indicesAlpha);
@@ -1333,7 +1505,7 @@ export class PlayerRenderer {
             countAlpha: indicesAlpha.length | 0,
         };
         try {
-            if (cacheKey && animationApplied) {
+            if (cacheKey && (animationApplied || seqId < 0)) {
                 const cacheAlphaVerts = new Uint8Array(verticesAlpha);
                 const cacheAlphaInds = new Int32Array(indicesAlpha);
                 this.geomCache.set(cacheKey, {
@@ -1377,6 +1549,7 @@ export class PlayerRenderer {
         const strideBytes = 12;
 
         if (needGrowVB) {
+            const oldBuf = r.playerInterleavedBuffer;
             const requiredBytes = Math.max(strideBytes, vertexBytes);
             const pow2Bytes = nextPow2(requiredBytes);
             const capBytes = Math.ceil(pow2Bytes / strideBytes) * strideBytes;
@@ -1389,6 +1562,7 @@ export class PlayerRenderer {
                 integer: true as any,
             });
             r.playerInterleavedBuffer = newBuf;
+            oldBuf?.delete();
             this.interleavedBuffer = newBuf;
             this.lastUploadedOpaqueGeomKey = undefined;
             // Recreate opaque draw call to ensure it references updated VAO (defensive)
@@ -1397,6 +1571,7 @@ export class PlayerRenderer {
                     .createDrawCall(r.playerProgramOpaque ?? r.playerProgram, r.playerVertexArray)
                     .uniformBlock("SceneUniforms", r.sceneUniformBuffer)
                     .uniform("u_timeLoaded", -1.0)
+                    .uniform("u_usePlayerSlotAttribute", false)
                     .texture("u_textures", r.textureArray)
                     .texture("u_textureMaterials", r.textureMaterials);
                 // Keep alpha draw call bound to the dedicated alpha VAO; see ensurePlayerGpuCapacityAlpha().
@@ -1405,11 +1580,13 @@ export class PlayerRenderer {
         }
 
         if (needGrowIB) {
+            const oldBuf = r.playerIndexBuffer;
             const newElems = nextPow2(indexCount);
             const initData = new Int32Array(newElems);
             const newBuf = app.createIndexBuffer(PicoGL.UNSIGNED_INT as number, initData);
             r.playerVertexArray = r.playerVertexArray.indexBuffer(newBuf);
             r.playerIndexBuffer = newBuf;
+            oldBuf?.delete();
             this.indexBuffer = newBuf;
             this.lastUploadedOpaqueGeomKey = undefined;
             // Recreate opaque draw call to ensure it references updated VAO (defensive)
@@ -1418,6 +1595,7 @@ export class PlayerRenderer {
                     .createDrawCall(r.playerProgramOpaque ?? r.playerProgram, r.playerVertexArray)
                     .uniformBlock("SceneUniforms", r.sceneUniformBuffer)
                     .uniform("u_timeLoaded", -1.0)
+                    .uniform("u_usePlayerSlotAttribute", false)
                     .texture("u_textures", r.textureArray)
                     .texture("u_textureMaterials", r.textureMaterials);
                 // Keep alpha draw call bound to the dedicated alpha VAO; see ensurePlayerGpuCapacityAlpha().
@@ -1450,6 +1628,7 @@ export class PlayerRenderer {
         const strideBytes = 12;
 
         if (needGrowVB) {
+            const oldBuf = r.playerInterleavedBufferAlpha;
             const requiredBytes = Math.max(strideBytes, vertexBytes);
             const pow2Bytes = nextPow2(requiredBytes);
             const capBytes = Math.ceil(pow2Bytes / strideBytes) * strideBytes;
@@ -1461,12 +1640,14 @@ export class PlayerRenderer {
                 integer: true as any,
             });
             r.playerInterleavedBufferAlpha = newBuf;
+            oldBuf?.delete();
             this.lastUploadedAlphaGeomKey = undefined;
             if (r.playerProgram) {
                 r.playerDrawCallAlpha = app
                     .createDrawCall(r.playerProgram, r.playerVertexArrayAlpha)
                     .uniformBlock("SceneUniforms", r.sceneUniformBuffer)
                     .uniform("u_timeLoaded", -1.0)
+                    .uniform("u_usePlayerSlotAttribute", false)
                     .texture("u_textures", r.textureArray)
                     .texture("u_textureMaterials", r.textureMaterials);
                 this.drawCallAlpha = r.playerDrawCallAlpha;
@@ -1474,17 +1655,20 @@ export class PlayerRenderer {
         }
 
         if (needGrowIB) {
+            const oldBuf = r.playerIndexBufferAlpha;
             const newElems = nextPow2(indexCount);
             const initData = new Int32Array(newElems);
             const newBuf = app.createIndexBuffer(PicoGL.UNSIGNED_INT as number, initData);
             r.playerVertexArrayAlpha = r.playerVertexArrayAlpha.indexBuffer(newBuf);
             r.playerIndexBufferAlpha = newBuf;
+            oldBuf?.delete();
             this.lastUploadedAlphaGeomKey = undefined;
             if (r.playerProgram) {
                 r.playerDrawCallAlpha = app
                     .createDrawCall(r.playerProgram, r.playerVertexArrayAlpha)
                     .uniformBlock("SceneUniforms", r.sceneUniformBuffer)
                     .uniform("u_timeLoaded", -1.0)
+                    .uniform("u_usePlayerSlotAttribute", false)
                     .texture("u_textures", r.textureArray)
                     .texture("u_textureMaterials", r.textureMaterials);
                 this.drawCallAlpha = r.playerDrawCallAlpha;
@@ -1705,17 +1889,14 @@ export class PlayerRenderer {
         const pe = r.osrsClient.playerEcs;
         const playerIndices = this.getRenderPlayersForMap(map);
         if (playerIndices.length === 0) return;
+        const activePlayerCount = pe.getActiveCount();
+        const combatTargetPid = r.getCombatTargetPlayerEcsIndex();
 
         // Clear batch groups for this frame
         this.batchGroups.clear();
 
-        // Reuse draw ranges and slots buffers
-        const drawRangesLocal = this.drawRangesLocalBuffer;
+        // Reuse the slot buffer.
         const slots = this.slotsBuffer;
-        // Ensure capacity and set length
-        if (drawRangesLocal.length < playerIndices.length) {
-            drawRangesLocal.length = playerIndices.length;
-        }
         if (slots.length < playerIndices.length) {
             slots.length = playerIndices.length;
         }
@@ -1743,30 +1924,45 @@ export class PlayerRenderer {
             const movementSeqId = peInst.getAnimMovementSeqId(pid) | 0;
             const idleSeqId = peInst.getAnimSeq(pid, "idle") | 0;
 
-            const controller = this.renderer.osrsClient.playerAnimController;
-            const serverId = this.renderer.osrsClient.playerEcs.getServerIdForIndex(pid);
-
-            let movementFrameIdx = 0;
-            let actionFrameIdx = 0;
-            if (controller && serverId !== undefined) {
-                movementFrameIdx = (controller.getMovementSequenceState(serverId)?.frame ?? 0) | 0;
-                actionFrameIdx = (controller.getSequenceState(serverId)?.frame ?? 0) | 0;
-            }
             const actionDelay = (peInst.getAnimSeqDelay?.(pid) ?? 0) | 0;
             const actionActive = actionSeqId >= 0 && actionDelay === 0;
             const forcedSeq = this.resolveControlledIdleSeqOverride(pid | 0);
             const useActionSequence = forcedSeq === undefined && actionActive;
+            const unanimatedIdle = shouldUseUnanimatedIdlePlayer(
+                activePlayerCount,
+                this.canBatchPlayer(pid, peInst) && (pid | 0) !== (combatTargetPid ?? -1),
+                moving,
+                actionActive,
+                movementSeqId,
+                idleSeqId,
+            );
+
+            let movementFrameIdx = 0;
+            let actionFrameIdx = 0;
+            if (!unanimatedIdle) {
+                const controller = this.renderer.osrsClient.playerAnimController;
+                const serverId = this.renderer.osrsClient.playerEcs.getServerIdForIndex(pid);
+                if (controller && serverId !== undefined) {
+                    movementFrameIdx =
+                        (controller.getMovementSequenceState(serverId)?.frame ?? 0) | 0;
+                    actionFrameIdx = (controller.getSequenceState(serverId)?.frame ?? 0) | 0;
+                }
+            }
 
             if (!forcedSeq && !actionActive && (movementSeqId | 0) < 0) continue;
 
             let seqId =
-                forcedSeq !== undefined
+                unanimatedIdle
+                    ? -1
+                    : forcedSeq !== undefined
                     ? forcedSeq.seqId | 0
                     : useActionSequence
                       ? actionSeqId | 0
                       : movementSeqId | 0;
             let frameIdx =
-                forcedSeq !== undefined
+                unanimatedIdle
+                    ? 0
+                    : forcedSeq !== undefined
                     ? forcedSeq.frameIdx | 0
                     : useActionSequence
                       ? actionFrameIdx | 0
@@ -1791,7 +1987,7 @@ export class PlayerRenderer {
             }
 
             // Frame sounds: mirror server-driven movement/action unless a local debug override is active.
-            if (!forcedSeq && (movementSeqId | 0) >= 0) {
+            if (!forcedSeq && !unanimatedIdle && (movementSeqId | 0) >= 0) {
                 this.emitPlayerFrameSound(
                     pid | 0,
                     movementSeqId | 0,
@@ -1880,7 +2076,8 @@ export class PlayerRenderer {
         const draw = r.configureDrawCall(this.drawCall as any as DrawCall);
         const playerEcs = r.osrsClient?.playerEcs;
         const playerDeckH = r.getWorldEntityDeckHeight(0, 0);
-        draw.uniform("u_mapPos", vec2.fromValues(map.renderPosX, map.renderPosY))
+        const playerMapPos = vec2.fromValues(map.renderPosX, map.renderPosY);
+        draw.uniform("u_mapPos", playerMapPos)
             .uniform("u_npcDataOffset", baseOffsetPlayer)
             .uniform("u_modelYOffset", r.playerYOffset)
             .uniform("u_worldEntityTransform", WebGLMapSquare.IDENTITY_MAT4)
@@ -1902,8 +2099,87 @@ export class PlayerRenderer {
             const baseRec = this.ensureBaseForAppearance(group.appearance);
             if (!baseRec) continue;
 
-            // Each player needs individual vertex buffer update (skeletal animation per-player)
+            // Players in the same group share appearance and animation geometry. Upload it once,
+            // while retaining one instance per actor slot for exact placement.
+            slots.length = 0;
+            let batchSource: (typeof group.instances)[number] | undefined;
             for (const inst of group.instances) {
+                if (this.canBatchPlayer(inst.pid, playerEcs)) {
+                    batchSource ??= inst;
+                    slots.push(inst.slot | 0);
+                }
+            }
+
+            if (batchSource) {
+                const gpuOwnerKey = `${this.getAppearanceCacheKey(group.appearance)}|seq:${
+                    group.seqId | 0
+                }|overlay:${group.overlaySeqId ?? -1}`;
+                let gpuGeometry = this.getPlayerGpuGeometry(gpuOwnerKey, batchKey);
+                if (!gpuGeometry) {
+                    this.dynamicUpdateBuffersFor(
+                        baseRec.baseModel,
+                        baseRec.baseCenterX,
+                        baseRec.baseCenterZ,
+                        group.seqId,
+                        group.frameIdx,
+                        batchKey,
+                        batchSource.pid,
+                        batchSource.mode,
+                        group.overlaySeqId,
+                        group.overlayFrameIdx,
+                        "cacheOnly",
+                    );
+                    gpuGeometry = this.getPlayerGpuGeometry(gpuOwnerKey, batchKey);
+                }
+                const counts = gpuGeometry
+                    ? {
+                          countOpaque: gpuGeometry.opaque?.count ?? 0,
+                          countAlpha: gpuGeometry.alpha?.count ?? 0,
+                      }
+                    : this.dynamicUpdateBuffersFor(
+                          baseRec.baseModel,
+                          baseRec.baseCenterX,
+                          baseRec.baseCenterZ,
+                          group.seqId,
+                          group.frameIdx,
+                          batchKey,
+                          batchSource.pid,
+                          batchSource.mode,
+                          group.overlaySeqId,
+                          group.overlayFrameIdx,
+                          "opaqueOnly",
+                      );
+                for (const inst of group.instances) {
+                    if (this.canBatchPlayer(inst.pid, playerEcs)) {
+                        this.framePlayerAlphaCounts.set(inst.pid | 0, counts.countAlpha | 0);
+                    }
+                }
+                if ((counts.countOpaque | 0) > 0) {
+                    const playerDraw = gpuGeometry?.opaque
+                        ? r
+                              .configureDrawCall(gpuGeometry.opaque.drawCall)
+                              .uniform("u_mapPos", playerMapPos)
+                              .uniform("u_npcDataOffset", baseOffsetPlayer)
+                              .uniform("u_modelYOffset", r.playerYOffset)
+                              .uniform("u_worldEntityTransform", WebGLMapSquare.IDENTITY_MAT4)
+                              .texture("u_npcDataTexture", actorDataTexture)
+                              .texture("u_heightMap", map.heightMapTexture)
+                              .uniform("u_sceneBorderSize", map.borderSize)
+                        : draw;
+                    drawPlayerSlots(
+                        playerDraw,
+                        r.playerSlotBuffer!,
+                        this.playerSlotScratch,
+                        slots,
+                        counts.countOpaque | 0,
+                    );
+                }
+            }
+
+            for (const inst of group.instances) {
+                if (batchSource && this.canBatchPlayer(inst.pid, playerEcs)) {
+                    continue;
+                }
                 const counts = this.dynamicUpdateBuffersFor(
                     baseRec.baseModel,
                     baseRec.baseCenterX,
@@ -1974,6 +2250,8 @@ export class PlayerRenderer {
             const pe = r.osrsClient.playerEcs;
             const playerIndices = this.getRenderPlayersForMap(map);
             if (playerIndices.length === 0) continue;
+            const activePlayerCount = pe.getActiveCount();
+            const combatTargetPid = r.getCombatTargetPlayerEcsIndex();
 
             // PERF: Clear and reuse cached batch groups Map to avoid per-frame allocation
             this.alphaBatchGroups.clear();
@@ -2007,31 +2285,45 @@ export class PlayerRenderer {
                 const movementSeqId = peInst.getAnimMovementSeqId(pid) | 0;
                 const idleSeqId = peInst.getAnimSeq(pid, "idle") | 0;
 
-                const controller = this.renderer.osrsClient.playerAnimController;
-                const serverId = this.renderer.osrsClient.playerEcs.getServerIdForIndex(pid);
-
-                let movementFrameIdx = 0;
-                let actionFrameIdx = 0;
-                if (controller && serverId !== undefined) {
-                    movementFrameIdx =
-                        (controller.getMovementSequenceState(serverId)?.frame ?? 0) | 0;
-                    actionFrameIdx = (controller.getSequenceState(serverId)?.frame ?? 0) | 0;
-                }
                 const actionDelay = (pe.getAnimSeqDelay?.(pid) ?? 0) | 0;
                 const actionActive = actionSeqId >= 0 && actionDelay === 0;
                 const forcedSeq = this.resolveControlledIdleSeqOverride(pid | 0);
                 const useActionSequence = forcedSeq === undefined && actionActive;
+                const unanimatedIdle = shouldUseUnanimatedIdlePlayer(
+                    activePlayerCount,
+                    this.canBatchPlayer(pid, peInst) && (pid | 0) !== (combatTargetPid ?? -1),
+                    moving,
+                    actionActive,
+                    movementSeqId,
+                    idleSeqId,
+                );
+
+                let movementFrameIdx = 0;
+                let actionFrameIdx = 0;
+                if (!unanimatedIdle) {
+                    const controller = this.renderer.osrsClient.playerAnimController;
+                    const serverId = this.renderer.osrsClient.playerEcs.getServerIdForIndex(pid);
+                    if (controller && serverId !== undefined) {
+                        movementFrameIdx =
+                            (controller.getMovementSequenceState(serverId)?.frame ?? 0) | 0;
+                        actionFrameIdx = (controller.getSequenceState(serverId)?.frame ?? 0) | 0;
+                    }
+                }
 
                 if (!forcedSeq && !actionActive && (movementSeqId | 0) < 0) continue;
 
                 let seqId =
-                    forcedSeq !== undefined
+                    unanimatedIdle
+                        ? -1
+                        : forcedSeq !== undefined
                         ? forcedSeq.seqId | 0
                         : useActionSequence
                           ? actionSeqId | 0
                           : movementSeqId | 0;
                 let frameIdx =
-                    forcedSeq !== undefined
+                    unanimatedIdle
+                        ? 0
+                        : forcedSeq !== undefined
                         ? forcedSeq.frameIdx | 0
                         : useActionSequence
                           ? actionFrameIdx | 0
@@ -2116,11 +2408,12 @@ export class PlayerRenderer {
             }
             if (alphaBatchGroups.size === 0) continue;
 
-            // Render batched alpha groups through the active draw backend.
+            // Render batched alpha groups.
             const draw = r.configureDrawCall(this.drawCallAlpha as any as DrawCall);
             const playerEcsAlpha = r.osrsClient?.playerEcs;
             const alphaDeckH = r.getWorldEntityDeckHeight(0, 0);
-            draw.uniform("u_mapPos", vec2.fromValues(map.renderPosX, map.renderPosY))
+            const alphaMapPos = vec2.fromValues(map.renderPosX, map.renderPosY);
+            draw.uniform("u_mapPos", alphaMapPos)
                 .uniform("u_npcDataOffset", baseOffset)
                 .uniform("u_modelYOffset", r.playerYOffset)
                 .uniform("u_worldEntityTransform", WebGLMapSquare.IDENTITY_MAT4)
@@ -2136,8 +2429,77 @@ export class PlayerRenderer {
                 const baseRec = this.ensureBaseForAppearance(group.appearance);
                 if (!baseRec) continue;
 
-                // Each player needs individual vertex buffer update
+                slots.length = 0;
+                let batchSource: (typeof group.instances)[number] | undefined;
                 for (const inst of group.instances) {
+                    if (this.canBatchPlayer(inst.pid, playerEcsAlpha)) {
+                        batchSource ??= inst;
+                        slots.push(inst.slot | 0);
+                    }
+                }
+
+                if (batchSource) {
+                    const gpuOwnerKey = `${this.getAppearanceCacheKey(group.appearance)}|seq:${
+                        group.seqId | 0
+                    }|overlay:${group.overlaySeqId ?? -1}`;
+                    let gpuGeometry = this.getPlayerGpuGeometry(gpuOwnerKey, batchKey);
+                    if (!gpuGeometry) {
+                        this.dynamicUpdateBuffersFor(
+                            baseRec.baseModel,
+                            baseRec.baseCenterX,
+                            baseRec.baseCenterZ,
+                            group.seqId,
+                            group.frameIdx,
+                            batchKey,
+                            batchSource.pid,
+                            batchSource.mode,
+                            group.overlaySeqId,
+                            group.overlayFrameIdx,
+                            "cacheOnly",
+                        );
+                        gpuGeometry = this.getPlayerGpuGeometry(gpuOwnerKey, batchKey);
+                    }
+                    const counts = gpuGeometry
+                        ? { countAlpha: gpuGeometry.alpha?.count ?? 0 }
+                        : this.dynamicUpdateBuffersFor(
+                              baseRec.baseModel,
+                              baseRec.baseCenterX,
+                              baseRec.baseCenterZ,
+                              group.seqId,
+                              group.frameIdx,
+                              batchKey,
+                              batchSource.pid,
+                              batchSource.mode,
+                              group.overlaySeqId,
+                              group.overlayFrameIdx,
+                              "alphaOnly",
+                          );
+                    if ((counts.countAlpha | 0) > 0) {
+                        const playerDraw = gpuGeometry?.alpha
+                            ? r
+                                  .configureDrawCall(gpuGeometry.alpha.drawCall)
+                                  .uniform("u_mapPos", alphaMapPos)
+                                  .uniform("u_npcDataOffset", baseOffset)
+                                  .uniform("u_modelYOffset", r.playerYOffset)
+                                  .uniform("u_worldEntityTransform", WebGLMapSquare.IDENTITY_MAT4)
+                                  .texture("u_npcDataTexture", playerDataTexture)
+                                  .texture("u_heightMap", map.heightMapTexture)
+                                  .uniform("u_sceneBorderSize", map.borderSize)
+                            : draw;
+                        drawPlayerSlots(
+                            playerDraw,
+                            r.playerSlotBuffer!,
+                            this.playerSlotScratch,
+                            slots,
+                            counts.countAlpha | 0,
+                        );
+                    }
+                }
+
+                for (const inst of group.instances) {
+                    if (batchSource && this.canBatchPlayer(inst.pid, playerEcsAlpha)) {
+                        continue;
+                    }
                     const counts = this.dynamicUpdateBuffersFor(
                         baseRec.baseModel,
                         baseRec.baseCenterX,
@@ -2225,6 +2587,14 @@ export class PlayerRenderer {
         }
     }
 
+    private canBatchPlayer(pid: number, playerEcs: any): boolean {
+        return (
+            !!this.renderer.playerSlotBuffer &&
+            !this.isControlledPid(pid) &&
+            (playerEcs?.getWorldViewId?.(pid) ?? -1) < 0
+        );
+    }
+
     private resetRenderSelectionFrameIfNeeded(): void {
         const frameId = (this.renderer.stats?.frameCount ?? 0) | 0;
         if (frameId === this.frameRenderSelectionId) return;
@@ -2247,10 +2617,10 @@ export class PlayerRenderer {
         const overlayView = this.renderer.osrsClient.worldViewManager.getWorldViewByOverlayMapId(
             map.id,
         );
-        const count = pe.size?.() ?? (pe as any).size?.() ?? 0;
         const renderSelf = this.renderer.osrsClient.renderSelf !== false;
 
-        for (let pid = 0; pid < count; pid++) {
+        for (const activePid of pe.getAllActiveIndices()) {
+            const pid = activePid | 0;
             if (!renderSelf && this.isControlledPid(pid)) {
                 continue;
             }
