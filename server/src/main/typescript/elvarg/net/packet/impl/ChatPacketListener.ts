@@ -1,5 +1,6 @@
 import { PlayerPunishment } from "../../../util/PlayerPunishment";
 import { Misc } from "../../../util/Misc";
+import { World } from "../../../game/World";
 import { CommandPacketListener } from "./CommandPacketListener";
 
 export class ChatPacketListener {
@@ -32,7 +33,15 @@ export class ChatPacketListener {
     if (!ChatPacketListener.allowChat(player, text)) return;
     player.forceChat(text);
 
-    const recipients = [player, ...player.getLocalPlayers()];
+    // Local lists can be asymmetric at the 255-player cap. Include clients
+    // that render the speaker even when the speaker cannot render them.
+    const recipients = [
+      player,
+      ...player.getLocalPlayers(),
+      ...World.getNearbyPlayersForUpdate(player).filter((recipient) =>
+        recipient.getLocalPlayers().includes(player)
+      ),
+    ];
     const sent = new Set<number>();
     for (const recipient of recipients) {
       if (

@@ -5,6 +5,7 @@
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
+const { ChatPacketListener } = require("../../src/main/typescript/elvarg/net/packet/impl/ChatPacketListener");
 const { createBotPlayer } = require("./behaviours/spawn/BotPlayerFactory");
 const { randomInRange } = require("./behaviours/navigation/BotNavigation");
 const { ATTR_SKIP_PERSISTENCE } = require("./runtime/BotPersistenceConstants");
@@ -158,7 +159,10 @@ module.exports = {
               randomClippedStepWithinBounds(player, GRAND_EXCHANGE_BOUNDS);
             }
             if (activityTick >= activity.nextChatTick) {
-              player.forceChat(CHAT_MESSAGES[randomInRange(0, CHAT_MESSAGES.length - 1)]);
+              ChatPacketListener.handleText(
+                player,
+                CHAT_MESSAGES[randomInRange(0, CHAT_MESSAGES.length - 1)]
+              );
               activity.nextChatTick = nextStressBotActivityTick(
                 activityTick,
                 CHAT_DELAY_TICKS.min,
