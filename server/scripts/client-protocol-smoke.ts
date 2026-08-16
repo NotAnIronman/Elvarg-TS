@@ -354,12 +354,25 @@ const appearance = encodePlayerAppearance(
   [808, 823, 819, 820, 821, 822, 824]
 );
 const playerState = createPlayerSyncState(1, { x: 3089, y: 3524, level: 0 });
+const activeSlots = playerState.active;
+const emptySlots = playerState.empty;
 const playerFrame = encodePlayerSync(1, 3040, 3472, 10, [
   { index: 1, x: 3090, y: 3524, level: 0, appearance },
   { index: 2, x: 3091, y: 3524, level: 0, appearance },
 ], playerState);
 assert.strictEqual(playerFrame[0], 20);
-assert.deepStrictEqual(playerState.active, [1, 2]);
+assert.strictEqual(playerState.active, activeSlots);
+assert.strictEqual(playerState.empty, emptySlots);
+assert.deepStrictEqual(Array.from(playerState.active.subarray(0, playerState.activeCount)), [1, 2]);
+encodePlayerSync(1, 3040, 3472, 11, [
+  { index: 1, x: 3090, y: 3524, level: 0, appearance },
+], playerState);
+assert.deepStrictEqual(Array.from(playerState.active.subarray(0, playerState.activeCount)), [1]);
+encodePlayerSync(1, 3040, 3472, 12, [
+  { index: 1, x: 3090, y: 3524, level: 0, appearance },
+  { index: 3, x: 3092, y: 3524, level: 0, appearance },
+], playerState);
+assert.deepStrictEqual(Array.from(playerState.active.subarray(0, playerState.activeCount)), [1, 3]);
 
 const forcedState = createPlayerSyncState(1, { x: 3089, y: 3521, level: 0 });
 const forcedEnd = { x: 3089, y: 3524, level: 0 };

@@ -89,12 +89,21 @@ export type PlayerView = Tile & ActorUpdateView & {
 
 export type PlayerSyncState = {
   flags: Uint8Array;
-  active: number[];
-  empty: number[];
+  active: Uint16Array;
+  activeCount: number;
+  empty: Uint16Array;
+  emptyCount: number;
   regions: Int32Array;
   lastTiles: Map<number, Tile>;
   movementTypes: Map<number, 1 | 2>;
   interactionIndices: Map<number, number>;
+  viewPositions: Int16Array;
+  movementChanged: Uint8Array;
+  movementDx: Int16Array;
+  movementDy: Int16Array;
+  movementPlaneDelta: Uint8Array;
+  nextMovementTypes: Uint8Array;
+  updateBlocks: Buffer[];
 };
 
 export type NpcView = Tile & ActorUpdateView & {
@@ -1417,20 +1426,32 @@ export function createPlayerSyncState(
   tile: Tile
 ): PlayerSyncState {
   const flags = new Uint8Array(2048);
-  const empty: number[] = [];
+  const active = new Uint16Array(2048);
+  const empty = new Uint16Array(2048);
+  active[0] = localIndex;
+  let emptyCount = 0;
   for (let index = 1; index < 2048; index++) {
     if (index === localIndex) continue;
     flags[index] = 1; // mirrors the empty-slot skip in the initial sync packet
-    empty.push(index);
+    empty[emptyCount++] = index;
   }
   return {
     flags,
-    active: [localIndex],
+    active,
+    activeCount: 1,
     empty,
+    emptyCount,
     regions: new Int32Array(2048),
     lastTiles: new Map([[localIndex, { ...tile }]]),
     movementTypes: new Map([[localIndex, 1]]),
     interactionIndices: new Map(),
+    viewPositions: new Int16Array(2048).fill(-1),
+    movementChanged: new Uint8Array(2048),
+    movementDx: new Int16Array(2048),
+    movementDy: new Int16Array(2048),
+    movementPlaneDelta: new Uint8Array(2048),
+    nextMovementTypes: new Uint8Array(2048),
+    updateBlocks: [],
   };
 }
 
@@ -1714,43 +1735,55 @@ export function encodePlayerSync(
   state: PlayerSyncState
 ): Buffer {
   const writer = new BitWriter();
-  const viewByIndex = new Map<number, PlayerView>();
-  for (const view of views) {
-    if (view.index > 0 && view.index < 2048 && !viewByIndex.has(view.index)) {
-      viewByIndex.set(view.index, view);
+  const viewPositions = state.viewPositions;
+  viewPositions.fill(-1);
+  for (let position = 0; position < views.length; position++) {
+    const index = views[position].index;
+    if (index > 0 && index < 2048 && viewPositions[index] < 0) {
+      viewPositions[index] = position;
     }
   }
-  const localView = viewByIndex.get(localIndex);
+  const viewAt = (index: number): PlayerView | undefined => views[viewPositions[index]];
+  const localView = viewAt(localIndex);
   if (!localView) throw new Error("player sync is missing its local player");
 
-  const activeNow = new Set(viewByIndex.keys());
-  const previous = new Set(state.active);
-  const spawned = new Set<number>();
-  for (const index of activeNow) if (!previous.has(index)) spawned.add(index);
-  const updateBlocks: Buffer[] = [];
-
-  const movement = (index: number) => {
-    const view = viewByIndex.get(index);
+  for (let position = 0; position < views.length; position++) {
+    const view = views[position];
+    const index = view.index;
+    if (index <= 0 || index >= 2048 || viewPositions[index] !== position) continue;
     const from = state.lastTiles.get(index);
-    if (!view || !from) return { changed: !!view, dx: 0, dy: 0, planeDelta: 0, movementType: undefined };
+    if (!from) {
+      state.movementChanged[index] = 1;
+      state.movementDx[index] = 0;
+      state.movementDy[index] = 0;
+      state.movementPlaneDelta[index] = 0;
+      state.nextMovementTypes[index] = 0;
+      continue;
+    }
     const tile = view.forcedMovementEnd && !view.forcedMovement ? view.forcedMovementEnd : view;
     const dx = tile.x - from.x;
     const dy = tile.y - from.y;
     const planeDelta = (tile.level - from.level) & 3;
     const distance = Math.max(Math.abs(dx), Math.abs(dy));
-    const movementType = planeDelta === 0 && distance > 0 && distance <= 2
-      ? (distance === 2 ? 2 : 1) as 1 | 2
-      : undefined;
-    return { changed: dx !== 0 || dy !== 0 || planeDelta !== 0, dx, dy, planeDelta, movementType };
-  };
+    state.movementChanged[index] = dx !== 0 || dy !== 0 || planeDelta !== 0 ? 1 : 0;
+    state.movementDx[index] = dx;
+    state.movementDy[index] = dy;
+    state.movementPlaneDelta[index] = planeDelta;
+    state.nextMovementTypes[index] = planeDelta === 0 && distance > 0 && distance <= 2
+      ? distance === 2 ? 2 : 1
+      : 0;
+  }
+
+  const updateBlocks = state.updateBlocks;
+  updateBlocks.length = 0;
   const wantsInteractionWrite = (index: number, view: PlayerView): boolean =>
     state.interactionIndices.get(index) !== (view.interactionIndex ?? -1);
 
   const needsBlock = (index: number): boolean => {
-    const view = viewByIndex.get(index);
+    const view = viewAt(index);
     if (!view) return false;
-    const nextType = movement(index).movementType;
-    const writeMovementType = nextType !== undefined && state.movementTypes.get(index) !== nextType;
+    const nextType = state.nextMovementTypes[index] as 0 | 1 | 2;
+    const writeMovementType = nextType !== 0 && state.movementTypes.get(index) !== nextType;
     return playerUpdateMask(
       view,
       writeMovementType,
@@ -1759,23 +1792,28 @@ export function encodePlayerSync(
     ) !== 0;
   };
   const shouldUpdatePlayer = (index: number): boolean =>
-    !viewByIndex.has(index) || movement(index).changed || needsBlock(index);
+    viewPositions[index] < 0 || state.movementChanged[index] !== 0 || needsBlock(index);
 
   const appendUpdateBlock = (index: number, forceAppearance = false): void => {
-    const view = viewByIndex.get(index);
+    const view = viewAt(index);
     if (!view) return;
-    const nextType = movement(index).movementType;
-    const writeMovementType = nextType !== undefined && state.movementTypes.get(index) !== nextType;
+    const nextType = state.nextMovementTypes[index] as 0 | 1 | 2;
+    const writeMovementType = nextType !== 0 && state.movementTypes.get(index) !== nextType;
     const writeAppearance = forceAppearance || view.appearanceDirty === true;
     const writeInteraction = wantsInteractionWrite(index, view);
     updateBlocks.push(
-      writePlayerUpdateBlock(view, writeMovementType, nextType, writeAppearance, writeInteraction)
+      writePlayerUpdateBlock(
+        view,
+        writeMovementType,
+        nextType === 0 ? undefined : nextType,
+        writeAppearance,
+        writeInteraction
+      )
     );
   };
 
   const writePlayerUpdate = (index: number): void => {
-    const view = viewByIndex.get(index);
-    const move = movement(index);
+    const view = viewAt(index);
     const block = !!view && needsBlock(index);
     writer.writeBits(1, block ? 1 : 0);
     if (!view) {
@@ -1786,25 +1824,28 @@ export function encodePlayerSync(
         (((last.x >>> 13) & 0xff) << 14) | ((last.y >>> 13) & 0xff);
       return;
     }
-    if (!move.changed) writer.writeBits(2, 0);
-    else if (move.planeDelta === 0 && Math.max(Math.abs(move.dx), Math.abs(move.dy)) === 1) {
-      const direction = [0, 1, 2, 3, -1, 4, 5, 6, 7][(move.dy + 1) * 3 + move.dx + 1];
+    const dx = state.movementDx[index];
+    const dy = state.movementDy[index];
+    const planeDelta = state.movementPlaneDelta[index];
+    if (state.movementChanged[index] === 0) writer.writeBits(2, 0);
+    else if (planeDelta === 0 && Math.max(Math.abs(dx), Math.abs(dy)) === 1) {
+      const direction = [0, 1, 2, 3, -1, 4, 5, 6, 7][(dy + 1) * 3 + dx + 1];
       writer.writeBits(2, 1);
       writer.writeBits(3, direction);
     } else {
-      const runDirection = move.planeDelta === 0 ? RUN_DIRECTIONS.indexOf(`${move.dx},${move.dy}`) : -1;
+      const runDirection = planeDelta === 0 ? RUN_DIRECTIONS.indexOf(`${dx},${dy}`) : -1;
       if (runDirection >= 0) {
         writer.writeBits(2, 2);
         writer.writeBits(4, runDirection);
       } else {
         writer.writeBits(2, 3);
-        if (move.dx >= -16 && move.dx <= 15 && move.dy >= -16 && move.dy <= 15) {
+        if (dx >= -16 && dx <= 15 && dy >= -16 && dy <= 15) {
           writer.writeBits(1, 0);
-          writer.writeBits(12, (move.planeDelta << 10) | ((move.dx & 0x1f) << 5) | (move.dy & 0x1f));
+          writer.writeBits(12, (planeDelta << 10) | ((dx & 0x1f) << 5) | (dy & 0x1f));
         } else {
           writer.writeBits(1, 1);
-          writer.writeBits(30, ((move.planeDelta << 28) |
-            ((move.dx & 0x3fff) << 14) | (move.dy & 0x3fff)) >>> 0);
+          writer.writeBits(30, ((planeDelta << 28) |
+            ((dx & 0x3fff) << 14) | (dy & 0x3fff)) >>> 0);
         }
       }
     }
@@ -1812,7 +1853,7 @@ export function encodePlayerSync(
   };
 
   const writeExternalUpdate = (index: number): void => {
-    const view = viewByIndex.get(index)!;
+    const view = viewAt(index)!;
     const packedRegion = ((view.level & 3) << 28) |
       (((view.x >>> 13) & 0xff) << 14) | ((view.y >>> 13) & 0xff);
     writer.writeBits(2, 0);
@@ -1834,14 +1875,15 @@ export function encodePlayerSync(
   };
 
   const writePass = (
-    indices: number[],
+    indices: Uint16Array,
+    count: number,
     wantBit: 0 | 1,
     shouldUpdate: (index: number) => boolean,
     writeUpdate: (index: number) => void,
     markUpdated: boolean
   ): void => {
     let skip = 0;
-    for (let offset = 0; offset < indices.length; offset++) {
+    for (let offset = 0; offset < count; offset++) {
       const index = indices[offset];
       if ((state.flags[index] & 1) !== wantBit) continue;
       if (skip > 0) {
@@ -1856,7 +1898,7 @@ export function encodePlayerSync(
         continue;
       }
       let run = 0;
-      for (let next = offset + 1; next < indices.length && run < 2047; next++) {
+      for (let next = offset + 1; next < count && run < 2047; next++) {
         const nextIndex = indices[next];
         if ((state.flags[nextIndex] & 1) !== wantBit) continue;
         if (shouldUpdate(nextIndex)) break;
@@ -1869,29 +1911,49 @@ export function encodePlayerSync(
     }
   };
 
-  writePass(state.active, 0, shouldUpdatePlayer, writePlayerUpdate, false);
+  writePass(state.active, state.activeCount, 0, shouldUpdatePlayer, writePlayerUpdate, false);
   writer.alignToByte();
-  writePass(state.active, 1, shouldUpdatePlayer, writePlayerUpdate, false);
+  writePass(state.active, state.activeCount, 1, shouldUpdatePlayer, writePlayerUpdate, false);
   writer.alignToByte();
-  writePass(state.empty, 1, (index) => spawned.has(index), writeExternalUpdate, true);
+  writePass(state.empty, state.emptyCount, 1, (index) => viewPositions[index] >= 0, writeExternalUpdate, true);
   writer.alignToByte();
-  writePass(state.empty, 0, (index) => spawned.has(index), writeExternalUpdate, true);
+  writePass(state.empty, state.emptyCount, 0, (index) => viewPositions[index] >= 0, writeExternalUpdate, true);
 
-  for (let index = 1; index < 2048; index++) state.flags[index] >>>= 1;
-  state.active = Array.from(activeNow).sort((a, b) => a - b);
-  state.empty = [];
-  for (let index = 1; index < 2048; index++) if (!activeNow.has(index)) state.empty.push(index);
-  for (const [index] of state.lastTiles) if (!activeNow.has(index)) state.lastTiles.delete(index);
-  for (const [index] of state.interactionIndices) if (!activeNow.has(index)) state.interactionIndices.delete(index);
-  for (const view of viewByIndex.values()) {
-    const nextType = movement(view.index).movementType;
-    const tile = view.forcedMovementEnd ?? view;
-    state.lastTiles.set(view.index, { x: tile.x, y: tile.y, level: tile.level });
-    if (nextType !== undefined) state.movementTypes.set(view.index, nextType);
-    state.interactionIndices.set(view.index, view.interactionIndex ?? -1);
+  for (let offset = 0; offset < state.activeCount; offset++) {
+    const index = state.active[offset];
+    if (viewPositions[index] >= 0) continue;
+    state.lastTiles.delete(index);
+    state.movementTypes.delete(index);
+    state.interactionIndices.delete(index);
   }
 
-  const sync = Buffer.concat([writer.toBuffer(), ...updateBlocks]);
+  state.activeCount = 0;
+  state.emptyCount = 0;
+  for (let index = 1; index < 2048; index++) {
+    state.flags[index] >>>= 1;
+    if (viewPositions[index] >= 0) state.active[state.activeCount++] = index;
+    else state.empty[state.emptyCount++] = index;
+  }
+
+  for (let offset = 0; offset < state.activeCount; offset++) {
+    const index = state.active[offset];
+    const view = viewAt(index)!;
+    const nextType = state.nextMovementTypes[index] as 0 | 1 | 2;
+    const tile = view.forcedMovementEnd ?? view;
+    const previousTile = state.lastTiles.get(index);
+    if (previousTile) {
+      previousTile.x = tile.x;
+      previousTile.y = tile.y;
+      previousTile.level = tile.level;
+    } else {
+      state.lastTiles.set(index, { x: tile.x, y: tile.y, level: tile.level });
+    }
+    if (nextType !== 0) state.movementTypes.set(index, nextType);
+    state.interactionIndices.set(index, view.interactionIndex ?? -1);
+  }
+
+  updateBlocks.unshift(writer.toBuffer());
+  const sync = Buffer.concat(updateBlocks);
   const header = Buffer.alloc(12);
   header.writeUInt16BE(baseX, 0);
   header.writeUInt16BE(baseY, 2);
