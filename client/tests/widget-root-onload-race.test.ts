@@ -29,25 +29,44 @@ const root: any = {
     scrollWidth: 0,
     scrollHeight: 0,
     onLoad: [123],
+    onSubChange: [789],
+};
+const subRoot = {
+    ...root,
+    uid: 901 << 16,
+    id: 901 << 16,
+    groupId: 901,
+    onLoad: [456],
+    onSubChange: undefined,
 };
 const loader = {
-    loadWidgetGroup: () => ({ root, widgets: new Map([[root.uid, root]]) }),
-    getAvailableGroups: () => [900],
+    loadWidgetGroup: (groupId: number) => {
+        const group = groupId === 900 ? root : subRoot;
+        return { root: group, widgets: new Map([[group.uid, group]]) };
+    },
+    getAvailableGroups: () => [900, 901],
     clearCache: () => undefined,
 };
 const manager = new WidgetManager({} as never, loader as never);
-let loads = 0;
-manager.onLoadListener = () => loads++;
+let rootLoads = 0;
+manager.onLoadListener = (scriptId) => {
+    if (scriptId === 123) rootLoads++;
+};
+let subChanges = 0;
+manager.onSubChangeListener = () => subChanges++;
 
 manager.setRootInterface(900);
-assert.equal(loads, 0, "root onLoad must wait for a usable canvas");
+manager.openSubInterface(root.uid, 901);
+assert.equal(rootLoads, 0);
 
 manager.resize(800, 600);
-assert.equal(loads, 1, "first canvas resize must run the deferred root onLoad");
+assert.equal(rootLoads, 1);
 assert.equal(root.width, 800);
 assert.equal(root.height, 600);
+assert.equal(manager.getSubInterface(root.uid)?.group, 901);
+assert.equal(subChanges, 2);
 
 manager.resize(801, 600);
-assert.equal(loads, 1, "later resizes must not run root onLoad twice");
+assert.equal(rootLoads, 1);
 
 console.log("Widget root onLoad race test passed");

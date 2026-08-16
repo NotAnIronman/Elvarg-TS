@@ -1639,7 +1639,7 @@ export function registerClientOps(handlers: HandlerMap): void {
         const delay = ctx.intStack[--ctx.intStackSize];
         const loops = ctx.intStack[--ctx.intStackSize];
         const soundId = ctx.intStack[--ctx.intStackSize];
-        ctx.playSoundEffect?.(soundId, delay, Math.max(0, loops - 1));
+        if (loops !== 0) ctx.playSoundEffect?.(soundId, delay, loops - 1);
     });
 
     // SOUND_SONG pops 5 params from stack

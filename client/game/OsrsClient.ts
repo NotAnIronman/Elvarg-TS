@@ -865,6 +865,9 @@ export class OsrsClient {
     private npcUpdateDecoder: NpcUpdateDecoder = new NpcUpdateDecoder();
     private readonly hitsplatFlush: HitsplatFlushController;
     private readonly clientScripts: ClientScriptLoader;
+    /** Widget onLoad scripts awaiting a not-yet-streamed cache group. */
+    private readonly pendingScriptRetries = new Set<string>();
+    private scriptRetryGeneration = 0;
     private readonly chatTextMetrics: ChatTextMetrics;
     private readonly npcInstances: NpcInstanceFlushController;
 
@@ -1707,7 +1710,7 @@ export class OsrsClient {
                 if (self.soundEffectSystem && soundId >= 0) {
                     self.soundEffectSystem.playSoundEffect(soundId, {
                         loops,
-                        delayMs: delay * 20, // CS2 delay is in client ticks (50ms), convert to ms
+                        delayMs: delay * 20, // CS2 delay is in client cycles (20ms)
                     });
                 }
             },
@@ -1996,111 +1999,11 @@ export class OsrsClient {
             }
         };
 
-        // Helper to substitute magic args with actual values for widget scripts
-        const substituteMagicArgs = (intArgs: number[], widget: any): number[] => {
-            return intArgs.map((value) => {
-                switch (value) {
-                    case ScriptArgMagic.WIDGET_ID:
-                        return widget?.uid ?? -1;
-                    case ScriptArgMagic.MOUSE_X:
-                    case ScriptArgMagic.MOUSE_Y:
-                        return 0;
-                    case ScriptArgMagic.OP_INDEX:
-                        return 1;
-                    case ScriptArgMagic.WIDGET_CHILD_INDEX:
-                        return -1;
-                    case ScriptArgMagic.DRAG_TARGET_ID:
-                        return -1;
-                    case ScriptArgMagic.DRAG_TARGET_CHILD_INDEX:
-                        return -1;
-                    default:
-                        return value;
-                }
-            });
-        };
-
-        // Helper to run widget scripts
-        const runWidgetScript = (scriptId: number, widget: any, triggerArgs: any[]) => {
-            /*console.log(
-                `[runWidgetScript] scriptId=${scriptId} widget=${widget.groupId}:${widget.fileId} uid=${widget.uid}`,
-            );*/
-            try {
-                const script = this.clientScripts.load(scriptId);
-                if (script) {
-                    /*console.log(
-                        `[runWidgetScript] Script ${scriptId} loaded`,
-                    );*/
-                    const prevActiveWidget = this.cs2Vm.activeWidget;
-                    const prevDotWidget = this.cs2Vm.dotWidget;
-                    const prevComponentId = this.cs2Vm.eventContext.componentId;
-                    const prevComponentIndex = this.cs2Vm.eventContext.componentIndex;
-                    this.cs2Vm.activeWidget = widget;
-                    this.cs2Vm.dotWidget = widget;
-                    this.cs2Vm.eventContext.componentId =
-                        widget?.fileId === -1 && typeof widget?.parentUid === "number"
-                            ? widget.parentUid
-                            : (widget?.uid ?? -1);
-                    this.cs2Vm.eventContext.componentIndex = widget?.childIndex ?? -1;
-                    try {
-                        const rawIntArgs: number[] = [];
-                        const stringArgs: string[] = [];
-                        for (let i = 1; i < triggerArgs.length; i++) {
-                            const arg = triggerArgs[i];
-                            if (typeof arg === "number") {
-                                rawIntArgs.push(arg);
-                            } else if (typeof arg === "string") {
-                                stringArgs.push(arg);
-                            }
-                        }
-                        // Substitute magic args (like WIDGET_ID) with actual values
-                        const intArgs = substituteMagicArgs(rawIntArgs, widget);
-                        // Log tab-related scripts
-                        if (
-                            scriptId === 901 ||
-                            scriptId === 915 ||
-                            scriptId === 916 ||
-                            scriptId === 903 ||
-                            scriptId === 908 ||
-                            scriptId === 250 // music_init
-                        ) {
-                            console.log(
-                                `[runWidgetScript] TAB SCRIPT ${scriptId} widget=${widget.groupId}:${widget.fileId} intArgs=`,
-                                intArgs,
-                            );
-                        }
-                        // Debug music_init
-                        if (scriptId === 250) {
-                            console.log(
-                                `[MUSIC] dbRepository:`,
-                                !!(this.cs2Vm as any).context?.dbRepository,
-                            );
-                        }
-                        this.cs2Vm.run(script, intArgs, stringArgs);
-                        if (scriptId === 250) {
-                            console.log(
-                                `[MUSIC] After run, dbRowQuery.length:`,
-                                (this.cs2Vm as any).dbRowQuery?.length,
-                            );
-                        }
-                    } finally {
-                        this.cs2Vm.activeWidget = prevActiveWidget;
-                        this.cs2Vm.dotWidget = prevDotWidget;
-                        this.cs2Vm.eventContext.componentId = prevComponentId;
-                        this.cs2Vm.eventContext.componentIndex = prevComponentIndex;
-                    }
-                } else {
-                    console.warn(`[runWidgetScript] Script ${scriptId} not found in cache`);
-                }
-            } catch (err) {
-                console.error(`[Cs2Vm] Script ${scriptId} crashed:`, err);
-            }
-        };
-
         // IMPORTANT (): Cache-loaded listener arrays are in the form [scriptId, ...args].
         // These must be executed via runScriptEvent/executeScriptListener so the VM can split args
         // correctly and substitute magic values. Do NOT pass the scriptId as a normal int arg.
         this.widgetManager.onLoadListener = (_scriptId, widget) => {
-            if (Array.isArray(widget?.onLoad)) this.executeScriptListener(widget, widget.onLoad);
+            if (Array.isArray(widget?.onLoad)) this.executeWidgetOnLoad(widget, widget.onLoad);
         };
 
         this.widgetManager.onResizeListener = (_scriptId, widget) => {
@@ -3811,6 +3714,33 @@ export class OsrsClient {
 
     handleUiInput() {
         this.widgetInputController.handleUiInput();
+    }
+
+    private executeWidgetOnLoad(widget: any, listener: any[]): void {
+        const scriptId = listener?.[0];
+        if (typeof scriptId !== "number" || scriptId <= 0) return;
+
+        if (this.clientScripts.load(scriptId)) {
+            this.executeScriptListener(widget, listener);
+            return;
+        }
+
+        const widgetUid = typeof widget?.uid === "number" ? widget.uid : -1;
+        const key = `${scriptId}:${widgetUid}`;
+        if (this.pendingScriptRetries.has(key)) return;
+
+        this.pendingScriptRetries.add(key);
+        const generation = this.scriptRetryGeneration;
+        void this.clientScripts.loadWithRetry(scriptId).then((script) => {
+            this.pendingScriptRetries.delete(key);
+            if (generation !== this.scriptRetryGeneration) return;
+            if (widgetUid >= 0 && this.widgetManager.getWidgetByUid(widgetUid) !== widget) return;
+            if (!script) {
+                console.warn(`[widget:onLoad] Script ${scriptId} not found in cache`);
+                return;
+            }
+            this.executeScriptListener(widget, listener);
+        });
     }
 
     /**
@@ -7636,6 +7566,8 @@ export class OsrsClient {
      */
     dispose(): void {
         console.log("[OsrsClient] Disposing...");
+        this.scriptRetryGeneration++;
+        this.pendingScriptRetries.clear();
         const subscriptions = [
             ...this.serverSubscriptions.splice(0),
             this.unsubscribeWidgetEvents,

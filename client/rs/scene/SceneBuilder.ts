@@ -588,6 +588,14 @@ export class SceneBuilder {
                         const overrideKey = `${sceneX},${sceneY},${level},${id}`;
                         const wildcardOverrideKey = `${sceneX},${sceneY},${level},-1`;
                         let override = this.locOverrides.get(overrideKey);
+                        if (
+                            override &&
+                            ((override.matchType !== undefined && override.matchType !== type) ||
+                                (override.matchRotation !== undefined &&
+                                    (override.matchRotation & 3) !== (rotation & 3)))
+                        ) {
+                            override = undefined;
+                        }
                         if (!override) {
                             const wildcardOverride = this.locOverrides.get(wildcardOverrideKey);
                             if (

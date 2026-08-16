@@ -47,6 +47,7 @@ export abstract class Renderer {
 
     private _resizeObs?: ResizeObserver;
     private _timeoutId?: ReturnType<typeof setTimeout>;
+    private _initPromise?: Promise<void>;
     private _useTimeout: boolean = false;
     private _framePacingDebtMs: number = 0;
 
@@ -59,9 +60,14 @@ export abstract class Renderer {
 
     abstract init(): Promise<void>;
 
+    initOnce(): Promise<void> {
+        return (this._initPromise ??= this.init());
+    }
+
     abstract cleanUp(): void;
 
     start() {
+        if (this.running) return;
         this.running = true;
         this._framePacingDebtMs = 0;
         this._updateVisibilityMode();

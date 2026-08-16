@@ -196,6 +196,14 @@ export function onLocDel(host: WebGLOsrsRendererHost, tile: { x: number; y: numb
             const key = `${tile.x},${tile.y},${level},${shape}`;
             host.addedLocs.delete(key);
 
+            // Suppress the base cache-baked loc at this tile so a deregistered
+            // object (e.g. a chopped tree) actually disappears - buildScene has
+            // no other way to know a cache loc was removed.
+            host.locOverrides.set(`${tile.x | 0},${tile.y | 0},${level | 0},-1`, {
+                newId: 0,
+                matchType: shape as LocModelType,
+            });
+
             const mapX = Math.floor(tile.x / 64);
             const mapY = Math.floor(tile.y / 64);
             // LOC_DEL does not carry an object id. Resolve it from the current

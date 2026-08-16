@@ -22,6 +22,11 @@ type DecodedSound = {
     onsetSec: number;
 };
 
+type PendingSoundRetry = {
+    options: PlaySoundOptions;
+    queuedAtMs: number;
+};
+
 const enum EasingCurveId {
     LINEAR = 0,
     EASE_IN_SINE = 1,
@@ -69,7 +74,6 @@ export interface SequenceSoundContext {
     position?: { x: number; y: number; z?: number };
     isLocalPlayer?: boolean;
     distanceFadeCurve?: number;
-    radiusOverride?: number;
     // Debug-only metadata for one-line logging
     debugSeqId?: number;
     debugFrame?: number;
@@ -135,13 +139,14 @@ export class SoundEffectSystem {
     private ambientVolume = 1.0; // Separate volume for area/ambient sounds
     private readonly activeSources: AudioBufferSourceNode[] = [];
     private readonly maxSimultaneous = 32;
-    private readonly lastPlayed = new Map<string, number>();
     private readonly ambientSounds = new Map<string, ActiveAmbientSound>();
     private listenerX = 0;
     private listenerY = 0;
     private listenerZ = 0;
     private lastAmbientUpdateTime = -1;
     private readonly warnedSounds = new Set<number>();
+    private readonly pendingRetries = new Map<number, PendingSoundRetry[]>();
+    private disposed = false;
     // Memory leak fix: track context resume listener cleanup
     private contextResumeCleanup: (() => void) | null = null;
     private readonly MAX_CACHE_SIZE = 100;
@@ -218,14 +223,16 @@ export class SoundEffectSystem {
         }
     }
 
-    private cacheKey(soundId: number, sampleRate: number): string {
-        return `${soundId}@${sampleRate}`;
+    private cacheKey(soundId: number, sampleRate: number, trimOnset: boolean): string {
+        return `${soundId}@${sampleRate}@${trimOnset ? "trimmed" : "full"}`;
     }
 
     private decode(
         soundId: number,
         targetSampleRate?: number,
         forceResample = false,
+        loadedRaw?: RawSoundData,
+        trimOnset = true,
     ): DecodedSound | undefined {
         const ctx = this.context;
         const effectiveRate =
@@ -234,12 +241,12 @@ export class SoundEffectSystem {
                 : typeof targetSampleRate === "number"
                   ? targetSampleRate
                   : 0;
-        const cacheKey = this.cacheKey(soundId, effectiveRate);
+        const cacheKey = this.cacheKey(soundId, effectiveRate, trimOnset);
         const cached = this.decodedCache.get(cacheKey);
         if (cached) return cached;
 
         const t0 = performance.now();
-        const raw = this.loader.load(soundId);
+        const raw = loadedRaw ?? this.loader.load(soundId, trimOnset);
         if (!raw) return undefined;
         const t1 = performance.now();
 
@@ -268,6 +275,40 @@ export class SoundEffectSystem {
         }
 
         return decoded;
+    }
+
+    private retryMissingSound(soundId: number, options: PlaySoundOptions): void {
+        const queuedCount = [...this.pendingRetries.values()].reduce(
+            (count, requests) => count + requests.length,
+            0,
+        );
+        if (queuedCount >= 50) return;
+
+        const request = { options, queuedAtMs: performance.now() };
+        const pending = this.pendingRetries.get(soundId);
+        if (pending) {
+            pending.push(request);
+            return;
+        }
+        this.pendingRetries.set(soundId, [request]);
+        this.loader
+            .loadWithRetry(soundId)
+            .then((raw) => {
+                const requests = this.pendingRetries.get(soundId);
+                this.pendingRetries.delete(soundId);
+                if (raw && requests && !this.disposed) {
+                    const now = performance.now();
+                    for (const queued of requests) {
+                        this.playSoundEffectInternal(
+                            soundId,
+                            queued.options,
+                            Math.max(0, now - queued.queuedAtMs),
+                            raw,
+                        );
+                    }
+                }
+            })
+            .catch(() => this.pendingRetries.delete(soundId));
     }
 
     private toFloatData(raw: RawSoundData, targetSampleRate: number): DecodedSound {
@@ -362,13 +403,29 @@ export class SoundEffectSystem {
     }
 
     playSoundEffect(soundId: number, options: PlaySoundOptions = {}): void {
+        this.playSoundEffectInternal(soundId, options, 0);
+    }
+
+    private playSoundEffectInternal(
+        soundId: number,
+        options: PlaySoundOptions,
+        elapsedMs: number,
+        loadedRaw?: RawSoundData,
+    ): void {
+        if (this.disposed) return;
         const ctx = this.ensureContext();
         if (!ctx || !this.loader.available()) return;
 
         resumeAudioContextIfNeeded(ctx);
 
-        const decoded = this.decode(soundId);
-        if (!decoded) return;
+        const decoded = this.decode(soundId, undefined, false, loadedRaw);
+        if (!decoded) {
+            // Cache group may still be streaming in (sparse cache); retry once
+            // it lands instead of silently dropping the sound.
+            this.retryMissingSound(soundId, options);
+            return;
+        }
+        const delayMs = SoundEffectSystem.remainingDelayMs(options, decoded.onsetSec, elapsedMs);
         if (!decoded.channelData || decoded.channelData.length === 0 || decoded.sampleRate <= 0) {
             // As a last-resort safety net, synthesize a tiny click to avoid errors and keep timing consistent
             const contextSampleRate =
@@ -396,15 +453,13 @@ export class SoundEffectSystem {
                 this.gainNode.connect(ctx.destination);
             }
             source.connect(this.gainNode);
-            source.start(ctx.currentTime + (options.delayMs ? options.delayMs / 1000 : 0));
+            source.start(ctx.currentTime + delayMs / 1000);
             this.registerSource(source);
             return;
         }
 
         const radius = options.radius;
         const position = options.position;
-        const delayMs = options.delayMs ?? 0;
-
         if (radius !== undefined && radius > 0) {
             if (!position) {
                 return;
@@ -434,6 +489,34 @@ export class SoundEffectSystem {
         }
 
         this.startOneShot(decoded, ctx, 1, delayMs, options.loops, false);
+    }
+
+    private static remainingDelayMs(
+        options: PlaySoundOptions,
+        onsetSec: number,
+        elapsedMs: number,
+    ): number {
+        return Math.max(0, (options.delayMs ?? 0) + onsetSec * 1000 - elapsedMs);
+    }
+
+    private static expandFiniteLoop(
+        samples: Float32Array,
+        loopStart: number,
+        loopEnd: number,
+        repeats: number,
+    ): Float32Array {
+        if (loopStart < 0 || loopEnd <= loopStart || loopEnd > samples.length) return samples;
+
+        const loopLength = loopEnd - loopStart;
+        const expanded = new Float32Array(samples.length + loopLength * repeats);
+        expanded.set(samples.subarray(0, loopEnd));
+        let offset = loopEnd;
+        for (let i = 0; i < repeats; i++) {
+            expanded.set(samples.subarray(loopStart, loopEnd), offset);
+            offset += loopLength;
+        }
+        expanded.set(samples.subarray(loopEnd), offset);
+        return expanded;
     }
 
     /**
@@ -504,71 +587,69 @@ export class SoundEffectSystem {
             source.connect(bus);
         }
 
-        // The synth onset trimmed at decode time is re-added to the play delay
-        const startTime = ctx.currentTime + (delayMs > 0 ? delayMs / 1000 : 0) + decoded.onsetSec;
+        const startTime = ctx.currentTime + (delayMs > 0 ? delayMs / 1000 : 0);
 
         // Reference semantics: numLoops < 0 = infinite, 0 = play once, n > 0 = loop n additional times
         const requestedLoops = typeof loops === "number" ? loops : 0;
 
-        if (requestedLoops < 0) {
+        if (requestedLoops < 0 && decoded.loopEndSec > decoded.loopStartSec) {
             // Infinite loop (matches RawPcmStream.setNumLoopsInternal(-1))
             source.loop = true;
             source.loopStart = decoded.loopStartSec;
-            source.loopEnd =
-                decoded.loopEndSec > decoded.loopStartSec ? decoded.loopEndSec : buffer.duration;
+            source.loopEnd = decoded.loopEndSec;
             source.start(startTime);
-        } else if (requestedLoops === 0) {
+        } else if (requestedLoops <= 0) {
             // Play once (matches RawPcmStream.setNumLoopsInternal(0))
             source.start(startTime);
         } else {
-            // Loop n times then stop
-            source.loop = true;
-            source.loopStart = decoded.loopStartSec;
-            source.loopEnd =
-                decoded.loopEndSec > decoded.loopStartSec ? decoded.loopEndSec : buffer.duration;
+            // Repeat only the cache-defined loop segment, then play the remaining tail.
+            const expanded = SoundEffectSystem.expandFiniteLoop(
+                decoded.channelData,
+                Math.round(decoded.loopStartSec * decoded.sampleRate),
+                Math.round(decoded.loopEndSec * decoded.sampleRate),
+                requestedLoops,
+            );
+            if (expanded !== decoded.channelData) {
+                const expandedBuffer = ctx.createBuffer(1, expanded.length, decoded.sampleRate);
+                expandedBuffer.getChannelData(0).set(expanded);
+                source.buffer = expandedBuffer;
+            }
             source.start(startTime);
-            source.stop(startTime + buffer.duration * (requestedLoops + 1));
         }
 
         this.registerSource(source, gainNode ? [gainNode] : []);
     }
 
     handleSeqFrameSounds(effects: SeqSoundEffect[], context?: SequenceSoundContext): void {
-        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-        for (const effect of effects) {
-            const radiusTiles = typeof effect.location === "number" ? effect.location : 0;
-            // animation frame sound loops field uses 1-indexed semantics.
-            // loops=1 means play once, loops=2 means play twice.
-            // Subtract 1 to convert to our internal semantics (0=play once, n>0=play n+1 times, -1=infinite).
-            const loops = (typeof effect.loops === "number" ? effect.loops : 1) - 1;
-
-            const locationKey =
-                context?.position != null
-                    ? `${effect.id}:${Math.round(context.position.x / 128)}:${Math.round(
-                          context.position.y / 128,
-                      )}`
-                    : `${effect.id}`;
-            const lastPlayed = this.lastPlayed.get(locationKey);
-            const last = typeof lastPlayed === "number" ? lastPlayed : 0;
-            if (now - last < 20) continue;
-            this.lastPlayed.set(locationKey, now);
-
-            const radiusOverride = context?.radiusOverride;
-            const radiusScene =
-                radiusOverride !== undefined
-                    ? radiusOverride
-                    : radiusTiles > 0
-                      ? radiusTiles * 128
-                      : undefined;
-
-            this.playSoundEffect(effect.id, {
-                loops,
-                position: context?.position,
-                radius: radiusScene,
-                distanceFadeCurve: context?.distanceFadeCurve,
-                isLocalPlayer: context?.isLocalPlayer,
-            });
+        let effect: SeqSoundEffect | undefined = effects[0];
+        if (effects.length > 1) {
+            const roll = 1 + Math.floor(Math.random() * 100);
+            let weightCursor = 0;
+            effect = undefined;
+            for (const candidate of effects) {
+                const rangeStart = weightCursor;
+                weightCursor += candidate.weight ?? 1;
+                if (rangeStart <= roll && roll < weightCursor) {
+                    effect = candidate;
+                    break;
+                }
+            }
         }
+        if (!effect) return;
+
+        const radiusTiles = typeof effect.location === "number" ? effect.location : 0;
+        if (radiusTiles === 0 && !context?.isLocalPlayer) return;
+
+        // animation frame sound loops field uses 1-indexed semantics.
+        const loops = (typeof effect.loops === "number" ? effect.loops : 1) - 1;
+        this.playSoundEffect(effect.id, {
+            loops,
+            position: context?.position,
+            radius: radiusTiles > 0 ? radiusTiles * 128 : undefined,
+            distanceFadeCurve: context?.distanceFadeCurve,
+            isLocalPlayer: context?.isLocalPlayer,
+            attenuation: effect.attenuation,
+        });
     }
 
     updateAmbientSounds(instances: AmbientSoundInstance[]): void {
@@ -721,13 +802,8 @@ export class SoundEffectSystem {
         ctx: AudioContext,
         now: number,
     ): void {
-        const decoded = this.decode(soundId, undefined, true); // Force resample to AudioContext rate
+        const decoded = this.decode(soundId, undefined, true, undefined, false);
         if (!decoded) {
-            console.warn(
-                `[SoundEffectSystem] Failed to decode ambient loop ${soundId} for loc ${active.instance.locId}`,
-            );
-            // Tune to the failed id so decoding isn't retried every frame
-            active.loopSoundId = soundId;
             return;
         }
         const loopBuffer = this.prepareBuffer(decoded, ctx, true);
@@ -1089,10 +1165,8 @@ export class SoundEffectSystem {
         }
         const nextSoundId = validSoundIds[nextIndex];
 
-        const decoded = this.decode(nextSoundId);
+        const decoded = this.decode(nextSoundId, undefined, false, undefined, false);
         if (!decoded) {
-            // Re-arm rather than retrying every frame
-            active.nextChangeTime = now + this.computeOverlayDelaySec(instance);
             return;
         }
 
@@ -1161,6 +1235,9 @@ export class SoundEffectSystem {
     }
 
     dispose(): void {
+        this.disposed = true;
+        this.pendingRetries.clear();
+
         // Stop all active sources
         for (const source of this.activeSources) {
             try {
@@ -1193,7 +1270,6 @@ export class SoundEffectSystem {
 
         // Clear caches
         this.decodedCache.clear();
-        this.lastPlayed.clear();
         this.warnedSounds.clear();
     }
 }

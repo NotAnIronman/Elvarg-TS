@@ -1,5 +1,7 @@
 import { CacheSystem } from "../../rs/cache/CacheSystem";
 import { IndexType } from "../../rs/cache/IndexType";
+import { isGroupMissingError } from "../../rs/cache/js5/GroupMissingError";
+import { retryOnMissingGroup } from "../../rs/cache/js5/retryOnMissingGroup";
 import { type Script as Cs2Script, parseScriptFromBytes } from "../../rs/cs2/Script";
 
 export type ClientScriptLoaderDeps = {
@@ -12,6 +14,7 @@ export type ClientScriptLoaderDeps = {
 export class ClientScriptLoader {
     private static readonly CACHE_CAPACITY = 128;
     private readonly cache: Map<number, Cs2Script> = new Map();
+    private readonly pendingLoads = new Map<number, Promise<Cs2Script | null>>();
 
     constructor(private readonly deps: ClientScriptLoaderDeps) {}
 
@@ -19,7 +22,7 @@ export class ClientScriptLoader {
         this.cache.clear();
     }
 
-    load(scriptId: number): Cs2Script | null {
+    private tryLoad(scriptId: number): Cs2Script | null {
         const cached = this.cache.get(scriptId);
         if (cached) {
             this.cache.delete(scriptId);
@@ -27,25 +30,44 @@ export class ClientScriptLoader {
             return cached;
         }
 
-        try {
-            const scriptIdx = this.deps.getCacheSystem().getIndex(IndexType.DAT2.clientScript);
-            const arch = scriptIdx.getArchive(scriptId);
-            const file = arch?.getFile(0);
-            if (!file?.data) {
-                return null;
-            }
+        const scriptIdx = this.deps.getCacheSystem().getIndex(IndexType.DAT2.clientScript);
+        const arch = scriptIdx.getArchive(scriptId);
+        const file = arch?.getFile(0);
+        if (!file?.data) return null;
 
-            const script = parseScriptFromBytes(
-                scriptId,
-                file.data,
-                this.deps.getCacheSystem().decodeProfile,
-            );
-            this.cacheClientScript(scriptId, script);
-            return script;
+        const script = parseScriptFromBytes(
+            scriptId,
+            file.data,
+            this.deps.getCacheSystem().decodeProfile,
+        );
+        this.cacheClientScript(scriptId, script);
+        return script;
+    }
+
+    load(scriptId: number): Cs2Script | null {
+        try {
+            return this.tryLoad(scriptId);
         } catch (e) {
-            console.warn(`[Cs2Vm] Failed to load script ${scriptId}`, e);
+            if (!isGroupMissingError(e)) {
+                console.warn(`[Cs2Vm] Failed to load script ${scriptId}`, e);
+            }
             return null;
         }
+    }
+
+    loadWithRetry(scriptId: number): Promise<Cs2Script | null> {
+        const pending = this.pendingLoads.get(scriptId);
+        if (pending) return pending;
+
+        const promise = retryOnMissingGroup(() => this.tryLoad(scriptId), 20, 250)
+            .then((script) => script ?? null)
+            .catch((e) => {
+                console.warn(`[Cs2Vm] Failed to load script ${scriptId}`, e);
+                return null;
+            })
+            .finally(() => this.pendingLoads.delete(scriptId));
+        this.pendingLoads.set(scriptId, promise);
+        return promise;
     }
 
     loadIfExists(scriptId: number): Cs2Script | null {

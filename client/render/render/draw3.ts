@@ -277,17 +277,18 @@ export function rebuildGroundItemsForMap(host: WebGLOsrsRendererHost,
         stacks: ClientGroundItemStack[] | undefined,
     ): boolean {
 
-        if (!host.mainProgram || !host.mainAlphaProgram) return false;
+        const hasStacks = !!stacks?.length;
+        if (!host.mainProgram || !host.mainAlphaProgram) return hasStacks;
         if (
             !host.textureArray ||
             !host.textureMaterials ||
             !host.waterTextures ||
             !host.sceneUniformBuffer
         )
-            return false;
+            return hasStacks;
         const objModelLoader = host.osrsClient.objModelLoader;
         const textureLoader = host.osrsClient.textureLoader;
-        if (!objModelLoader || !textureLoader) return false;
+        if (!objModelLoader || !textureLoader) return hasStacks;
 
         const missesBefore = objModelLoader.modelLoader?.missCount ?? 0;
         const data = buildGroundItemGeometry(

@@ -14,17 +14,19 @@ export function Canvas({ renderer }: CanvasProps): JSX.Element {
         if (!host) {
             return;
         }
+        let active = true;
         host.appendChild(renderer.canvas);
         renderer.attachResizeObserver();
         requestAnimationFrame(() => renderer.forceResize());
 
-        renderer.init().then(() => {
-            renderer.start();
+        renderer.initOnce().then(() => {
+            if (active) renderer.start();
         });
 
         return () => {
+            active = false;
             renderer.stop();
-            host.removeChild(renderer.canvas);
+            if (renderer.canvas.parentNode === host) host.removeChild(renderer.canvas);
         };
     }, [renderer]);
 

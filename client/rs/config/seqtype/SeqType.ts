@@ -9,7 +9,7 @@ export interface SeqSoundEffect {
     /** Radius in tiles; when omitted, treated as 0 (no falloff). */
     location?: number;
     weight?: number;
-    retain?: number;
+    attenuation?: number;
 }
 
 export class SeqType extends Type {
@@ -168,7 +168,7 @@ export class SeqType extends Type {
             this.frameSounds = new Map();
             for (let i = 0; i < entries; i++) {
                 const frame = buffer.readUnsignedShort();
-                let id: number, loops: number, location: number, retain: number;
+                let id: number, loops: number, location: number, attenuation: number;
                 let weight: number | undefined;
 
                 if (rev220) {
@@ -178,17 +178,17 @@ export class SeqType extends Type {
                     }
                     loops = buffer.readUnsignedByte();
                     location = buffer.readUnsignedByte();
-                    retain = buffer.readUnsignedByte();
+                    attenuation = buffer.readUnsignedByte();
                 } else {
                     const val = buffer.readUnsignedMedium();
                     location = val & 15;
                     id = val >> 8;
                     loops = (val >> 4) & 7;
-                    retain = 0;
+                    attenuation = 0;
                 }
 
                 const sounds = this.frameSounds.get(frame) ?? [];
-                sounds.push({ id, loops, location, weight, retain });
+                sounds.push({ id, loops, location, weight, attenuation });
                 this.frameSounds.set(frame, sounds);
             }
         } else if (opcode === (rev226 ? 15 : 16)) {
