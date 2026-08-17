@@ -248,6 +248,7 @@ export async function doInstanceSceneBuild(host: WebGLOsrsRendererHost,
             instance: { templateChunks, regionX, regionY },
             locOverrides: host.locOverrides,
             terrainOverrides: host.terrainOverrides,
+            mapRegionReplacements: host.mapRegionReplacements,
             extraLocs,
         };
 

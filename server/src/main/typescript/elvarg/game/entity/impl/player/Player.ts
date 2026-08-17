@@ -127,7 +127,6 @@ export class Player extends Mobile {
     private runEnergy = 100;
     private lastRunRecovery = new Stopwatch();
     private isDying: boolean;
-    private allowRegionChangePacket: boolean;
     public experienceLocked: boolean;
     public forceMovement: ForceMovement;
     private currentPet: NPC;
@@ -146,7 +145,6 @@ export class Player extends Mobile {
     private updateInventory: boolean; // Updates inventory on next tick
     private newPlayer: boolean;
     private packetsBlocked = false;
-    private regionHeight: number;
 
     public questPoints: number;
     public questProgress = new Map<number, number>();
@@ -859,14 +857,6 @@ export class Player extends Mobile {
         return this.relations;
     }
 
-    public isAllowRegionChangePacket(): boolean {
-        return this.allowRegionChangePacket;
-    }
-
-    public setAllowRegionChangePacket(allowRegionChangePacket: boolean): void {
-        this.allowRegionChangePacket = allowRegionChangePacket;
-    }
-
     public getWalkableInterfaceId(): number {
         return this.walkableInterfaceId;
     }
@@ -1402,14 +1392,6 @@ export class Player extends Mobile {
 
     public setCachedUpdateBlock(cachedUpdateBlock: Buffer) {
         this.cachedUpdateBlock = cachedUpdateBlock;
-    }
-
-    public getRegionHeight(): number {
-        return this.regionHeight;
-    }
-
-    public setRegionHeight(regionHeight: number) {
-        this.regionHeight = regionHeight;
     }
 
     public getSkill(): any {

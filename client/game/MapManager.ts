@@ -14,6 +14,9 @@ function getMapDistanceSq(x: number, z: number, mapX: number, mapY: number): num
 
 type LoadMapFunction = (mapX: number, mapY: number, streamGeneration?: number) => void;
 
+const MAP_LOAD_RETRY_BASE_DELAY_MS = 250;
+const MAP_LOAD_RETRY_MAX_DELAY_MS = 5000;
+
 export interface MapSquare {
     mapX: number;
     mapY: number;
@@ -43,6 +46,8 @@ export class MapManager<T extends MapSquare> {
 
     invalidMapIds: Set<number> = new Set();
     loadingMapIds: Set<number> = new Set();
+    private mapLoadFailureCounts: Map<number, number> = new Map();
+    private mapLoadRetryAfter: Map<number, number> = new Map();
     /** Map IDs that belong to world entity overlays — always included in visible set. */
     worldEntityMapIds: Set<number> = new Set();
 
@@ -157,6 +162,8 @@ export class MapManager<T extends MapSquare> {
     clearMaps(): void {
         this.invalidMapIds.clear();
         this.loadingMapIds.clear();
+        this.mapLoadFailureCounts.clear();
+        this.mapLoadRetryAfter.clear();
         this._lastUsed.clear();
         this.gridMapIdSet.clear();
         this.gridMinMapX = -1;
@@ -271,6 +278,8 @@ export class MapManager<T extends MapSquare> {
     addMap(mapX: number, mapY: number, mapSquare: T): void {
         const mapId = getMapSquareId(mapX, mapY);
         this.loadingMapIds.delete(mapId);
+        this.mapLoadFailureCounts.delete(mapId);
+        this.mapLoadRetryAfter.delete(mapId);
         this.invalidMapIds.delete(mapId);
         const prev = this.mapSquares.get(mapId);
         this.mapSquares.set(mapId, mapSquare);
@@ -320,6 +329,20 @@ export class MapManager<T extends MapSquare> {
         const mapId = getMapSquareId(mapX, mapY);
         this.invalidMapIds.add(mapId);
         this.loadingMapIds.delete(mapId);
+        this.mapLoadFailureCounts.delete(mapId);
+        this.mapLoadRetryAfter.delete(mapId);
+    }
+
+    deferFailedMapLoad(mapX: number, mapY: number): void {
+        const mapId = getMapSquareId(mapX, mapY);
+        const failures = Math.min(6, (this.mapLoadFailureCounts.get(mapId) ?? 0) + 1);
+        const delay = Math.min(
+            MAP_LOAD_RETRY_MAX_DELAY_MS,
+            MAP_LOAD_RETRY_BASE_DELAY_MS * 2 ** (failures - 1),
+        );
+        this.loadingMapIds.delete(mapId);
+        this.mapLoadFailureCounts.set(mapId, failures);
+        this.mapLoadRetryAfter.set(mapId, Date.now() + delay);
     }
 
     loadMap(
@@ -329,13 +352,16 @@ export class MapManager<T extends MapSquare> {
         streamGeneration: number = this.gridRevision,
     ): void {
         const mapId = getMapSquareId(mapX, mapY);
+        const retryAfter = this.mapLoadRetryAfter.get(mapId) ?? 0;
         if (
             (!forceReload && this.mapSquares.has(mapId)) ||
             this.invalidMapIds.has(mapId) ||
-            this.loadingMapIds.has(mapId)
+            this.loadingMapIds.has(mapId) ||
+            Date.now() < retryAfter
         ) {
             return;
         }
+        this.mapLoadRetryAfter.delete(mapId);
         this.loadingMapIds.add(mapId);
         this.loadMapFunction(mapX, mapY, streamGeneration | 0);
     }
@@ -384,6 +410,12 @@ export class MapManager<T extends MapSquare> {
         }
         for (const mapId of staleLoadingIds) {
             this.loadingMapIds.delete(mapId);
+        }
+        for (const mapId of this.mapLoadRetryAfter.keys()) {
+            if (!gridSet.has(mapId)) {
+                this.mapLoadFailureCounts.delete(mapId);
+                this.mapLoadRetryAfter.delete(mapId);
+            }
         }
     }
 

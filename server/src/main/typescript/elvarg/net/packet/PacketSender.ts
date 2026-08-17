@@ -7,10 +7,7 @@ import { Flag } from "../../game/model/Flag";
 import { Skill } from "../../game/model/Skill";
 import { Location } from "../../game/model/Location";
 import { DonatorRights } from "../../game/model/rights/DonatorRights";
-import { MapRegionReplacementManager } from "../../game/collision/MapRegionReplacementManager";
-import { World } from "../../game/World";
 import { InterfaceLayoutRegistry } from "../../game/definition/InterfaceLayoutDefinition";
-import { CachePipeline } from "../../game/cache/CachePipeline";
 import { Misc } from "../../util/Misc";
 import {
   encodeBankSnapshot,
@@ -27,7 +24,6 @@ import {
   encodePlayJingle,
   encodePlaySong,
   encodeProjectiles,
-  encodeRebuildNormal,
   encodeRunClientScript,
   encodeRunEnergy,
   encodeSkillsDelta,
@@ -81,33 +77,6 @@ export class PacketSender {
   private player: any;
   constructor(player: any) {
     this.player = player;
-  }
-
-  public sendMapRegion(): PacketSender {
-    this.player.setAllowRegionChangePacket(true);
-    MapRegionReplacementManager.markSceneLoadStarted(this.player);
-    // Track the last known region using the player's actual position, matching the Java server.
-    this.player.setLastKnownRegion(this.player.getLocation().clone());
-    if (this.player?.isPlayerBot?.() !== true) {
-      World.markActiveRegionsDirty();
-    }
-    try {
-      const location = this.player.getLocation();
-      const currentRegionId = ((location.getX() >> 6) << 8) | (location.getY() >> 6);
-      MapRegionReplacementManager.sendReplacementToPlayer(this.player, currentRegionId, false);
-    } catch (_err) {
-      // Region replacement refresh is best-effort; map-region sync must still proceed.
-    }
-    const regionX = this.player.getLocation().getRegionX() + 6;
-    const regionY = this.player.getLocation().getRegionY() + 6;
-    const regionIds: number[] = [];
-    for (let x = ((regionX - 6) / 8) | 0; x <= (((regionX + 6) / 8) | 0); x++) {
-      for (let y = ((regionY - 6) / 8) | 0; y <= (((regionY + 6) / 8) | 0); y++) regionIds.push((x << 8) | y);
-    }
-    this.player.getSession().sendClientPacket(encodeRebuildNormal(
-      regionX, regionY, true, regionIds.map((regionId) => CachePipeline.getXtea(regionId))
-    ));
-    return this;
   }
 
   sendLogout(): this {
@@ -792,12 +761,6 @@ export class PacketSender {
       return this;
     }
 
-    // Avoid sending object deltas while the client is mid-region change.
-    // RegionChange sync will send a full consistent object snapshot.
-    if (this.player?.isAllowRegionChangePacket?.() === true) {
-      return this;
-    }
-
     const location = object.getLocation();
     this.player.getSession().sendClientPacket(encodeLocAddChange(
       object.getId(), location.getX(), location.getY(), location.getZ(), object.getType(), object.getFace()
@@ -812,12 +775,6 @@ export class PacketSender {
       typeof object.getType !== "function" ||
       typeof object.getFace !== "function"
     ) {
-      return this;
-    }
-
-    // Avoid sending object deltas while the client is mid-region change.
-    // RegionChange sync will send a full consistent object snapshot.
-    if (this.player?.isAllowRegionChangePacket?.() === true) {
       return this;
     }
 

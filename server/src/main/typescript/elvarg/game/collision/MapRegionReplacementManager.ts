@@ -3,8 +3,7 @@ import * as path from "path";
 import * as zlib from "zlib";
 import { CacheMaps } from "../cache/CacheMaps";
 import { Buffer as CollisionBuffer } from "./Buffer";
-import { PacketBuilder } from "../../net/packet/PacketBuilder";
-import { PacketType } from "../../net/packet/PacketType";
+import { encodeRegionReplacement } from "../../net/protocol/ClientProtocol";
 
 export type ReplaceMapRegionSource = string | [string, string];
 
@@ -24,17 +23,9 @@ export type ReplaceMapRegionResult = {
 };
 
 export class MapRegionReplacementManager {
-  private static readonly PACKET_OPCODE = 12;
   private static readonly MAX_PACKET_PAYLOAD = 0xffff;
-  private static readonly PACKET_TYPE = Object.freeze({
-    REGION_DATA: 0,
-    ERROR: 3,
-    CLEAR: 4,
-  });
-  private static readonly PACKET_FLAG_ALLOW_RELOAD = 0x1;
 
   private static replacements: Map<number, RegionReplacement> = new Map();
-  private static pendingSceneLoads: WeakSet<object> = new WeakSet();
 
   public static replaceMapRegion(
     regionId: number,
@@ -45,13 +36,7 @@ export class MapRegionReplacementManager {
     }
 
     const loadedSource = this.loadSource(regionId, source);
-    const payloadLength =
-      1 + // packet type
-      1 + // flags
-      4 + // region id
-      4 + // terrain length
-      4 + // object length
-      loadedSource.terrainData.length +
+    const payloadLength = 7 + loadedSource.terrainData.length +
       (loadedSource.objectData?.length ?? 0);
     if (payloadLength > this.MAX_PACKET_PAYLOAD) {
       throw new Error(
@@ -74,20 +59,6 @@ export class MapRegionReplacementManager {
       objectBytes: loadedSource.objectData?.length ?? 0,
       objectCount,
     };
-  }
-
-  public static markSceneLoadStarted(player: any): void {
-    if (player && typeof player === "object") {
-      this.pendingSceneLoads.add(player);
-    }
-  }
-
-  public static consumeSceneLoadStarted(player: any): boolean {
-    if (!player || typeof player !== "object" || !this.pendingSceneLoads.has(player)) {
-      return false;
-    }
-    this.pendingSceneLoads.delete(player);
-    return true;
   }
 
   public static getReplacementMapData(
@@ -216,67 +187,15 @@ export class MapRegionReplacementManager {
     allowReload: boolean
   ): boolean {
     const session = player?.getSession?.();
-    if (!session || typeof session.write !== "function") {
+    if (!session || typeof session.sendClientPacket !== "function") {
       return false;
     }
-
-    return this.sendRegionReplacementPacket(player, replacement, allowReload);
-  }
-
-  private static sendRegionReplacementPacket(
-    player: any,
-    replacement: RegionReplacement,
-    allowReload: boolean
-  ): boolean {
-    const session = player?.getSession?.();
-    if (!session || typeof session.write !== "function") {
-      return false;
-    }
-    const terrainBuffer = Buffer.from(replacement.terrainData);
-    const objectBuffer = replacement.objectData
-      ? Buffer.from(replacement.objectData)
-      : null;
-    const objectLength = objectBuffer ? objectBuffer.length : -1;
-    const flags = allowReload ? this.PACKET_FLAG_ALLOW_RELOAD : 0;
-    const payloadLength =
-      1 + // packet type
-      1 + // flags
-      4 + // region id
-      4 + // terrain length
-      4 + // object length
-      terrainBuffer.length +
-      (objectBuffer?.length ?? 0);
-
-    if (payloadLength > this.MAX_PACKET_PAYLOAD) {
-      const errorPacket = new PacketBuilder(
-        this.PACKET_OPCODE,
-        PacketType.VARIABLE_SHORT
-      );
-      errorPacket
-        .put(this.PACKET_TYPE.ERROR)
-        .putString(
-          `region_override_too_large region=${replacement.regionId} bytes=${payloadLength}`
-        );
-      session.write(errorPacket);
-      return false;
-    }
-
-    const packet = new PacketBuilder(
-      this.PACKET_OPCODE,
-      PacketType.VARIABLE_SHORT
-    );
-    packet
-      .put(this.PACKET_TYPE.REGION_DATA)
-      .put(flags)
-      .putInt(replacement.regionId)
-      .putInt(terrainBuffer.length)
-      .putInt(objectLength)
-      .writeBuffer(terrainBuffer);
-    if (objectBuffer) {
-      packet.writeBuffer(objectBuffer);
-    }
-    session.write(packet);
-    return true;
+    return session.sendClientPacket(encodeRegionReplacement(
+      replacement.regionId,
+      allowReload,
+      replacement.terrainData,
+      replacement.objectData
+    ));
   }
 
   private static computeVisibleRegionIds(

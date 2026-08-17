@@ -7,6 +7,8 @@ import { MapObjects } from "./MapObjects";
 
 export class ObjectManager {
 
+    private static readonly SCENE_SIZE = 104;
+
     private static sameObjectIdentity(a: GameObject, b: GameObject): boolean {
         return a.getId() === b.getId()
             && a.getType() === b.getType()
@@ -15,7 +17,7 @@ export class ObjectManager {
             && a.getLocation().equals(b.getLocation());
     }
 
-    public static onRegionChange(player: Player) {
+    public static onRegionChange(player: Player, baseX: number, baseY: number, level: number) {
         // Region sync should only target the requesting player.
         // Broadcasting every object spawn globally here causes redundant updates.
         for (const object of World.getObjects()) {
@@ -25,7 +27,10 @@ export class ObjectManager {
             if (player.getPrivateArea() !== object.getPrivateArea()) {
                 continue;
             }
-            if (!player.getLocation().isWithinDistance(object.getLocation(), 64)) {
+            const location = object.getLocation();
+            if (location.getZ() !== level
+                || location.getX() < baseX || location.getX() >= baseX + this.SCENE_SIZE
+                || location.getY() < baseY || location.getY() >= baseY + this.SCENE_SIZE) {
                 continue;
             }
             player.getPacketSender().sendObject(object);
@@ -38,7 +43,10 @@ export class ObjectManager {
             if (player.getPrivateArea() !== object.getPrivateArea()) {
                 continue;
             }
-            if (!player.getLocation().isWithinDistance(object.getLocation(), 64)) {
+            const location = object.getLocation();
+            if (location.getZ() !== level
+                || location.getX() < baseX || location.getX() >= baseX + this.SCENE_SIZE
+                || location.getY() < baseY || location.getY() >= baseY + this.SCENE_SIZE) {
                 continue;
             }
             player.getPacketSender().sendObjectRemoval(object);
@@ -130,7 +138,10 @@ export class ObjectManager {
                     if (player.getPrivateArea() != object.getPrivateArea()) {
                         return;
                     }
-                    if (!player.getLocation().isWithinDistance(object.getLocation(), 64)) {
+                    const location = object.getLocation();
+                    if (!player.getSession().isTileInScene(
+                        location.getX(), location.getY(), location.getZ()
+                    )) {
                         return;
                     }
                     if (type == OperationType.SPAWN) {

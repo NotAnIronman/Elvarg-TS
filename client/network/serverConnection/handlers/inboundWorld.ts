@@ -41,6 +41,16 @@ import { applyGroundItemsDelta, cloneGroundItemsPayload } from "../utils/groundI
 import { sanitizeBankSlotMessage, sanitizeInventorySlotMessage, sanitizeSpellResult } from "../utils/sanitize";
 
 export function handleInboundWorld(msg: any): boolean {
+    if (msg.type === "region_replacement") {
+        try {
+            const client = ((typeof window !== "undefined" ? window : globalThis) as any)
+                .__osrsClient;
+            client?.onRegionReplacement?.(msg.payload);
+        } catch (err) {
+            console.warn("region_replacement handler error", err);
+        }
+        return true;
+    }
     if (msg.type === "camera") {
         try {
             const g: any = (typeof window !== "undefined" ? window : globalThis) as any;

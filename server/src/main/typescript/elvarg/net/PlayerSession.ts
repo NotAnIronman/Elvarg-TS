@@ -22,6 +22,8 @@ import { Music } from "../game/Music";
 import { Skill } from "../game/model/Skill";
 import { HitMask } from "../game/content/combat/hit/HitMask";
 import { ServerPerf } from "../util/ServerPerf";
+import { ObjectManager } from "../game/entity/impl/object/ObjectManager";
+import { MapRegionReplacementManager } from "../game/collision/MapRegionReplacementManager";
 
 type SessionChannel = {
   binaryTransport?: boolean;
@@ -40,6 +42,7 @@ type SessionChannel = {
 const OUTBOUND_BACKPRESSURE_LOG_COOLDOWN_MS = 5000;
 const NETWORK_PERF_LOG_INTERVAL_MS = 10000;
 const WS_CLOSE_BACKPRESSURE = 1013;
+const WS_CLOSE_SEND_FAILURE = 1011;
 
 export class PlayerSession {
   private channel: SessionChannel;
@@ -50,6 +53,11 @@ export class PlayerSession {
   private networkPerfMaxBufferedBytes = 0;
   private sceneBaseX = -1;
   private sceneBaseY = -1;
+  private replayedSceneBaseX = -1;
+  private replayedSceneBaseY = -1;
+  private replayedSceneLevel = -1;
+  private replayedPrivateArea: unknown;
+  private hasReplayedScene = false;
   private playerSyncState?: PlayerSyncState;
   private npcSyncState: NpcSyncState = createNpcSyncState();
   private appearanceCache = new Map<number, { player: Player; payload: Buffer }>();
@@ -89,16 +97,31 @@ export class PlayerSession {
     return this.channel;
   }
 
+  public isTileInScene(x: number, y: number, level: number): boolean {
+    return this.hasReplayedScene
+      && level === this.replayedSceneLevel
+      && x >= this.replayedSceneBaseX && x < this.replayedSceneBaseX + 104
+      && y >= this.replayedSceneBaseY && y < this.replayedSceneBaseY + 104;
+  }
+
   public sendClientPacket(frame: Buffer): boolean {
-    if (!this.isBinaryChannelOpen() || this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES) {
-      return true;
+    if (!this.isBinaryChannelOpen() || typeof this.channel.send !== "function") {
+      return false;
+    }
+    if (this.getBufferedAmount() >= NetworkConstants.OUTBOUND_WS_BUFFER_CRITICAL_BYTES) {
+      this.closeBackpressuredWebSocket("critical_buffered_amount");
+      return false;
     }
     try {
-      this.channel.send?.(frame);
+      this.channel.send(frame);
+      return true;
     } catch (error) {
       console.warn("[PlayerSession] client packet send failed", error);
+      try {
+        this.channel.close?.(WS_CLOSE_SEND_FAILURE, "send failed");
+      } catch {}
+      return false;
     }
-    return true;
   }
 
   private flushClient(tick: number): void {
@@ -131,20 +154,54 @@ export class PlayerSession {
         }
       }
     });
-    let playerSync: Buffer;
-    if (!this.playerSyncState) {
+    if (!this.isBinaryChannelOpen()) return;
+
+    const initialSync = !this.playerSyncState;
+    if (initialSync) {
       this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
       this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
+    } else {
+      const localX = current.x - this.sceneBaseX;
+      const localY = current.y - this.sceneBaseY;
+      if (localX < 16 || localX >= 88) this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
+      if (localY < 16 || localY >= 88) this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
+    }
+    const privateArea = player.getPrivateArea();
+    const sceneChanged = !this.hasReplayedScene
+      || this.replayedSceneBaseX !== this.sceneBaseX
+      || this.replayedSceneBaseY !== this.sceneBaseY
+      || this.replayedSceneLevel !== current.level
+      || this.replayedPrivateArea !== privateArea;
+    const replacementWindowChanged = !this.hasReplayedScene
+      || this.replayedSceneBaseX !== this.sceneBaseX
+      || this.replayedSceneBaseY !== this.sceneBaseY;
+
+    if (replacementWindowChanged) {
+      MapRegionReplacementManager.sendVisibleReplacementsToPlayer(
+        player,
+        this.sceneBaseX + 48,
+        this.sceneBaseY + 48,
+        6,
+        [],
+        false
+      );
+      if (!this.isBinaryChannelOpen()) return;
+    }
+    // xrsps replays the initial scene during login; later scene replays follow
+    // the authoritative player-sync base below.
+    if (initialSync && sceneChanged) {
+      ObjectManager.onRegionChange(player, this.sceneBaseX, this.sceneBaseY, current.level);
+      if (!this.isBinaryChannelOpen()) return;
+    }
+
+    let playerSync: Buffer;
+    if (initialSync) {
       playerSync = ServerPerf.measurePhase(
         "network.flush.encode_player_sync",
         () => encodeInitialPlayerSync(player.getIndex(), current.x, current.y, current.level, tick)
       );
       this.playerSyncState = createPlayerSyncState(player.getIndex(), current);
     } else {
-      const localX = current.x - this.sceneBaseX;
-      const localY = current.y - this.sceneBaseY;
-      if (localX < 16 || localX >= 88) this.sceneBaseX = Math.max(0, (current.x - 48) & ~7);
-      if (localY < 16 || localY >= 88) this.sceneBaseY = Math.max(0, (current.y - 48) & ~7);
       const views = ServerPerf.measurePhase(
         "network.flush.build_player_views",
         () => [player, ...player.getLocalPlayers()].map((target) =>
@@ -196,21 +253,33 @@ export class PlayerSession {
       () => encodeNpcSync(tick, npcLocal, npcViews, this.npcSyncState)
     );
 
-    ServerPerf.measurePhase("network.flush.socket_send", () => {
-      try {
-        const tickFrame = encodeTick(tick, Date.now());
-        this.channel.send?.(tickFrame);
-        this.channel.send?.(playerSync);
-        this.channel.send?.(npcSync);
-        this.recordNetworkPerf(
-          tickFrame.length + playerSync.length + npcSync.length,
-          player.getLocalPlayers().length,
-          player.getLocalNpcs().length
-        );
-      } catch (error) {
-        console.warn("[PlayerSession] client sync failed", error);
+    const syncSent = ServerPerf.measurePhase("network.flush.socket_send", () => {
+      const tickFrame = encodeTick(tick, Date.now());
+      if (!this.sendClientPacket(tickFrame)
+        || !this.sendClientPacket(playerSync)
+        || !this.sendClientPacket(npcSync)) {
+        return false;
       }
+      this.recordNetworkPerf(
+        tickFrame.length + playerSync.length + npcSync.length,
+        player.getLocalPlayers().length,
+        player.getLocalNpcs().length
+      );
+      return true;
     });
+    if (!syncSent) return;
+
+    if (!initialSync && sceneChanged) {
+      ObjectManager.onRegionChange(player, this.sceneBaseX, this.sceneBaseY, current.level);
+      if (!this.isBinaryChannelOpen()) return;
+    }
+    if (sceneChanged) {
+      this.replayedSceneBaseX = this.sceneBaseX;
+      this.replayedSceneBaseY = this.sceneBaseY;
+      this.replayedSceneLevel = current.level;
+      this.replayedPrivateArea = privateArea;
+      this.hasReplayedScene = true;
+    }
   }
 
   private createPlayerView(player: Player, forceAppearance = false): PlayerView {

@@ -54,7 +54,7 @@ Supported `source` formats:
 
 Behavior:
 - Replaces server clipping/runtime map decode for that region.
-- Streams a procedural override payload (opcode `12`) to connected players so they see the same map edits.
+- Streams the replacement through the native binary client protocol so connected players see the same map edits.
 - Re-streams active replacements on player login.
 
 ## Data Files

@@ -6478,6 +6478,19 @@ export class OsrsClient {
         }
     }
 
+    onRegionReplacement(payload: {
+        regionId: number;
+        allowReload: boolean;
+        terrainData: Uint8Array;
+        objectData?: Uint8Array;
+    }): void {
+        try {
+            (this.renderer as any)?.onRegionReplacement?.(payload);
+        } catch (err) {
+            console.warn("onRegionReplacement error", err);
+        }
+    }
+
     refreshGamemodeWorldLocs(): void {
         try {
             if (

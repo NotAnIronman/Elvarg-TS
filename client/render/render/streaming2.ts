@@ -230,13 +230,29 @@ export async function queueLoadMap(host: WebGLOsrsRendererHost,
             extraLocs: host.getExtraLocsForMap(mapX, mapY),
             locSpawns: host.locSpawns,
             terrainOverrides: host.terrainOverrides,
+            mapRegionReplacements: host.mapRegionReplacements,
         };
 
-        const mapData = await host.osrsClient.workerPool.queueLoad<
-            SdMapLoaderInput,
-            SdMapData | undefined,
-            SdMapDataLoader
-        >(host.dataLoader, input);
+        let mapData: SdMapData | undefined;
+        try {
+            mapData = await host.osrsClient.workerPool.queueLoad<
+                SdMapLoaderInput,
+                SdMapData | undefined,
+                SdMapDataLoader
+            >(host.dataLoader, input);
+        } catch (error) {
+            console.error(`[WebGLOsrsRenderer] map load failed for (${mapX}, ${mapY})`, error);
+            if (typeof locReloadBatchId === "number") {
+                host.resolveLocReloadBatchMap(locReloadBatchId, mapId, undefined);
+            } else {
+                host.mapManager.deferFailedMapLoad(mapX, mapY);
+            }
+            host.pendingLocUpdates.delete(mapId);
+            host.pendingLocGeometryUpdates.delete(mapId);
+            host.pendingDoorLocUpdates.delete(mapId);
+            host.queuedLocReloadBatchByMap.delete(mapId);
+            return;
+        }
 
         if (mapData && host.isValidMapData(mapData)) {
             if (typeof locReloadBatchId === "number") {

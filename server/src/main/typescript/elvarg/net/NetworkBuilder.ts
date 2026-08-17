@@ -631,7 +631,6 @@ class ClientConnection {
     if (pending.save) pending.save.applyToPlayer(player);
     player.setPasswordHashWithSalt(pending.passwordHash);
     player.setLastKnownRegion(player.getLocation().clone());
-    player.setRegionHeight(player.getLocation().getZ());
     player.getUpdateFlag().flag(Flag.APPEARANCE);
 
     if (!World.getPlayers().add(player)) {

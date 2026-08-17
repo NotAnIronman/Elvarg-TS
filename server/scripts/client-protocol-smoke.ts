@@ -31,6 +31,7 @@ import {
   encodeBankSnapshot,
   encodeLocAddChange,
   encodeRebuildNormal,
+  encodeRegionReplacement,
   encodeShopOpen,
   encodeTradeOpen,
   encodeVarbit,
@@ -303,6 +304,13 @@ assert.strictEqual(encodeGroundItemsDelta(2, [], [7])[0], 55);
 assert.strictEqual(encodeBankSnapshot(1410, [{ slot: 0, itemId: 995, quantity: 1000, tab: 0 }])[0], 52);
 assert.deepStrictEqual([...encodeLocAddChange(1000, 3091, 3524, 0, 10, 2)], [134, 8, 3, 232, 12, 19, 13, 196, 0, 42]);
 assert.strictEqual(encodeRebuildNormal(386, 440, true, [[1, 2, 3, 4]])[0], 141);
+const regionReplacement = encodeRegionReplacement(
+  12343,
+  false,
+  Uint8Array.from([1, 2, 3]),
+  Uint8Array.from([4, 5])
+);
+assert.deepStrictEqual([...regionReplacement], [144, 0, 12, 48, 55, 0, 0, 3, 0, 2, 1, 2, 3, 4, 5]);
 assert.strictEqual(encodeShopOpen("1", "Shop", 995, false, 1, 1, [
   { slot: 0, itemId: 4151, quantity: 1 },
 ])[0], 150);

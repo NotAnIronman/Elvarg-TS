@@ -1322,6 +1322,24 @@ export function decodeServerPacket(data: Uint8Array | ArrayBuffer): DecodedServe
             };
         }
 
+        case ServerPacketId.REGION_REPLACEMENT: {
+            const regionId = reader.readShort();
+            const allowReload = reader.readBoolean();
+            const terrainLength = reader.readShort();
+            const objectLength = reader.readShort();
+            const terrainData = reader.readBytes(terrainLength);
+            const objectData = objectLength > 0 ? reader.readBytes(objectLength) : undefined;
+            if (reader.remaining !== 0) {
+                throw new RangeError(
+                    `Region replacement ${regionId} has ${reader.remaining} trailing bytes`,
+                );
+            }
+            return {
+                type: "region_replacement",
+                payload: { regionId, allowReload, terrainData, objectData },
+            };
+        }
+
         case ServerPacketId.LOC_ANIM: {
             const locId = reader.readShort();
             const tile = { x: reader.readShort(), y: reader.readShort() };

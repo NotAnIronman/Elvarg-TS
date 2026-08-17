@@ -213,6 +213,7 @@ export function clearSessionCaches(host: WebGLOsrsRendererHost, ): void {
         host.locAnimTimers.clear();
         host.locSpawns.clear();
         host.terrainOverrides.clear();
+        host.mapRegionReplacements.clear();
         host.gamemodeWorldLocOverrideKeys.clear();
         host.gamemodeWorldLocSpawnKeys.clear();
         host.gamemodeWorldTerrainOverrideKeys.clear();

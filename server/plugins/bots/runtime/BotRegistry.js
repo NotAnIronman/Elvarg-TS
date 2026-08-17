@@ -589,7 +589,6 @@ function createBotRegistry(options) {
     applyForcedModeForDiagnosis(bot, state);
     bot.setLocation?.(botSpawn.clone());
     bot.setLastKnownRegion?.(botSpawn.clone());
-    bot.setRegionHeight?.(botSpawn.getZ?.());
     botStatesByName.set(username, state);
     playerBotUsernames.add(username);
     assignmentMap.set(username, assignmentValue);

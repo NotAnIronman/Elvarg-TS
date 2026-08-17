@@ -96,6 +96,7 @@ export const enum ServerPacketId {
     REBUILD_NORMAL = 141,
     REBUILD_WORLDENTITY = 142,
     WORLDENTITY_INFO = 143,
+    REGION_REPLACEMENT = 144,
 
     // ========================================
     // SHOP/TRADE (150-169)
@@ -217,6 +218,7 @@ export const SERVER_PACKET_LENGTHS: Record<ServerPacketId, number> = {
     [ServerPacketId.REBUILD_NORMAL]: -2,
     [ServerPacketId.REBUILD_WORLDENTITY]: -2,
     [ServerPacketId.WORLDENTITY_INFO]: -1, // count(1) + per-entity updates + new spawns
+    [ServerPacketId.REGION_REPLACEMENT]: -2,
 
     [ServerPacketId.SHOP_OPEN]: -2,
     [ServerPacketId.SHOP_SLOT]: -1,

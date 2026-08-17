@@ -1232,6 +1232,7 @@ export class SdMapDataLoader implements RenderDataLoader<SdMapLoaderInput, SdMap
             locOverrides,
             locSpawns,
             terrainOverrides,
+            mapRegionReplacements,
             instance: instanceInput,
             extraLocs: extraLocsInput,
             extraNpcs: extraNpcsInput,
@@ -1240,6 +1241,7 @@ export class SdMapDataLoader implements RenderDataLoader<SdMapLoaderInput, SdMap
     ): Promise<RenderDataResult<SdMapData | undefined>> {
         console.time(`load map ${mapX},${mapY}`);
         this.init();
+        state.sceneBuilder.mapFileLoader.setRegionReplacements(mapRegionReplacements);
 
         const locTypeLoader = state.locTypeLoader;
         const npcTypeLoader = state.npcTypeLoader;

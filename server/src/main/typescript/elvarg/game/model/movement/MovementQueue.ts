@@ -6,7 +6,6 @@ import { CombatFactory } from "../../content/combat/CombatFactory";
 import { ObjectDefinition } from "../../definition/ObjectDefinition";
 import type { NPC } from "../../entity/impl/npc/NPC";
 import { GameObject } from "../../entity/impl/object/GameObject";
-import { ObjectManager } from "../../entity/impl/object/ObjectManager";
 import type { Player } from "../../entity/impl/player/Player";
 import { Direction, Directions } from "../Direction";
 import { Location } from "../Location";
@@ -492,19 +491,11 @@ export class MovementQueue {
             regionChanged = true;
         else if (diffY >= 88)
             regionChanged = true;
-        if (regionChanged || player.getRegionHeight() != player.getLocation().getZ()) {
-            player.getPacketSender().sendMapRegion();
-            player.setRegionHeight(player.getLocation().getZ());
+        if (regionChanged) {
             this.character.setLastKnownRegion(player.getLocation().clone());
-            // sendMapRegion() sets allowRegionChangePacket=true, which makes sendObject/
-            // sendObjectRemoval silently drop deltas (see PacketSender comments) until the
-            // "full consistent object snapshot" promised there actually goes out. Nothing else
-            // ever reset the flag or sent that snapshot, so every dynamically opened/closed
-            // door (and any other ObjectManager-tracked object) went permanently invisible to
-            // a player's client after their first scene change of the session - only a fresh
-            // login (which re-derives state independently) showed the real state again.
-            player.setAllowRegionChangePacket(false);
-            ObjectManager.onRegionChange(player);
+            if (player.isPlayerBot?.() !== true) {
+                World.markActiveRegionsDirty();
+            }
         }
     }
 

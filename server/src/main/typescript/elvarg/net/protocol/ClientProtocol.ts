@@ -952,6 +952,27 @@ export function encodeRebuildNormal(regionX: number, regionY: number, forceReloa
   return encodeServerPacket(ServerPacketId.REBUILD_NORMAL, payload);
 }
 
+export function encodeRegionReplacement(
+  regionId: number,
+  allowReload: boolean,
+  terrainData: Uint8Array,
+  objectData: Uint8Array | null
+): Buffer {
+  const objects = objectData ?? new Uint8Array(0);
+  const payloadLength = 7 + terrainData.length + objects.length;
+  if (payloadLength > 0xffff) {
+    throw new Error(`Region replacement ${regionId} exceeds short packet length`);
+  }
+  const payload = Buffer.allocUnsafe(payloadLength);
+  payload.writeUInt16BE(regionId & 0xffff, 0);
+  payload[2] = allowReload ? 1 : 0;
+  payload.writeUInt16BE(terrainData.length, 3);
+  payload.writeUInt16BE(objects.length, 5);
+  Buffer.from(terrainData).copy(payload, 7);
+  Buffer.from(objects).copy(payload, 7 + terrainData.length);
+  return encodeServerPacket(ServerPacketId.REGION_REPLACEMENT, payload);
+}
+
 export type ShopSlotView = { slot: number; itemId: number; quantity: number; defaultQuantity?: number; priceEach?: number; sellPrice?: number };
 
 function encodeShopSlotPayload(slot: ShopSlotView): Buffer {

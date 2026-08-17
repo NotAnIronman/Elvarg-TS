@@ -4,14 +4,23 @@ import { ByteBuffer } from "../io/ByteBuffer";
 import { MapFileIndex } from "./MapFileIndex";
 
 export type XteaMap = Map<number, number[]>;
+export type MapRegionReplacement = { terrainData: Int8Array; objectData?: Int8Array };
 
 export class MapFileLoader {
+    private regionReplacements: Map<number, MapRegionReplacement> = new Map();
+
     constructor(
         readonly mapIndex: CacheIndex,
         readonly mapFileIndex: MapFileIndex,
     ) {}
 
+    setRegionReplacements(replacements?: Map<number, MapRegionReplacement>): void {
+        this.regionReplacements = replacements ?? new Map();
+    }
+
     getTerrainData(mapX: number, mapY: number, xteasMap?: XteaMap): Int8Array | undefined {
+        const replacement = this.regionReplacements.get((mapX << 8) | mapY);
+        if (replacement) return replacement.terrainData;
         const archiveId = this.mapFileIndex.getTerrainArchiveId(mapX, mapY);
         if (archiveId === -1) {
             return undefined;
@@ -27,6 +36,8 @@ export class MapFileLoader {
     }
 
     getLocData(mapX: number, mapY: number, xteasMap: XteaMap): Int8Array | undefined {
+        const replacement = this.regionReplacements.get((mapX << 8) | mapY);
+        if (replacement?.objectData) return replacement.objectData;
         const archiveId = this.mapFileIndex.getLocArchiveId(mapX, mapY);
         if (archiveId === -1) {
             return undefined;

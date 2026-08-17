@@ -50,6 +50,11 @@ export type SdMapLoaderInput = {
         }
     >;
 
+    mapRegionReplacements?: Map<
+        number,
+        { terrainData: Int8Array; objectData?: Int8Array }
+    >;
+
     /**
      * Instance mode: when present, the loader uses buildInstanceScene() instead
      * of buildScene(). The SceneBuilder loads required cache regions internally.

@@ -83,7 +83,6 @@ function createBotPlayer(username, spawn, options = {}) {
   bot.setAutoRetaliate(false);
   bot.setRunning(false);
   bot.setLastKnownRegion(spawn.clone());
-  bot.setRegionHeight(spawn.getZ());
 
   let appliedPersistence = false;
   let hasValidSavedAppearance = false;
@@ -123,7 +122,6 @@ function createBotPlayer(username, spawn, options = {}) {
   // positions should not drag them back to stale saved coordinates.
   bot.setLocation(spawn.clone());
   bot.setLastKnownRegion(spawn.clone());
-  bot.setRegionHeight(spawn.getZ());
   bot.getUpdateFlag().flag(Flag.APPEARANCE);
   World.getAddPlayerQueue().push(bot);
   return bot;

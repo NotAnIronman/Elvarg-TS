@@ -449,12 +449,27 @@ export function onLocAddChange(host: WebGLOsrsRendererHost,
 
         try {
             const key = `${tile.x},${tile.y},${level},${shape}`;
+            const overrideKey = `${tile.x | 0},${tile.y | 0},${level | 0},-1`;
+            const existing = host.addedLocs.get(key);
+            const existingOverride = host.locOverrides.get(overrideKey);
+            if (
+                existing?.locId === locId &&
+                existing.x === tile.x &&
+                existing.y === tile.y &&
+                existing.level === level &&
+                existing.shape === shape &&
+                existing.rotation === rotation &&
+                existingOverride?.newId === 0 &&
+                existingOverride.matchType === shape
+            ) {
+                return;
+            }
             host.addedLocs.set(key, { locId, x: tile.x, y: tile.y, level, shape, rotation });
 
             // Suppress the base cache-baked loc at this tile so it doesn't
             // keep rendering alongside (or instead of) the new one - buildScene
             // has no other way to know a cache loc was replaced/removed.
-            host.locOverrides.set(`${tile.x | 0},${tile.y | 0},${level | 0},-1`, {
+            host.locOverrides.set(overrideKey, {
                 newId: 0,
                 matchType: shape as LocModelType,
             });

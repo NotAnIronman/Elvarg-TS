@@ -290,6 +290,10 @@ export class WebGLOsrsRenderer extends GameRenderer<WebGLMapSquare> {
             renderFlags?: number;
         }
     > = new Map();
+    public mapRegionReplacements: Map<
+        number,
+        { terrainData: Int8Array; objectData?: Int8Array }
+    > = new Map();
     public gamemodeWorldLocOverrideKeys: Set<string> = new Set();
     public gamemodeWorldLocSpawnKeys: Set<string> = new Set();
     public gamemodeWorldTerrainOverrideKeys: Set<string> = new Set();
@@ -2474,6 +2478,26 @@ export class WebGLOsrsRenderer extends GameRenderer<WebGLMapSquare> {
         },
     ): void {
         return render.onLocChange(this, oldId, newId, tile, level, opts);
+    }
+
+    onRegionReplacement(payload: {
+        regionId: number;
+        allowReload: boolean;
+        terrainData: Uint8Array;
+        objectData?: Uint8Array;
+    }): void {
+        const regionId = payload.regionId | 0;
+        if (regionId < 0 || regionId > 0xffff || payload.terrainData.length === 0) return;
+        this.mapRegionReplacements.set(regionId, {
+            terrainData: Int8Array.from(payload.terrainData),
+            objectData: payload.objectData?.length ? Int8Array.from(payload.objectData) : undefined,
+        });
+        if (!payload.allowReload) return;
+        const mapX = regionId >> 8;
+        const mapY = regionId & 0xff;
+        if (!this.mapManager.getMap(mapX, mapY)) return;
+        this.pendingLocUpdates.add(getMapSquareId(mapX, mapY));
+        this.scheduleLocReload(mapX, mapY);
     }
 
     public getExtraLocsForMap(
