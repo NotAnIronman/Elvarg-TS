@@ -8,6 +8,7 @@ import {
 import { markWidgetInteractionDirty } from "../../../widgets/WidgetInteraction";
 import type { WidgetNode } from "../../../widgets/WidgetManager";
 import { getViewportSize } from "../../../common/utils/DeviceUtil";
+import { Cs2ArrayObject } from "../Cs2ArrayObject";
 import { Opcodes } from "../Opcodes";
 import type { HandlerContext, HandlerMap } from "./HandlerTypes";
 
@@ -235,6 +236,70 @@ function getParamDefaultValue(ctx: HandlerContext, paramId: number): any {
 function getWidgetParamValue(ctx: HandlerContext, widget: any, paramId: number): any {
     const raw = widget?.params instanceof Map ? widget.params.get(paramId) : undefined;
     return raw !== undefined ? raw : getParamDefaultValue(ctx, paramId);
+}
+
+const WIDGET_QUERY_KEY = Symbol("widgetQuery");
+
+interface WidgetQueryState {
+    widgets: WidgetNode[];
+    cursor: number;
+}
+
+function getWidgetQuery(ctx: HandlerContext): WidgetQueryState {
+    return ((ctx as any)[WIDGET_QUERY_KEY] ??= { widgets: [], cursor: 0 });
+}
+
+function initWidgetQuery(
+    ctx: HandlerContext,
+    mode: number,
+    root: WidgetNode | null,
+    anchorIndex: number,
+    anchorWidget: WidgetNode | null = null,
+): WidgetQueryState {
+    if (mode < 0 || mode > 2) throw new Error("RuntimeException");
+
+    const query = getWidgetQuery(ctx);
+    query.widgets = [];
+    query.cursor = 0;
+    if (!root) return query;
+
+    if (((root.childIndex ?? -1) | 0) !== -1 || (root.type ?? 0) !== 0) {
+        throw new Error("RuntimeException");
+    }
+
+    const directChildren = (widget: WidgetNode): WidgetNode[] =>
+        Array.isArray(widget.children)
+            ? widget.children.filter((child): child is WidgetNode => !!child)
+            : [];
+    const findByIndex = (widget: WidgetNode, childIndex: number): WidgetNode | null => {
+        for (const child of directChildren(widget)) {
+            if (((child.childIndex ?? -1) | 0) === childIndex) return child;
+            const nested = findByIndex(child, childIndex);
+            if (nested) return nested;
+        }
+        return null;
+    };
+    const collect = (widget: WidgetNode, recursive: boolean): void => {
+        for (const child of directChildren(widget)) {
+            query.widgets.push(child);
+            if (recursive) collect(child, true);
+        }
+    };
+
+    if (mode === 0) {
+        collect(root, true);
+        query.widgets.sort((a, b) => ((a.childIndex ?? -1) | 0) - ((b.childIndex ?? -1) | 0));
+        return query;
+    }
+
+    const anchor =
+        anchorWidget ?? (anchorIndex === -1 ? root : findByIndex(root, anchorIndex));
+    if (anchor) collect(anchor, mode === 2);
+    return query;
+}
+
+function widgetQueryIndices(query: WidgetQueryState): number[] {
+    return query.widgets.map((widget) => (widget.childIndex ?? -1) | 0);
 }
 
 function getWidgetByUidAndChild(
@@ -1109,44 +1174,64 @@ export function registerWidgetOps(handlers: HandlerMap): void {
         ctx.pushInt(found ? 1 : 0);
     });
 
-    // CC_GETUID / IF_CHILDREN_FIND (opcode 211)
-    // In modern OSRS, this opcode is IF_CHILDREN_FIND which initializes children iteration.
-    // Stack: [uid, startIndex] -> initializes iteration over children of widget with given uid
-    handlers.set(Opcodes.CC_GETUID, (ctx, intOp) => {
-        // IF_CHILDREN_FIND: pop startIndex and uid, initialize children iteration
-        const startIndex = ctx.intStack[--ctx.intStackSize];
-        const uid = ctx.intStack[--ctx.intStackSize];
-        const w = ctx.widgetManager.getWidgetByUid(uid);
-
-        // Collect child indices > startIndex
-        const indices: number[] = [];
-        if (w && w.children) {
-            for (let i = 0; i < w.children.length; i++) {
-                if (w.children[i] && i > startIndex) {
-                    indices.push(i);
-                }
-            }
-        }
-        indices.sort((a, b) => a - b);
-
-        ctx.childrenIterWidget = w ?? null;
-        ctx.childrenIterIndices = indices;
-        ctx.childrenIterIndex = 0;
+    handlers.set(Opcodes.WIDGET_QUERY, (ctx) => {
+        ctx.intStackSize -= 3;
+        const mode = ctx.intStack[ctx.intStackSize] | 0;
+        const uid = ctx.intStack[ctx.intStackSize + 1] | 0;
+        const anchorIndex = ctx.intStack[ctx.intStackSize + 2] | 0;
+        ctx.widgetManager.getGroup((uid >>> 16) & 0xffff);
+        const query = initWidgetQuery(
+            ctx,
+            mode,
+            ctx.widgetManager.getWidgetByUid(uid) ?? null,
+            anchorIndex,
+        );
+        ctx.pushInt(query.widgets.length);
     });
 
-    // CC_GETTYPE / IF_CHILDREN_FINDNEXTID (opcode 214)
-    // In modern OSRS, this opcode is IF_CHILDREN_FINDNEXTID which returns the next child index.
-    // Returns the next child index from iteration, or -1 if no more children.
-    handlers.set(Opcodes.CC_GETTYPE, (ctx, intOp) => {
-        if (ctx.childrenIterIndex < ctx.childrenIterIndices.length) {
-            ctx.pushInt(ctx.childrenIterIndices[ctx.childrenIterIndex++]);
-        } else {
-            // No more children - return -1 and clear iteration state
-            ctx.pushInt(-1);
-            ctx.childrenIterIndices = [];
-            ctx.childrenIterIndex = 0;
-            ctx.childrenIterWidget = null;
+    handlers.set(Opcodes.CC_WIDGET_QUERY, (ctx, intOp) => {
+        const mode = ctx.popInt() | 0;
+        const base = getTargetWidget(ctx, intOp);
+        if (!base) throw new Error("RuntimeException");
+
+        const baseIndex = (base.childIndex ?? -1) | 0;
+        let root = base;
+        while (((root.childIndex ?? -1) | 0) !== -1) {
+            const parent = ctx.widgetManager.getWidgetByUid(root.parentUid);
+            if (!parent) throw new Error("RuntimeException");
+            root = parent;
         }
+        const query = initWidgetQuery(ctx, mode, root, baseIndex, baseIndex === -1 ? null : base);
+        ctx.pushInt(query.widgets.length);
+    });
+
+    handlers.set(Opcodes.WIDGET_QUERY_NEXT, (ctx, intOp) => {
+        const query = getWidgetQuery(ctx);
+        setTargetWidget(ctx, intOp, query.widgets[query.cursor++] ?? null);
+    });
+
+    handlers.set(Opcodes.WIDGET_QUERY_NEXTINDEX, (ctx) => {
+        const query = getWidgetQuery(ctx);
+        const widget = query.widgets[query.cursor++];
+        ctx.pushInt(widget ? ((widget.childIndex ?? -1) | 0) : -1);
+    });
+
+    handlers.set(Opcodes.WIDGET_QUERY_GETINDICES, (ctx) => {
+        const indices = widgetQueryIndices(getWidgetQuery(ctx));
+        const array = new Cs2ArrayObject("int", 0, indices.length, indices.length, true);
+        for (let i = 0; i < indices.length; i++) array.setAt(i, indices[i]);
+        ctx.pushString(array);
+    });
+
+    handlers.set(Opcodes.WIDGET_QUERY_FILTER, (ctx) => {
+        const valueType = ctx.popInt() | 0;
+        const value = popValueByScriptVarType(ctx, valueType);
+        const paramId = ctx.popInt() | 0;
+        const query = getWidgetQuery(ctx);
+        query.widgets = query.widgets.filter(
+            (widget) => getWidgetParamValue(ctx, widget, paramId) === value,
+        );
+        ctx.pushInt(query.widgets.length);
     });
 
     handlers.set(Opcodes.CC_GETID, (ctx, intOp) => {

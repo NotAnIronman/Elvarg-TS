@@ -72,10 +72,18 @@ export enum Opcodes {
      * Value operands are popped by script-var-type ids.
      */
     IF_FIND_CHILD = 210,
-    /** Returns the widget's UID (cc_getuid). */
-    CC_GETUID = 211,
-    /** Returns the widget's type (0=container, 3=rect, 4=text, 5=sprite, etc.) */
-    CC_GETTYPE = 214,
+    /** Initializes a query over a widget's dynamic children. */
+    WIDGET_QUERY = 211,
+    /** Initializes a query relative to the active/dot widget. */
+    CC_WIDGET_QUERY = 212,
+    /** Selects the next widget in the active query. */
+    WIDGET_QUERY_NEXT = 213,
+    /** Returns the next child index in the active query. */
+    WIDGET_QUERY_NEXTINDEX = 214,
+    /** Returns all child indices in the active query as a typed int array. */
+    WIDGET_QUERY_GETINDICES = 215,
+    /** Filters the active query by a widget parameter. */
+    WIDGET_QUERY_FILTER = 216,
     CC_SETPOSITION = 1000,
     CC_SETSIZE = 1001,
     CC_SETHIDE = 1003,
