@@ -187,6 +187,10 @@ export class PlayerModelLoader {
             } catch {}
             const metaSlot = deriveEquipSlotFromParams(obj) ?? (slot as EquipmentSlot);
             if (metaSlot !== undefined) equippedSlots.add(metaSlot);
+            if (obj?.wearPos2 === 6 || obj?.wearPos3 === 6) {
+                hiddenParts.add(3);
+                kits[3] = -1;
+            }
 
             if (metaSlot === EquipmentSlot.HEAD) {
                 const coverage = getHeadCoverage(obj);
@@ -234,11 +238,11 @@ export class PlayerModelLoader {
                     continue;
                 }
 
-                // Torso/arms suppression for body
+                // A body item replaces the torso. OSRS only replaces the separate arms
+                // composition slot when wearPos2/wearPos3 is slot 6 (for example platebodies).
                 if (metaSlot === EquipmentSlot.BODY) {
                     if (kits.length < 7) kits.length = 7;
                     kits[2] = -1; // torso
-                    kits[3] = -1; // arms
                 }
                 // Head + jaw suppression
                 // Legs suppression
@@ -276,8 +280,9 @@ export class PlayerModelLoader {
             case 1:
                 return hiddenParts?.has(1) ?? false;
             case 2:
-            case 3:
                 return equippedSlots.has(EquipmentSlot.BODY);
+            case 3:
+                return false;
             case 4:
                 return equippedSlots.has(EquipmentSlot.GLOVES);
             case 5:
