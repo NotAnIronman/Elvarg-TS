@@ -7,9 +7,7 @@ import { ObjType } from "../objtype/ObjType";
 import { ObjTypeLoader } from "../objtype/ObjTypeLoader";
 import {
     EquipmentSlot,
-    HeadCoverage,
     deriveEquipSlotFromParams,
-    getHeadCoverage,
 } from "./Equipment";
 import { Gender, PlayerAppearance } from "./PlayerAppearance";
 import {
@@ -23,6 +21,16 @@ import {
 // PlayerComposition palette constants originate from signed Java shorts, so
 // normalise them before comparing them with ModelData.faceColors.
 const asUnsignedHsl = (color: number): number => color & 0xffff;
+
+const compositionSlotToKitPart: Record<number, number> = {
+    4: 2,
+    6: 3,
+    7: 5,
+    8: 0,
+    9: 4,
+    10: 6,
+    11: 1,
+};
 
 // Phase A: compose body from IdentityKits only (no equipment yet)
 export class PlayerModelLoader {
@@ -187,20 +195,11 @@ export class PlayerModelLoader {
             } catch {}
             const metaSlot = deriveEquipSlotFromParams(obj) ?? (slot as EquipmentSlot);
             if (metaSlot !== undefined) equippedSlots.add(metaSlot);
-            if (obj?.wearPos2 === 6 || obj?.wearPos3 === 6) {
-                hiddenParts.add(3);
-                kits[3] = -1;
-            }
-
-            if (metaSlot === EquipmentSlot.HEAD) {
-                const coverage = getHeadCoverage(obj);
-                if (coverage === HeadCoverage.HEAD || coverage === HeadCoverage.HEAD_AND_JAW) {
-                    hiddenParts.add(0);
-                    kits[0] = -1;
-                }
-                if (coverage === HeadCoverage.HEAD_AND_JAW) {
-                    hiddenParts.add(1);
-                    kits[1] = -1;
+            for (const compositionSlot of [obj?.wearPos2, obj?.wearPos3]) {
+                const part = compositionSlotToKitPart[compositionSlot ?? -1];
+                if (part !== undefined) {
+                    hiddenParts.add(part);
+                    kits[part] = -1;
                 }
             }
         }

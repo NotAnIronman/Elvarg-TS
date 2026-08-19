@@ -61,8 +61,6 @@ export const EquipToDisplaySlot: Record<number, EquipmentDisplaySlot> = {
     [EquipmentSlot.AMMO]: EquipmentDisplaySlot.AMMO,
 };
 
-// Head coverage behavior removed: server is expected to provide final appearance kits.
-
 // OSRS equipment slot param mapping seen in item.params[1564]
 // Observed values from dump: 0=head, 3=weapon, 4=body, 5=shield, 7=legs
 export const OSRS_EQUIP_SLOT_PARAM_ID = 1564;
@@ -132,58 +130,4 @@ export function deriveAdditionalEquipSlotsFromParams(obj: ObjType | undefined): 
         slots.push(slot);
     }
     return slots;
-}
-
-// Heuristic keyword lists to determine whether a head-slot item should suppress
-// the base head/jaw identity kits (complete helmets, masks, etc.).
-const HEAD_HIDE_KEYWORDS = [
-    "helm",
-    "hood",
-    "mask",
-    "cowl",
-    "faceguard",
-    "facemask",
-    "helmet",
-    "headpiece",
-    "headdress",
-    "earmuff",
-    "visage",
-];
-
-const HEAD_SHOW_KEYWORDS = [
-    "hat",
-    "cap",
-    "crown",
-    "tiara",
-    "circlet",
-    "wreath",
-    "hair",
-    "headband",
-];
-
-function matchesKeyword(name: string, keywords: string[]): boolean {
-    for (const key of keywords) {
-        if (name.includes(key)) return true;
-    }
-    return false;
-}
-
-export enum HeadCoverage {
-    NONE = 0,
-    HEAD = 1,
-    HEAD_AND_JAW = 2,
-}
-
-export function getHeadCoverage(obj: ObjType | undefined): HeadCoverage {
-    const rawName = obj?.name;
-    if (typeof rawName !== "string") return HeadCoverage.NONE;
-    const name = rawName.toLowerCase();
-    if (matchesKeyword(name, HEAD_SHOW_KEYWORDS)) return HeadCoverage.NONE;
-    if (name.includes("med helm")) return HeadCoverage.HEAD;
-    if (matchesKeyword(name, HEAD_HIDE_KEYWORDS)) return HeadCoverage.HEAD_AND_JAW;
-    return HeadCoverage.NONE;
-}
-
-export function itemHidesHead(obj: ObjType | undefined): boolean {
-    return getHeadCoverage(obj) !== HeadCoverage.NONE;
 }
