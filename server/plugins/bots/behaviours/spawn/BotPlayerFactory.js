@@ -25,6 +25,7 @@ const MALE_RANGES = {
 
 const FEMALE_RANGES = {
   head: [45, 54],
+  beard: [292, 306],
   chest: [56, 60],
   arms: [61, 65],
   hands: [67, 68],
@@ -52,8 +53,7 @@ function buildRandomAppearanceLook() {
   look[Appearance.HANDS] = randomFromRange(ranges.hands);
   look[Appearance.LEGS] = randomFromRange(ranges.legs);
   look[Appearance.FEET] = randomFromRange(ranges.feet);
-  look[Appearance.BEARD] =
-    gender === 0 ? randomFromRange(MALE_RANGES.beard) : 57;
+  look[Appearance.BEARD] = randomFromRange(ranges.beard);
 
   look[Appearance.HAIR_COLOUR] = randomFromRange(COLOR_RANGES[0]);
   look[Appearance.TORSO_COLOUR] = randomFromRange(COLOR_RANGES[1]);
