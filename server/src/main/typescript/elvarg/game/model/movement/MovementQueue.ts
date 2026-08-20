@@ -949,20 +949,37 @@ export class MovementQueue {
     }
 
     public walkToGroundItem(pos: Location, action: () => void) {
-        this.walkToTile(pos, action, PathFinder.reachedObj);
+        this.walkToTile(pos, action, MovementQueue.reachedGroundItem);
+    }
+
+    /**
+     * Operable distance for a ground item. Standing on the tile always counts.
+     * An adjacent tile only counts when this cycle produced no step, which is
+     * upstream's `stepsTaken === 0` gate: a click from one tile away still routes
+     * onto the item and picks it up on arrival, but a player who cannot close the
+     * last square (frozen, blocked) still gets to take it.
+     */
+    private static reachedGroundItem(entity: Mobile, destination: Location): boolean {
+        if (PathFinder.reachedTile(entity, destination)) {
+            return true;
+        }
+        return !entity.getMovementQueue().didMoveThisCycle() &&
+            PathFinder.reachedObj(entity, destination);
     }
 
     /**
      * @param reached decides when the destination counts as arrived at. Defaults to
      *   standing exactly on the tile, which is what a plugin-supplied route
-     *   destination wants; ground items also accept an adjacent tile.
+     *   destination wants.
      */
     public walkToTile(
         pos: Location,
         action: () => void,
         reached: (entity: Mobile, destination: Location) => boolean = PathFinder.reachedTile
     ) {
-        if (reached(this.player, pos)) {
+        // Call time, not tick time: only an exact tile match may skip the walk.
+        // Anything looser would let an adjacent click resolve without stepping.
+        if (PathFinder.reachedTile(this.player, pos)) {
             action();
             return;
         }
@@ -1010,7 +1027,7 @@ export class MovementQueue {
             this.player.getMovementQueue().reset();
             lastRouteCycle = cycle;
             PathFinder.calculateGroundItemRoute(this.player, pos);
-        }));
+        }, false));
     }
 
     public walkToReset() {
@@ -1385,8 +1402,14 @@ class Point {
 
 
 class MovementTask extends Task {
-    constructor(n1: number, private readonly execFunc: (task: MovementTask) => void) {
-        super(0, n1, true);
+    /**
+     * @param immediate run the first reach check at submit time, before this cycle's
+     *   movement. True for entity targets, which upstream lets you operate before
+     *   moving; false for scenery and ground items, whose op is gated on having
+     *   taken no step, so they must never resolve on the click cycle itself.
+     */
+    constructor(n1: number, private readonly execFunc: (task: MovementTask) => void, immediate = true) {
+        super(0, n1, immediate);
         // Ticked from the owner's turn after movement, not from the global task pass.
         this.type = TaskType.WALK_TO;
     }

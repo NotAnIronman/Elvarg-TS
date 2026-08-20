@@ -62,6 +62,30 @@ try {
   task.execute();
   assert.strictEqual(pickups, 1);
 
+  // Clicking a ground item from one tile away must walk onto it first. Upstream
+  // gates an obj's op on having taken no step, so an adjacent click cannot
+  // resolve on the click cycle.
+  {
+    let moved = true;
+    const adjPlayer: any = {
+      isPlayer: () => true, getIndex: () => 2, getSize: () => 1, getPrivateArea: () => null,
+      getLocation: () => new Location(3201, 3200, 0),
+      getMovementQueue: () => ({ didMoveThisCycle: () => moved }),
+    };
+    adjPlayer.getAsPlayer = () => adjPlayer;
+    (PathFinder as any).rsmodRouteFinding = { reachedAbsolute: () => true };
+    const reached = (MovementQueue as any).reachedGroundItem;
+    const item = new Location(3200, 3200, 0);
+    assert.strictEqual(reached(adjPlayer, item), false,
+      "adjacent must not count while the player is still stepping toward the item");
+    moved = false;
+    assert.strictEqual(reached(adjPlayer, item), true,
+      "adjacent counts once the player can no longer close the last square");
+    const onTile: any = { ...adjPlayer, getLocation: () => new Location(3200, 3200, 0) };
+    onTile.getMovementQueue = () => ({ didMoveThisCycle: () => true });
+    assert.strictEqual(reached(onTile, item), true, "standing on the tile always counts");
+  }
+
   // A walk-to task must be driven from its owner's turn (after that cycle's steps),
   // not from the global task pass which runs before anyone has moved.
   (TaskManager as any).submit = originalSubmit;
