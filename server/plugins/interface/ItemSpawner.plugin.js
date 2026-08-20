@@ -13,8 +13,34 @@ const CLOSE_UID = uid(7);
 const RESULT_UIDS = Array.from({ length: SLOT_COUNT }, (_, slot) => uid(ICON_START + slot));
 const WIDGET_GROUP = buildItemSpawnerWidgetGroup();
 
+const OP_SPAWN = 1;
+const OP_SPAWN_X = 2;
+// Item amounts are a signed 32-bit value; the container clamps stacks itself and
+// stops adding non-stackables once the inventory is full.
+const MAX_SPAWN_AMOUNT = 2147483647;
+
 function isDeveloper(player) {
   return player?.getRights?.() === PlayerRights.DEVELOPER;
+}
+
+function isSpawnableItem(itemId) {
+  return (
+    Number.isInteger(itemId) &&
+    itemId > 0 &&
+    itemId < CacheDefinitions.getCounts().items
+  );
+}
+
+function itemName(itemId) {
+  const name = CacheDefinitions.getItem(itemId)?.name;
+  return name && name !== "null" ? name : `item ${itemId}`;
+}
+
+function spawnItem(player, itemId, amount) {
+  player.getInventory().adds(itemId, amount);
+  player
+    .getPacketSender()
+    .sendMessage(`Spawned ${amount} x ${itemName(itemId)} (${itemId}).`);
 }
 
 module.exports = {
@@ -47,12 +73,28 @@ module.exports = {
       return true;
     });
 
-    api.onInterfaceActionButton(RESULT_UIDS, ({ player, itemId }) => {
-      if (!isDeveloper(player) || !Number.isInteger(itemId)) return true;
-      const count = CacheDefinitions.getCounts().items;
-      if (itemId <= 0 || itemId >= count) return true;
-      player.getInventory().adds(itemId, 1);
-      player.getPacketSender().sendMessage(`Spawned item ${itemId}.`);
+    api.onInterfaceActionButton(RESULT_UIDS, ({ player, itemId, action }) => {
+      if (!isDeveloper(player) || !isSpawnableItem(itemId)) return true;
+
+      if (action === OP_SPAWN_X) {
+        player.setEnteredAmountAction({
+          execute: (amount) => {
+            // Re-checked on resume: the prompt is answered on a later tick, and
+            // this is a privileged action.
+            if (!isDeveloper(player) || !isSpawnableItem(itemId)) return;
+            const requested = Math.floor(Number(amount));
+            if (!Number.isFinite(requested) || requested < 1) return;
+            spawnItem(player, itemId, Math.min(requested, MAX_SPAWN_AMOUNT));
+          },
+        });
+        player
+          .getPacketSender()
+          .sendEnterAmountPrompt(`Enter the amount of ${itemName(itemId)} to spawn.`);
+        return true;
+      }
+
+      if (action !== OP_SPAWN) return true;
+      spawnItem(player, itemId, 1);
       return true;
     });
   },
