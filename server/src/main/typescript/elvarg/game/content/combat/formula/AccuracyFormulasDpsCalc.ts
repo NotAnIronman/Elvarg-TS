@@ -72,6 +72,16 @@ export class AccuracyFormulasDpsCalc {
         return entity.getAsPlayer().getBonusManager().getDefenceBonus()[bonusIndex] ?? 0;
     }
 
+    /**
+     * NPC accuracy bonuses: stats[5] melee, [7] magic, [9] ranged. See
+     * NpcDefinition.DEFAULT_STATS for the full slot layout. These were hard-coded
+     * to 0 until monsters-complete.json carried attack bonuses, which made every
+     * NPC attack roll a bare `effective x 64`.
+     */
+    private static npcAttackBonus(entity: Mobile, slot: number): number {
+        return entity.getAsNpc().getCurrentDefinition().getStats()[slot] ?? 0;
+    }
+
     private static meleeAttackPrayerBonus(player: Player): number {
         if (PrayerHandler.isActivated(player, PrayerHandler.CLARITY_OF_THOUGHT)) {
             return 1.05;
@@ -212,8 +222,8 @@ export class AccuracyFormulasDpsCalc {
         let attRoll = AccuracyFormulasDpsCalc.effectiveAttackLevel(entity);
 
         if (entity.isNpc()) {
-            // NPC's don't currently have stab/slash/crush bonuses
-            attRoll *= 64;
+            // NPCs have a single melee accuracy bonus, not per-style ones.
+            attRoll *= AccuracyFormulasDpsCalc.npcAttackBonus(entity, 5) + 64;
             cache.attackMeleeRoll = Math.floor(attRoll);
             return cache.attackMeleeRoll;
         }
@@ -366,7 +376,9 @@ export class AccuracyFormulasDpsCalc {
         if (cache.attackRangedRoll != null) {
             return cache.attackRangedRoll;
         }
-        let accuracyBonus = (entity.isNpc() ? 0 : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_RANGE]);
+        let accuracyBonus = (entity.isNpc()
+            ? AccuracyFormulasDpsCalc.npcAttackBonus(entity, 9)
+            : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_RANGE]);
 
         let attRoll = AccuracyFormulasDpsCalc.effectiveRangedAttack(entity);
 
@@ -446,7 +458,9 @@ export class AccuracyFormulasDpsCalc {
         if (cache.attackMagicRoll != null) {
             return cache.attackMagicRoll;
         }
-        let accuracyBonus = (entity.isNpc() ? 0 : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_MAGIC]);
+        let accuracyBonus = (entity.isNpc()
+            ? AccuracyFormulasDpsCalc.npcAttackBonus(entity, 7)
+            : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_MAGIC]);
 
         let attRoll = AccuracyFormulasDpsCalc.effectiveMagicLevel(entity);
         attRoll *= (accuracyBonus + 64);

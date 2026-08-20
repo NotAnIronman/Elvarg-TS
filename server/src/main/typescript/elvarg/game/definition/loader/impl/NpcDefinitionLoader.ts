@@ -18,7 +18,11 @@ type CombatStats = {
     aggressive?: boolean;
     poisonous?: boolean;
     slayerLevel?: number;
-    aggressiveRadius?: number;
+    attackBonuses?: {
+        melee?: number;
+        magic?: number;
+        ranged?: number;
+    };
     defenceBonuses?: {
         stab?: number;
         slash?: number;
@@ -43,13 +47,57 @@ const ANIMATION_FALLBACKS: Record<number, CombatAnimation> = {
 const normalizeName = (value?: string) => (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 
 export class NpcDefinitionLoader extends DefinitionLoader {
+    /**
+     * Translates one osrsreboxed monsters-complete.json entry into the internal
+     * stats shape. Undefined (rather than 0) is used wherever the dump has no
+     * usable value, so the `?? existing` fallbacks below leave the definition's
+     * own default alone.
+     */
+    public static fromMonsterDump(monster: any): CombatStats {
+        return {
+            name: monster.name,
+            hitpoints: monster.hitpoints,
+            attackLevel: monster.attack_level,
+            strengthLevel: monster.strength_level,
+            defenceLevel: monster.defence_level,
+            magicLevel: monster.magic_level,
+            rangedLevel: monster.ranged_level,
+            attackSpeed: monster.attack_speed,
+            // null on ~141 entries of the dump.
+            maxHit: typeof monster.max_hit === "number" ? monster.max_hit : undefined,
+            aggressive: monster.aggressive === true,
+            poisonous: monster.poisonous === true,
+            slayerLevel:
+                monster.slayer_monster === true && monster.slayer_level > 0
+                    ? monster.slayer_level
+                    : undefined,
+            attackBonuses: {
+                // Accuracy only - damage comes from maxHit, so the dump's
+                // strength/magic/ranged damage bonuses are deliberately unread.
+                melee: monster.attack_bonus,
+                magic: monster.attack_magic,
+                ranged: monster.attack_ranged,
+            },
+            defenceBonuses: {
+                stab: monster.defence_stab,
+                slash: monster.defence_slash,
+                crush: monster.defence_crush,
+                magic: monster.defence_magic,
+                // The dump splits ranged defence into light/standard/heavy; this
+                // engine models a single ranged defence.
+                ranged: monster.defence_ranged_standard,
+            },
+        };
+    }
+
     load(): boolean {
         NpcDefinition.definitions.clear();
         const directory = path.resolve(GameConstants.DEFINITIONS_DIRECTORY);
-        const stats = this.read(directory, "npc-combat-stats.json").npcs ?? {};
+        // Combat stats, including aggression, come straight from the vendored dump.
+        // Animations are not in it and keep coming from the files below.
+        const monsters = this.readOptional(directory, "monsters-complete.json") ?? {};
         const animationFile = this.read(directory, "npc-combat-defs.json");
         const observedAnimations = this.read(directory, "npc-animations.json") as Record<string, number[]>;
-        const aggression = this.read(directory, "npc-aggression.json").npcs ?? {};
         const animations: Record<string, CombatAnimation> = {};
 
         for (const row of animationFile.refs?.npcs ?? []) {
@@ -103,8 +151,8 @@ export class NpcDefinitionLoader extends DefinitionLoader {
         }
 
         const ids = new Set([
-            ...Object.keys(stats), ...Object.keys(animations), ...Object.keys(observedAnimations),
-            ...Object.keys(aggression),
+            ...Object.keys(monsters),
+            ...Object.keys(animations), ...Object.keys(observedAnimations),
         ]);
         let applied = 0;
         let mismatched = 0;
@@ -114,12 +162,18 @@ export class NpcDefinitionLoader extends DefinitionLoader {
             if (!Number.isInteger(id) || id < 0 || id >= count) continue;
             const cached = CacheDefinitions.getNpc(id);
             const definition = NpcDefinition.forId(id) as any;
-            const stat = stats[key] as CombatStats | undefined;
+            const stat = monsters[key]
+                ? NpcDefinitionLoader.fromMonsterDump(monsters[key])
+                : undefined;
+            // Name-guarded: a dump keyed to a different cache revision is dropped,
+            // not applied to whatever monster happens to sit at that id here.
             if (stat && normalizeName(stat.name) === normalizeName(cached.name)) {
                 const levels = definition.getStats().slice();
                 for (const [index, value] of [
                     [0, stat.attackLevel], [1, stat.strengthLevel], [2, stat.defenceLevel],
                     [3, stat.rangedLevel], [4, stat.magicLevel],
+                    [5, stat.attackBonuses?.melee], [7, stat.attackBonuses?.magic],
+                    [9, stat.attackBonuses?.ranged],
                     [10, stat.defenceBonuses?.stab], [11, stat.defenceBonuses?.slash],
                     [12, stat.defenceBonuses?.crush], [13, stat.defenceBonuses?.magic],
                     [14, stat.defenceBonuses?.ranged],
@@ -134,7 +188,6 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                     aggressive: stat.aggressive ?? definition.isAggressive(),
                     poisonous: stat.poisonous ?? definition.isPoisonous(),
                     slayerLevel: stat.slayerLevel ?? definition.getSlayerLevel(),
-                    combatFollowDistance: stat.aggressiveRadius ?? definition.getCombatFollowDistance(),
                 });
                 applied++;
             } else if (stat) {
@@ -150,9 +203,6 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                     deathSound: animation.sounds?.death ?? definition.getDeathSound(),
                 });
             }
-            if (typeof aggression[key]?.aggressive === "boolean") {
-                definition.aggressive = aggression[key].aggressive;
-            }
         }
         console.info(
             `[npc-definitions] cache-backed; configured stats applied=${applied}, mismatched=${mismatched}, ` +
@@ -167,5 +217,15 @@ export class NpcDefinitionLoader extends DefinitionLoader {
 
     private read(directory: string, name: string): any {
         return JSON.parse(fs.readFileSync(path.join(directory, name), "utf8"));
+    }
+
+    /** The monster dump is a large vendored file; boot without it rather than crash. */
+    private readOptional(directory: string, name: string): any {
+        const file = path.join(directory, name);
+        if (!fs.existsSync(file)) {
+            console.warn(`[npc-definitions] ${name} missing - NPC combat stats will fall back to defaults`);
+            return null;
+        }
+        return JSON.parse(fs.readFileSync(file, "utf8"));
     }
 }

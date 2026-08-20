@@ -2,6 +2,14 @@ import { CacheDefinitions } from "../cache/CacheDefinitions";
 
 export class NpcDefinition {
     static definitions: Map<number, NpcDefinition> = new Map<number, NpcDefinition>();
+    /**
+     * Slot layout, populated by NpcDefinitionLoader from monsters-complete.json:
+     *   0-4   combat levels: attack, strength, defence, ranged, magic
+     *   5,7,9 accuracy bonuses: melee, magic, ranged
+     *   10-14 defence bonuses, in BonusManager.DEFENCE_* order
+     *         (stab, slash, crush, magic, ranged)
+     * Slots 6, 8 and 15-17 are unused - damage comes from maxHit directly.
+     */
     private static DEFAULT_STATS: number[] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     private static DEFAULT: NpcDefinition = new NpcDefinition();
     

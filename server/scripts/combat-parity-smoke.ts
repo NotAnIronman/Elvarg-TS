@@ -4,6 +4,7 @@
  *  - hit XP ratios (magic 1/2, hitpoints 1/3, defensive-cast defence 1/4)
  *  - damage is capped to the target's HP at roll time (tick eating)
  *  - HitQueue drains once per cycle, at the top of the owner's turn
+ *  - monsters-complete.json normalisation into NPC definition stats
  */
 import * as assert from "node:assert/strict";
 // Import order matters: the combat graph is circular, and pulling the formula
@@ -19,6 +20,7 @@ import { HitQueue } from "../src/main/typescript/elvarg/game/content/combat/hit/
 import { PendingHit } from "../src/main/typescript/elvarg/game/content/combat/hit/PendingHit";
 import { BonusManager } from "../src/main/typescript/elvarg/game/model/equipment/BonusManager";
 import { Skill } from "../src/main/typescript/elvarg/game/model/Skill";
+import { NpcDefinitionLoader } from "../src/main/typescript/elvarg/game/definition/loader/impl/NpcDefinitionLoader";
 
 void World;
 void Combat;
@@ -34,7 +36,13 @@ try {
     // in BonusManager.DEFENCE_* order. Both used to be ignored for NPCs.
     const armouredNpc = (): any => {
         const stats = new Array(18).fill(0);
+        stats[0] = 1;    // attack level 1 -> effective 10
         stats[2] = 1;    // defence level 1 -> effective 10
+        stats[3] = 1;    // ranged level
+        stats[4] = 1;    // magic level
+        stats[5] = 30;   // melee accuracy bonus
+        stats[7] = 15;   // magic accuracy bonus
+        stats[9] = 25;   // ranged accuracy bonus
         stats[10] = 0;   // stab
         stats[12] = 100; // crush
         stats[14] = 40;  // ranged
@@ -63,6 +71,43 @@ try {
         AccuracyFormulasDpsCalc.defenseRangedRoll(armouredNpc()),
         10 * (40 + 64),
         "an NPC's ranged defence bonus must feed the ranged defence roll"
+    );
+
+    // ...and the attack side, which used to be a bare `effective x 64`.
+    assert.equal(
+        AccuracyFormulasDpsCalc.attackMeleeRoll(armouredNpc()),
+        10 * (30 + 64),
+        "an NPC's melee accuracy bonus must feed the attack roll"
+    );
+    assert.equal(
+        AccuracyFormulasDpsCalc.attackRangedRoll(armouredNpc()),
+        10 * (25 + 64),
+        "an NPC's ranged accuracy bonus must feed the attack roll"
+    );
+    assert.equal(
+        AccuracyFormulasDpsCalc.attackMagicRoll(armouredNpc()),
+        10 * (15 + 64),
+        "an NPC's magic accuracy bonus must feed the attack roll"
+    );
+
+    // --- monster dump -> internal stats --------------------------------------
+    const dumped = NpcDefinitionLoader.fromMonsterDump({
+        name: "King Black Dragon",
+        hitpoints: 240, attack_level: 240, strength_level: 240, defence_level: 240,
+        magic_level: 240, ranged_level: 70, attack_speed: 4, max_hit: 25,
+        aggressive: true, poisonous: false, slayer_monster: false, slayer_level: 0,
+        attack_bonus: 80, attack_magic: 0, attack_ranged: 0,
+        defence_stab: 40, defence_slash: 90, defence_crush: 90, defence_magic: 80,
+        defence_ranged_standard: 70, defence_ranged_light: 5, defence_ranged_heavy: 9,
+    });
+    assert.equal(dumped.defenceBonuses?.ranged, 70, "ranged defence comes from the standard split");
+    assert.equal(dumped.attackBonuses?.melee, 80, "melee accuracy bonus is imported");
+    assert.equal(dumped.maxHit, 25, "max hit is imported when present");
+
+    assert.equal(
+        NpcDefinitionLoader.fromMonsterDump({ name: "x", max_hit: null }).maxHit,
+        undefined,
+        "a null max hit must not become 0 - it has to fall through to the default"
     );
 
     // --- hit XP ratios -------------------------------------------------------
