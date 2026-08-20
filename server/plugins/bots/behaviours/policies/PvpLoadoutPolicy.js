@@ -494,7 +494,7 @@ function chooseEliteDarkBowSpecPrimary(magicPackage) {
       {
         weight: 2,
         weaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        ammoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        ammoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         usesAvas: true,
         useOffhand: false,
       },
@@ -843,7 +843,7 @@ function buildHybridInventory(options = {}) {
     meleeWeaponId = ItemIdentifiers.ABYSSAL_WHIP,
     specWeaponId = ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
     rangeWeaponId = ItemIdentifiers.RUNE_CROSSBOW,
-    rangeAmmoId = ItemIdentifiers.DRAGON_BOLTS_E_,
+    rangeAmmoId = ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
     rangeAmmoAmount = 120,
     mageBodyId = ItemIdentifiers.MYSTIC_ROBE_TOP,
     mageLegId = ItemIdentifiers.MYSTIC_ROBE_BOTTOM,
@@ -884,7 +884,7 @@ function buildStaffHybridInventory(options = {}) {
     specWeaponId = null,
     meleeWeaponId = ItemIdentifiers.ABYSSAL_WHIP,
     rangeWeaponId = ItemIdentifiers.RUNE_CROSSBOW,
-    rangeAmmoId = ItemIdentifiers.DRAGON_BOLTS_E_,
+    rangeAmmoId = ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
     rangeAmmoAmount = 100,
     mageBodyId = ItemIdentifiers.MYSTIC_ROBE_TOP,
     mageLegId = ItemIdentifiers.MYSTIC_ROBE_BOTTOM,
@@ -1309,7 +1309,7 @@ const ARCHETYPES = Object.freeze({
       buildHybridInventory({
         meleeWeaponId: ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
         rangeWeaponId: ItemIdentifiers.RUNE_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 70,
         extraFood: -1,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
@@ -1359,12 +1359,12 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(choose([ItemIdentifiers.DRAGON_BOOTS, ItemIdentifiers.RANGER_BOOTS, ItemIdentifiers.RUNE_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 95),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 95),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
         ItemIdentifiers.ARMADYL_GODSWORD,
-        ItemIdentifiers.DRAGON_BOLTS_E_,
+        ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         120,
         { comboEatCount: 5 }
       ),
@@ -1880,12 +1880,12 @@ const ARCHETYPES = Object.freeze({
         item(choose(RANGE_GLOVES)),
         item(choose([ItemIdentifiers.DRAGON_BOOTS, ...RANGE_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 90),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 90),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
         ItemIdentifiers.ARMADYL_GODSWORD,
-        ItemIdentifiers.DRAGON_BOLTS_E_,
+        ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         120,
         { comboEatCount: 5 }
       ),
@@ -1957,12 +1957,12 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.BARROWS_GLOVES),
         item(choose([ItemIdentifiers.DRAGON_BOOTS, ...RANGE_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 95),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 95),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
         ItemIdentifiers.DRAGON_CLAWS,
-        ItemIdentifiers.DRAGON_BOLTS_E_,
+        ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         125,
         { comboEatCount: 5 }
       ),
@@ -1993,7 +1993,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 90),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 90),
       ]);
     },
     inventory: (magicPackage) =>
@@ -2001,7 +2001,7 @@ const ARCHETYPES = Object.freeze({
         meleeWeaponId: ItemIdentifiers.ABYSSAL_WHIP,
         specWeaponId: ItemIdentifiers.ARMADYL_GODSWORD,
         rangeWeaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 100,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
       }),
@@ -2140,7 +2140,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 100),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 100),
       ]);
     },
     inventory: (magicPackage) =>
@@ -2148,7 +2148,7 @@ const ARCHETYPES = Object.freeze({
         meleeWeaponId: ItemIdentifiers.ZAMORAKIAN_SPEAR,
         specWeaponId: ItemIdentifiers.ARMADYL_GODSWORD,
         rangeWeaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 110,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
       }),
@@ -2186,7 +2186,7 @@ const ARCHETYPES = Object.freeze({
         meleeWeaponId: ItemIdentifiers.STAFF_OF_THE_DEAD,
         specWeaponId: ItemIdentifiers.DRAGON_CLAWS,
         rangeWeaponId: ItemIdentifiers.RUNE_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 90,
         shieldId: ItemIdentifiers.BOOK_OF_DARKNESS,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
@@ -2218,7 +2218,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 95),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 95),
       ]);
     },
     inventory: () =>
@@ -2227,7 +2227,7 @@ const ARCHETYPES = Object.freeze({
         specWeaponId: ItemIdentifiers.DRAGON_CLAWS,
         meleeWeaponId: null,
         rangeWeaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 110,
         shieldId: ItemIdentifiers.BOOK_OF_DARKNESS,
       }),
@@ -2258,6 +2258,9 @@ const ARCHETYPES = Object.freeze({
         item(choose(RANGE_GLOVES)),
         item(choose(RANGE_BOOTS)),
         item(ItemIdentifiers.RING_OF_RECOIL),
+        !isVeteranOrEliteProfile(profile)
+          ? item(ItemIdentifiers.RUNE_ARROW, 150)
+          : null,
       ]),
     inventory: (magicPackage, profile) =>
       buildRangeToMeleeInventory(
@@ -2284,12 +2287,12 @@ const ARCHETYPES = Object.freeze({
         item(choose(RANGE_GLOVES)),
         item(choose(RANGE_BOOTS)),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 75),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 75),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
         ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
-        ItemIdentifiers.DRAGON_BOLTS_E_,
+        ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         125
       ),
   }),
@@ -2319,6 +2322,9 @@ const ARCHETYPES = Object.freeze({
         item(choose(RANGE_GLOVES)),
         item(choose(RANGE_BOOTS)),
         item(ItemIdentifiers.RING_OF_RECOIL),
+        !isVeteranOrEliteProfile(profile)
+          ? item(ItemIdentifiers.RUNE_ARROW, 175)
+          : null,
       ]),
     inventory: (magicPackage, profile) =>
       buildRangeToMeleeInventory(
@@ -2376,12 +2382,12 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.VOID_KNIGHT_GLOVES),
         item(choose([ItemIdentifiers.SNAKESKIN_BOOTS, ItemIdentifiers.RANGER_BOOTS, ItemIdentifiers.DRAGON_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 90),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 90),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
         ItemIdentifiers.DRAGON_CLAWS,
-        ItemIdentifiers.DRAGON_BOLTS_E_,
+        ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         120
       ),
   }),
@@ -2404,12 +2410,12 @@ const ARCHETYPES = Object.freeze({
         item(ItemIdentifiers.VOID_KNIGHT_GLOVES),
         item(choose([ItemIdentifiers.SNAKESKIN_BOOTS, ItemIdentifiers.RANGER_BOOTS, ItemIdentifiers.DRAGON_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 90),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 90),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
         ItemIdentifiers.ARMADYL_GODSWORD,
-        ItemIdentifiers.DRAGON_BOLTS_E_,
+        ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         120
       ),
   }),
@@ -2588,7 +2594,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 80),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 80),
       ]);
     },
     inventory: (magicPackage) =>
@@ -2630,7 +2636,7 @@ const ARCHETYPES = Object.freeze({
       buildHybridInventory({
         meleeWeaponId: ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
         rangeWeaponId: ItemIdentifiers.RUNE_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 60,
         extraFood: -1,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
@@ -2662,7 +2668,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 95),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 95),
       ]);
     },
     inventory: (magicPackage) =>
@@ -2670,7 +2676,7 @@ const ARCHETYPES = Object.freeze({
         meleeWeaponId: ItemIdentifiers.ABYSSAL_WHIP,
         specWeaponId: ItemIdentifiers.ARMADYL_GODSWORD,
         rangeWeaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 110,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
       }),
@@ -2701,7 +2707,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 95),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 95),
       ]);
     },
     inventory: (magicPackage) =>
@@ -2709,7 +2715,7 @@ const ARCHETYPES = Object.freeze({
         meleeWeaponId: ItemIdentifiers.ABYSSAL_WHIP,
         specWeaponId: ItemIdentifiers.DRAGON_CLAWS,
         rangeWeaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 110,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
       }),
@@ -2740,7 +2746,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 95),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 95),
       ]);
     },
     inventory: () =>
@@ -2748,7 +2754,7 @@ const ARCHETYPES = Object.freeze({
         staffId: ItemIdentifiers.VOLATILE_NIGHTMARE_STAFF,
         meleeWeaponId: ItemIdentifiers.ABYSSAL_WHIP,
         rangeWeaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 110,
         shieldId: ItemIdentifiers.BOOK_OF_DARKNESS,
       }),
@@ -2777,14 +2783,14 @@ const ARCHETYPES = Object.freeze({
         item(choose([ItemIdentifiers.MITHRIL_GLOVES, ...MAGE_GLOVES, ...RANGE_GLOVES])),
         item(choose([ItemIdentifiers.CLIMBING_BOOTS, ...MAGE_BOOTS, ...RANGE_BOOTS])),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 70),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 70),
       ]),
     inventory: (magicPackage) =>
       buildHybridInventory({
         meleeWeaponId: ItemIdentifiers.DRAGON_SCIMITAR,
         specWeaponId: ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
         rangeWeaponId: ItemIdentifiers.RUNE_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 80,
         mageBodyId: choose([ItemIdentifiers.MYSTIC_ROBE_TOP, ItemIdentifiers.SPLITBARK_BODY]),
         mageLegId: choose([ItemIdentifiers.MYSTIC_ROBE_BOTTOM, ItemIdentifiers.BLACK_DHIDE_CHAPS]),
@@ -2817,7 +2823,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 85),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 85),
       ]);
     },
     inventory: (magicPackage) =>
@@ -2825,7 +2831,7 @@ const ARCHETYPES = Object.freeze({
         meleeWeaponId: ItemIdentifiers.ABYSSAL_WHIP,
         specWeaponId: ItemIdentifiers.ARMADYL_GODSWORD,
         rangeWeaponId: ItemIdentifiers.DRAGON_CROSSBOW,
-        rangeAmmoId: ItemIdentifiers.DRAGON_BOLTS_E_,
+        rangeAmmoId: ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         rangeAmmoAmount: 90,
         spellbook: magicPackage?.spellbook ?? MagicSpellbook.ANCIENT,
       }),
@@ -2855,7 +2861,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 90),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 90),
       ]);
     },
     inventory: (magicPackage) =>
@@ -2894,7 +2900,7 @@ const ARCHETYPES = Object.freeze({
         item(wear.gloves),
         item(wear.boots),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        usingRangeMainHand ? item(ItemIdentifiers.DRAGON_BOLTS_E_, 90) : null,
+        usingRangeMainHand ? item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 90) : null,
       ]);
     },
     inventory: (magicPackage) =>
@@ -2933,7 +2939,7 @@ const ARCHETYPES = Object.freeze({
         item(choose([ItemIdentifiers.MITHRIL_GLOVES, wear.gloves])),
         item(choose([ItemIdentifiers.CLIMBING_BOOTS, wear.boots])),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        usingRangeMainHand ? item(ItemIdentifiers.DRAGON_BOLTS_E_, 70) : null,
+        usingRangeMainHand ? item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 70) : null,
       ]);
     },
     inventory: (magicPackage) =>
@@ -2994,12 +3000,12 @@ const ARCHETYPES = Object.freeze({
         item(choose(RANGE_GLOVES)),
         item(choose(RANGE_BOOTS)),
         item(ItemIdentifiers.RING_OF_RECOIL),
-        item(ItemIdentifiers.DRAGON_BOLTS_E_, 60),
+        item(ItemIdentifiers.DRAGONSTONE_BOLTS_E_, 60),
       ]),
     inventory: () =>
       buildRangeToMeleeInventory(
         ItemIdentifiers.DRAGON_DAGGER_P_PLUS_PLUS_,
-        ItemIdentifiers.DRAGON_BOLTS_E_,
+        ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
         100
       ),
   }),
@@ -3279,9 +3285,13 @@ function applyGeneratedPvpLoadout(player, state, options = {}) {
     const inventory = generated.preset.getInventory?.() ?? [];
     state.pvp.generatedArchetypeId = generated.archetypeId;
     state.pvp.generatedPrimaryWeaponId =
-      equipment[Equipment.WEAPON_SLOT]?.getId?.() ?? null;
+      equipment.find?.((entry) =>
+        entry?.getDefinition?.()?.getEquipmentType?.()?.getSlot?.() === Equipment.WEAPON_SLOT
+      )?.getId?.() ?? null;
     state.pvp.generatedPrimaryAmmoId =
-      equipment[Equipment.AMMUNITION_SLOT]?.getId?.() ?? null;
+      equipment.find?.((entry) =>
+        entry?.getDefinition?.()?.getEquipmentType?.()?.getSlot?.() === Equipment.AMMUNITION_SLOT
+      )?.getId?.() ?? null;
     state.pvp.generatedSpecWeaponId =
       inventory.find?.((entry) => {
         const itemId = entry?.getId?.() ?? -1;
