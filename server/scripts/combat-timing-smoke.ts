@@ -475,7 +475,7 @@ try {
             isPlayer: () => false,
             isNpc: () => true,
             getAsNpc: () => ({
-                getCurrentDefinition: () => ({ isPoisonous: () => false }),
+                getCurrentDefinition: () => ({ isPoisonous: () => false, isVenomous: () => false }),
             }),
         };
         const resolvedHit: any = {

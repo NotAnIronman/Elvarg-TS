@@ -4,7 +4,7 @@
  *  - hit XP ratios (magic 1/2, hitpoints 1/3, defensive-cast defence 1/4)
  *  - damage is capped to the target's HP at roll time (tick eating)
  *  - HitQueue drains once per cycle, at the top of the owner's turn
- *  - monsters-complete.json normalisation into NPC definition stats
+ *  - monsters-complete.json normalisation, attack_type styles and venom
  */
 import * as assert from "node:assert/strict";
 // Import order matters: the combat graph is circular, and pulling the formula
@@ -108,6 +108,32 @@ try {
         NpcDefinitionLoader.fromMonsterDump({ name: "x", max_hit: null }).maxHit,
         undefined,
         "a null max hit must not become 0 - it has to fall through to the default"
+    );
+
+    // --- attack_type -> combat style ------------------------------------------
+    const rat = NpcDefinitionLoader.resolveAttackType;
+    assert.equal(rat(["ranged"]), CombatType.RANGED, "a pure ranged monster ranges");
+    assert.equal(rat(["magic"]), CombatType.MAGIC, "a pure magic monster casts");
+    assert.equal(rat(["magic", "ranged"]), CombatType.RANGED, "ranged wins over magic when both and no melee");
+    assert.equal(rat(["crush"]), CombatType.MELEE, "a melee token means melee");
+    assert.equal(rat(["crush", "ranged"]), CombatType.MELEE,
+        "a hybrid that can melee keeps meleeing - one method per NPC");
+    assert.equal(rat(["magic", "melee"]), CombatType.MELEE, "...including the explicit melee token");
+    assert.equal(rat(["dragonfire", "slash"]), CombatType.MELEE, "dragonfire is not a style we model");
+    assert.equal(rat(["typeless"]), CombatType.MELEE, "typeless falls back to melee");
+    assert.equal(rat([]), CombatType.MELEE, "so does an empty list");
+    assert.equal(rat(undefined), CombatType.MELEE, "and a missing one");
+
+    // --- venomous -------------------------------------------------------------
+    assert.equal(
+        NpcDefinitionLoader.fromMonsterDump({ name: "Zulrah", venomous: true }).venomous,
+        true,
+        "a venomous monster is flagged"
+    );
+    assert.equal(
+        NpcDefinitionLoader.fromMonsterDump({ name: "Rat", poisonous: true }).venomous,
+        false,
+        "a merely poisonous one is not"
     );
 
     // --- hit XP ratios -------------------------------------------------------

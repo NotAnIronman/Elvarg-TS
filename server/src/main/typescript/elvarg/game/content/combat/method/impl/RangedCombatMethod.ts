@@ -56,6 +56,14 @@ export class RangedCombatMethod extends CombatMethod {
             character.performGraphic(ammo.getStartGraphic());
         }
 
+        if (character.isNpc()) {
+            // NPCs have no ranged weapon or ammo. The monster dump carries no
+            // projectile ids, so a generic arrow keeps the shot visible; per-NPC
+            // visuals still need a hand-written CombatMethod (see method/impl/npcs).
+            Projectile.createProjectile(character, target, 10, 40, 57, 43, 31).sendProjectile();
+            return;
+        }
+
         if (!rangedWeapon || !ammo) {
             return;
         }

@@ -696,9 +696,12 @@ export class CombatFactory {
                 }
             }
         } else if (attacker.isNpc()) {
-            const npcAttacker = attacker.getAsNpc();
-            if (npcAttacker.getCurrentDefinition().isPoisonous() && Misc.getRandom(10) <= 5) {
-                CombatFactory.poisonEntity(target, 30);
+            const definition = attacker.getAsNpc().getCurrentDefinition();
+            const venomous = definition.isVenomous();
+            if ((definition.isPoisonous() || venomous) && Misc.getRandom(10) <= 5) {
+                // Venom stores its starting damage rather than a severity, and
+                // escalates from there - see CombatPoisonData.getMeleeSeverity.
+                CombatFactory.poisonEntity(target, venomous ? 6 : 30, venomous ? 2 : 1);
             }
         }
 

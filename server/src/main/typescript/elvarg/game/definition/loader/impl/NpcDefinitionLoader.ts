@@ -4,6 +4,7 @@ import { CacheDefinitions } from "../../../cache/CacheDefinitions";
 import { GameConstants } from "../../../GameConstants";
 import { NpcDefinition } from "../../NpcDefinition";
 import { DefinitionLoader } from "../DefinitionLoader";
+import { CombatType } from "../../../content/combat/CombatType";
 
 type CombatStats = {
     name?: string;
@@ -17,6 +18,8 @@ type CombatStats = {
     maxHit?: number;
     aggressive?: boolean;
     poisonous?: boolean;
+    venomous?: boolean;
+    attackType?: CombatType;
     slayerLevel?: number;
     attackBonuses?: {
         melee?: number;
@@ -46,6 +49,9 @@ const ANIMATION_FALLBACKS: Record<number, CombatAnimation> = {
 
 const normalizeName = (value?: string) => (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 
+/** Dump attack_type tokens that mean "this thing can hit you in melee". */
+const MELEE_ATTACK_TYPES = new Set(["stab", "slash", "crush", "melee"]);
+
 export class NpcDefinitionLoader extends DefinitionLoader {
     /**
      * Translates one osrsreboxed monsters-complete.json entry into the internal
@@ -67,6 +73,8 @@ export class NpcDefinitionLoader extends DefinitionLoader {
             maxHit: typeof monster.max_hit === "number" ? monster.max_hit : undefined,
             aggressive: monster.aggressive === true,
             poisonous: monster.poisonous === true,
+            venomous: monster.venomous === true,
+            attackType: NpcDefinitionLoader.resolveAttackType(monster.attack_type),
             slayerLevel:
                 monster.slayer_monster === true && monster.slayer_level > 0
                     ? monster.slayer_level
@@ -88,6 +96,24 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                 ranged: monster.defence_ranged_standard,
             },
         };
+    }
+
+    /**
+     * Picks the single default combat style for an NPC from the dump's attack_type
+     * list. An NPC gets one CombatMethod, so hybrids have to pick a side: anything
+     * that can melee keeps meleeing, because standing a hybrid off at range would
+     * break it more thoroughly than walking a pure ranger into melee ever did.
+     * Only pure ranged/magic monsters switch. `dragonfire` and `typeless` are not
+     * styles this engine models, so they fall through to melee.
+     */
+    public static resolveAttackType(attackTypes: unknown): CombatType {
+        const types = Array.isArray(attackTypes)
+            ? attackTypes.map((type) => String(type).toLowerCase())
+            : [];
+        if (types.some((type) => MELEE_ATTACK_TYPES.has(type))) return CombatType.MELEE;
+        if (types.includes("ranged")) return CombatType.RANGED;
+        if (types.includes("magic")) return CombatType.MAGIC;
+        return CombatType.MELEE;
     }
 
     load(): boolean {
@@ -187,6 +213,8 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                     maxHit: stat.maxHit ?? definition.getMaxHit(),
                     aggressive: stat.aggressive ?? definition.isAggressive(),
                     poisonous: stat.poisonous ?? definition.isPoisonous(),
+                    venomous: stat.venomous ?? definition.isVenomous(),
+                    attackType: stat.attackType ?? definition.getAttackType(),
                     slayerLevel: stat.slayerLevel ?? definition.getSlayerLevel(),
                 });
                 applied++;

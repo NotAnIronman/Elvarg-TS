@@ -447,9 +447,17 @@ export class NPC extends Mobile {
     }
 
     public getCombatMethod(): CombatMethod {
-        // By default, NPCs use Melee combat.
-        // This can be overridden by creating a class in entity.impl.npc.impl
-        return CombatFactory.MELEE_COMBAT;
+        // Style comes from the monster dump's attack_type. Per-NPC behaviour is still
+        // overridable by a class in entity.impl.npc.impl or a plugin combat-method
+        // provider - CombatFactory.getMethod() consults those first.
+        switch (this.getCurrentDefinition().getAttackType()) {
+            case CombatType.RANGED:
+                return CombatFactory.RANGED_COMBAT;
+            case CombatType.MAGIC:
+                return CombatFactory.MAGIC_COMBAT;
+            default:
+                return CombatFactory.MELEE_COMBAT;
+        }
     }
 
     public clone(): NPC {

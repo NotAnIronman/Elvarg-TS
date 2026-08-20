@@ -1,5 +1,7 @@
 import { CombatMethod } from "../CombatMethod";
+import { Animation } from "../../../../model/Animation";
 import { Graphic } from "../../../../model/Graphic";
+import { Projectile } from "../../../../model/Projectile";
 import { Sounds } from "../../../../Sounds";
 import { Sound } from "../../../../Sound";
 import { World } from "../../../../World";
@@ -125,6 +127,18 @@ export class MagicCombatMethod extends CombatMethod {
     public start(character: Mobile, target: Mobile): void {
         const spell = character.getCombat().getSelectedSpell();
 
+        if (spell == null && character.isNpc()) {
+            // NPCs cast without a Spell object. The monster dump carries no projectile
+            // ids, so a generic magic projectile keeps the attack visible; per-NPC
+            // visuals still need a hand-written CombatMethod (see method/impl/npcs).
+            const animation = character.getAttackAnim();
+            if (animation !== -1) {
+                character.performAnimation(new Animation(animation));
+            }
+            Projectile.createProjectile(character, target, 91, 0, 20, 43, 31).sendProjectile();
+            return;
+        }
+
         if (spell != null) {
             const castSound = MagicCombatMethod.resolveCastSound(spell.spellId());
             if (castSound != null) {
@@ -165,6 +179,12 @@ export class MagicCombatMethod extends CombatMethod {
     }
 
     finished(character: Mobile, target: Mobile) {
+        // NPCs cast without a Spell object, so none of the player cast teardown
+        // applies. Running it anyway reset their combat after every swing, which
+        // made a magic NPC attack once and then stand there.
+        if (character.isNpc()) {
+            return;
+        }
         // Reset the castSpell to autocastSpell
         // Update previousCastSpell so effects can be handled.
         const current = character.getCombat().getCastSpell();

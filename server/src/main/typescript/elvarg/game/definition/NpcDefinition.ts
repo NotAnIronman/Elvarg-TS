@@ -1,4 +1,5 @@
 import { CacheDefinitions } from "../cache/CacheDefinitions";
+import { CombatType } from "../content/combat/CombatType";
 
 export class NpcDefinition {
     static definitions: Map<number, NpcDefinition> = new Map<number, NpcDefinition>();
@@ -23,6 +24,9 @@ export class NpcDefinition {
     private aggressive: boolean = false;
     private aggressiveTolerance: boolean = true;
     private poisonous: boolean = false;
+    private venomous: boolean = false;
+    /** Which default CombatMethod this NPC fights with; see NPC.getCombatMethod(). */
+    private attackType: CombatType = CombatType.MELEE;
     private fightsBack: boolean = true;
     private respawn: number = 25;
     private maxHit: number = 1;
@@ -173,6 +177,14 @@ export class NpcDefinition {
         return this.stats;
     }
     
+    public isVenomous(): boolean {
+        return this.venomous;
+    }
+
+    public getAttackType(): CombatType {
+        return this.attackType;
+    }
+
     public getSlayerLevel(): number {
         return this.slayerLevel;
     }
