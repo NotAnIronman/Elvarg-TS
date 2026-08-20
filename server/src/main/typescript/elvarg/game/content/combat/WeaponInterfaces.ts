@@ -49,6 +49,9 @@ export class WeaponInterfaces {
 
         player.getPacketSender().sendTabInterface(0,
             weapon.getInterfaceId());
+        // %option_nodef (varp 172) is inverted: 0 enables auto-retaliate.
+        // Re-send it whenever the combat interface is opened or replaced.
+        player.getPacketSender().sendConfig(172, player.autoRetaliateReturn() ? 0 : 1);
         player.getPacketSender().sendString(
 (weapon == WeaponInterfaces.UNARMED ? "Unarmed" : equippedWeapon.getDefinition().getName()), weapon.getNameLineId());
         CombatSpecial.assign(player);

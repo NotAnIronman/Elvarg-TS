@@ -983,7 +983,10 @@ export class CombatFactory {
                 target.getCombat().extendAttackDelay(Math.floor(attackSpeed / 2));
             }
             TaskManager.submit(new CombatFactoryTask(1, target, false, () => {
-                target.getCombat().attack(attacker);
+                if (target.isPlayer() && !target.getAsPlayer().autoRetaliateReturn()) {
+                    return;
+                }
+                target.getCombat().attack(attacker, true);
             }));
         }
     }

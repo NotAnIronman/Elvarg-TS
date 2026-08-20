@@ -40,6 +40,7 @@ export class Combat {
     private nextAttackCycle = 0;
     private route: RouteState | null = null;
     private target: Mobile | null = null;
+    private autoRetaliating = false;
     private attacker: Mobile | null = null;
     private graniteMaulSpecialQueued = false;
     private method: CombatMethod | null = null;
@@ -51,8 +52,9 @@ export class Combat {
 
     constructor(private readonly character: Mobile) {}
 
-    public attack(target: Mobile): void {
+    public attack(target: Mobile, autoRetaliation = false): void {
         this.setTarget(target);
+        this.autoRetaliating = autoRetaliation;
         if (this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack()) return;
         this.character.setMobileInteraction(target);
         this.performNewAttack(false);
@@ -239,6 +241,7 @@ export class Combat {
     public reset(): void {
         const previousTarget = this.target;
         this.target = null;
+        this.autoRetaliating = false;
         if (previousTarget && this.method) this.method.onCombatEnded(this.character, previousTarget);
         this.character.getMovementQueue().reset();
         this.character.setMobileInteraction(null);
@@ -293,6 +296,11 @@ export class Combat {
     public getCharacter(): Mobile { return this.character; }
     public getTarget(): Mobile | null { return this.target; }
     public setTarget(target: Mobile | null): void { this.target = target; this.route = null; }
+    public stopAutoRetaliation(): void {
+        // A target equal to the current attacker is retaliation, including
+        // combat that began before the server started tagging its source.
+        if (this.autoRetaliating || this.target === this.attacker) this.reset();
+    }
     public getHitQueue(): HitQueue { return this.hitQueue; }
     public getAttacker(): Mobile | null { return this.attacker; }
     public setUnderAttack(attacker: Mobile | null): void { this.attacker = attacker; this.lastAttack.reset(); }

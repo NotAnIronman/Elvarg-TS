@@ -356,6 +356,17 @@ class ClientConnection {
               // Shop owns its stock and sell-inventory widgets while open.
             } else if (actionPacket.groupId === 541 && PrayerHandler.togglePrayer(this.player, actionPacket.childId)) {
               // Prayer widgets map directly onto the existing prayer engine.
+            } else if (actionPacket.groupId === 593 && actionPacket.childId === 32) {
+              // The combat widget's auto-retaliate control does not emit a varp
+              // change in every cache/client path, so the button is authoritative.
+              this.player.setAutoRetaliate(!this.player.autoRetaliateReturn());
+              if (!this.player.autoRetaliateReturn()) {
+                this.player.getCombat().stopAutoRetaliation();
+              }
+              this.player.getPacketSender().sendConfig(
+                172,
+                this.player.autoRetaliateReturn() ? 0 : 1,
+              );
             } else if (actionPacket.groupId === 593 && actionPacket.childId === 39) {
               CombatSpecial.activate(this.player);
             } else if (Autocasting.handleWidgetAction(
@@ -397,6 +408,9 @@ class ClientConnection {
               BonusManager.update(this.player);
             } else if (packet.varpId === 172) {
               this.player.setAutoRetaliate(packet.value === 0);
+              if (!this.player.autoRetaliateReturn()) {
+                this.player.getCombat().stopAutoRetaliation();
+              }
               this.player.getPacketSender().sendConfig(172, this.player.autoRetaliateReturn() ? 0 : 1);
             } else if (packet.varpId === 173) {
               this.player.setRunning(packet.value !== 0 && this.player.getRunEnergy() > 0);
