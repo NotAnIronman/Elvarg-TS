@@ -33,6 +33,7 @@ type CombatCycleState = {
     targetY: number;
     targetZ: number;
     routeRequested: boolean;
+    attackBlocked: boolean;
     mobilityBlocked: boolean;
     skipPost: boolean;
 };
@@ -56,6 +57,7 @@ export class Combat {
     private autoCastSpell: CombatSpell | null = null;
     private previousCast: CombatSpell | null = null;
     private generation = 0;
+    private deniedNoticeGeneration = -1;
     /** Target tile the live route was built for; see shouldRouteToward(). */
     private routedTargetX = Number.MIN_SAFE_INTEGER;
     private routedTargetY = Number.MIN_SAFE_INTEGER;
@@ -121,6 +123,7 @@ export class Combat {
             targetY: location.getY(),
             targetZ: location.getZ(),
             routeRequested: false,
+            attackBlocked: false,
             mobilityBlocked: false,
             skipPost: false,
         };
@@ -139,7 +142,12 @@ export class Combat {
         const permission = CombatFactory.canAttackPermission(this.character, target, true, method);
         if (permission !== CanAttackResponse.CAN_ATTACK) {
             this.handleAttackDenied(permission, target, generation);
-            return;
+            if (!Combat.isTransientDenial(permission) ||
+                this.target !== target || this.generation !== generation) {
+                return;
+            }
+            // Keep walking in; postMovementProcess re-checks before landing a hit.
+            state.attackBlocked = true;
         }
 
         this.character.setMobileInteraction(target);
@@ -215,6 +223,10 @@ export class Combat {
         const permission = CombatFactory.canAttackPermission(this.character, target, true, method);
         if (permission !== CanAttackResponse.CAN_ATTACK) {
             this.handleAttackDenied(permission, target, generation);
+            return;
+        }
+        if (state.attackBlocked && CombatRange.canReach(this.character, method, target)) {
+            // Denied before movement but in range now; the next cycle re-evaluates.
             return;
         }
 
@@ -484,6 +496,17 @@ export class Combat {
         this.character.setMobileInteraction(target);
     }
 
+    /**
+     * Denials that clear on their own: the single-combat gate stays closed only while
+     * a delayed hit from the previous fight is still in flight. Pursuit continues and
+     * the attack resumes once it lands - cancelling here throws the click away, which
+     * is what made attacking a new npc feel unresponsive after a kill.
+     */
+    private static isTransientDenial(response: CanAttackResponse): boolean {
+        return response === CanAttackResponse.ALREADY_UNDER_ATTACK ||
+            response === CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED;
+    }
+
     private cancelIfCurrent(target: Mobile, generation: number): void {
         if (this.target === target && this.generation === generation) this.reset();
     }
@@ -502,8 +525,12 @@ export class Combat {
                 // the method itself owns any message and any hard reset.
                 return;
             case CanAttackResponse.ALREADY_UNDER_ATTACK:
-                player?.getPacketSender().sendMessage("You are already under attack!");
-                break;
+                // Once per interaction: this is re-checked twice a cycle while pursuing.
+                if (this.deniedNoticeGeneration !== generation) {
+                    this.deniedNoticeGeneration = generation;
+                    player?.getPacketSender().sendMessage("You are already under attack!");
+                }
+                return;
             case CanAttackResponse.LEVEL_DIFFERENCE_TOO_GREAT:
                 player?.getPacketSender().sendMessage("Your level difference is too great.");
                 player?.getPacketSender().sendMessage("You need to move deeper into the Wilderness.");

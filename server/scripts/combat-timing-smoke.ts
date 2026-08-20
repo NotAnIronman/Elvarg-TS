@@ -322,6 +322,39 @@ try {
     assert.equal(combat.getTarget(), null, "an exhausted ranged-style continuation must not renew as melee");
     renewAllowed = true;
 
+    // A single-combat denial while a previous fight's delayed hit is still landing is
+    // transient: it must not throw the click away, and it must not spam the notice.
+    permission = CanAttackResponse.ALREADY_UNDER_ATTACK;
+    const transientTarget = { ...combatTarget };
+    combat.attack(transientTarget);
+    messages.length = 0;
+    attackAttempts = 0;
+    queuedCheckpoints = 0;
+    reach = false;
+    routeCalls = 0;
+    (World as any).processCycle = 600;
+    combat.preMovementProcess();
+    assert.equal(combat.getTarget(), transientTarget, "a transient denial must keep the target");
+    assert.equal(routeCalls, 1, "a transient denial must still pursue");
+    combat.postMovementProcess();
+    (World as any).processCycle = 601;
+    queuedCheckpoints = 0;
+    combat.preMovementProcess();
+    combat.postMovementProcess();
+    assert.equal(combat.getTarget(), transientTarget, "still pursuing on the next cycle");
+    assert.equal(messages.filter((m) => m === "You are already under attack!").length, 1,
+      "the notice must be sent once per interaction, not twice a cycle");
+    assert.equal(attackAttempts, 0, "a denied attacker must not land a hit");
+
+    // ...and it resumes the moment the condition clears.
+    permission = CanAttackResponse.CAN_ATTACK;
+    reach = true;
+    (World as any).processCycle = 602;
+    combat.preMovementProcess();
+    combat.postMovementProcess();
+    assert.equal(attackAttempts, 1, "the attack resumes once the denial clears");
+
+
     reach = false;
     let npcCheckpoint = 0;
     let npcBlockedByOccupancy = false;
