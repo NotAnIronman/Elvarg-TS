@@ -169,6 +169,9 @@ export class Player extends Mobile {
     private consecutiveTasks: number;
 
     // Combat
+    private static readonly PREFERRED_VIEW_DISTANCE = 15;
+    private static readonly PREFERRED_LOCAL_PLAYERS = 250;
+    private static readonly VIEW_DISTANCE_REGROW_CYCLES = 10;
     public skullType: SkullType;
     public combatSpecial: CombatSpecial;
     private recoilDamage: number;
@@ -386,6 +389,11 @@ export class Player extends Mobile {
         const isBot = this.isPlayerBot();
         const timed = <T>(phase: string, fn: () => T): T =>
             ServerPerf.measurePhase(`player.process.${phase}`, fn);
+
+        // Queued impacts land before this player acts, matching LostCity's
+        // processQueues-then-processInteraction order. A hit that kills them here
+        // stops the rest of this turn via the isDying/hitpoints guards below.
+        timed("combat_hits", () => this.getCombat().getHitQueue().process(World.getProcessCycle()));
 
         // Timers
         timed("timers", () => this.getTimers().process());
@@ -759,6 +767,31 @@ export class Player extends Mobile {
 
     public isDyingReturn(): boolean {
         return this.isDying;
+    }
+
+    /**
+     * Per-player view radius for the local-player rebuild. Shrinks while the view is
+     * saturated and creeps back when it is not, so per-player cost stays bounded in a
+     * crowd instead of growing with density. Ported from upstream's BuildArea.resize.
+     */
+    private viewDistance = Player.PREFERRED_VIEW_DISTANCE;
+    private viewDistanceQuietCycles = 0;
+
+    public getViewDistance(): number {
+        return this.viewDistance;
+    }
+
+    public resizeViewDistance(localPlayerCount: number): void {
+        if (localPlayerCount >= Player.PREFERRED_LOCAL_PLAYERS) {
+            if (this.viewDistance > 1) this.viewDistance--;
+            this.viewDistanceQuietCycles = 0;
+            return;
+        }
+        if (++this.viewDistanceQuietCycles < Player.VIEW_DISTANCE_REGROW_CYCLES) {
+            return;
+        }
+        this.viewDistanceQuietCycles = 0;
+        if (this.viewDistance < Player.PREFERRED_VIEW_DISTANCE) this.viewDistance++;
     }
 
     public getLocalPlayers(): Player[] {

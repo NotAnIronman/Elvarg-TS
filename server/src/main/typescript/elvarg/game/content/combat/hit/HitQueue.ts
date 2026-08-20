@@ -12,14 +12,30 @@ export class HitQueue {
     private static readonly active = new Set<HitQueue>();
     private readonly pendingHits: ScheduledHit[] = [];
     private readonly pendingDamage: HitDamage[] = [];
+    private lastProcessedCycle = -1;
 
     constructor(private readonly character: Mobile) {}
 
+    /**
+     * Catch-all for entities that did not take a turn this cycle - inactive NPCs and
+     * bots skipped by the process stride. Anything that did take a turn has already
+     * drained at the top of it and is filtered out by the cycle guard.
+     */
     static processAll(currentCycle: number): void {
         for (const queue of this.active) queue.process(currentCycle);
     }
 
-    private process(currentCycle: number): void {
+    /**
+     * Applies every impact due on or before `currentCycle`. Called at the start of the
+     * owner's own turn, so a lethal hit lands before that entity gets to act - this is
+     * how LostCity orders it (processQueues runs ahead of processInteraction) and it is
+     * what stops a mob that is already dead from getting one last swing in.
+     */
+    process(currentCycle: number): void {
+        if (this.lastProcessedCycle === currentCycle) {
+            return;
+        }
+        this.lastProcessedCycle = currentCycle;
         const character = this.character;
         if (!character.isRegistered() || character.getHitpoints() <= 0) {
             this.pendingHits.length = 0;

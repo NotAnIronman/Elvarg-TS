@@ -234,11 +234,24 @@ export class Location {
     }
 
     isViewableFrom(other: Location): boolean {
+        return this.isViewableFromWithin(other, 15);
+    }
+
+    /**
+     * Hot path: called O(players x candidates) per cycle by the local-player rebuild.
+     * Deliberately does not go through Misc.delta, which allocates a Location per
+     * call and made this the largest single source of GC pressure under load.
+     */
+    isViewableFromWithin(other: Location, distance: number): boolean {
         if (this.z !== other.z) {
             return false;
         }
-        let p = Misc.delta(this, other);
-        return p.x <= 15 && p.x >= -15 && p.y <= 15 && p.y >= -15;
+        const dx = other.x - this.x;
+        if (dx > distance || dx < -distance) {
+            return false;
+        }
+        const dy = other.y - this.y;
+        return dy <= distance && dy >= -distance;
     }
 
     getTranslate(x: number, y: number): Location {

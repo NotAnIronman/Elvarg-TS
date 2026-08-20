@@ -48,8 +48,8 @@ const GAME_EXIT_IDS = new Set([ObjectIdentifiers.PORTAL_10, ObjectIdentifiers.PO
 const STAND_TEAMS = { [ObjectIdentifiers.SARADOMIN_STANDARD_2]: TEAM.SARADOMIN, [ObjectIdentifiers.STANDARD_STAND]: TEAM.SARADOMIN, [ObjectIdentifiers.ZAMORAK_STANDARD_2]: TEAM.ZAMORAK, [ObjectIdentifiers.STANDARD_STAND_2]: TEAM.ZAMORAK };
 const TRAPDOOR_ROUTES = { [ObjectIdentifiers.TRAPDOOR_16]: { blockedTeam: TEAM.ZAMORAK, to: [2429, 3075, 1] }, [ObjectIdentifiers.TRAPDOOR_17]: { blockedTeam: TEAM.SARADOMIN, to: [2370, 3132, 1] } };
 const ENERGY_BARRIERS = {
-  [ObjectIdentifiers.ENERGY_BARRIER]: { team: TEAM.SARADOMIN, branches: [[[2426, 3080, 1], "y", 3080, [2426, 3081, 1]], [[2426, 3080, 1], "y", 3081, [2426, 3080, 1]], [[2423, 3076, 1], "x", 2422, [2423, 3076, 1]], [[2423, 3076, 1], "x", 2423, [2422, 3076, 1]]] },
-  [ObjectIdentifiers.ENERGY_BARRIER_2]: { team: TEAM.ZAMORAK, branches: [[[2373, 3127, 1], "y", 3126, [2373, 3127, 1]], [[2373, 3127, 1], "y", 3127, [2373, 3126, 1]], [[2376, 3131, 1], "x", 2376, [2377, 3131, 1]], [[2376, 3131, 1], "x", 2377, [2376, 3131, 1]]] },
+  [ObjectIdentifiers.ENERGY_BARRIER]: { team: TEAM.SARADOMIN, crossings: [[[2426, 3080, 1], [2426, 3080, 1], [2426, 3081, 1]], [[2426, 3080, 1], [2426, 3081, 1], [2426, 3080, 1]], [[2423, 3076, 1], [2422, 3076, 1], [2423, 3076, 1]], [[2423, 3076, 1], [2423, 3076, 1], [2422, 3076, 1]]] },
+  [ObjectIdentifiers.ENERGY_BARRIER_2]: { team: TEAM.ZAMORAK, crossings: [[[2373, 3127, 1], [2373, 3126, 1], [2373, 3127, 1]], [[2373, 3127, 1], [2373, 3127, 1], [2373, 3126, 1]], [[2376, 3131, 1], [2376, 3131, 1], [2377, 3131, 1]], [[2376, 3131, 1], [2377, 3131, 1], [2376, 3131, 1]]] },
 };
 const TELEPORT_ROUTES = {
   [ObjectIdentifiers.STAIRCASE_15]: [[[2428, 3081, 1], [2430, 3080, 2]], [[2425, 3074, 2], [2426, 3074, 3]], [[2419, 3078, 0], [2420, 3080, 1]]],
@@ -660,7 +660,7 @@ function createCastleWars(api) {
     return true;
   }
 
-  function handleEnergyBarrier(player, object, allowedTeam, branches) {
+  function handleEnergyBarrier(player, object, allowedTeam, crossings) {
     if (getTeamId(player) !== allowedTeam) {
       player.getPacketSender().sendMessage(ENEMY_SPAWN_MESSAGE);
       return true;
@@ -668,14 +668,35 @@ function createCastleWars(api) {
 
     player.resetCastlewarsIdleTime();
     const tile = getLocationTile(player);
-    for (const [from, axis, value, to] of branches) {
-      if (!isAt(object, from[0], from[1], from[2]) || tile?.[axis] !== value) {
-        continue;
-      }
-      moveTo(player, to);
-      break;
+    const objectCrossings = crossings.filter(([at]) => isAt(object, at[0], at[1], at[2]));
+    if (!tile || objectCrossings.length === 0) {
+      return true;
     }
+    const crossing = objectCrossings.find(([, from]) => isAt(tile, from[0], from[1], from[2]));
+    if (crossing) {
+      moveTo(player, crossing[2]);
+      return true;
+    }
+
     return true;
+  }
+
+  function handleObjectRoute(event) {
+    const barrier = ENERGY_BARRIERS[event.objectId];
+    if (!barrier) {
+      return;
+    }
+    const tile = event.sourceLocation;
+    const crossing = barrier.crossings
+      .filter(([at]) => isAt(event.object, at[0], at[1], at[2]))
+      .sort((a, b) => {
+        const distance = ([, from]) => Math.abs(from[0] - tile.x) + Math.abs(from[1] - tile.y);
+        return distance(a) - distance(b);
+      })[0];
+    if (crossing) {
+      const [, from] = crossing;
+      event.destination = { x: from[0], y: from[1], z: from[2] };
+    }
   }
 
   function handleSteppingStone(player, object) {
@@ -738,7 +759,7 @@ function createCastleWars(api) {
     if (
       RegionManager.blocked(location, player.getPrivateArea()) ||
       ObjectManager.existsLocation(location) ||
-      World.isNpcOccupyingTile(location)
+      World.isNpcOccupyingTile(location, null, 1, player.getPrivateArea())
     ) {
       player.getPacketSender().sendMessage("You can't set up a barricade here.");
       return true;
@@ -767,7 +788,7 @@ function createCastleWars(api) {
     const id = object.getId();
     const barrier = ENERGY_BARRIERS[id];
     if (barrier) {
-      return handleEnergyBarrier(player, object, barrier.team, barrier.branches);
+      return handleEnergyBarrier(player, object, barrier.team, barrier.crossings);
     }
 
     const routes = TELEPORT_ROUTES[id];
@@ -1231,6 +1252,7 @@ function createCastleWars(api) {
     }
   });
   api.onItemOnPlayer(handleItemOnPlayer);
+  api.onObjectRoute(handleObjectRoute);
   api.onObjectInteraction(handleObjectInteraction);
   api.onCanEquip(handleTeamColourChange);
   api.onCanUnequip(handleTeamColourChange);

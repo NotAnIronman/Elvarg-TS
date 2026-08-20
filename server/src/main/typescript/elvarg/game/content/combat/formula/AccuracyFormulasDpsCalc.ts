@@ -59,6 +59,29 @@ export class AccuracyFormulasDpsCalc {
         return Misc.randomInclusive(0, Math.max(0, Math.floor(max)));
     }
 
+    /**
+     * NPC defence bonuses live at stats[10..14], in the same order as the
+     * BonusManager.DEFENCE_* indices. NpcDefinitionLoader has always loaded them,
+     * but every defence roll used to hard-code 0 for NPCs - so armoured monsters
+     * defended as if naked. LostCity applies npc_combat_defencebonus the same way.
+     */
+    private static defenceBonus(entity: Mobile, bonusIndex: number): number {
+        if (entity.isNpc()) {
+            return entity.getAsNpc().getCurrentDefinition().getStats()[10 + bonusIndex] ?? 0;
+        }
+        return entity.getAsPlayer().getBonusManager().getDefenceBonus()[bonusIndex] ?? 0;
+    }
+
+    /**
+     * NPC accuracy bonuses: stats[5] melee, [7] magic, [9] ranged. See
+     * NpcDefinition.DEFAULT_STATS for the full slot layout. These were hard-coded
+     * to 0 until monsters-complete.json carried attack bonuses, which made every
+     * NPC attack roll a bare `effective x 64`.
+     */
+    private static npcAttackBonus(entity: Mobile, slot: number): number {
+        return entity.getAsNpc().getCurrentDefinition().getStats()[slot] ?? 0;
+    }
+
     private static meleeAttackPrayerBonus(player: Player): number {
         if (PrayerHandler.isActivated(player, PrayerHandler.CLARITY_OF_THOUGHT)) {
             return 1.05;
@@ -199,8 +222,8 @@ export class AccuracyFormulasDpsCalc {
         let attRoll = AccuracyFormulasDpsCalc.effectiveAttackLevel(entity);
 
         if (entity.isNpc()) {
-            // NPC's don't currently have stab/slash/crush bonuses
-            attRoll *= 64;
+            // NPCs have a single melee accuracy bonus, not per-style ones.
+            attRoll *= AccuracyFormulasDpsCalc.npcAttackBonus(entity, 5) + 64;
             cache.attackMeleeRoll = Math.floor(attRoll);
             return cache.attackMeleeRoll;
         }
@@ -273,12 +296,9 @@ export class AccuracyFormulasDpsCalc {
         }
         let defLevel = AccuracyFormulasDpsCalc.effectiveDefenseLevel(enemy);
 
-        let enemyPlayer = enemy.getAsPlayer();
-
-        // NPCs don't have defence bonuses currently
-        let defStab = (enemy.isNpc() ? 0 : enemyPlayer.getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_STAB]);
-        let defSlash = (enemy.isNpc() ? 0 : enemyPlayer.getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_SLASH]);
-        let defCrush = (enemy.isNpc() ? 0 : enemyPlayer.getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_CRUSH]);
+        let defStab = AccuracyFormulasDpsCalc.defenceBonus(enemy, BonusManager.DEFENCE_STAB);
+        let defSlash = AccuracyFormulasDpsCalc.defenceBonus(enemy, BonusManager.DEFENCE_SLASH);
+        let defCrush = AccuracyFormulasDpsCalc.defenceBonus(enemy, BonusManager.DEFENCE_CRUSH);
 
         switch (bonusType) {
             case BonusManager.ATTACK_STAB:
@@ -308,9 +328,7 @@ export class AccuracyFormulasDpsCalc {
         }
         let defLevel = AccuracyFormulasDpsCalc.effectiveDefenseLevel(enemy);
 
-        const defRange = (enemy.isPlayer() ?
-            enemy.getAsPlayer().getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_RANGE]
-            : 0);
+        const defRange = AccuracyFormulasDpsCalc.defenceBonus(enemy, BonusManager.DEFENCE_RANGE);
 
         defLevel = applyRangedDefenseModifiers(enemy, defLevel);
         defLevel *= defRange + 64;
@@ -358,7 +376,9 @@ export class AccuracyFormulasDpsCalc {
         if (cache.attackRangedRoll != null) {
             return cache.attackRangedRoll;
         }
-        let accuracyBonus = (entity.isNpc() ? 0 : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_RANGE]);
+        let accuracyBonus = (entity.isNpc()
+            ? AccuracyFormulasDpsCalc.npcAttackBonus(entity, 9)
+            : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_RANGE]);
 
         let attRoll = AccuracyFormulasDpsCalc.effectiveRangedAttack(entity);
 
@@ -390,11 +410,10 @@ export class AccuracyFormulasDpsCalc {
             mag = Math.floor(mag * 1.45);
         }
 
-        let fightStyle = player.getFightType().getStyle();
-        if (fightStyle == FightStyle.ACCURATE)
-            mag += 3;
-        else if (fightStyle == FightStyle.DEFENSIVE)
-            mag += 1;
+        // +8 base, +1 style. Magic's style bonus is always 1 regardless of the
+        // weapon's selected melee stance - a caster's FightType is still their
+        // staff's bash/pound/focus, so reading it here handed staves left on
+        // Accurate a free +3 magic attack.
         mag += 9;
 
         mag = applyMagicAttackAccuracyModifiers(player, mag);
@@ -426,7 +445,7 @@ export class AccuracyFormulasDpsCalc {
             defLevel = applyMagicDefenseModifiers(player, defLevel);
         }
 
-        let defRange = (enemy.isNpc() ? 0 : enemy.getAsPlayer().getBonusManager().getDefenceBonus()[BonusManager.DEFENCE_MAGIC]);
+        let defRange = AccuracyFormulasDpsCalc.defenceBonus(enemy, BonusManager.DEFENCE_MAGIC);
 
         defLevel *= (defRange + 64);
 
@@ -439,7 +458,9 @@ export class AccuracyFormulasDpsCalc {
         if (cache.attackMagicRoll != null) {
             return cache.attackMagicRoll;
         }
-        let accuracyBonus = (entity.isNpc() ? 0 : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_MAGIC]);
+        let accuracyBonus = (entity.isNpc()
+            ? AccuracyFormulasDpsCalc.npcAttackBonus(entity, 7)
+            : entity.getAsPlayer().getBonusManager().getAttackBonus()[BonusManager.ATTACK_MAGIC]);
 
         let attRoll = AccuracyFormulasDpsCalc.effectiveMagicLevel(entity);
         attRoll *= (accuracyBonus + 64);

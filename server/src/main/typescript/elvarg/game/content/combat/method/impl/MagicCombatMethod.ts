@@ -1,5 +1,7 @@
 import { CombatMethod } from "../CombatMethod";
+import { Animation } from "../../../../model/Animation";
 import { Graphic } from "../../../../model/Graphic";
+import { Projectile } from "../../../../model/Projectile";
 import { Sounds } from "../../../../Sounds";
 import { Sound } from "../../../../Sound";
 import { World } from "../../../../World";
@@ -15,6 +17,8 @@ import { MagicSpellbook } from "../../../../model/MagicSpellbook";
 export class MagicCombatMethod extends CombatMethod {
 
     public static SPLASH_GRAPHIC = new Graphic(85, GraphicHeight.MIDDLE);
+    /** Wind strike; used when an npc has no projectile configured. */
+    private static readonly DEFAULT_NPC_PROJECTILE = 91;
     private static readonly MAGIC_CAST_DEBUG =
         process.env.MAGIC_CAST_DEBUG === "1" ||
         process.env.MAGIC_CAST_DEBUG === "true";
@@ -125,6 +129,20 @@ export class MagicCombatMethod extends CombatMethod {
     public start(character: Mobile, target: Mobile): void {
         const spell = character.getCombat().getSelectedSpell();
 
+        if (spell == null && character.isNpc()) {
+            // NPCs cast without a Spell object. Use the projectile configured in
+            // npc-combat-defs.json, falling back to a generic one so the cast is at
+            // least visible.
+            const animation = character.getAttackAnim();
+            if (animation !== -1) {
+                character.performAnimation(new Animation(animation));
+            }
+            const configured = character.getAsNpc().getCurrentDefinition().getProjectileId();
+            const projectileId = configured >= 0 ? configured : MagicCombatMethod.DEFAULT_NPC_PROJECTILE;
+            Projectile.createProjectile(character, target, projectileId, 0, 20, 43, 31).sendProjectile();
+            return;
+        }
+
         if (spell != null) {
             const castSound = MagicCombatMethod.resolveCastSound(spell.spellId());
             if (castSound != null) {
@@ -165,6 +183,12 @@ export class MagicCombatMethod extends CombatMethod {
     }
 
     finished(character: Mobile, target: Mobile) {
+        // NPCs cast without a Spell object, so none of the player cast teardown
+        // applies. Running it anyway reset their combat after every swing, which
+        // made a magic NPC attack once and then stand there.
+        if (character.isNpc()) {
+            return;
+        }
         // Reset the castSpell to autocastSpell
         // Update previousCastSpell so effects can be handled.
         const current = character.getCombat().getCastSpell();

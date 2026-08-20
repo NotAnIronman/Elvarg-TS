@@ -1,5 +1,5 @@
 {
-  "$comment": "NPC combat definitions - server-side only. Client loads animations dynamically.",
+  "$comment": "NPC combat definitions - server-side only. Client loads animations dynamically. `projectile` is the projectile graphic id an npc's ranged/magic attack draws; without it the default generic arrow/magic projectile is used.",
   "npcs": {
     "73": {
       "name": "Skeleton",
@@ -2791,6 +2791,11 @@
       "sounds": {
         "death": 512
       }
+    },
+    "7308": {
+      "name": "Ancient Wizard",
+      "projectile": 27,
+      "$comment": "Runite bolt - Ammunition.RUNITE_BOLT projectile id in RangedData; this npc wields a crossbow"
     }
   },
   "refs": {

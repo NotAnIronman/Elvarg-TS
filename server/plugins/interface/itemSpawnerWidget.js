@@ -4,6 +4,7 @@ const COLUMNS = 8;
 const BACKGROUND_START = 20;
 const ICON_START = 100;
 const FLAG_OP1 = 1 << 1;
+const FLAG_OP2 = 1 << 2;
 
 const uid = (component) => (GROUP_ID << 16) | component;
 
@@ -219,8 +220,10 @@ function buildItemSpawnerWidgetGroup() {
       graphicShadow: 0x333333,
       shadowColor: 0x333333,
       text: "",
-      actions: ["Spawn"],
-      flags: FLAG_OP1,
+      // actions[i] is op i+1 client-side (inferWidgetOpId), and each op needs its
+      // transmit bit set in flags or the client will not send the click.
+      actions: ["Spawn", "Spawn X"],
+      flags: FLAG_OP1 | FLAG_OP2,
       isHidden: true,
       hidden: true,
     });

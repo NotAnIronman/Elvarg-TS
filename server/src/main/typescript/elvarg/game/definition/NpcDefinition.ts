@@ -1,7 +1,16 @@
 import { CacheDefinitions } from "../cache/CacheDefinitions";
+import { CombatType } from "../content/combat/CombatType";
 
 export class NpcDefinition {
     static definitions: Map<number, NpcDefinition> = new Map<number, NpcDefinition>();
+    /**
+     * Slot layout, populated by NpcDefinitionLoader from monsters-complete.json:
+     *   0-4   combat levels: attack, strength, defence, ranged, magic
+     *   5,7,9 accuracy bonuses: melee, magic, ranged
+     *   10-14 defence bonuses, in BonusManager.DEFENCE_* order
+     *         (stab, slash, crush, magic, ranged)
+     * Slots 6, 8 and 15-17 are unused - damage comes from maxHit directly.
+     */
     private static DEFAULT_STATS: number[] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     private static DEFAULT: NpcDefinition = new NpcDefinition();
     
@@ -15,6 +24,11 @@ export class NpcDefinition {
     private aggressive: boolean = false;
     private aggressiveTolerance: boolean = true;
     private poisonous: boolean = false;
+    private venomous: boolean = false;
+    /** Which default CombatMethod this NPC fights with; see NPC.getCombatMethod(). */
+    private attackType: CombatType = CombatType.MELEE;
+    /** Projectile graphic for ranged/magic attacks; -1 falls back to the generic one. */
+    private projectileId: number = -1;
     private fightsBack: boolean = true;
     private respawn: number = 25;
     private maxHit: number = 1;
@@ -165,6 +179,18 @@ export class NpcDefinition {
         return this.stats;
     }
     
+    public isVenomous(): boolean {
+        return this.venomous;
+    }
+
+    public getAttackType(): CombatType {
+        return this.attackType;
+    }
+
+    public getProjectileId(): number {
+        return this.projectileId;
+    }
+
     public getSlayerLevel(): number {
         return this.slayerLevel;
     }

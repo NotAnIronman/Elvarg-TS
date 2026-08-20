@@ -696,9 +696,12 @@ export class CombatFactory {
                 }
             }
         } else if (attacker.isNpc()) {
-            const npcAttacker = attacker.getAsNpc();
-            if (npcAttacker.getCurrentDefinition().isPoisonous() && Misc.getRandom(10) <= 5) {
-                CombatFactory.poisonEntity(target, 30);
+            const definition = attacker.getAsNpc().getCurrentDefinition();
+            const venomous = definition.isVenomous();
+            if ((definition.isPoisonous() || venomous) && Misc.getRandom(10) <= 5) {
+                // Venom stores its starting damage rather than a severity, and
+                // escalates from there - see CombatPoisonData.getMeleeSeverity.
+                CombatFactory.poisonEntity(target, venomous ? 6 : 30, venomous ? 2 : 1);
             }
         }
 
@@ -738,6 +741,9 @@ export class CombatFactory {
             hitSkills.includes(Skill.MAGIC.getIndex()) &&
             hitSkills.includes(Skill.DEFENCE.getIndex());
 
+        // Hit XP is expressed relative to one melee style, which OSRS pays at
+        // 4/damage. Everything below is that ratio: magic 2/damage is /2,
+        // hitpoints 1.33/damage is /3, defensive-cast defence 1/damage is /4.
         // Add magic exp, even if total damage is 0.
         // Since spells have a base exp reward
         if (hit.getCombatType() === CombatType.MAGIC) {
@@ -746,7 +752,7 @@ export class CombatFactory {
                     if (!defensiveMagicSplit) {
                         player.getSkillManager().addExperience(
                             Skill.MAGIC,
-                            Math.floor(hitDamage)/* + player.getCombat().getPreviousCast().baseExperience() */,
+                            Math.floor(hitDamage / 2)/* + player.getCombat().getPreviousCast().baseExperience() */,
                             true
                         );
                     }
@@ -763,20 +769,16 @@ export class CombatFactory {
         }
 
         // Add hp xp
-        player.getSkillManager().addExperience(Skill.HITPOINTS, Math.floor(hitDamage * .70), true);
+        player.getSkillManager().addExperience(Skill.HITPOINTS, Math.floor(hitDamage / 3), true);
 
         // Magic xp was already added
         if (hit.getCombatType() === CombatType.MAGIC) {
             if (!defensiveMagicSplit) {
                 return;
             }
-            for (let i of hitSkills) {
-                let skill = Skill.values()[i];
-                if (!skill) {
-                    continue;
-                }
-                player.getSkillManager().addExperience(skill, Math.floor(hitDamage / hitSkills.length), true);
-            }
+            // Defensive casting is not an even split: 1.33 magic / 1.0 defence.
+            player.getSkillManager().addExperience(Skill.MAGIC, Math.floor(hitDamage / 3), true);
+            player.getSkillManager().addExperience(Skill.DEFENCE, Math.floor(hitDamage / 4), true);
             return;
         }
 
@@ -995,11 +997,15 @@ export class CombatFactory {
             if (target.getMovementQueue) {
                 target.getMovementQueue().reset();
             }
+            // OSRS flinch: whoever was not already mid-fight waits half an attack
+            // speed before swinging back. LostCity applies this to players too
+            // (playerhit_n_retaliate / pvp_retaliate), not just NPCs
+            // (npc_default_retaliate) - restricting it to NPCs let players counter
+            // on the very next tick regardless of weapon speed.
             if (
-                target.isNpc() &&
-                (currentTarget == null ||
-                    currentTarget.getHitpoints() <= 0 ||
-                    !currentTarget.isRegistered())
+                currentTarget == null ||
+                currentTarget.getHitpoints() <= 0 ||
+                !currentTarget.isRegistered()
             ) {
                 const attackSpeed = Math.max(
                     1,

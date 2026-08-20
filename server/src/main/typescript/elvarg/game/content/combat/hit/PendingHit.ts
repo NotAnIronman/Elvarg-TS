@@ -122,6 +122,21 @@ export class PendingHit {
 
         this.totalDamage = 0;
 
+        // Damage is capped to the HP the target had when the blow was rolled, the
+        // way LostCity does it (min(randominc(maxhit), stat(hitpoints))). This is
+        // what makes tick-eating work: healing after the roll but before the hit
+        // lands leaves the already-capped damage non-lethal. It also keeps XP
+        // honest, since XP is awarded from this total at swing time rather than
+        // from an uncapped overkill roll.
+        let remaining = Math.max(0, this.target.getHitpoints());
+        const capToRemaining = (damage: HitDamage): HitDamage => {
+            if (damage.getDamage() > remaining) {
+                damage.setDamage(remaining);
+            }
+            remaining -= damage.getDamage();
+            return damage;
+        };
+
         if (hitAmount === 1) {
             this.accurate = !rollAccuracy || ServerPerf.measurePhase(
                 "combat.process.method_hits.roll_accuracy",
@@ -148,6 +163,7 @@ export class PendingHit {
                     this.method
                 )
             );
+            capToRemaining(damage);
             this.totalDamage = damage.getDamage();
             return [damage];
         }
@@ -173,6 +189,7 @@ export class PendingHit {
                     this.method
                 )
             );
+            capToRemaining(damage);
             this.totalDamage += damage.getDamage();
             hits[i] = damage;
         }

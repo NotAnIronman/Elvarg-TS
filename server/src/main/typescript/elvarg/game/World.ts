@@ -61,6 +61,19 @@ export class World {
     private static realPlayerObserverCount = 0;
     private static playerUpdateBuckets: Map<string, Player[]> = new Map();
     private static npcUpdateBuckets: Map<string, NPC[]> = new Map();
+    /**
+     * Stress runs only: include bots in visibility work so the O(players^2) local
+     * player/npc maintenance is actually exercised. Bots still receive no packets -
+     * this separates "whose view is computed" from "who gets written to".
+     */
+    private static stressBotUpdatesCache?: boolean;
+    /**
+     * Read lazily, not as a static initialiser: Server.ts imports World before it
+     * parses argv, so a load-time read would always see the flag unset.
+     */
+    private static get STRESS_BOT_UPDATES(): boolean {
+        return (World.stressBotUpdatesCache ??= process.env.STRESS_TEST_BOT_UPDATES === "1");
+    }
     private static playerProcessOrder: Player[] = [];
     private static nextPlayerOrderShuffleCycle = 0;
 
@@ -496,10 +509,12 @@ export class World {
         World.realPlayerObserverBuckets.clear();
         World.realPlayerObserverCount = 0;
         World.players.forEach((candidate) => {
-            if (!candidate || candidate.isPlayerBot?.() === true) {
+            if (!candidate) {
                 return;
             }
-            if (!World.isPlayerSessionConnected(candidate)) {
+            if (World.STRESS_BOT_UPDATES && candidate.isPlayerBot?.() === true) {
+                // counted as an observer so LOD strides and bucket sizing match real load
+            } else if (candidate.isPlayerBot?.() === true || !World.isPlayerSessionConnected(candidate)) {
                 return;
             }
             const location = candidate.getLocation?.();
@@ -526,30 +541,59 @@ export class World {
         });
     }
 
+    /**
+     * Walks buckets nearest-first and stops once `budget` candidates are collected.
+     * The old version materialised every bucket in radius, sorted the lot by index,
+     * and then used at most MAX_NEW_LOCAL_PLAYERS_PER_CYCLE of them - so in a crowd
+     * almost all of that work was discarded. Nearest-first also means a capped list
+     * holds the closest actors rather than the lowest-indexed ones.
+     */
     private static collectFromBuckets<T>(
         buckets: Map<string, T[]>,
-        location: Location
+        location: Location,
+        radius: number = World.UPDATE_BUCKET_RADIUS,
+        budget: number = Number.MAX_SAFE_INTEGER
     ): T[] {
         const results: T[] = [];
+        if (budget <= 0) {
+            return results;
+        }
         const baseChunkX = location.getX() >> 3;
         const baseChunkY = location.getY() >> 3;
         const z = location.getZ();
-        for (let dx = -World.UPDATE_BUCKET_RADIUS; dx <= World.UPDATE_BUCKET_RADIUS; dx++) {
-            for (let dy = -World.UPDATE_BUCKET_RADIUS; dy <= World.UPDATE_BUCKET_RADIUS; dy++) {
-                const bucket = buckets.get(`${z}:${baseChunkX + dx}:${baseChunkY + dy}`);
-                if (!bucket || bucket.length === 0) {
-                    continue;
+        for (let ring = 0; ring <= radius; ring++) {
+            for (let dx = -ring; dx <= ring; dx++) {
+                for (let dy = -ring; dy <= ring; dy++) {
+                    // Only the newly-reached edge of this ring; inner tiles already ran.
+                    if (ring !== 0 && Math.abs(dx) !== ring && Math.abs(dy) !== ring) {
+                        continue;
+                    }
+                    const bucket = buckets.get(`${z}:${baseChunkX + dx}:${baseChunkY + dy}`);
+                    if (!bucket || bucket.length === 0) {
+                        continue;
+                    }
+                    for (const entry of bucket) {
+                        results.push(entry);
+                        if (results.length >= budget) {
+                            return results;
+                        }
+                    }
                 }
-                results.push(...bucket);
             }
         }
         return results;
     }
 
     public static getBucketNearbyPlayersForUpdate(player: Player): Player[] {
-        const nearby = World.collectFromBuckets(World.playerUpdateBuckets, player.getLocation());
-        nearby.sort((a, b) => a.getIndex() - b.getIndex());
-        return nearby;
+        // No sort: consumers treat the list as unordered, and nearest-first
+        // collection is a better tie-break than lowest index when the cap bites.
+        const viewDistance = player.getViewDistance();
+        return World.collectFromBuckets(
+            World.playerUpdateBuckets,
+            player.getLocation(),
+            Math.max(0, Math.ceil(viewDistance / 8)),
+            World.MAX_LOCAL_PLAYERS + World.MAX_NEW_LOCAL_PLAYERS_PER_CYCLE
+        );
     }
 
     public static getNearbyPlayersForUpdate(player: Player): Player[] {
@@ -562,6 +606,7 @@ export class World {
         return nearby;
     }
 
+    private static readonly localPlayerScratch = new Set<number>();
     private static readonly MAX_LOCAL_PLAYERS = 255;
     private static readonly MAX_NEW_LOCAL_PLAYERS_PER_CYCLE = 25;
     private static readonly MAX_LOCAL_NPCS = 255;
@@ -570,26 +615,43 @@ export class World {
     // reads this list directly to know who to include in the player's view.
     private static updateLocalPlayers(player: Player): void {
         const localPlayers = player.getLocalPlayers();
-        const retained = localPlayers.filter((localPlayer) =>
-            World.getPlayers().get(localPlayer.getIndex()) != null &&
-            localPlayer.getLocation().isViewableFrom(player.getLocation()) &&
-            !localPlayer.isNeedsPlacement() &&
-            localPlayer.getPrivateArea() === player.getPrivateArea()
-        );
-        localPlayers.length = 0;
-        localPlayers.push(...retained);
+        const origin = player.getLocation();
+        const privateArea = player.getPrivateArea();
+        const viewDistance = player.getViewDistance();
 
-        const localIndexes = new Set(localPlayers.map((localPlayer) => localPlayer.getIndex()));
+        // Compact in place rather than filter()+push(...spread), which allocated two
+        // arrays per player per cycle.
+        let write = 0;
+        for (let read = 0; read < localPlayers.length; read++) {
+            const local = localPlayers[read];
+            if (
+                World.getPlayers().get(local.getIndex()) != null &&
+                local.getLocation().isViewableFromWithin(origin, viewDistance) &&
+                !local.isNeedsPlacement() &&
+                local.getPrivateArea() === privateArea
+            ) {
+                localPlayers[write++] = local;
+            }
+        }
+        localPlayers.length = write;
+
+        // Membership by index into a reused scratch set, not a fresh Set per player.
+        const seen = World.localPlayerScratch;
+        seen.clear();
+        for (const local of localPlayers) seen.add(local.getIndex());
+
         let added = 0;
         for (const candidate of World.getNearbyPlayersForUpdate(player)) {
             if (localPlayers.length >= World.MAX_LOCAL_PLAYERS || added >= World.MAX_NEW_LOCAL_PLAYERS_PER_CYCLE) break;
-            if (!candidate || candidate === player || localIndexes.has(candidate.getIndex())) continue;
-            if (!candidate.getLocation().isViewableFrom(player.getLocation())) continue;
-            if (candidate.getPrivateArea() !== player.getPrivateArea()) continue;
+            if (!candidate || candidate === player || seen.has(candidate.getIndex())) continue;
+            if (!candidate.getLocation().isViewableFromWithin(origin, viewDistance)) continue;
+            if (candidate.getPrivateArea() !== privateArea) continue;
             localPlayers.push(candidate);
-            localIndexes.add(candidate.getIndex());
+            seen.add(candidate.getIndex());
             added++;
         }
+
+        player.resizeViewDistance(localPlayers.length);
     }
 
     // Maintains player.getLocalNpcs() - the per-tick sync path (PlayerSession.flushClient)
@@ -649,6 +711,19 @@ export class World {
             Date.now()
         );
         PluginManager.emitActiveRegionsUpdated(snapshot);
+    }
+
+    /** Whose local player/npc view is maintained. Delivery is a separate question. */
+    private static shouldRunVisibilityUpdates(player: Player): boolean {
+        if (!player) return false;
+        if (World.STRESS_BOT_UPDATES && player.isPlayerBot?.() === true) return true;
+        return World.shouldRunNetworkUpdates(player);
+    }
+
+    private static forEachVisibilityPlayer(consumer: (player: Player) => void): void {
+        World.players.forEach((player) => {
+            if (World.shouldRunVisibilityUpdates(player)) consumer(player);
+        });
     }
 
     private static shouldRunNetworkUpdates(player: Player): boolean {
@@ -1067,6 +1142,9 @@ export class World {
         // walk-to interactions ticked, or the interaction hangs until they do.
         timed("walk_to_sweep", () => TaskManager.processRemainingWalkTo());
 
+        // Sweep for anyone who did not take a turn this cycle: inactive NPCs and
+        // bots skipped by the process stride. Entities that did take a turn drained
+        // at the top of it and are no-ops here.
         timed("combat_hits", () => {
             HitQueue.processAll(World.processCycle);
         });
@@ -1076,7 +1154,7 @@ export class World {
         });
 
         timed("update_players_npcs", () => {
-            World.forEachNetworkPlayer((player) => {
+            World.forEachVisibilityPlayer((player) => {
                 try {
                     const nearbyNpcs = timed("collect_nearby_npcs", () =>
                         World.getNearbyNpcsForUpdate(player)
