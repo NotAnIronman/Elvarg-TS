@@ -38,6 +38,7 @@ type CombatStats = {
 type CombatAnimation = {
     anims?: { attack?: number; block?: number; death?: number };
     sounds?: { death?: number };
+    projectile?: number;
 };
 
 type CombatAnimationRole = keyof NonNullable<CombatAnimation["anims"]>;
@@ -130,7 +131,11 @@ export class NpcDefinitionLoader extends DefinitionLoader {
             const [id, attack, block, death] = row;
             animations[String(id)] = { anims: { attack, block, death } };
         }
-        Object.assign(animations, animationFile.npcs ?? {});
+        const projectiles: Record<string, number> = {};
+        for (const [id, entry] of Object.entries((animationFile.npcs ?? {}) as Record<string, CombatAnimation>)) {
+            if (entry?.anims) animations[id] = entry;
+            if (Number.isInteger(entry?.projectile)) projectiles[id] = entry.projectile as number;
+        }
         for (const [id, fallback] of Object.entries(ANIMATION_FALLBACKS)) {
             if (!animations[id]) animations[id] = fallback;
         }
@@ -179,6 +184,7 @@ export class NpcDefinitionLoader extends DefinitionLoader {
         const ids = new Set([
             ...Object.keys(monsters),
             ...Object.keys(animations), ...Object.keys(observedAnimations),
+            ...Object.keys(projectiles),
         ]);
         let applied = 0;
         let mismatched = 0;
@@ -220,6 +226,10 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                 applied++;
             } else if (stat) {
                 mismatched++;
+            }
+
+            if (Number.isInteger(projectiles[key])) {
+                definition.projectileId = projectiles[key];
             }
 
             const animation = animations[key];

@@ -27,6 +27,8 @@ export class NpcDefinition {
     private venomous: boolean = false;
     /** Which default CombatMethod this NPC fights with; see NPC.getCombatMethod(). */
     private attackType: CombatType = CombatType.MELEE;
+    /** Projectile graphic for ranged/magic attacks; -1 falls back to the generic one. */
+    private projectileId: number = -1;
     private fightsBack: boolean = true;
     private respawn: number = 25;
     private maxHit: number = 1;
@@ -183,6 +185,10 @@ export class NpcDefinition {
 
     public getAttackType(): CombatType {
         return this.attackType;
+    }
+
+    public getProjectileId(): number {
+        return this.projectileId;
     }
 
     public getSlayerLevel(): number {

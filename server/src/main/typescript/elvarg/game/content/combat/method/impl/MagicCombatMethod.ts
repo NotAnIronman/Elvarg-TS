@@ -17,6 +17,8 @@ import { MagicSpellbook } from "../../../../model/MagicSpellbook";
 export class MagicCombatMethod extends CombatMethod {
 
     public static SPLASH_GRAPHIC = new Graphic(85, GraphicHeight.MIDDLE);
+    /** Wind strike; used when an npc has no projectile configured. */
+    private static readonly DEFAULT_NPC_PROJECTILE = 91;
     private static readonly MAGIC_CAST_DEBUG =
         process.env.MAGIC_CAST_DEBUG === "1" ||
         process.env.MAGIC_CAST_DEBUG === "true";
@@ -128,14 +130,16 @@ export class MagicCombatMethod extends CombatMethod {
         const spell = character.getCombat().getSelectedSpell();
 
         if (spell == null && character.isNpc()) {
-            // NPCs cast without a Spell object. The monster dump carries no projectile
-            // ids, so a generic magic projectile keeps the attack visible; per-NPC
-            // visuals still need a hand-written CombatMethod (see method/impl/npcs).
+            // NPCs cast without a Spell object. Use the projectile configured in
+            // npc-combat-defs.json, falling back to a generic one so the cast is at
+            // least visible.
             const animation = character.getAttackAnim();
             if (animation !== -1) {
                 character.performAnimation(new Animation(animation));
             }
-            Projectile.createProjectile(character, target, 91, 0, 20, 43, 31).sendProjectile();
+            const configured = character.getAsNpc().getCurrentDefinition().getProjectileId();
+            const projectileId = configured >= 0 ? configured : MagicCombatMethod.DEFAULT_NPC_PROJECTILE;
+            Projectile.createProjectile(character, target, projectileId, 0, 20, 43, 31).sendProjectile();
             return;
         }
 
