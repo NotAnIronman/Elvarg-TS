@@ -436,10 +436,10 @@ class PvpCombatExecutionNode {
       combat.getTarget?.() === target ||
       combat.getAttacker?.() === target ||
       player.getCombatFollowing?.() === target;
-    const canAttackTargetNow =
-      this.CombatFactory.canAttack(player, this.CombatFactory.getMethod(player), target) ===
-      CanAttackResponse.CAN_ATTACK;
-    const shouldApproachTarget = committedToTarget || canAttackTargetNow;
+    const method = this.CombatFactory.getMethod(player);
+    const shouldApproachTarget = committedToTarget ||
+      this.CombatFactory.canAttackPermission(player, target, false, method) ===
+        CanAttackResponse.CAN_ATTACK;
     if (!shouldApproachTarget) {
       clearApproachForTarget(player, target);
       pvp.nextActionAt = Math.max(Number(pvp.nextActionAt ?? 0), nowMs + 600);
@@ -519,7 +519,12 @@ class PvpCombatExecutionNode {
         }
 
         if (
-          this.CombatFactory.canAttack(player, this.CombatFactory.getMethod(player), target) !==
+          this.CombatFactory.canAttackPermission(
+            player,
+            target,
+            false,
+            this.CombatFactory.getMethod(player)
+          ) !==
           CanAttackResponse.CAN_ATTACK
         ) {
           clearApproachForTarget(player, target);
@@ -530,7 +535,6 @@ class PvpCombatExecutionNode {
           player.getMovementQueue?.().reset?.();
           player.setFollowing?.(target);
           player.setMobileInteraction?.(target);
-          player.setPositionToFace?.(target.getLocation());
           combat.attack(target);
         }
       })

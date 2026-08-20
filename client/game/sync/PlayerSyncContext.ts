@@ -25,10 +25,6 @@ export interface PlayerSyncState {
         directions: number[];
         /** True when the movement stream encoded a 2-tile displacement. */
         movedTwoTiles: boolean;
-        /** True when the movement stream encoded a teleport-style displacement (moveType=3). */
-        teleported?: boolean;
-        /** When teleported, whether the move should snap immediately. */
-        snap?: boolean;
     };
 
     /**

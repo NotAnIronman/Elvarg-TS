@@ -81,6 +81,7 @@ export type ActorUpdateView = {
 export type PlayerView = Tile & ActorUpdateView & {
   index: number;
   appearance: Buffer;
+  movementType?: 1 | 2;
   appearanceDirty?: boolean;
   faceDirection?: number;
   forcedMovement?: ForcedMovementView;
@@ -1791,7 +1792,7 @@ export function encodePlayerSync(
     state.movementDy[index] = dy;
     state.movementPlaneDelta[index] = planeDelta;
     state.nextMovementTypes[index] = planeDelta === 0 && distance > 0 && distance <= 2
-      ? distance === 2 ? 2 : 1
+      ? view.movementType ?? (distance === 2 ? 2 : 1)
       : 0;
   }
 
@@ -1849,12 +1850,15 @@ export function encodePlayerSync(
     const dy = state.movementDy[index];
     const planeDelta = state.movementPlaneDelta[index];
     if (state.movementChanged[index] === 0) writer.writeBits(2, 0);
-    else if (planeDelta === 0 && Math.max(Math.abs(dx), Math.abs(dy)) === 1) {
+    else if (planeDelta === 0 && Math.max(Math.abs(dx), Math.abs(dy)) === 1 &&
+      state.nextMovementTypes[index] !== 2) {
       const direction = [0, 1, 2, 3, -1, 4, 5, 6, 7][(dy + 1) * 3 + dx + 1];
       writer.writeBits(2, 1);
       writer.writeBits(3, direction);
     } else {
-      const runDirection = planeDelta === 0 ? RUN_DIRECTIONS.indexOf(`${dx},${dy}`) : -1;
+      const runDirection = planeDelta === 0 && state.nextMovementTypes[index] === 2
+        ? RUN_DIRECTIONS.indexOf(`${dx},${dy}`)
+        : -1;
       if (runDirection >= 0) {
         writer.writeBits(2, 2);
         writer.writeBits(4, runDirection);

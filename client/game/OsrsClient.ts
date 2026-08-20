@@ -944,18 +944,16 @@ export class OsrsClient {
             DEBUG_PROJECTILES?: boolean;
             DEBUG_PROJECTILES_VERBOSE?: boolean;
             DEBUG_PROJECTILES_TRAJ?: boolean;
+            DEBUG_HITSPLATS?: boolean;
             osrsRenderer?: GameRenderer;
             osrsClient?: OsrsClient;
         };
-        // Always enable projectile debug flags unless explicitly disabled by user.
+        // Debug logging stays opt-in; set these globals to true when tracing combat visuals.
         try {
-            if (globalState.DEBUG_PROJECTILES === undefined) globalState.DEBUG_PROJECTILES = true;
-            if (globalState.DEBUG_PROJECTILES_VERBOSE === undefined) {
-                globalState.DEBUG_PROJECTILES_VERBOSE = true;
-            }
-            if (globalState.DEBUG_PROJECTILES_TRAJ === undefined) {
-                globalState.DEBUG_PROJECTILES_TRAJ = true;
-            }
+            globalState.DEBUG_PROJECTILES = false;
+            globalState.DEBUG_PROJECTILES_VERBOSE = false;
+            globalState.DEBUG_PROJECTILES_TRAJ = false;
+            globalState.DEBUG_HITSPLATS = false;
         } catch {}
         this.renderer = createRenderer(rendererType, this);
         try {
@@ -2086,14 +2084,16 @@ export class OsrsClient {
                 }
             },
             onHitsplat: (payload) => {
-                try {
-                    console.log(
-                        `[hitsplat] ${payload.targetType} ${payload.targetId} damage=${
-                            payload.damage
-                        } serverTick=${payload.tick} clientTick=${getCurrentTick()}`,
-                        payload,
-                    );
-                } catch {}
+                if ((globalThis as any)?.DEBUG_HITSPLATS) {
+                    try {
+                        console.log(
+                            `[hitsplat] ${payload.targetType} ${payload.targetId} damage=${
+                                payload.damage
+                            } serverTick=${payload.tick} clientTick=${getCurrentTick()}`,
+                            payload,
+                        );
+                    } catch {}
+                }
                 if (this.renderer) this.renderer.registerHitsplat(payload as any);
                 else this.hitsplatFlush.queueHitsplat(payload as any);
             },
@@ -4044,6 +4044,7 @@ export class OsrsClient {
             // Keep the dedicated icon array in lockstep with the decoded
             // appearance for remote players as well as the local player.
             this.playerEcs.setHeadIconPrayer(ecsIndex, pa.headIcons.prayer ?? -1);
+            this.playerEcs.setHeadIconPk(ecsIndex, pa.headIcons.skull ?? -1);
             let team = 0;
             try {
                 const equip = Array.isArray(pa?.equip) ? pa.equip : [];
@@ -7579,6 +7580,9 @@ export class OsrsClient {
      */
     dispose(): void {
         console.log("[OsrsClient] Disposing...");
+        try {
+            this.renderer?.stop();
+        } catch {}
         this.scriptRetryGeneration++;
         this.pendingScriptRetries.clear();
         const subscriptions = [

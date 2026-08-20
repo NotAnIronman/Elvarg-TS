@@ -1,7 +1,7 @@
 import { Sound } from "../../Sound";
 import { Sounds } from "../../Sounds";
 import { PrayerHandler } from "../PrayerHandler";
-import { Dueling } from "../Duelling";
+import { Dueling, DuelRule, DuelState } from "../Duelling";
 import { WeaponInterfaces } from "./WeaponInterfaces";
 import { DamageFormulas } from "./formula/DamageFormulas";
 import { HitDamage } from "./hit/HitDamage";
@@ -41,7 +41,6 @@ import { TimerKey } from "../../../util/timers/TimerKey";
 import { CombatType } from "./CombatType";
 import { CombatSpecial } from "./CombatSpecial";
 import { CombatPoisonData } from "../../task/impl/CombatPoisonEffect";
-import { DuelRule } from "../Duelling";
 import { PoisonType } from "../../task/impl/CombatPoisonEffect";
 import { CombatConstants } from "./CombatConstants";
 import { Wilderness } from "../wilderness/Wilderness";
@@ -247,16 +246,23 @@ export class CombatFactory {
     }
 
     static validTarget(attacker: Mobile, target: Mobile) {
-        if (attacker == null || target == null) {
+        if (attacker == null || target == null || attacker === target) {
             return false;
         }
         if (!target.isRegistered() || !attacker.isRegistered() || attacker.getHitpoints() <= 0
-            || target.getHitpoints() <= 0 || attacker.isUntargetable()) {
+            || target.getHitpoints() <= 0 || attacker.isUntargetable() || target.isUntargetable()
+            || attacker.isNeedsPlacement() || target.isNeedsPlacement()
+            || attacker.isTeleportingReturn() || target.isTeleportingReturn()
+            || (attacker.isPlayer() && attacker.getAsPlayer().isDyingReturn())
+            || (target.isPlayer() && target.getAsPlayer().isDyingReturn())
+            || (attacker.isNpc() && attacker.getAsNpc().isDyingFunction())
+            || (target.isNpc() && target.getAsNpc().isDyingFunction())) {
             return false;
         }
 
         if (
             attacker.getPrivateArea() !== target.getPrivateArea() ||
+            attacker.getLocation().getZ() !== target.getLocation().getZ() ||
             attacker.getLocation().getDistance(target.getLocation()) >= 40
         ) {
             return false;
@@ -352,13 +358,50 @@ export class CombatFactory {
         attacker: Mobile,
         method: CombatMethod,
         target: Mobile,
-        skipTargetValidation: boolean = false
+        skipTargetValidation: boolean = false,
+        skipPermissionValidation: boolean = false
+    ): CanAttackResponse {
+        if (!skipPermissionValidation) {
+            const permission = CombatFactory.canAttackPermission(attacker, target, skipTargetValidation, method);
+            if (permission !== CanAttackResponse.CAN_ATTACK) return permission;
+        }
+
+        if (!ServerPerf.measurePhase(
+            "combat.process.can_attack.method",
+            () => method.canAttack(attacker, target)
+        )) {
+            return CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED;
+        }
+
+        return CanAttackResponse.CAN_ATTACK;
+    }
+
+    /** Target/area ownership checks safe to run before pursuit; no ammo or runes are consumed. */
+    public static canAttackPermission(
+        attacker: Mobile,
+        target: Mobile,
+        skipTargetValidation: boolean = false,
+        method?: CombatMethod
     ): CanAttackResponse {
         if (!skipTargetValidation && !ServerPerf.measurePhase(
             "combat.process.can_attack.valid_target",
             () => CombatFactory.validTarget(attacker, target)
         )) {
             return CanAttackResponse.INVALID_TARGET;
+        }
+
+        const attackerDuel = attacker.isPlayer() ? attacker.getAsPlayer().getDueling() : null;
+        const targetDuel = target.isPlayer() ? target.getAsPlayer().getDueling() : null;
+        const duelActive = attackerDuel?.inDuel() === true || targetDuel?.inDuel() === true;
+        if (duelActive) {
+            if (!attackerDuel || !targetDuel ||
+                attackerDuel.getInteract() !== target.getAsPlayer() ||
+                targetDuel.getInteract() !== attacker.getAsPlayer()) {
+                return CanAttackResponse.DUEL_WRONG_OPPONENT;
+            }
+            if (attackerDuel.getState() !== DuelState.IN_DUEL || targetDuel.getState() !== DuelState.IN_DUEL) {
+                return CanAttackResponse.DUEL_NOT_STARTED_YET;
+            }
         }
 
         // Here we check if we are already in combat with another entity.
@@ -391,72 +434,54 @@ export class CombatFactory {
         }
 
         // Check plugin and area attack policy.
-        const areaResponse = ServerPerf.measurePhase(
-            "combat.process.can_attack.policy",
-            () => CombatFactory.canAttackByPolicy(attacker, target)
-        );
+        const areaResponse = duelActive
+            ? CanAttackResponse.CAN_ATTACK
+            : ServerPerf.measurePhase(
+                "combat.process.can_attack.policy",
+                () => CombatFactory.canAttackByPolicy(attacker, target)
+            );
         if (areaResponse != CanAttackResponse.CAN_ATTACK) {
             return areaResponse;
         }
 
-        if (!ServerPerf.measurePhase(
-            "combat.process.can_attack.method",
-            () => method.canAttack(attacker, target)
+        if (method && !ServerPerf.measurePhase(
+            "combat.process.can_attack.method_permission",
+            () => method.canPursue(attacker, target)
         )) {
             return CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED;
         }
 
-        // Check special attack and player-only attack restrictions.
         if (attacker.isPlayer()) {
-            const playerRestriction = ServerPerf.measurePhase(
-                "combat.process.can_attack.player_restrictions",
-                () => {
-                    const player = attacker.getAsPlayer();
-                    const special = getPlayerCombatSpecial(player);
-
-                    if (player.isSpecialActivated() && special != null) {
-                        if (special === CombatSpecial.GRANITE_MAUL && player.getCombat().isGraniteMaulSpecialQueued()) {
-                            return CanAttackResponse.CAN_ATTACK;
-                        }
-                        if (player.getSpecialPercentage() < special.getDrainAmount()) {
-                            return CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY;
-                        }
+            const player = attacker.getAsPlayer();
+            const special = getPlayerCombatSpecial(player);
+            if (player.isSpecialActivated() && special != null) {
+                if (special !== CombatSpecial.GRANITE_MAUL || !player.getCombat().isGraniteMaulSpecialQueued()) {
+                    if (player.getSpecialPercentage() < special.getDrainAmount()) {
+                        return CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY;
                     }
-
-                    if (player.getTimers().has(TimerKey.STUN)) {
-                        return CanAttackResponse.STUNNED;
-                    }
-
-                    if (player.getDueling().inDuel()) {
-                        if (method.type() == CombatType.MELEE && player.getDueling().getRules()[DuelRule.NO_MELEE.getButtonId()]) {
-                            return CanAttackResponse.DUEL_MELEE_DISABLED;
-                        }
-                        if (method.type() == CombatType.RANGED && player.getDueling().getRules()[DuelRule.NO_RANGED.getButtonId()]) {
-                            return CanAttackResponse.DUEL_RANGED_DISABLED;
-                        }
-                        if (method.type() == CombatType.MAGIC && player.getDueling().getRules()[DuelRule.NO_MAGIC.getButtonId()]) {
-                            return CanAttackResponse.DUEL_MAGIC_DISABLED;
-                        }
-                    }
-
-                    return CanAttackResponse.CAN_ATTACK;
                 }
-            );
-            if (playerRestriction != CanAttackResponse.CAN_ATTACK) {
-                return playerRestriction;
+            }
+            if (player.getTimers().has(TimerKey.STUN)) return CanAttackResponse.STUNNED;
+            if (method && player.getDueling().inDuel()) {
+                const rules = player.getDueling().getRules();
+                if (method.type() == CombatType.MELEE && rules[DuelRule.NO_MELEE.getButtonId()]) {
+                    return CanAttackResponse.DUEL_MELEE_DISABLED;
+                }
+                if (method.type() == CombatType.RANGED && rules[DuelRule.NO_RANGED.getButtonId()]) {
+                    return CanAttackResponse.DUEL_RANGED_DISABLED;
+                }
+                if (method.type() == CombatType.MAGIC && rules[DuelRule.NO_MAGIC.getButtonId()]) {
+                    return CanAttackResponse.DUEL_MAGIC_DISABLED;
+                }
             }
         }
 
-        // Check immune npcs..
-        if (target.isNpc()) {
-            if (ServerPerf.measurePhase(
-                "combat.process.can_attack.target_immunity",
-                () => (target as unknown as NPC).getTimers().has(TimerKey.ATTACK_IMMUNITY)
-            )) {
-                return CanAttackResponse.TARGET_IS_IMMUNE;
-            }
+        if (target.isNpc() && ServerPerf.measurePhase(
+            "combat.process.can_attack.target_immunity",
+            () => (target as unknown as NPC).getTimers().has(TimerKey.ATTACK_IMMUNITY)
+        )) {
+            return CanAttackResponse.TARGET_IS_IMMUNE;
         }
-
         return CanAttackResponse.CAN_ATTACK;
     }
 
@@ -1033,16 +1058,25 @@ export class CombatFactory {
         }
     }
 
-    public static checkAmmo(player: Player, amountRequired: number): boolean {
+    /**
+     * @param skipReset the caller owns ending combat (post-attack renewal). The
+     *   player is still told why they cannot fire - going silent here is how a
+     *   fight ends with no explanation after the last arrow leaves the bow.
+     */
+    public static checkAmmo(player: Player, amountRequired: number, skipReset = false): boolean {
         const rangedWeapon = player.getCombat().getRangedWeapon();
         const ammoData = player.getCombat().getAmmunition();
+        const reject = (message?: string) => {
+            if (message) player.getPacketSender().sendMessage(message);
+            if (!skipReset) player.getCombat().reset();
+            return false;
+        };
 
         if (rangedWeapon == null) {
-            player.getCombat().reset();
-            return false;
+            return reject();
         }
 
-        const pluginAmmoCheck = PluginManager.checkRangedAmmo(player, amountRequired);
+        const pluginAmmoCheck = PluginManager.checkRangedAmmo(player, amountRequired, false);
         if (pluginAmmoCheck != null) {
             return pluginAmmoCheck;
         }
@@ -1050,34 +1084,26 @@ export class CombatFactory {
         if (rangedWeapon === RangedWeapon.CRYSTAL_BOW) {
             const weaponId = player.getEquipment().getItems()[Equipment.WEAPON_SLOT]?.getId?.() ?? -1;
             if (isEmptyCrystalBow(weaponId)) {
-                player.getPacketSender().sendMessage("Your crystal bow has no charges left.");
-                player.getCombat().reset();
-                return false;
+                return reject("Your crystal bow has no charges left.");
             }
             return true;
         }
 
         if (ammoData == null) {
-            player.getPacketSender().sendMessage("You don't have any ammunition to fire.");
-            player.getCombat().reset();
-            return false;
+            return reject("You don't have any ammunition to fire.");
         }
 
         if (CombatFactory.usesWeaponSlotAmmo(rangedWeapon)) {
             const weaponSlotItem = player.getEquipment().getItems()[Equipment.WEAPON_SLOT];
             if (weaponSlotItem.getId() == -1 || weaponSlotItem.getAmount() < amountRequired) {
-                player.getPacketSender().sendMessage("You don't have the required amount of ammunition to fire that.");
-                player.getCombat().reset();
-                return false;
+                return reject("You don't have the required amount of ammunition to fire that.");
             }
             return true;
         }
 
         let ammoSlotItem = player.getEquipment().getItems()[Equipment.AMMUNITION_SLOT];
         if (ammoSlotItem.getId() == -1 || ammoSlotItem.getAmount() < amountRequired) {
-            player.getPacketSender().sendMessage("You don't have the required amount of ammunition to fire that.");
-            player.getCombat().reset();
-            return false;
+            return reject("You don't have the required amount of ammunition to fire that.");
         }
 
         let properReq = false;
@@ -1096,10 +1122,8 @@ export class CombatFactory {
             let ammoName = ammoSlotItem.getDefinition().getName(),
                 weaponName = player.getEquipment().getItems()[Equipment.WEAPON_SLOT].getDefinition().getName(),
                 add = !ammoName.endsWith("s") && !ammoName.endsWith("(e)") ? "s" : "";
-            player.getPacketSender().sendMessage("You can not use " + ammoName + "" + add + " with "
+            return reject("You can not use " + ammoName + "" + add + " with "
                 + Misc.anOrA(weaponName) + " " + weaponName + ".");
-            player.getCombat().reset();
-            return false;
         }
 
         return true;

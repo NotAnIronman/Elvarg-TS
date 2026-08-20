@@ -33,13 +33,12 @@ const CROSSBOW_INTERFACES = new Set([
 ]);
 const ARROW_IDS = new Set([
   ItemIdentifiers.ADAMANT_ARROW,
-  ItemIdentifiers.BROAD_ARROW,
+  ItemIdentifiers.BROAD_ARROWS_2,
   ItemIdentifiers.DRAGON_ARROW,
   ItemIdentifiers.RUNE_ARROW,
 ]);
 const BOLT_IDS = new Set([
-  ItemIdentifiers.DRAGON_BOLTS,
-  ItemIdentifiers.DRAGON_BOLTS_E_,
+  ItemIdentifiers.DRAGONSTONE_BOLTS_E_,
   ItemIdentifiers.BOLT_RACK,
 ]);
 const SPEC_WEAPON_IDS = new Set([

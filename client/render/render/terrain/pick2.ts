@@ -193,13 +193,8 @@ import { RENDER_CONSTANTS } from "../constants";
 export function toGLClickXY(host: WebGLOsrsRendererHost, evt?: MouseEvent): { sx: number; sy: number } {
 
         if (evt) {
-            const rect = host.canvas.getBoundingClientRect();
-            const cx = Math.max(0, Math.min(rect.width, evt.clientX - rect.left));
-            const cy = Math.max(0, Math.min(rect.height, evt.clientY - rect.top));
-            return {
-                sx: cx | 0,
-                sy: cy | 0,
-            };
+            const [sx, sy] = getMousePos(host.canvas, evt);
+            return { sx: sx | 0, sy: sy | 0 };
         }
         // Prefer pinned menu anchor; else current mouse position
         // These values are already in canvas coordinates from InputManager.

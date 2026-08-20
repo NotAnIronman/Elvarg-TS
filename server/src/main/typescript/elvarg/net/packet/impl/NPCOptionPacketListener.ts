@@ -10,7 +10,6 @@ export class NPCOptionPacketListener {
     const npc = World.getNpcs().get(index);
     if (!npc || !player.getLocation().isWithinDistance(npc.getLocation(), 24)) return;
 
-    player.setPositionToFace(npc.getLocation());
     const option = npc.getCurrentDefinition?.()?.getActions?.()?.[clickType - 1]?.toLowerCase();
     if (option === "attack") {
       if (!npc.getCurrentDefinition?.()?.isAttackable?.() || npc.getHitpoints?.() <= 0) return;
@@ -19,6 +18,7 @@ export class NPCOptionPacketListener {
       return;
     }
 
+    player.setPositionToFace(npc.getLocation());
     player.getMovementQueue().walkToEntity(npc, () => {
       player.setPositionToFace(npc.getLocation());
       npc.setMobileInteraction?.(player);
@@ -72,7 +72,6 @@ export class NPCOptionPacketListener {
       player.getMovementQueue().reset();
       return false;
     }
-    player.setPositionToFace(npc.getLocation());
     player.getCombat().castSpellOn(npc, spell);
     return true;
   }

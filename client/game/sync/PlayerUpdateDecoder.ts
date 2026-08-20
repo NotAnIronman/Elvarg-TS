@@ -339,7 +339,8 @@ export class PlayerUpdateDecoder {
             return;
         }
 
-        // moveType === 3: teleport / plane+large displacement.
+        // moveType === 3: relative/absolute displacement. The movement flag or
+        // cached traversal speed decides whether this is a snap, walk, or run.
         const absolute = stream.readBits(1) === 1;
         let targetX = state.tileX | 0;
         let targetY = state.tileY | 0;
@@ -366,16 +367,7 @@ export class PlayerUpdateDecoder {
 
         state.level = targetPlane;
 
-        if (needsUpdate && !localOutOfBounds) {
-            state.pendingMove = {
-                tileX: targetX,
-                tileY: targetY,
-                directions: [],
-                movedTwoTiles: false,
-                teleported: true,
-                snap: true,
-            };
-        } else {
+        if (localOutOfBounds) {
             state.tileX = targetX;
             state.tileY = targetY;
             state.running = false;
@@ -388,6 +380,24 @@ export class PlayerUpdateDecoder {
                 subY: toSubCoord(targetY),
                 snap: true,
             });
+        } else if (needsUpdate) {
+            state.pendingMove = {
+                tileX: targetX,
+                tileY: targetY,
+                directions: [],
+                movedTwoTiles: false,
+            };
+        } else {
+            this.applyMultiStepDelta(
+                context,
+                state,
+                targetX,
+                targetY,
+                [],
+                resolveTraversalDefault(state),
+                index,
+                movements,
+            );
         }
     }
 
@@ -635,23 +645,6 @@ export class PlayerUpdateDecoder {
                             subX: toSubCoord(state.tileX),
                             subY: toSubCoord(state.tileY),
                             snap: true,
-                            applyAfterBlocks: true,
-                        });
-                        continue;
-                    }
-
-                    if (pending.teleported) {
-                        state.tileX = pending.tileX | 0;
-                        state.tileY = pending.tileY | 0;
-                        state.running = false;
-                        state.hasKnownPosition = true;
-                        movements.push({
-                            index,
-                            mode: "teleport",
-                            tile: { x: state.tileX, y: state.tileY, level: state.level },
-                            subX: toSubCoord(state.tileX),
-                            subY: toSubCoord(state.tileY),
-                            snap: pending.snap ?? true,
                             applyAfterBlocks: true,
                         });
                         continue;

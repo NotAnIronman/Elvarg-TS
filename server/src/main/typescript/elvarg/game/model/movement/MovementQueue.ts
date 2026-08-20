@@ -2,7 +2,6 @@ import { RegionManager } from "../../collision/RegionManager";
 import type { Mobile } from "../../entity/impl/Mobile";
 import { World } from "../../World";
 import { Dueling, DuelRule } from "../../content/Duelling";
-import { CombatFactory } from "../../content/combat/CombatFactory";
 import { ObjectDefinition } from "../../definition/ObjectDefinition";
 import type { NPC } from "../../entity/impl/npc/NPC";
 import { GameObject } from "../../entity/impl/object/GameObject";
@@ -11,12 +10,10 @@ import { Direction, Directions } from "../Direction";
 import { Location } from "../Location";
 import { Skill } from "../Skill";
 import { PathFinder } from "./path/PathFinder";
-import { PlayerRights } from "../rights/PlayerRights";
 import { Task } from "../../task/Task";
 import { TaskManager } from "../../task/TaskManager";
-import { CombatType } from "../../content/combat/CombatType";
+import { TaskType } from "../../task/TaskType";
 import { Misc } from "../../../util/Misc";
-import { NpcIdentifiers } from "../../../util/NpcIdentifiers";
 import { RandomGen } from "../../../util/RandomGen";
 import { TimerKey } from "../../../util/timers/TimerKey";
 import { Action } from "../Action";
@@ -28,7 +25,6 @@ import * as fs from "fs";
 import * as path from "path";
 export class MovementQueue {
     private static readonly BOT_FOLLOW_REPATH_COOLDOWN_MS = 500;
-    private static readonly BOT_COMBAT_FOLLOW_REPATH_COOLDOWN_MS = 350;
 
     private static RANDOM: RandomGen = new RandomGen();
     private static LOG_DIR = path.join(process.cwd(), "logs");
@@ -93,6 +89,19 @@ export class MovementQueue {
      * Are we currently moving?
      */
     private isMoving = false;
+    private movedThisCycle = false;
+    private blockedByDynamicOccupancy = false;
+    private routeEvaluated = false;
+    private alternativeRoute = false;
+    /**
+     * Set when a step toward the head checkpoint was rejected, plus whether an
+     * entity was the reason. Both survive beginCycle() so the next cycle's
+     * pursuit can decide whether rebuilding the route would achieve anything.
+     */
+    private stepBlocked = false;
+    private stepBlockedByEntity = false;
+    private lastSentDestX = Number.MIN_SAFE_INTEGER;
+    private lastSentDestY = Number.MIN_SAFE_INTEGER;
 
     /**
      * Creates a walking queue for the specified character.
@@ -246,6 +255,27 @@ export class MovementQueue {
         }
     }
 
+    /** Stores a routefinder turning point without expanding the segment into tiles. */
+    public addCheckpoint(position: Location): void {
+        if (!this.getMobility().canMove() || this.points.length >= MovementQueue.MAXIMUM_SIZE) {
+            return;
+        }
+        this.points.push(new Point(position.clone(), Direction.NONE));
+        if (this.character.isNpc()) World.markNpcCombatActive(this.character.getAsNpc(), true);
+    }
+
+    /** Replaces ordinary NPC combat pursuit with one live footprint destination. */
+    public setPursuitCheckpoint(position: Location): void {
+        this.reset(false);
+        this.lastDestX = position.getX();
+        this.lastDestY = position.getY();
+        this.setRoute(true, false);
+        if (!position.equals(this.character.getLocation())) {
+            this.addCheckpoint(position);
+        }
+        this.syncDestinationFlagToRoute();
+    }
+
     /**
          * Determines the Player's Mobility status
          *
@@ -326,6 +356,23 @@ export class MovementQueue {
         return last;
     }
 
+    public syncDestinationFlagToRoute(): void {
+        if (!this.player || this.player.isPlayerBot?.() === true) {
+            return;
+        }
+        const destination = this.points.peekLast()?.position;
+        const x = destination?.getX() ?? 0;
+        const y = destination?.getY() ?? 0;
+        // Combat re-affirms the route every cycle; only tell the client when the
+        // flag actually moves, otherwise this is two packets per fighter per tick.
+        if (this.lastSentDestX === x && this.lastSentDestY === y) {
+            return;
+        }
+        this.lastSentDestX = x;
+        this.lastSentDestY = y;
+        this.player.getPacketSender().sendDestination(x, y);
+    }
+
     public followX = -1;
     public followY = -1;
 
@@ -336,11 +383,40 @@ export class MovementQueue {
         return this.isMoving;
     }
 
+    public beginCycle(): void {
+        this.movedThisCycle = false;
+        this.blockedByDynamicOccupancy = false;
+    }
+
+    public didMoveThisCycle(): boolean {
+        return this.movedThisCycle;
+    }
+
+    public wasBlockedByDynamicOccupancy(): boolean {
+        return this.blockedByDynamicOccupancy;
+    }
+
+    /**
+     * True when the last processed cycle could not advance for a reason the route
+     * finder can actually see - a shut door, a new wall.
+     *
+     * Deliberately false when an entity was in the way. Entity-occupancy flags are
+     * invisible to both pathfinders and are only tested when the actor is about to
+     * step, so rerouting around a blocker would return the identical route and burn
+     * a search every cycle. The queue is kept instead, and the actor resumes its
+     * original path once the blocker moves.
+     */
+    public wasRouteInvalidated(): boolean {
+        return this.stepBlocked && !this.stepBlockedByEntity;
+    }
+
+    public invalidateDestinationFlagCache(): void {
+        this.lastSentDestX = Number.MIN_SAFE_INTEGER;
+        this.lastSentDestY = Number.MIN_SAFE_INTEGER;
+    }
+
     public hasPendingWork(): boolean {
         if (this.points.length > 0 || this.isMoving) {
-            return true;
-        }
-        if (this.character.getCombatFollowing() != null) {
             return true;
         }
         if (this.character.getFollowing() != null) {
@@ -350,30 +426,22 @@ export class MovementQueue {
     }
 
     public process() {
+        this.movedThisCycle = false;
         const ownerLabel = this.ownerLabel();
         if (
             this.points.length === 0 &&
             !this.isMoving &&
-            this.character.getCombatFollowing() == null &&
             this.character.getFollowing() == null
         ) {
             return;
         }
 
         if (!this.getMobility().canMove()) {
-            if (this.points.length > 0) {
-                MovementQueue.log(`[movement.process] ${ownerLabel} blocked; clearing ${this.points.length} queued steps`);
-            }
-            this.reset();
+            this.isMoving = false;
             return;
         }
 
-        if (this.character.getCombatFollowing() != null) {
-            ServerPerf.measurePhase(
-                "movement.process.combat_follow",
-                () => this.processCombatFollowing()
-            );
-        } else if (this.character.getFollowing() != null) {
+        if (this.character.getFollowing() != null) {
             ServerPerf.measurePhase(
                 "movement.process.follow",
                 () => this.processFollowing()
@@ -384,49 +452,51 @@ export class MovementQueue {
             MovementQueue.log(`[movement.process] ${ownerLabel} processing ${this.points.length} steps; run=${this.isRunToggled()}`);
         }
 
-        let walkPoint: Point = null;
-        let runPoint: Point = null;
+        const start = this.character.getLocation();
+        let current = start;
+        let previous = start;
+        let steps = this.isRunToggled() ? 2 : 1;
+        let moved = false;
+        this.stepBlocked = false;
+        this.stepBlockedByEntity = false;
 
-        walkPoint = ServerPerf.measurePhase(
-            "movement.process.dequeue",
-            () => this.points.shift()
-        );
-
-        if (this.isRunToggled()) {
-            runPoint = this.points.shift();
-        }
-
-        let oldPosition: Location = this.character.getLocation();
-        let moved: boolean = false;
-
-        if (walkPoint != null && walkPoint.direction != Direction.NONE) {
-            let next: Location = walkPoint.position;
-            if (ServerPerf.measurePhase("movement.process.walk_check", () => this.canWalkTo(next))) {
-                this.followX = oldPosition.getX();
-                this.followY = oldPosition.getY();
-                this.character.setLocation(next);
-                this.character.setWalkingDirection(walkPoint.direction);
-                moved = true;
-            } else {
-                MovementQueue.log(`[movement.process] ${ownerLabel} blocked walking to ${next.toString()} (reset queue of ${this.points.length})`);
-                this.reset();
-                return;
+        while (steps-- > 0) {
+            while (this.points.peekFirst()?.position.equals(current)) {
+                this.points.shift();
             }
-        }
+            const checkpoint = this.points.peekFirst();
+            if (!checkpoint) {
+                break;
+            }
+            const next = ServerPerf.measurePhase(
+                "movement.process.step_check",
+                () => this.validatedStep(current, checkpoint.position)
+            );
+            if (!next) {
+                MovementQueue.log(`[movement.process] ${ownerLabel} blocked toward ${checkpoint.position.toString()} (checkpoint retained)`);
+                this.stepBlocked = true;
+                this.stepBlockedByEntity = this.blockedByDynamicOccupancy;
+                break;
+            }
 
-        if (runPoint != null && runPoint.direction != Direction.NONE) {
-            let next: Location = runPoint.position;
-            if (ServerPerf.measurePhase("movement.process.run_check", () => this.canWalkTo(next))) {
-                this.followX = oldPosition.getX();
-                this.followY = oldPosition.getY();
-                oldPosition = next;
-                this.character.setLocation(next);
-                this.character.setRunningDirection(runPoint.direction);
-                moved = true;
+            const direction = Direction.fromDeltas(
+                next.getX() - current.getX(),
+                next.getY() - current.getY()
+            );
+            this.followX = current.getX();
+            this.followY = current.getY();
+            previous = current;
+            current = next;
+            this.character.setLocation(next);
+            if (!moved) {
+                this.character.setWalkingDirection(direction);
             } else {
-                MovementQueue.log(`[movement.process] ${ownerLabel} blocked running to ${next.toString()} (reset queue of ${this.points.length})`);
-                this.reset();
-                return;
+                this.character.setRunningDirection(direction);
+            }
+            moved = true;
+
+            if (checkpoint.position.equals(current)) {
+                this.points.shift();
             }
         }
 
@@ -435,14 +505,19 @@ export class MovementQueue {
                 this.handleRegionChange();
                 this.syncWildernessStateForMovedPlayer();
                 this.drainRunEnergy();
-                this.character.getAsPlayer().setOldPosition(oldPosition);
+                this.character.getAsPlayer().setOldPosition(previous);
             }
         }
 
         this.isMoving = moved;
+        this.movedThisCycle = moved;
+
+        if (this.points.length === 0) {
+            this.syncDestinationFlagToRoute();
+        }
 
         if (!moved && this.points.length > 0) {
-            MovementQueue.log(`[movement.process] ${ownerLabel} did not move; remaining steps ${this.points.length} (walk=${walkPoint?.direction} run=${runPoint?.direction})`);
+            MovementQueue.log(`[movement.process] ${ownerLabel} did not move; remaining checkpoints ${this.points.length}`);
         }
     }
 
@@ -452,11 +527,11 @@ export class MovementQueue {
             : `npc:${(this.character as any).getId ? (this.character as any).getId() : "unknown"}`;
     }
 
-    public canWalkTo(next: Location) {
+    public canWalkTo(next: Location, source: Location = this.character.getLocation()) {
         if (
-            next.getZ() !== this.character.getLocation().getZ() ||
+            next.getZ() !== source.getZ() ||
             !RegionManager.canMovestart(
-                this.character.getLocation(),
+                source,
                 next,
                 this.character.getSize(),
                 this.character.getSize(),
@@ -465,12 +540,66 @@ export class MovementQueue {
         ) {
             return false;
         }
-        if (this.character.isNpc() && !(this.character as NPC).canWalkThroughNPCs()) {
-            if (World.isNpcOccupyingTile(next, this.character as NPC)) {
-                return false;
-            }
+        if (this.isDynamicallyOccupied(next)) {
+            return false;
         }
         return true;
+    }
+
+    /**
+     * Occupancy the static clipping map cannot know about. A player marks its tile
+     * as blocking NPCs but never as blocking players, so NPCs are stopped by both
+     * NPCs and players while players walk freely through each other.
+     *
+     * Upstream splits the two opt-outs (walk-through-NPCs and walk-through-players
+     * are separate NPC properties). Pets are this server's only walk-through NPC
+     * and need both, so one flag covers it; split canWalkThroughNPCs() if an NPC
+     * ever needs to pass NPCs but not players.
+     */
+    private isDynamicallyOccupied(next: Location): boolean {
+        if (this.character.isNpc() && !(this.character as NPC).canWalkThroughNPCs()) {
+            const size = this.character.getSize();
+            const privateArea = this.character.getPrivateArea();
+            if (World.isNpcOccupyingTile(next, this.character as NPC, size, privateArea)) {
+                return true;
+            }
+            if (World.isPlayerOccupyingTile(next, null, size, privateArea)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Diagonal first, then east/west, then north/south - except that only 1x1
+     * actors ever take the diagonal. Anything larger squares the corner with a
+     * cardinal step instead.
+     */
+    private validatedStep(source: Location, destination: Location): Location | null {
+        const signX = Math.sign(destination.getX() - source.getX());
+        const signY = Math.sign(destination.getY() - source.getY());
+        const candidates: number[][] = [];
+        if (this.character.getSize() === 1 && signX !== 0 && signY !== 0) {
+            candidates.push([signX, signY]);
+        }
+        if (signX !== 0) candidates.push([signX, 0]);
+        if (signY !== 0) candidates.push([0, signY]);
+        for (const [offsetX, offsetY] of candidates) {
+            const next = source.transform(offsetX, offsetY);
+            if (this.canWalkTo(next, source)) {
+                return next;
+            }
+            if (next.getZ() === source.getZ() && RegionManager.canMovestart(
+                source,
+                next,
+                this.character.getSize(),
+                this.character.getSize(),
+                this.character.getPrivateArea()
+            ) && this.isDynamicallyOccupied(next)) {
+                this.blockedByDynamicOccupancy = true;
+            }
+        }
+        return null;
     }
 
 
@@ -549,12 +678,20 @@ export class MovementQueue {
         return 1700 - (p.getSkillManager().getCurrentLevel(Skill.AGILITY) * 10);
     }
 
-    public reset(): MovementQueue {
+    public reset(clearDestination = true): MovementQueue {
         this.points.clear();
         this.followX = -1;
         this.followY = -1;
         this.isMoving = false;
+        this.movedThisCycle = false;
         this.foundRoute = false;
+        this.routeEvaluated = false;
+        this.alternativeRoute = false;
+        this.stepBlocked = false;
+        this.stepBlockedByEntity = false;
+        if (clearDestination) {
+            this.syncDestinationFlagToRoute();
+        }
         return this;
     }
 
@@ -562,347 +699,6 @@ export class MovementQueue {
         this.character.setCombatFollowing(null);
         this.character.setFollowing(null);
         this.character.setPositionToFace(null);
-    }
-
-    public processCombatFollowing() {
-        const following = this.character.getCombatFollowing();
-        if (!following) {
-            return;
-        }
-        if (
-            !following.isRegistered() ||
-            following.getHitpoints() <= 0 ||
-            (following.isPlayer?.() && following.getAsPlayer()?.isDyingReturn?.() === true) ||
-            (following.isNpc?.() && following.getAsNpc?.()?.isDyingFunction?.() === true)
-        ) {
-            this.character.getCombat().reset();
-            this.character.setCombatFollowing(null);
-            this.character.setFollowing(null);
-            this.character.setMobileInteraction(null);
-            this.character.setPositionToFace(null);
-            this.reset();
-            return;
-        }
-        const isBot = this.isBotPlayer();
-        const nowMs = Date.now();
-        const size = this.character.getSize();
-        const followingSize = following.getSize();
-
-        // Update interaction
-        this.character.setMobileInteraction(following);
-
-        // Normal players keep the legacy reset behavior. Bots are allowed to
-        // retain an in-flight route briefly so they do not rebuild it every tick.
-        if (!isBot) {
-            this.reset();
-        }
-
-        // Block if our movement is locked.
-        if (!this.getMobility().canMove()) {
-            return;
-        }
-        if (
-            this.character.getTimers().has(TimerKey.STEPPING_OUT) &&
-            this.size() > 0
-        ) {
-            // Let an already-queued sidestep complete before combat-follow
-            // immediately rebuilds a route onto the same target tile.
-            return;
-        }
-
-        let combatFollow = this.character.getCombat().getTarget() === following;
-
-        // Cheap hard reset checks first; avoid combat-method resolution and
-        // reach checks when the target is obviously out of follow scope.
-        if (!this.character.getLocation().isViewableFrom(following.getLocation()) || !following.isRegistered() || following.getPrivateArea() != this.character.getPrivateArea()) {
-
-            let reset = true;
-
-            // Handle pets, they should teleport to their owner
-            // when they're too far away.
-            if (this.character.isNpc()) {
-                const npc = this.character.getAsNpc();
-                if (npc.isPet()) {
-                    const tiles = new Array<Location>();
-                    for (const tile of following.outterTiles()) {
-                        if (RegionManager.blocked(tile, following.getPrivateArea())) {
-                            continue;
-                        }
-                        tiles.push(tile);
-                    }
-                    if (tiles.length !== 0) {
-                        npc.setVisible(false);
-                        npc.moveTo(tiles[Misc.getRandom(tiles.length - 1)]);
-                        npc.setVisible(true);
-                        npc.setArea(following.getArea());
-                    } else {
-                        // Never leave pets stuck invisible when no adjacent tile is currently valid.
-                        npc.setVisible(true);
-                    }
-                    return;
-                }
-
-                switch (npc.getId()) {
-                    case NpcIdentifiers.TZTOK_JAD:
-                        reset = false;
-                        break;
-                }
-            }
-
-            if (reset) {
-                if (this.character.isPlayer() && following.isPlayer()) {
-                    this.character.sendMessage(`Unable to find ${following.getAsPlayer().getUsername()}.`);
-                    if (this.character.getAsPlayer().getRights() === PlayerRights.DEVELOPER) {
-                        const p = Misc.delta(this.character.getLocation(), following.getLocation());
-                        this.character.sendMessage("Delta: " + p.x + ", " + p.y);
-                    }
-                }
-                if (combatFollow) {
-                    this.character.getCombat().reset();
-                }
-                this.character.getMovementQueue().reset();
-                this.character.setCombatFollowing(null);
-                this.character.setMobileInteraction(null);
-                return;
-            }
-        }
-
-        let method = null;
-
-        let closeEnoughToNeedReachCheck = true;
-        if (combatFollow) {
-            method = ServerPerf.measurePhase(
-                "movement.process.combat_follow.get_method",
-                () => this.character.getCombat().resolveMethodForCurrentCycle()
-            );
-            let requiredDistance = method.attackDistance(this.character);
-            const currentDistance = this.character.calculateDistance(following);
-            if (
-                method.type() == CombatType.MELEE &&
-                (following.getMovementQueue().isMovings() || this.character.getMovementQueue().isMovings())
-            ) {
-                requiredDistance++;
-            }
-            closeEnoughToNeedReachCheck = currentDistance <= requiredDistance;
-        }
-
-        if (
-            combatFollow &&
-            closeEnoughToNeedReachCheck &&
-            ServerPerf.measurePhase(
-                "movement.process.combat_follow.can_reach",
-                () => this.canStopCombatFollowing(method, following)
-            )
-        ) {
-            // Don't continue finding a path if we can reach our opponent
-            this.reset();
-            return;
-        }
-
-        let dancing = (!combatFollow && this.character.isPlayer() && following.isPlayer() && following.getCombatFollowing() == this.character);
-        let basicPathing = (combatFollow && this.character.isNpc() && !((this.character as NPC).canUsePathFinding()));
-        let current = this.character.getLocation();
-        let destination = following.getLocation();
-
-        if (dancing) {
-            destination = following.getAsPlayer().getOldPosition();
-        }
-
-        if (!dancing) {
-            if (!combatFollow && this.character.calculateDistance(following) == 1 && !PathFinder.isDiagonalTiles(current, destination)) {
-                return;
-            }
-
-            // Handle simple walking to the destination for NPCs which don't use pathfinding.
-            if (basicPathing) {
-
-                // Same spot, step away.
-                if (destination.equals(current) && !following.getMovementQueue().isMovings()
-                    && this.character.getSize() == 1 && following.getSize() == 1) {
-                    let tiles = new Array<Location>();
-                    for (let tile of following.outterTiles()) {
-                        if (!RegionManager.canMovestart(this.character.getLocation(), tile, size, size, this.character.getPrivateArea())
-                            || RegionManager.blocked(tile, this.character.getPrivateArea())) {
-                            continue;
-                        }
-                        // Projectile attack
-                        if (this.character.useProjectileClipping() && !RegionManager.canProjectileAttackReturn(tile, following.getLocation(), this.character.getSize(), this.character.getPrivateArea())) {
-                            continue;
-                        }
-                        tiles.push(tile);
-                    }
-                    if (tiles.length > 0) {
-                        this.addFirstStep(tiles[Misc.getRandom(tiles.length - 1)]);
-                    }
-                    return;
-                }
-
-                let deltaX = destination.getX() - current.getX();
-                let deltaY = destination.getY() - current.getY();
-                if (deltaX < -1) {
-                    deltaX = -1;
-                } else if (deltaX > 1) {
-                    deltaX = 1;
-                }
-                if (deltaY < -1) {
-                    deltaY = -1;
-                } else if (deltaY > 1) {
-                    deltaY = 1;
-                }
-                let direction: Direction = Direction.fromDeltas(deltaX, deltaY);
-
-                switch (direction) {
-                    case Direction.NORTH_WEST:
-                        if (RegionManager.canMoveposition(current, Direction.WEST, size, this.character.getPrivateArea())) {
-                            direction = Direction.WEST;
-                        } else if (RegionManager.canMoveposition(current, Direction.NORTH, size, this.character.getPrivateArea())) {
-                            direction = Direction.NORTH;
-                        } else {
-                            direction = Direction.NONE;
-                        }
-                        break;
-                    case Direction.NORTH_EAST:
-                        if (RegionManager.canMoveposition(current, Direction.NORTH, size, this.character.getPrivateArea())) {
-                            direction = Direction.NORTH;
-                        } else if (RegionManager.canMoveposition(current, Direction.EAST, size, this.character.getPrivateArea())) {
-                            direction = Direction.EAST;
-                        } else {
-                            direction = Direction.NONE;
-                        }
-                        break;
-                    case Direction.SOUTH_WEST:
-                        if (RegionManager.canMoveposition(current, Direction.WEST, size, this.character.getPrivateArea())) {
-                            direction = Direction.WEST;
-                        } else if (RegionManager.canMoveposition(current, Direction.SOUTH, size, this.character.getPrivateArea())) {
-                            direction = Direction.SOUTH;
-                        } else {
-                            direction = Direction.NONE;
-                        }
-                        break;
-                    case Direction.SOUTH_EAST:
-                        if (RegionManager.canMoveposition(current, Direction.EAST, size, this.character.getPrivateArea())) {
-                            direction = Direction.EAST;
-                        } else if (RegionManager.canMoveposition(current, Direction.SOUTH, size, this.character.getPrivateArea())) {
-                            direction = Direction.SOUTH;
-                        } else {
-                            direction = Direction.NONE;
-                        }
-                        break;
-                    default:
-                        break;
-                }
-
-                if (direction == Direction.NONE) {
-                    return;
-                }
-
-                let next = current.transform(direction.getX(), direction.getY());
-                if (RegionManager.canMovestart(current, next, size, size, this.character.getPrivateArea())) {
-                    this.addSteps(next);
-                }
-                return;
-            }
-            if (method == null) {
-                method = ServerPerf.measurePhase(
-                    "movement.process.combat_follow.get_method",
-                    () => this.character.getCombat().resolveMethodForCurrentCycle()
-                );
-            }
-            const attackDistance = method.attackDistance(this.character);
-
-            if (this.shouldContinueCachedBotAttackRoute(following, attackDistance, nowMs)) {
-                return;
-            }
-
-            // Find the nearest tile surrounding the target
-            destination = ServerPerf.measurePhase(
-                "movement.process.combat_follow.attack_tile",
-                () => this.getCachedBotAttackTile(following, attackDistance, nowMs)
-            );
-            if (destination == null) {
-                destination = ServerPerf.measurePhase(
-                    "movement.process.combat_follow.closest_attack_tile",
-                    () => PathFinder.getClosestAttackableTile(this.character, following, attackDistance)
-                );
-                this.cacheBotAttackTile(following, attackDistance, destination, nowMs);
-            }
-            if (destination == null) {
-                if (this.character.isPlayer()) {
-                    this.character.getAsPlayer().sendMessage("I can't reach that!");
-                    this.character.getAsPlayer().getCombat().reset();
-                }
-                this.reset();
-                return;
-            }
-        }
-
-        if (ServerPerf.measurePhase(
-            "movement.process.combat_follow.repath_gate",
-            () => this.shouldThrottleBotRepath(destination, nowMs, true)
-        )) {
-            return;
-        }
-        const destinationChanged =
-            this.lastDestX !== destination.getX() || this.lastDestY !== destination.getY();
-        if (!isBot || destinationChanged) {
-            this.reset();
-        }
-        this.markBotRepathScheduled(destination, nowMs, true);
-        ServerPerf.measurePhase("movement.process.combat_follow.route", () =>
-            PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY())
-        );
-    }
-
-    private canStopCombatFollowing(method: any, following: Mobile): boolean {
-        if (!this.character.isPlayer()) {
-            return this.character.getCombat().resolveCanReachForCurrentCycle(method, following);
-        }
-
-        const current = this.character.getLocation();
-        const target = following.getLocation();
-        if (!current || !target) {
-            return false;
-        }
-        if (current.equals(target)) {
-            return false;
-        }
-
-        let requiredDistance = method.attackDistance(this.character);
-        const distance = this.character.calculateDistance(following);
-        if (
-            method.type() == CombatType.MELEE &&
-            (following.getMovementQueue().isMovings() || this.character.getMovementQueue().isMovings())
-        ) {
-            requiredDistance++;
-        }
-        if (distance > requiredDistance) {
-            return false;
-        }
-
-        if (
-            method.type() == CombatType.MELEE &&
-            this.character.getSize() == 1 &&
-            following.getSize() == 1 &&
-            !this.character.getMovementQueue().isMovings() &&
-            !following.getMovementQueue().isMovings() &&
-            PathFinder.isDiagonalLocation(this.character, following)
-        ) {
-            return false;
-        }
-
-        if (
-            this.character.useProjectileClipping() &&
-            !RegionManager.canProjectileAttackReturn(
-                current,
-                target,
-                this.character.getSize(),
-                this.character.getPrivateArea()
-            )
-        ) {
-            return false;
-        }
-
-        return true;
     }
 
     public processFollowing() {
@@ -1005,12 +801,12 @@ export class MovementQueue {
         }
 
         // Avoid resetting and rebuilding identical routes each tick for bots.
-        if (this.shouldThrottleBotRepath(destination, nowMs, false)) {
+        if (this.shouldThrottleBotRepath(destination, nowMs)) {
             return;
         }
 
         this.reset();
-        this.markBotRepathScheduled(destination, nowMs, false);
+        this.markBotRepathScheduled(destination, nowMs);
         PathFinder.calculateWalkRoute(this.character, destination.getX(), destination.getY());
     }
 
@@ -1071,7 +867,9 @@ export class MovementQueue {
     }
 
     public isRunToggled(): boolean {
-        return this.character.isPlayer() && (this.character as Player).isRunningReturn();
+        return this.character.isPlayer()
+            ? (this.character as Player).isRunningReturn()
+            : this.character.getAsNpc().getMovementSteps() > 1;
     }
 
     public setBlockMovement(blockMovement: boolean): MovementQueue {
@@ -1088,15 +886,6 @@ export class MovementQueue {
     public pathX: number;
     public pathY: number;
     private nextBotFollowRepathAt = 0;
-    private nextBotCombatFollowRepathAt = 0;
-    private cachedBotAttackTileExpiresAt = 0;
-    private cachedBotAttackTileTargetX = Number.MIN_SAFE_INTEGER;
-    private cachedBotAttackTileTargetY = Number.MIN_SAFE_INTEGER;
-    private cachedBotAttackTileTargetZ = Number.MIN_SAFE_INTEGER;
-    private cachedBotAttackTileDistance = -1;
-    private cachedBotAttackTileX = Number.MIN_SAFE_INTEGER;
-    private cachedBotAttackTileY = Number.MIN_SAFE_INTEGER;
-    private cachedBotAttackTileZ = Number.MIN_SAFE_INTEGER;
 
     public setPathX(x: number): MovementQueue {
         this.pathX = (this.character.getLocation().getRegionX() * 8) + x;
@@ -1110,12 +899,22 @@ export class MovementQueue {
 
     private foundRoute: boolean;
 
-    public setRoute(route: boolean) {
+    public setRoute(route: boolean, alternative = false) {
+        this.routeEvaluated = true;
         this.foundRoute = route;
+        this.alternativeRoute = alternative;
     }
 
     public hasRoute(): boolean {
         return this.foundRoute;
+    }
+
+    public wasRouteEvaluated(): boolean {
+        return this.routeEvaluated;
+    }
+
+    public usedAlternativeRoute(): boolean {
+        return this.alternativeRoute;
     }
 
     public pointsReturn() {
@@ -1126,100 +925,44 @@ export class MovementQueue {
         return this.character.isPlayer() && this.character.getAsPlayer().isPlayerBot();
     }
 
-    private shouldThrottleBotRepath(destination: Location, nowMs: number, combatFollow: boolean): boolean {
+    private shouldThrottleBotRepath(destination: Location, nowMs: number): boolean {
         if (!this.isBotPlayer() || !destination) {
             return false;
         }
-        const cooldownUntil = combatFollow
-            ? this.nextBotCombatFollowRepathAt
-            : this.nextBotFollowRepathAt;
         if (this.lastDestX !== destination.getX() || this.lastDestY !== destination.getY()) {
             return false;
         }
         if (this.points.length > 0) {
             return true;
         }
-        return nowMs < cooldownUntil;
+        return nowMs < this.nextBotFollowRepathAt;
     }
 
-    private markBotRepathScheduled(destination: Location, nowMs: number, combatFollow: boolean): void {
+    private markBotRepathScheduled(destination: Location, nowMs: number): void {
         if (!this.isBotPlayer() || !destination) {
             return;
         }
         this.lastDestX = destination.getX();
         this.lastDestY = destination.getY();
-        if (combatFollow) {
-            this.nextBotCombatFollowRepathAt =
-                nowMs + MovementQueue.BOT_COMBAT_FOLLOW_REPATH_COOLDOWN_MS;
-            return;
-        }
         this.nextBotFollowRepathAt =
             nowMs + MovementQueue.BOT_FOLLOW_REPATH_COOLDOWN_MS;
     }
 
-    private getCachedBotAttackTile(
-        following: Mobile,
-        attackDistance: number,
-        nowMs: number
-    ): Location | null {
-        if (!this.isBotPlayer() || !following || nowMs > this.cachedBotAttackTileExpiresAt) {
-            return null;
-        }
-        const target = following.getLocation();
-        if (
-            this.cachedBotAttackTileTargetX !== target.getX() ||
-            this.cachedBotAttackTileTargetY !== target.getY() ||
-            this.cachedBotAttackTileTargetZ !== target.getZ() ||
-            this.cachedBotAttackTileDistance !== attackDistance
-        ) {
-            return null;
-        }
-        return new Location(
-            this.cachedBotAttackTileX,
-            this.cachedBotAttackTileY,
-            this.cachedBotAttackTileZ
-        );
-    }
-
-    private shouldContinueCachedBotAttackRoute(
-        following: Mobile,
-        attackDistance: number,
-        nowMs: number
-    ): boolean {
-        if (!this.isBotPlayer() || this.points.length === 0) {
-            return false;
-        }
-        const destination = this.getCachedBotAttackTile(following, attackDistance, nowMs);
-        if (!destination) {
-            return false;
-        }
-        return this.lastDestX === destination.getX() && this.lastDestY === destination.getY();
-    }
-
-    private cacheBotAttackTile(
-        following: Mobile,
-        attackDistance: number,
-        destination: Location | null,
-        nowMs: number
-    ): void {
-        if (!this.isBotPlayer() || !following || destination == null) {
-            return;
-        }
-        const target = following.getLocation();
-        this.cachedBotAttackTileTargetX = target.getX();
-        this.cachedBotAttackTileTargetY = target.getY();
-        this.cachedBotAttackTileTargetZ = target.getZ();
-        this.cachedBotAttackTileDistance = attackDistance;
-        this.cachedBotAttackTileX = destination.getX();
-        this.cachedBotAttackTileY = destination.getY();
-        this.cachedBotAttackTileZ = destination.getZ();
-        this.cachedBotAttackTileExpiresAt =
-            nowMs + MovementQueue.BOT_COMBAT_FOLLOW_REPATH_COOLDOWN_MS;
-    }
-
     public walkToGroundItem(pos: Location, action: () => void) {
-        if (this.player.getLocation().getDistance(pos) == 0) {
-            // If player is already at the ground item, run the action now
+        this.walkToTile(pos, action, PathFinder.reachedObj);
+    }
+
+    /**
+     * @param reached decides when the destination counts as arrived at. Defaults to
+     *   standing exactly on the tile, which is what a plugin-supplied route
+     *   destination wants; ground items also accept an adjacent tile.
+     */
+    public walkToTile(
+        pos: Location,
+        action: () => void,
+        reached: (entity: Mobile, destination: Location) => boolean = PathFinder.reachedTile
+    ) {
+        if (reached(this.player, pos)) {
             action();
             return;
         }
@@ -1242,12 +985,19 @@ export class MovementQueue {
 
         PathFinder.calculateGroundItemRoute(this.player, pos);
         let lastRouteCycle = World.getProcessCycle();
+        let reachedDestination = false;
 
         TaskManager.submit(new MovementTask(this.player.getIndex(), (task: MovementTask) => {
-            if (PathFinder.reachedGroundItem(this.player, pos)) {
+            if (reachedDestination) {
                 action?.();
                 this.player.getMovementQueue().reset();
                 task.stop();
+                return;
+            }
+
+            if (reached(this.player, pos)) {
+                // The interaction resolves on the cycle after arrival.
+                reachedDestination = true;
                 return;
             }
 
@@ -1343,18 +1093,23 @@ export class MovementQueue {
 
         this.walkToReset();
 
+        if (PathFinder.reachedEntity(this.player, entity)) {
+            this.player.setMobileInteraction(entity);
+            runnable?.();
+            return;
+        }
+
         PathFinder.calculateEntityRoute(this.player, entity);
 
-        let currentX = entity.getLocation().getX();
-        let currentY = entity.getLocation().getY();
+        let routedX = entity.getLocation().getX();
+        let routedY = entity.getLocation().getY();
         TaskManager.submit(new MovementTask(this.player.getIndex(), (task: MovementTask) => {
-            this.player.setMobileInteraction(entity);
-            if (currentX != entity.getLocation().getX() || currentY != entity.getLocation().getY()) {
+            if (!this.isInteractionTargetValid(entity)) {
                 this.reset();
-                currentX = entity.getLocation().getX();
-                currentY = entity.getLocation().getY();
-                PathFinder.calculateEntityRoute(this.player, entity);
+                task.stop();
+                return;
             }
+            this.player.setMobileInteraction(entity);
 
             if (PathFinder.reachedEntity(this.player, entity)) {
                 this.player.getMovementQueue().reset();
@@ -1363,13 +1118,52 @@ export class MovementQueue {
                 return;
             }
 
-            if (this.player.getMovementQueue().points.length) {
+            const queue = this.player.getMovementQueue();
+            const location = entity.getLocation();
+            // Only the final stretch is rebuilt, and only when the target actually
+            // moved - the turning points behind it are still good. A step the clipping
+            // map rejected invalidates the corridor wherever we are standing.
+            const targetMoved = routedX !== location.getX() || routedY !== location.getY();
+            if (queue.size() === 0 || queue.wasRouteInvalidated() || (queue.size() === 1 && targetMoved)) {
+                routedX = location.getX();
+                routedY = location.getY();
+                PathFinder.calculateEntityRoute(this.player, entity);
+            }
+
+            if (queue.points.length || queue.isMovings()) {
                 return;
             }
-            this.player.getMovementQueue().reset();
+            queue.reset();
             task.stop();
             this.player.getPacketSender().sendMessage("I can't reach that!");
         }));
+    }
+
+    /**
+     * Re-checks an interaction target mid-walk. A target can despawn, change plane,
+     * leave the private area, or change type (an npc or loc transform) while the
+     * player is still walking to it; resolving against the stale capture would fire
+     * the interaction on something that is no longer there.
+     */
+    /**
+     * Re-checks a loc mid-walk. A loc can be removed or transformed into a different
+     * type while the player walks to it (a door opening, a stump replacing a tree),
+     * and the captured reference would otherwise still resolve the original action.
+     */
+    private isInteractionObjectValid(object: GameObject, id: number, type: number): boolean {
+        if (!object) return false;
+        const location = object.getLocation();
+        if (!location || location.getZ() !== this.player.getLocation().getZ()) return false;
+        if (object.getPrivateArea?.() !== this.player.getPrivateArea()) return false;
+        return object.getId() === id && object.getType() === type;
+    }
+
+    private isInteractionTargetValid(entity: Mobile): boolean {
+        return !!entity &&
+            entity.isRegistered() &&
+            entity.getHitpoints() > 0 &&
+            entity.getPrivateArea() === this.player.getPrivateArea() &&
+            entity.getLocation().getZ() === this.player.getLocation().getZ();
     }
 
     public walkToObject(object: GameObject, action: Action) {
@@ -1419,7 +1213,12 @@ export class MovementQueue {
 
         this.player.setPositionToFace(new Location(objectX, objectY));
         let repathAttempts = 0;
-        TaskManager.submit(new MovementeTaskFunc(this.player.getIndex(), () => {
+        TaskManager.submit(new MovementTask(this.player.getIndex(), (task) => {
+            if (!this.isInteractionObjectValid(object, id, type)) {
+                this.reset();
+                task.stop();
+                return;
+            }
             if (PathFinder.reachedObject(
                 this.player,
                 objectX,
@@ -1436,8 +1235,9 @@ export class MovementQueue {
                 this.pathX = this.player.getLocation().getX();
                 this.pathY = this.player.getLocation().getY();
                 this.player.setPositionToFace(new Location(objectX, objectY, this.player.getLocation().getZ()));
-                action.execute();
+                task.stop();
                 TaskManager.cancelTasks(this.player.getIndex());
+                action.execute();
                 return;
             }
             if (this.points.length || this.player.getMovementQueue().isMovings()) {
@@ -1459,6 +1259,7 @@ export class MovementQueue {
                 `[walkToObject] ${this.ownerLabel()} failed route=${this.player.getMovementQueue().hasRoute()} current=${this.player.getLocation().getX()},${this.player.getLocation().getY()} expected=${finalDestinationX},${finalDestinationY}`
             );
             this.player.getPacketSender().sendMessage("You can't reach that!");
+            task.stop();
             TaskManager.cancelTasks(this.player.getIndex());
         }));
     }
@@ -1586,19 +1387,11 @@ class Point {
 class MovementTask extends Task {
     constructor(n1: number, private readonly execFunc: (task: MovementTask) => void) {
         super(0, n1, true);
+        // Ticked from the owner's turn after movement, not from the global task pass.
+        this.type = TaskType.WALK_TO;
     }
     execute(): void {
         this.execFunc(this);
-    }
-
-}
-
-class MovementeTaskFunc extends Task {
-    constructor(n1: number, private readonly execFunc: Function) {
-        super(1, n1, true);
-    }
-    execute(): void {
-        this.execFunc();
     }
 
 }

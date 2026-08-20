@@ -7,8 +7,7 @@ import { PlayerRights } from "./model/rights/PlayerRights"
 export class GameConstants {
     public static readonly NAME: string = "RspsApp";
     public static readonly NPC_BITS: number = 18;
-    // Process NPC AI only near active player regions to avoid spending tick time
-    // on distant NPCs that no active client can currently observe.
+    // Process NPC mechanics near active players while carrying active off-region state.
     public static readonly PROCESS_NPCS_BY_ACTIVE_REGIONS: boolean = true;
     public static readonly CLIENT_UID: number = 8784521;
     public static readonly DEFINITIONS_DIRECTORY: string = "./data/definitions/";

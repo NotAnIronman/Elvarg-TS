@@ -1,6 +1,7 @@
 import { CombatMethod } from "../CombatMethod";
 import { CombatType } from "../../CombatType";
 import { CombatFactory } from "../../CombatFactory";
+import { Ammunition, RangedWeapon } from "../../ranged/RangedData";
 import { PendingHit } from "../../hit/PendingHit";
 import { Mobile } from "../../../../entity/impl/Mobile";
 import { Animation } from "../../../../model/Animation";
@@ -30,6 +31,15 @@ export class RangedCombatMethod extends CombatMethod {
             return false;
         }
         return true;
+    }
+
+    shouldRenew(character: Mobile): boolean {
+        if (!character.isPlayer()) return true;
+        const player = character.getAsPlayer();
+        player.getCombat().setRangedWeapon(RangedWeapon.getFor(player));
+        player.getCombat().setAmmunition(Ammunition.getFor(player));
+        if (player.getCombat().getRangedWeapon() == null) return false;
+        return CombatFactory.checkAmmo(player, WeaponProfiles.ranged(player).ammoRequired ?? 1, true);
     }
 
     start(character: Mobile, target: Mobile) {

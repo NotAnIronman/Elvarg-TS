@@ -368,6 +368,10 @@ export class CombatSpecial {
     }
 
     public static updateBar(player: Player) {
+        const packetSender = player.getPacketSender();
+        packetSender.updateSpecialAttackOrb();
+        packetSender.sendSpecialAttackState(player.isSpecialActivated());
+
         const weapon = player.getWeapon();
         if (!weapon || typeof weapon.getSpecialBar !== "function" || typeof weapon.getSpecialMeter !== "function") {
             return;
@@ -383,13 +387,12 @@ export class CombatSpecial {
             player.getPacketSender().sendInterfaceComponentMoval(specialAmount >= specialCheck ? 500 : 0, 0, --specialBar);
             specialCheck--;
         }
-        player.getPacketSender().updateSpecialAttackOrb().sendString(
+        packetSender.sendString(
             player.isSpecialActivated()
                 ? ("@yel@ Special Attack (" + player.getSpecialPercentage() + "%)")
                 : ("@bla@ Special Attack (" + player.getSpecialPercentage() + "%)"),
             weapon.getSpecialMeter()
         );
-        player.getPacketSender().sendSpecialAttackState(player.isSpecialActivated());
     }
 
     public static assign(player: Player) {

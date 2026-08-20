@@ -29,6 +29,7 @@ import {
   PluginNpcAggressionToleranceEvent,
   PluginNpcInteractionEvent,
   PluginNpcInteractionDefinition,
+  PluginObjectRouteEvent,
   PluginObjectInteractionEvent,
   PluginPlayerDefeatedEvent,
   PluginPathBlockedEvent,
@@ -118,6 +119,7 @@ export class PluginManager {
   private static regionLoadedHooks: PluginHook<PluginRegionLoadedEvent>[] = [];
   private static activeRegionsHooks: PluginHook<PluginActiveRegionsEvent>[] = [];
   private static pathBlockedHooks: PluginHook<PluginPathBlockedEvent>[] = [];
+  private static objectRouteHooks: PluginHook<PluginObjectRouteEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
   private static npcInteractionHooks: PluginHook<PluginNpcInteractionEvent>[] = [];
   private static npcDeathHooks: PluginHook<PluginNpcDeathEvent>[] = [];
@@ -577,6 +579,18 @@ export class PluginManager {
       );
     }
     return event.handled === true;
+  }
+
+  public static emitObjectRoute(event: PluginObjectRouteEvent): void {
+    if (!event?.player || !event.object) {
+      return;
+    }
+    for (const hook of PluginManager.objectRouteHooks) {
+      PluginManager.executeHook(hook, event, "object_route", "object_route");
+      if (event.destination) {
+        return;
+      }
+    }
   }
 
   // NOTE FOR MAINTAINERS:
@@ -1855,6 +1869,12 @@ export class PluginManager {
           },
         });
       },
+      onObjectRoute: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.objectRouteHooks.push({ pluginName, handler });
+      },
       onNpcInteraction: (handler) => {
         if (typeof handler !== "function") {
           return;
@@ -2968,10 +2988,10 @@ export class PluginManager {
     return null;
   }
 
-  public static checkRangedAmmo(player: any, amountRequired: number): boolean | null {
+  public static checkRangedAmmo(player: any, amountRequired: number, silent = false): boolean | null {
     for (const entry of PluginManager.rangedAmmoHandlers) {
       try {
-        const result = entry.handler.checkAmmo(player, amountRequired);
+        const result = entry.handler.checkAmmo(player, amountRequired, silent);
         if (result != null) {
           return result === true;
         }

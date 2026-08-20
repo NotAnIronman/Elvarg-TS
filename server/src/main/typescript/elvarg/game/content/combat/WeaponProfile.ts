@@ -3,7 +3,8 @@ import type { Player } from "../../entity/impl/player/Player";
 import { Equipment } from "../../model/container/impl/Equipment";
 import { FightType } from "./FightType";
 import { WeaponInterfaces } from "./WeaponInterfaces";
-import { RangedWeapon } from "./ranged/RangedData";
+import { CRYSTAL_BOW_ALL_WEAPON_IDS } from "./ranged/CrystalBow";
+import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 
 export type HitDelayProfile = { base: number; distanceOffset: number; divisor: number };
 export type ProjectileProfile = { delay: number; speed: number; startHeight: number; endHeight: number };
@@ -203,7 +204,7 @@ export class WeaponProfiles {
             specialDamage: { minimum: 8, maximum: 48 },
         });
         this.register({
-            itemIds: RangedWeapon.CRYSTAL_BOW.getWeaponIds(),
+            itemIds: CRYSTAL_BOW_ALL_WEAPON_IDS,
             attackAnimation: 426,
             attackSpeed: 5,
             attackDistance: 10,
@@ -213,7 +214,7 @@ export class WeaponProfiles {
             fireSound: Sound.SHOOT_ARROW,
         });
         this.register({
-            itemIds: RangedWeapon.TWISTED_BOW.getWeaponIds(),
+            itemIds: [ItemIdentifiers.TWISTED_BOW],
             attackAnimation: 426,
             attackSpeed: 5,
             attackDistance: 10,

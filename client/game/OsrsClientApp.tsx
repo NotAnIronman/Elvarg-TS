@@ -75,8 +75,6 @@ function hasCacheStorage(): boolean {
 if (typeof window !== "undefined" && window.__rsWorkerPoolNonce === undefined) {
     window.__rsWorkerPoolNonce = 0;
 }
-readWorkerPoolNonce();
-
 // On hot-reload, dispose the existing OsrsClient and increment the nonce
 if (typeof module !== "undefined" && module.hot) {
     module.hot.dispose(() => {
@@ -188,11 +186,15 @@ function OsrsClientApp() {
 
     // Two workers build maps in parallel — halves total grid load time.
     // Progressive rendering shows each map as it arrives, no main-thread freeze.
+    const workerPoolNonce = readWorkerPoolNonce();
     const workerCount = useMemo(() => {
         return 2;
     }, []);
 
-    const workerPool = useMemo(() => RenderDataWorkerPool.create(workerCount), [workerCount]);
+    const workerPool = useMemo(() => {
+        void workerPoolNonce;
+        return RenderDataWorkerPool.create(workerCount);
+    }, [workerCount, workerPoolNonce]);
 
     useEffect(() => {
         return () => {

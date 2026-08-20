@@ -181,16 +181,20 @@ function refreshBlowpipeState(player, item, preferredSlot = -1) {
   BonusManager.update(player);
 }
 
-function isReady(player, item, amountRequired = 1) {
+function isReady(player, item, amountRequired = 1, silent = false) {
   const { scales, dartAmount } = BlowpipeState.read(item);
   if (scales <= 0) {
-    player.getPacketSender().sendMessage("You must recharge your Toxic blowpipe using some Zulrah scales.");
-    player.getCombat().reset();
+    if (!silent) {
+      player.getPacketSender().sendMessage("You must recharge your Toxic blowpipe using some Zulrah scales.");
+      player.getCombat().reset();
+    }
     return false;
   }
   if (dartAmount < amountRequired) {
-    player.getPacketSender().sendMessage("You must load darts into the Toxic blowpipe.");
-    player.getCombat().reset();
+    if (!silent) {
+      player.getPacketSender().sendMessage("You must load darts into the Toxic blowpipe.");
+      player.getCombat().reset();
+    }
     return false;
   }
   return true;
@@ -437,12 +441,12 @@ module.exports = {
     });
 
     api.registerRangedAmmoHandler({
-      checkAmmo(player, amountRequired) {
+      checkAmmo(player, amountRequired, silent = false) {
         const rangedWeapon = player?.getCombat?.()?.getRangedWeapon?.();
         if (rangedWeapon !== RangedWeapon.TOXIC_BLOWPIPE) {
           return null;
         }
-        return isReady(player, BlowpipeState.equipped(player), amountRequired);
+        return isReady(player, BlowpipeState.equipped(player), amountRequired, silent);
       },
       decrementAmmo(player, pos, amount) {
         const rangedWeapon = player?.getCombat?.()?.getRangedWeapon?.();

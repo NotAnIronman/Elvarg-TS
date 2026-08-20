@@ -402,7 +402,13 @@ export class RegionManager {
     }
 
     public static addClipping(x: number, y: number, height: number, shift: number, privateArea: PrivateArea | null, region?: Region) {
-        if (RegionManager.applyPrivateClipping(privateArea, (area) => area.setClip(new Location(x, y), shift))) {
+        if (RegionManager.applyPrivateClipping(privateArea, (area) => {
+            const location = new Location(x, y, height);
+            const current = area.hasClip(location)
+                ? area.getClip(location)
+                : (region ?? RegionManager.getRegion(x, y))?.getClip(x, y, height) ?? 0;
+            area.setClip(location, current | shift);
+        })) {
             return;
         }
         const r = region ?? RegionManager.getRegion(x, y);
@@ -412,7 +418,13 @@ export class RegionManager {
     }
 
     public static removeClipping(x: number, y: number, height: number, shift: number, privateArea: PrivateArea) {
-        if (RegionManager.applyPrivateClipping(privateArea, (area) => area.removeClip(new Location(x, y, height)))) {
+        if (RegionManager.applyPrivateClipping(privateArea, (area) => {
+            const location = new Location(x, y, height);
+            const current = area.hasClip(location)
+                ? area.getClip(location)
+                : RegionManager.getRegion(x, y)?.getClip(x, y, height) ?? 0;
+            area.setClip(location, current & ~shift);
+        })) {
             return;
         }
         const r = RegionManager.getRegion(x, y);
@@ -424,12 +436,10 @@ export class RegionManager {
     public static getClipping(x: number, y: number, height: number, privateArea: PrivateArea | null) {
         if (
             privateArea &&
-            typeof privateArea.getClip === "function"
+            typeof privateArea.getClip === "function" &&
+            privateArea.hasClip(new Location(x, y, height))
         ) {
-            const privateClip = privateArea.getClip(new Location(x, y));
-            if (privateClip !== 0) {
-                return privateClip;
-            }
+            return privateArea.getClip(new Location(x, y, height));
         }
 
 
@@ -569,78 +579,91 @@ export class RegionManager {
     public static canProjectileAttackReturn(a: Location, b: Location, size: number, area: PrivateArea): boolean {
         return RegionManager.canProjectileMove(a.getX(), a.getY(), b.getX(), b.getY(), a.getZ(), size, size, area);
     }
+
+    public static canProjectileAttackBounds(
+        source: Location,
+        destination: Location,
+        sourceWidth: number,
+        sourceLength: number,
+        destinationWidth: number,
+        destinationLength: number,
+        area: PrivateArea
+    ): boolean {
+        const coordinate = (origin: number, other: number, size: number) =>
+            origin >= other ? origin : origin + size - 1 <= other ? origin + size - 1 : other;
+        const startX = coordinate(source.getX(), destination.getX(), Math.max(1, sourceWidth));
+        const startY = coordinate(source.getY(), destination.getY(), Math.max(1, sourceLength));
+        const endX = coordinate(destination.getX(), source.getX(), Math.max(1, destinationWidth));
+        const endY = coordinate(destination.getY(), source.getY(), Math.max(1, destinationLength));
+        return RegionManager.canProjectileRay(startX, startY, endX, endY, source.getZ(), area);
+    }
+
     public static canProjectileMove(startX: number, startY: number, endX: number, endY: number, height: number, xLength: number, yLength: number, privateArea: PrivateArea) {
-        let diffX = endX - startX;
-        let diffY = endY - startY;
-        let max = Math.max(Math.abs(diffX), Math.abs(diffY));
-        for (let ii = 0; ii < max; ii++) {
-            let currentX = endX - diffX;
-            let currentY = endY - diffY;
-            for (let i = 0; i < xLength; i++) {
-                for (let i2 = 0; i2 < yLength; i2++) {
-                    if (diffX < 0 && diffY < 0) {
-                        if ((RegionManager.getClipping(currentX + i - 1, currentY + i2 - 1, height, privateArea) & (RegionManager.UNLOADED_TILE
-                            | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED | RegionManager.PROJECTILE_EAST_BLOCKED
-                            | RegionManager.PROJECTILE_NORTH_EAST_BLOCKED | RegionManager.PROJECTILE_NORTH_BLOCKED)) != 0
-                            || (RegionManager.getClipping(currentX + i - 1, currentY + i2, height, privateArea)
-                                & (RegionManager.UNLOADED_TILE | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED
-                                    | RegionManager.PROJECTILE_EAST_BLOCKED)) != 0
-                            || (RegionManager.getClipping(currentX + i, currentY + i2 - 1, height, privateArea)
-                                & (RegionManager.UNLOADED_TILE | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED
-                                    | RegionManager.PROJECTILE_NORTH_BLOCKED)) != 0) {
-                            return false;
-                        }
-                    } else if (diffX < 0 && diffY > 0) {
-                        if ((RegionManager.getClipping(currentX + i - 1, currentY + i2 + 1, height, privateArea) & (RegionManager.UNLOADED_TILE | RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED | RegionManager.PROJECTILE_SOUTH_BLOCKED | RegionManager.PROJECTILE_SOUTH_EAST_BLOCKED | RegionManager.PROJECTILE_EAST_BLOCKED)) != 0
-                            || (RegionManager.getClipping(currentX + i - 1, currentY + i2, height, privateArea) & (RegionManager.UNLOADED_TILE | RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED | RegionManager.PROJECTILE_EAST_BLOCKED)) != 0
-                            || (RegionManager.getClipping(currentX + i, currentY + i2 + 1, height, privateArea) & (RegionManager.UNLOADED_TILE | RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED | RegionManager.PROJECTILE_SOUTH_BLOCKED)) != 0) {
-                            return false;
-                        }
-                    } else if (diffX > 0 && diffY < 0) {
-                        if ((RegionManager.getClipping(currentX + i + 1, currentY + i2 - 1, height, privateArea) & (RegionManager.UNLOADED_TILE
-                            | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED | RegionManager.PROJECTILE_WEST_BLOCKED
-                            | RegionManager.PROJECTILE_NORTH_BLOCKED | RegionManager.PROJECTILE_NORTH_WEST_BLOCKED)) != 0
-                            || (RegionManager.getClipping(currentX + i + 1, currentY + i2, height, privateArea)
-                                & (RegionManager.UNLOADED_TILE | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED
-                                    | RegionManager.PROJECTILE_WEST_BLOCKED)) != 0
-                            || (RegionManager.getClipping(currentX + i, currentY + i2 - 1, height, privateArea)
-                                & (RegionManager.UNLOADED_TILE | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED
-                                    | RegionManager.PROJECTILE_NORTH_BLOCKED)) != 0) {
-                            return false;
-                        }
-                    } else if (diffX > 0 && diffY == 0) {
-                        if ((RegionManager.getClipping(currentX + i + 1, currentY + i2, height, privateArea)
-                            & (RegionManager.UNLOADED_TILE | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED
-                                | RegionManager.PROJECTILE_WEST_BLOCKED)) != 0) {
-                            return false;
-                        }
-                    } else if (diffX < 0 && diffY == 0) {
-                        if ((RegionManager.getClipping(currentX + i - 1, currentY + i2, height, privateArea)
-                            & (RegionManager.UNLOADED_TILE | /* BLOCKED_TILE | */RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED
-                                | RegionManager.PROJECTILE_EAST_BLOCKED)) != 0) {
-                            return false;
-                        }
-                    }
-                    else if (diffX === 0 && diffY > 0) {
-                        if ((RegionManager.getClipping(currentX + i, currentY + i2 + 1, height, privateArea) & (RegionManager.UNLOADED_TILE | RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED | RegionManager.PROJECTILE_SOUTH_BLOCKED)) !== 0) {
-                            return false;
-                        }
-                    } else if (diffX === 0 && diffY < 0) {
-                        if ((RegionManager.getClipping(currentX + i, currentY + i2 - 1, height, privateArea) & (RegionManager.UNLOADED_TILE | RegionManager.UNKNOWN | RegionManager.PROJECTILE_TILE_BLOCKED | RegionManager.PROJECTILE_NORTH_BLOCKED)) !== 0) {
-                            return false;
-                        }
-                    }
-                }
+        const coordinate = (origin: number, other: number, size: number) =>
+            origin >= other ? origin : origin + size - 1 <= other ? origin + size - 1 : other;
+        return RegionManager.canProjectileRay(
+            coordinate(startX, endX, Math.max(1, xLength)),
+            coordinate(startY, endY, Math.max(1, yLength)),
+            endX,
+            endY,
+            height,
+            privateArea
+        );
+    }
+
+    private static canProjectileRay(
+        startX: number,
+        startY: number,
+        endX: number,
+        endY: number,
+        height: number,
+        privateArea: PrivateArea
+    ): boolean {
+        if (startX === endX && startY === endY) return true;
+        const deltaX = endX - startX;
+        const deltaY = endY - startY;
+        const east = deltaX >= 0;
+        const north = deltaY >= 0;
+        let xFlags = RegionManager.UNLOADED_TILE | RegionManager.UNKNOWN |
+            RegionManager.PROJECTILE_TILE_BLOCKED |
+            (east ? RegionManager.PROJECTILE_WEST_BLOCKED : RegionManager.PROJECTILE_EAST_BLOCKED);
+        let yFlags = RegionManager.UNLOADED_TILE | RegionManager.UNKNOWN |
+            RegionManager.PROJECTILE_TILE_BLOCKED |
+            (north ? RegionManager.PROJECTILE_SOUTH_BLOCKED : RegionManager.PROJECTILE_NORTH_BLOCKED);
+        const scale = 65536;
+        const halfTile = scale / 2;
+
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            const offsetX = east ? 1 : -1;
+            let scaledY = startY * scale + halfTile + (north ? 0 : -1);
+            const tangent = Math.trunc(deltaY * scale / Math.abs(deltaX));
+            for (let x = startX; x !== endX;) {
+                x += offsetX;
+                const y = Math.floor(scaledY / scale);
+                const atEnd = x === endX && y === endY;
+                if ((RegionManager.getClipping(x, y, height, privateArea) &
+                    (atEnd ? xFlags & ~RegionManager.PROJECTILE_TILE_BLOCKED : xFlags)) !== 0) return false;
+                scaledY += tangent;
+                const nextY = Math.floor(scaledY / scale);
+                const nextAtEnd = x === endX && nextY === endY;
+                if (nextY !== y && (RegionManager.getClipping(x, nextY, height, privateArea) &
+                    (nextAtEnd ? yFlags & ~RegionManager.PROJECTILE_TILE_BLOCKED : yFlags)) !== 0) return false;
             }
-            if (diffX < 0) {
-                diffX++;
-            } else if (diffX > 0) {
-                diffX--;
-            }
-            if (diffY < 0) {
-                diffY++;
-            } else if (diffY > 0) {
-                diffY--;
+        } else {
+            const offsetY = north ? 1 : -1;
+            let scaledX = startX * scale + halfTile + (east ? 0 : -1);
+            const tangent = Math.trunc(deltaX * scale / Math.abs(deltaY));
+            for (let y = startY; y !== endY;) {
+                y += offsetY;
+                const x = Math.floor(scaledX / scale);
+                const atEnd = x === endX && y === endY;
+                if ((RegionManager.getClipping(x, y, height, privateArea) &
+                    (atEnd ? yFlags & ~RegionManager.PROJECTILE_TILE_BLOCKED : yFlags)) !== 0) return false;
+                scaledX += tangent;
+                const nextX = Math.floor(scaledX / scale);
+                const nextAtEnd = nextX === endX && y === endY;
+                if (nextX !== x && (RegionManager.getClipping(nextX, y, height, privateArea) &
+                    (nextAtEnd ? xFlags & ~RegionManager.PROJECTILE_TILE_BLOCKED : xFlags)) !== 0) return false;
             }
         }
         return true;

@@ -33,24 +33,54 @@ export class CombatRange {
                 : this.hasMeleeLine(attackerBounds, targetBounds, attackerLocation.getZ(), attacker.getPrivateArea());
         }
 
-        const from = this.nearestTile(attackerBounds, targetBounds);
-        const to = this.nearestTile(targetBounds, attackerBounds);
-        return RegionManager.canProjectileAttackReturn(
-            new Location(from.x, from.y, attackerLocation.getZ()),
-            new Location(to.x, to.y, attackerLocation.getZ()),
-            Math.max(1, attacker.getSize()),
-            attacker.getPrivateArea(),
-        );
+        if (attacker.isNpc()) {
+            return this.hasProjectileLine(targetBounds, attackerBounds, target, attackerLocation.getZ());
+        }
+
+        const forward = this.hasProjectileLine(attackerBounds, targetBounds, attacker, attackerLocation.getZ());
+        return forward && (!target.isPlayer() ||
+            this.hasProjectileLine(targetBounds, attackerBounds, target, attackerLocation.getZ()));
     }
 
     static route(attacker: Mobile, method: CombatMethod, target: Mobile): boolean {
-        const range = Math.max(1, method.attackDistance(attacker) | 0);
-        if (method.type() === CombatType.MELEE) {
-            return PathFinder.calculateEntityRoute(attacker, target) > 0;
-        }
+        // Route toward the moving entity itself. Combat's post-movement phase stops the queue
+        // as soon as the method's real range/line-of-sight check succeeds, so this
+        // naturally finds the first usable ranged, magic, or melee tile without a
+        // separate geometric attack-tile heuristic.
+        PathFinder.calculateEntityRoute(attacker, target);
+        return attacker.getMovementQueue().hasRoute();
+    }
 
-        const tile = PathFinder.getClosestAttackableTile(attacker, target, range);
-        return tile != null && PathFinder.calculateWalkRoute(attacker, tile.getX(), tile.getY()) > 0;
+    /**
+     * Approach distance for an at-range interaction: within `range` tiles of the
+     * destination with an open projectile line. This is the generic mechanic behind
+     * spells and other actions that resolve without walking adjacent - use it as a
+     * walk-to reach predicate so the actor closes in only until it is satisfied.
+     */
+    static withinApproachDistance(source: Mobile, destination: Location, range: number): boolean {
+        if (!source || !destination) {
+            return false;
+        }
+        const sourceLocation = source.getLocation();
+        if (sourceLocation.getZ() !== destination.getZ()) {
+            return false;
+        }
+        const sourceBounds = this.bounds(source);
+        const destinationBounds = {
+            minX: destination.getX(),
+            minY: destination.getY(),
+            maxX: destination.getX(),
+            maxY: destination.getY(),
+        };
+        if (this.distance(sourceBounds, destinationBounds) > Math.max(0, range | 0)) {
+            return false;
+        }
+        return this.hasProjectileLine(sourceBounds, destinationBounds, source, sourceLocation.getZ());
+    }
+
+    static overlapsEntities(a: Mobile, b: Mobile): boolean {
+        return !!a && !!b && a.getLocation().getZ() === b.getLocation().getZ() &&
+            this.overlaps(this.bounds(a), this.bounds(b));
     }
 
     private static bounds(entity: Mobile): Bounds {
@@ -100,6 +130,18 @@ export class CombatRange {
         const from = this.nearestTile(a, b);
         const to = this.nearestTile(b, a);
         return RegionManager.canMove(from.x, from.y, to.x, to.y, z, 1, 1, area);
+    }
+
+    private static hasProjectileLine(source: Bounds, destination: Bounds, entity: Mobile, z: number): boolean {
+        return RegionManager.canProjectileAttackBounds(
+            new Location(source.minX, source.minY, z),
+            new Location(destination.minX, destination.minY, z),
+            source.maxX - source.minX + 1,
+            source.maxY - source.minY + 1,
+            destination.maxX - destination.minX + 1,
+            destination.maxY - destination.minY + 1,
+            entity.getPrivateArea(),
+        );
     }
 
     private static nearestTile(from: Bounds, to: Bounds): { x: number; y: number } {

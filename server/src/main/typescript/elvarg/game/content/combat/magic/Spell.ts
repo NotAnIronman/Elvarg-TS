@@ -73,7 +73,7 @@ export abstract class Spell {
                 return false;
             }
 
-            if (player.getEquipment().getItems()[Equipment.WEAPON_SLOT].getId() == 11791) {
+            if (del && player.getEquipment().getItems()[Equipment.WEAPON_SLOT].getId() == 11791) {
                 if (Misc.getRandom(7) == 1) {
                     player.getPacketSender().sendMessage("Your Staff of the dead negated your runes for this cast.");
                     del = false;

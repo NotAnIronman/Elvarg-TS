@@ -23,6 +23,20 @@ export abstract class CombatMethod {
         return true;
     }
 
+    /**
+     * Non-consuming eligibility used before pursuit. This must NOT delegate to
+     * canAttack(): overrides of that consume/validate ammo and runes and reset
+     * combat as a side effect, and pursuit runs every cycle while walking in.
+     * Override only when a method can cheaply decide it will never be usable.
+     */
+    public canPursue(character: Mobile, target: Mobile): boolean {
+        return true;
+    }
+
+    public shouldRenew(character: Mobile): boolean {
+        return true;
+    }
+
     public attackSpeed(character: Mobile): number {
         return character.getBaseAttackSpeed();
     }

@@ -29,6 +29,10 @@ export class FastDeque<T> {
     return value;
   }
 
+  public peekFirst(): T | undefined {
+    return this.tail === this.head ? undefined : this.store[this.head];
+  }
+
   public peekLast(): T | undefined {
     if (this.tail === this.head) {
       return undefined;

@@ -18,14 +18,23 @@ import type { CombatMethod } from "./method/CombatMethod";
 import { GraniteMaulCombatMethod } from "./method/impl/specials/GraniteMaulCombatMethod";
 import { Ammunition, RangedData, RangedWeapon } from "./ranged/RangedData";
 import { Animation } from "../../model/Animation";
+import { PathFinder } from "../../model/movement/path/PathFinder";
+import type { MovementQueue } from "../../model/movement/MovementQueue";
+import type { Location } from "../../model/Location";
+import { Misc } from "../../../util/Misc";
+import { TaskManager } from "../../task/TaskManager";
 
-type RouteState = {
+type CombatCycleState = {
+    cycle: number;
+    generation: number;
     target: Mobile;
-    x: number;
-    y: number;
-    z: number;
-    range: number;
     method: CombatMethod;
+    targetX: number;
+    targetY: number;
+    targetZ: number;
+    routeRequested: boolean;
+    mobilityBlocked: boolean;
+    skipPost: boolean;
 };
 
 /** Owns one character's target, attack deadline, approach route, and delayed hits. */
@@ -38,7 +47,6 @@ export class Combat {
     private readonly teleblockTimer = new SecondsTimer();
     private readonly prayerBlockTimer = new SecondsTimer();
     private nextAttackCycle = 0;
-    private route: RouteState | null = null;
     private target: Mobile | null = null;
     private autoRetaliating = false;
     private attacker: Mobile | null = null;
@@ -47,35 +55,200 @@ export class Combat {
     private castSpell: CombatSpell | null = null;
     private autoCastSpell: CombatSpell | null = null;
     private previousCast: CombatSpell | null = null;
+    private generation = 0;
+    /** Target tile the live route was built for; see shouldRouteToward(). */
+    private routedTargetX = Number.MIN_SAFE_INTEGER;
+    private routedTargetY = Number.MIN_SAFE_INTEGER;
+    private routedTargetZ = Number.MIN_SAFE_INTEGER;
+    private lastPreMovementCycle = -1;
+    private lastPostMovementCycle = -1;
+    private cycleState: CombatCycleState | null = null;
     public rangedWeapon: RangedWeapon | null = null;
     public ammunition: Ammunition | null = null;
 
     constructor(private readonly character: Mobile) {}
 
     public attack(target: Mobile, autoRetaliation = false): void {
-        this.setTarget(target);
+        if (!target || (this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack())) {
+            return;
+        }
+        const previousTarget = this.target;
+        if (previousTarget && previousTarget !== target && this.method) {
+            this.method.onCombatEnded(this.character, previousTarget);
+        }
+        this.generation++;
+        this.target = target;
         this.autoRetaliating = autoRetaliation;
-        if (this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack()) return;
+        this.method = null;
+        this.cycleState = null;
+        if (this.character.isPlayer()) TaskManager.cancelTasks(this.character.getIndex());
+        this.character.getMovementQueue().reset();
+        this.character.setFollowing(null);
+        this.character.setPositionToFace(null);
         this.character.setMobileInteraction(target);
-        this.performNewAttack(false);
+        if (this.character.isNpc()) World.markNpcCombatActive(this.character.getAsNpc(), true);
     }
 
     public castSpellOn(target: Mobile, spell: CombatSpell): void {
         if (!target || !spell) return;
-        this.character.setMobileInteraction(target);
-        this.character.setPositionToFace(target.getLocation());
         this.setCastSpell(spell);
         this.attack(target);
     }
 
-    public process(): void {
-        if (!this.target && !this.attacker) return;
+    public preMovementProcess(): void {
+        const cycle = World.getProcessCycle();
+        if (this.lastPreMovementCycle === cycle) return;
+        this.lastPreMovementCycle = cycle;
 
-        if (this.lastAttack.elapsedTime(6000)) {
+        if (this.attacker && this.lastAttack.elapsedTime(6000)) {
             this.setUnderAttack(null);
-            if (!this.target) return;
         }
-        this.performNewAttack(false);
+
+        const target = this.target;
+        if (!target) {
+            this.cycleState = null;
+            return;
+        }
+        const generation = this.generation;
+        const location = target.getLocation();
+        const method = this.resolveMethodForCurrentCycle();
+        const state: CombatCycleState = {
+            cycle,
+            generation,
+            target,
+            method,
+            targetX: location.getX(),
+            targetY: location.getY(),
+            targetZ: location.getZ(),
+            routeRequested: false,
+            mobilityBlocked: false,
+            skipPost: false,
+        };
+        this.cycleState = state;
+        this.method = method;
+
+        if (!CombatFactory.validTarget(this.character, target)) {
+            this.cancelIfCurrent(target, generation);
+            return;
+        }
+        if (this.shouldRetreat()) {
+            this.cancelIfCurrent(target, generation);
+            return;
+        }
+
+        const permission = CombatFactory.canAttackPermission(this.character, target, true, method);
+        if (permission !== CanAttackResponse.CAN_ATTACK) {
+            this.handleAttackDenied(permission, target, generation);
+            return;
+        }
+
+        this.character.setMobileInteraction(target);
+
+        if (this.character.isNpc() && CombatRange.overlapsEntities(this.character, target)) {
+            this.processNpcUnderTarget(state);
+            return;
+        }
+
+        if (CombatRange.canReach(this.character, method, target)) {
+            this.character.getMovementQueue().reset();
+            return;
+        }
+
+        const movement = this.character.getMovementQueue();
+        if (!movement.getMobility().canMove()) {
+            state.mobilityBlocked = true;
+            return;
+        }
+
+        if (this.character.isNpc()) {
+            movement.setPursuitCheckpoint(PathFinder.naiveEntityDestination(this.character, target));
+            state.routeRequested = true;
+        } else if (this.shouldRouteToward(movement, location)) {
+            state.routeRequested = true;
+            this.routedTargetX = location.getX();
+            this.routedTargetY = location.getY();
+            this.routedTargetZ = location.getZ();
+            ServerPerf.measurePhase("combat.route", () => CombatRange.route(this.character, method, target));
+        }
+    }
+
+    /**
+     * A path is only recalculated on its final checkpoint, and only when the target
+     * has actually moved - turning points earlier in the corridor are preserved, and
+     * a stationary target does not need the same route rebuilt every cycle.
+     *
+     * Two cases sit outside that rule. An empty queue has no path to preserve, so it
+     * always routes. A step the clipping map rejected (a door shut across the
+     * corridor) invalidates the cached route wherever the actor is standing; a step
+     * an entity rejected does not, since the pathfinder cannot see entities and would
+     * hand back the identical corridor.
+     */
+    private shouldRouteToward(movement: MovementQueue, targetLocation: Location): boolean {
+        if (movement.size() === 0 || movement.wasRouteInvalidated()) {
+            return true;
+        }
+        if (movement.size() > 1) {
+            return false;
+        }
+        return this.routedTargetX !== targetLocation.getX() ||
+            this.routedTargetY !== targetLocation.getY() ||
+            this.routedTargetZ !== targetLocation.getZ();
+    }
+
+    public postMovementProcess(): void {
+        const cycle = World.getProcessCycle();
+        if (this.lastPostMovementCycle === cycle) return;
+        this.lastPostMovementCycle = cycle;
+
+        const state = this.cycleState;
+        if (!state || state.cycle !== cycle || state.skipPost ||
+            this.target !== state.target || this.generation !== state.generation) {
+            return;
+        }
+
+        const { target, method, generation } = state;
+        if (!CombatFactory.validTarget(this.character, target)) {
+            this.cancelIfCurrent(target, generation);
+            return;
+        }
+
+        const permission = CombatFactory.canAttackPermission(this.character, target, true, method);
+        if (permission !== CanAttackResponse.CAN_ATTACK) {
+            this.handleAttackDenied(permission, target, generation);
+            return;
+        }
+
+        if (!CombatRange.canReach(this.character, method, target)) {
+            const location = target.getLocation();
+            const targetMoved =
+                state.targetX !== location.getX() ||
+                state.targetY !== location.getY() ||
+                state.targetZ !== location.getZ();
+            const movement = this.character.getMovementQueue();
+            if (targetMoved || state.mobilityBlocked || movement.didMoveThisCycle()) {
+                return;
+            }
+            if (this.character.isNpc() && state.routeRequested &&
+                !movement.wasBlockedByDynamicOccupancy()) {
+                this.cancelIfCurrent(target, generation);
+                return;
+            }
+            if (movement.size() > 0) return;
+            if (this.character.isPlayer() && (state.routeRequested || movement.wasRouteEvaluated())) {
+                if (this.character.getAsPlayer().isPlayerBot?.() !== true) {
+                    this.character.getAsPlayer().getPacketSender().sendMessage("I can't reach that!");
+                }
+                this.cancelIfCurrent(target, generation);
+            }
+            return;
+        }
+
+        this.character.getMovementQueue().reset();
+        if (cycle < this.nextAttackCycle) {
+            this.renewInteraction(target, generation);
+            return;
+        }
+        this.executeAttack(method, target, false, generation, true);
     }
 
     public hasPendingWork(): boolean {
@@ -84,130 +257,21 @@ export class Combat {
 
     public performNewAttack(instant: boolean): boolean {
         const target = this.target;
-        if (!target || (this.character.isNpc() && !this.character.getAsNpc().getDefinition().doesFightBack())) {
-            return false;
-        }
-
-        this.character.setMobileInteraction(target);
-        const targetLocation = target.getLocation();
-        this.character.setPositionToFaceCoordinates(targetLocation.getX(), targetLocation.getY(), targetLocation.getZ());
-
+        if (!target) return false;
+        const generation = this.generation;
         const method = this.resolveMethodForCurrentCycle();
-        this.method = method;
-        const bypassDelay = instant || method instanceof GraniteMaulCombatMethod;
-        const cycle = World.getProcessCycle();
-
         if (!CombatFactory.validTarget(this.character, target)) {
-            this.reset();
+            this.cancelIfCurrent(target, generation);
             return false;
         }
-
-        if (this.character.isNpc()) {
-            const npc = this.character.getAsNpc();
-            if (
-                npc.getCurrentDefinition().doesRetreat() &&
-                (npc.getMovementCoordinator().getCoordinateState() === CoordinateState.RETREATING ||
-                    npc.getLocation().getDistance(npc.getSpawnPosition()) >= npc.getCurrentDefinition().getCombatFollowDistance())
-            ) {
-                npc.getMovementCoordinator().setCoordinateState(CoordinateState.RETREATING);
-                this.reset();
-                return false;
-            }
-        }
-
-        // Moving toward the target must never wait on the previous weapon's
-        // attack cooldown - only landing the next hit is gated by that. This
-        // has to run before the cooldown check below: switching targets (or
-        // a target moving out of range) mid-cooldown should start pathing
-        // immediately, exactly like a first-time target click, instead of
-        // standing still until the old weapon-speed timer happens to expire.
-        if (!CombatRange.canReach(this.character, method, target)) {
-            this.routeToward(method, target);
+        const permission = CombatFactory.canAttackPermission(this.character, target, true, method);
+        if (permission !== CanAttackResponse.CAN_ATTACK) {
+            this.handleAttackDenied(permission, target, generation);
             return false;
         }
-
-        if (!bypassDelay && cycle < this.nextAttackCycle) return false;
-
-        this.character.getMovementQueue().reset();
-        this.route = null;
-        if (this.target !== target) return false;
-
-        switch (CombatFactory.canAttack(this.character, method, target, true)) {
-            case CanAttackResponse.CAN_ATTACK: {
-                if (this.attacker == null) method.onCombatBegan(this.character, target);
-                if (target.getCombat().getAttacker() == null) {
-                    CombatFactory.getMethod(target).onCombatBegan(target, this.character);
-                }
-                // A combat method may extend this in start() for a special attack.
-                if (!bypassDelay) this.nextAttackCycle = cycle + Math.max(1, method.attackSpeed(this.character) | 0);
-                method.start(this.character, target);
-                const hits = method.hits(this.character, target);
-                if (hits == null) return false;
-                if (hits.length > 0 && method.type() === CombatType.MELEE) {
-                    target.performAnimation(new Animation(target.getBlockAnim()));
-                }
-                for (const hit of hits) CombatFactory.addPendingHit(hit);
-                method.finished(this.character, target);
-
-                this.graniteMaulSpecialQueued = false;
-                if (this.character.isSpecialActivated()) {
-                    this.character.setSpecialActivated(false);
-                    if (this.character.isPlayer()) CombatSpecial.updateBar(this.character.getAsPlayer());
-                }
-                return true;
-            }
-            case CanAttackResponse.ALREADY_UNDER_ATTACK:
-                if (this.character.isPlayer()) this.character.getAsPlayer().getPacketSender().sendMessage("You are already under attack!");
-                this.reset();
-                return false;
-            case CanAttackResponse.CANT_ATTACK_IN_AREA:
-            case CanAttackResponse.INVALID_TARGET:
-                this.reset();
-                return false;
-            case CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED:
-                return false;
-            case CanAttackResponse.LEVEL_DIFFERENCE_TOO_GREAT:
-                this.character.getAsPlayer().getPacketSender().sendMessage("Your level difference is too great.");
-                this.character.getAsPlayer().getPacketSender().sendMessage("You need to move deeper into the Wilderness.");
-                this.reset();
-                return false;
-            case CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY: {
-                const player = this.character.getAsPlayer();
-                player.getPacketSender().sendMessage("You do not have enough special attack energy left!");
-                player.setSpecialActivated(false);
-                CombatSpecial.updateBar(player);
-                this.reset();
-                return false;
-            }
-            case CanAttackResponse.STUNNED:
-                this.character.getAsPlayer().getPacketSender().sendMessage("You're currently stunned and cannot attack.");
-                this.reset();
-                return false;
-            case CanAttackResponse.DUEL_NOT_STARTED_YET:
-                this.character.getAsPlayer().getPacketSender().sendMessage("The duel has not started yet!");
-                this.reset();
-                return false;
-            case CanAttackResponse.DUEL_WRONG_OPPONENT:
-                this.character.getAsPlayer().getPacketSender().sendMessage("This is not your opponent!");
-                this.reset();
-                return false;
-            case CanAttackResponse.DUEL_MELEE_DISABLED:
-                StatementDialogue.send(this.character.getAsPlayer(), "Melee has been disabled in this duel!");
-                this.reset();
-                return false;
-            case CanAttackResponse.DUEL_RANGED_DISABLED:
-                StatementDialogue.send(this.character.getAsPlayer(), "Ranged has been disabled in this duel!");
-                this.reset();
-                return false;
-            case CanAttackResponse.DUEL_MAGIC_DISABLED:
-                StatementDialogue.send(this.character.getAsPlayer(), "Magic has been disabled in this duel!");
-                this.reset();
-                return false;
-            case CanAttackResponse.TARGET_IS_IMMUNE:
-                if (this.character.isPlayer()) this.character.getAsPlayer().getPacketSender().sendMessage("This npc is currently immune to attacks.");
-                this.reset();
-                return false;
-        }
+        if (!CombatRange.canReach(this.character, method, target)) return false;
+        this.method = method;
+        return this.executeAttack(method, target, instant, generation, false);
     }
 
     public resolveMethodForCurrentCycle(): CombatMethod {
@@ -240,13 +304,17 @@ export class Combat {
 
     public reset(): void {
         const previousTarget = this.target;
+        this.generation++;
         this.target = null;
         this.autoRetaliating = false;
+        this.cycleState = null;
         if (previousTarget && this.method) this.method.onCombatEnded(this.character, previousTarget);
+        this.method = null;
         this.character.getMovementQueue().reset();
         this.character.setMobileInteraction(null);
-        this.route = null;
+        this.character.setPositionToFace(null);
         this.graniteMaulSpecialQueued = false;
+        if (this.character.isNpc()) World.markNpcCombatActive(this.character.getAsNpc(), this.attacker != null);
     }
 
     public isGraniteMaulSpecialQueued(): boolean { return this.graniteMaulSpecialQueued; }
@@ -295,7 +363,10 @@ export class Combat {
 
     public getCharacter(): Mobile { return this.character; }
     public getTarget(): Mobile | null { return this.target; }
-    public setTarget(target: Mobile | null): void { this.target = target; this.route = null; }
+    public setTarget(target: Mobile | null): void {
+        if (target == null) this.reset();
+        else this.attack(target);
+    }
     public stopAutoRetaliation(): void {
         // A target equal to the current attacker is retaliation, including
         // combat that began before the server started tagging its source.
@@ -303,7 +374,13 @@ export class Combat {
     }
     public getHitQueue(): HitQueue { return this.hitQueue; }
     public getAttacker(): Mobile | null { return this.attacker; }
-    public setUnderAttack(attacker: Mobile | null): void { this.attacker = attacker; this.lastAttack.reset(); }
+    public setUnderAttack(attacker: Mobile | null): void {
+        this.attacker = attacker;
+        this.lastAttack.reset();
+        if (this.character.isNpc()) {
+            World.markNpcCombatActive(this.character.getAsNpc(), attacker != null || this.target != null);
+        }
+    }
     public getCastSpell(): CombatSpell | null { return this.castSpell; }
     public setCastSpell(spell: CombatSpell | null): void { this.castSpell = spell; }
     public getAutocastSpell(): CombatSpell | null { return this.autoCastSpell; }
@@ -323,20 +400,143 @@ export class Combat {
     public getPrayerBlockTimer(): SecondsTimer { return this.prayerBlockTimer; }
     public getLastAttack(): Stopwatch { return this.lastAttack; }
 
-    private routeToward(method: CombatMethod, target: Mobile): void {
-        const location = target.getLocation();
-        const range = Math.max(1, method.attackDistance(this.character) | 0);
-        if (
-            this.route?.target === target &&
-            this.route.x === location.getX() && this.route.y === location.getY() && this.route.z === location.getZ() &&
-            this.route.range === range && this.route.method === method &&
-            this.character.getMovementQueue().hasPendingWork()
-        ) return;
-
-        if (ServerPerf.measurePhase("combat.route", () => CombatRange.route(this.character, method, target))) {
-            this.route = { target, x: location.getX(), y: location.getY(), z: location.getZ(), range, method };
-        } else {
-            this.route = null;
+    private shouldRetreat(): boolean {
+        if (!this.character.isNpc()) return false;
+        const npc = this.character.getAsNpc();
+        if (!npc.getCurrentDefinition().doesRetreat()) return false;
+        const coordinator = npc.getMovementCoordinator();
+        if (coordinator.getCoordinateState() === CoordinateState.RETREATING ||
+            npc.getLocation().getDistance(npc.getSpawnPosition()) >=
+                npc.getCurrentDefinition().getCombatFollowDistance()) {
+            coordinator.setCoordinateState(CoordinateState.RETREATING);
+            return true;
         }
+        return false;
+    }
+
+    private processNpcUnderTarget(state: CombatCycleState): void {
+        state.skipPost = true;
+        const movement = this.character.getMovementQueue();
+        movement.reset();
+        const targetBusy = state.target.isPlayer() &&
+            (state.target.getCombat().getTarget() != null ||
+                state.target.getFollowing?.() != null ||
+                TaskManager.hasActiveTask(state.target.getIndex?.(), "MovementTask") ||
+                TaskManager.wasTaskActiveThisCycle(state.target.getIndex?.(), "MovementTask"));
+        if (targetBusy) return;
+
+        const [offsetX, offsetY] = [[-1, 0], [1, 0], [0, -1], [0, 1]][Misc.getRandom(3)];
+        movement.setPursuitCheckpoint(this.character.getLocation().transform(offsetX, offsetY));
+    }
+
+    private executeAttack(
+        method: CombatMethod,
+        target: Mobile,
+        bypassDelay: boolean,
+        generation: number,
+        renew: boolean
+    ): boolean {
+        const cycle = World.getProcessCycle();
+        if (!bypassDelay && cycle < this.nextAttackCycle) {
+            if (renew) this.renewInteraction(target, generation);
+            return false;
+        }
+
+        const response = CombatFactory.canAttack(this.character, method, target, true, true);
+        if (response !== CanAttackResponse.CAN_ATTACK) {
+            this.handleAttackDenied(response, target, generation);
+            return false;
+        }
+
+        if (this.attacker == null) method.onCombatBegan(this.character, target);
+        if (target.getCombat().getAttacker() == null) {
+            CombatFactory.getMethod(target).onCombatBegan(target, this.character);
+        }
+        if (!bypassDelay) {
+            this.nextAttackCycle = cycle + Math.max(1, method.attackSpeed(this.character) | 0);
+        }
+
+        method.start(this.character, target);
+        const hits = method.hits(this.character, target);
+        if (hits == null) return false;
+        if (hits.length > 0 && method.type() === CombatType.MELEE) {
+            target.performAnimation(new Animation(target.getBlockAnim()));
+        }
+        for (const hit of hits) CombatFactory.addPendingHit(hit);
+        method.finished(this.character, target);
+
+        this.graniteMaulSpecialQueued = false;
+        if (this.character.isSpecialActivated()) {
+            this.character.setSpecialActivated(false);
+            if (this.character.isPlayer()) CombatSpecial.updateBar(this.character.getAsPlayer());
+        }
+        if (renew && this.target === target && this.generation === generation) {
+            if (method.shouldRenew(this.character)) this.renewInteraction(target, generation);
+            else this.cancelIfCurrent(target, generation);
+        }
+        return true;
+    }
+
+    private renewInteraction(target: Mobile, generation: number): void {
+        if (this.target !== target || this.generation !== generation) return;
+        this.generation++;
+        this.cycleState = null;
+        this.character.setMobileInteraction(target);
+    }
+
+    private cancelIfCurrent(target: Mobile, generation: number): void {
+        if (this.target === target && this.generation === generation) this.reset();
+    }
+
+    private handleAttackDenied(
+        response: CanAttackResponse,
+        target: Mobile,
+        generation: number
+    ): void {
+        if (this.target !== target || this.generation !== generation) return;
+        const player = this.character.isPlayer() ? this.character.getAsPlayer() : null;
+        switch (response) {
+            case CanAttackResponse.COMBAT_METHOD_NOT_ALLOWED:
+                // The weapon/spell is momentarily unusable (no ammo loaded, blowpipe
+                // empty, spell unselected). Keep the target so re-equipping resumes;
+                // the method itself owns any message and any hard reset.
+                return;
+            case CanAttackResponse.ALREADY_UNDER_ATTACK:
+                player?.getPacketSender().sendMessage("You are already under attack!");
+                break;
+            case CanAttackResponse.LEVEL_DIFFERENCE_TOO_GREAT:
+                player?.getPacketSender().sendMessage("Your level difference is too great.");
+                player?.getPacketSender().sendMessage("You need to move deeper into the Wilderness.");
+                break;
+            case CanAttackResponse.NOT_ENOUGH_SPECIAL_ENERGY:
+                if (player) {
+                    player.getPacketSender().sendMessage("You do not have enough special attack energy left!");
+                    player.setSpecialActivated(false);
+                    CombatSpecial.updateBar(player);
+                }
+                break;
+            case CanAttackResponse.STUNNED:
+                player?.getPacketSender().sendMessage("You're currently stunned and cannot attack.");
+                break;
+            case CanAttackResponse.DUEL_NOT_STARTED_YET:
+                player?.getPacketSender().sendMessage("The duel has not started yet!");
+                break;
+            case CanAttackResponse.DUEL_WRONG_OPPONENT:
+                player?.getPacketSender().sendMessage("This is not your opponent!");
+                break;
+            case CanAttackResponse.DUEL_MELEE_DISABLED:
+                if (player) StatementDialogue.send(player, "Melee has been disabled in this duel!");
+                break;
+            case CanAttackResponse.DUEL_RANGED_DISABLED:
+                if (player) StatementDialogue.send(player, "Ranged has been disabled in this duel!");
+                break;
+            case CanAttackResponse.DUEL_MAGIC_DISABLED:
+                if (player) StatementDialogue.send(player, "Magic has been disabled in this duel!");
+                break;
+            case CanAttackResponse.TARGET_IS_IMMUNE:
+                player?.getPacketSender().sendMessage("This npc is currently immune to attacks.");
+                break;
+        }
+        this.cancelIfCurrent(target, generation);
     }
 }

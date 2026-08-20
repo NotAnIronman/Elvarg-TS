@@ -217,8 +217,10 @@ export function toCssEvent(host: WebGLOsrsRendererHost,
             host.cachedCanvasRect = host.canvas.getBoundingClientRect();
         }
         const rect = host.cachedCanvasRect;
-        host.cachedCssEventResult.clientX = rect.left + gx;
-        host.cachedCssEventResult.clientY = rect.top + gy;
+        const scaleX = host.canvas.width > 0 ? rect.width / host.canvas.width : 1;
+        const scaleY = host.canvas.height > 0 ? rect.height / host.canvas.height : 1;
+        host.cachedCssEventResult.clientX = rect.left + gx * scaleX;
+        host.cachedCssEventResult.clientY = rect.top + gy * scaleY;
         return host.cachedCssEventResult;
     
 }

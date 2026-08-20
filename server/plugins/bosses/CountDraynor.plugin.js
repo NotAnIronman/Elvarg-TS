@@ -162,9 +162,6 @@ function forceCountDraynorAggression(area, player) {
   if (npc.getCombat?.().getTarget?.() === player) {
     return;
   }
-  npc.setFollowing?.(player);
-  npc.setCombatFollowing?.(player);
-  npc.setMobileInteraction?.(player);
   npc.getCombat?.().attack?.(player);
 }
 

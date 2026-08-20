@@ -360,6 +360,9 @@ export class PlayerSession {
       y: location.getY(),
       level: location.getZ(),
       appearance: payload,
+      movementType: player.getRunningDirection().getId() >= 0
+        ? 2
+        : player.getWalkingDirection().getId() >= 0 ? 1 : undefined,
       appearanceDirty: dirty,
       faceDirection: player.getUpdateFlag().flagged(Flag.FACE_POSITION) && positionToFace
         ? this.faceDirection(location, positionToFace)

@@ -1988,7 +1988,7 @@ export class WebGLOsrsRenderer extends GameRenderer<WebGLMapSquare> {
         tileForMenu?: { tileX: number; tileY: number; plane?: number },
         menuCtx?: MenuClickContext,
     ): void {
-        return render.performWorldEntryAction(this, e, orig);
+        return render.performWorldEntryAction(this, e, orig, evt, tileForMenu, menuCtx);
     }
 
     public buildSimpleMenuEntries(

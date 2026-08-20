@@ -205,10 +205,6 @@ export class EquipPacketListener {
       EquipPacketListener.resetWeapon(player, true);
     }
 
-    if (equipment.get(Equipment.WEAPON_SLOT)?.getId() !== 4153) {
-      player.getCombat().reset();
-    }
-
     getBonusManager().update(player);
     equipment.refreshItems();
     inventory.refreshItems();

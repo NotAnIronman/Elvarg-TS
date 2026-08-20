@@ -53,6 +53,7 @@ export class VolatileNightmareStaffCombatMethod extends CombatMethod {
 
     finished(character: Mobile, target: Mobile): void {
         character.getCombat().reset();
+        // reset() clears the interaction; a resolved cast still faces its target.
         character.setMobileInteraction(target);
         character.getMovementQueue().reset();
     }

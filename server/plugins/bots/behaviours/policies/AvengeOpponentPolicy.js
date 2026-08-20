@@ -144,7 +144,7 @@ class AvengeOpponentPolicy {
       }
     }
     const method = this.CombatFactory.getMethod(bot);
-    if (this.CombatFactory.canAttack(bot, method, target) !== CanAttackResponse.CAN_ATTACK) {
+    if (this.CombatFactory.canAttackPermission(bot, target, false, method) !== CanAttackResponse.CAN_ATTACK) {
       return false;
     }
     const durationMs = Math.max(

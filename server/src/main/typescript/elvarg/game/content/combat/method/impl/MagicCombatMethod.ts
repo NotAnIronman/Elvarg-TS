@@ -114,6 +114,14 @@ export class MagicCombatMethod extends CombatMethod {
         return character.getCombat().getCastSpell().canCast(character.getAsPlayer(), true);
     }
 
+    public canPursue(character: Mobile, target: Mobile): boolean {
+        if (character.isNpc()) return true;
+        // Read-only: canAttack() owns promoting the autocast spell into the cast slot.
+        const combat = character.getCombat();
+        const spell = combat.getCastSpell() ?? combat.getAutocastSpell();
+        return spell != null && spell.canCast(character.getAsPlayer(), false);
+    }
+
     public start(character: Mobile, target: Mobile): void {
         const spell = character.getCombat().getSelectedSpell();
 
@@ -163,8 +171,8 @@ export class MagicCombatMethod extends CombatMethod {
         character.getCombat().setCastSpell(null);
         if (character.getCombat().getAutocastSpell() === null) {
             character.getCombat().reset();
+            // reset() clears the interaction; a resolved manual cast still faces its target.
             character.setMobileInteraction(target);
-            character.getMovementQueue().reset();
         }
         character.getCombat().setPreviousCast(current);
     }

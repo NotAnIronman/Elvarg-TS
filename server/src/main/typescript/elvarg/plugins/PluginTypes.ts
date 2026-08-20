@@ -77,6 +77,15 @@ export interface PluginObjectInteractionEvent {
   handled: boolean;
 }
 
+export interface PluginObjectRouteEvent {
+  player: any;
+  object: any;
+  objectId: number;
+  clickType: number;
+  sourceLocation: { x: number; y: number; z: number };
+  destination: { x: number; y: number; z: number } | null;
+}
+
 export interface PluginNpcInteractionEvent {
   player: any;
   npc: any;
@@ -446,7 +455,7 @@ export interface PluginRangedAmmoResolver {
 }
 
 export interface PluginRangedAmmoHandler {
-  checkAmmo(player: any, amountRequired: number): boolean | null;
+  checkAmmo(player: any, amountRequired: number, silent?: boolean): boolean | null;
   decrementAmmo(player: any, pos: any, amount: number): boolean;
 }
 
@@ -469,6 +478,7 @@ export interface PluginApi {
   onActiveRegionsUpdated(handler: (event: PluginActiveRegionsEvent) => void): void;
   onPathBlocked(handler: (event: PluginPathBlockedEvent) => void): void;
   onPlayerPathBlocked(handler: (event: PluginPlayerPathBlockedEvent) => void): void;
+  onObjectRoute(handler: (event: PluginObjectRouteEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
   onNpcInteraction(handler: (event: PluginNpcInteractionEvent) => void): void;
   registerNpcInteraction(

@@ -4,6 +4,7 @@ import { MobileList } from '../game/entity/impl/MobileList'
 import { ItemOnGround } from './entity/impl/grounditem/ItemOnGround';
 import { ItemOnGroundManager } from './entity/impl/grounditem/ItemOnGroundManager';
 import { NPC } from './entity/impl/npc/NPC';
+import { CoordinateState } from './entity/impl/npc/NPCMovementCoordinator';
 import { GameObject } from './entity/impl/object/GameObject';
 import { MapObjects } from './entity/impl/object/MapObjects';
 import { Player } from './entity/impl/player/Player';
@@ -36,7 +37,11 @@ export class World {
     private static readonly BOT_PROCESS_LOD_MEDIUM_STRIDE = 2;
     private static readonly BOT_PROCESS_LOD_FAR_STRIDE = 12;
     private static readonly UPDATE_BUCKET_RADIUS = 2;
-    private static players: MobileList<Player> = new MobileList<Player>(World.MAX_PLAYERS);
+    private static players: MobileList<Player> = new MobileList<Player>(
+        World.MAX_PLAYERS,
+        (player) => World.registerPlayerPosition(player),
+        (player) => World.unregisterPlayerPosition(player)
+    );
     // TODO: Wire player bot storage back in when bot support is restored.
     private static playerBots: Map<string, any> = new Map<string, any>();
     private static npcs: MobileList<NPC> = new MobileList<NPC>(
@@ -47,6 +52,8 @@ export class World {
     private static items: ItemOnGround[] = [];
     private static playerArray: Player[] = []
     private static activeNpcsForUpdate: NPC[] = [];
+    private static combatActiveNpcs = new Set<NPC>();
+    private static playerTileOccupants: Map<string, Player[]> = new Map();
     private static npcTileOccupants: Map<string, NPC[]> = new Map();
     private static npcRegionOccupants: Map<string, Set<NPC>> = new Map();
     private static activeRegionIndex: ActiveRegionIndex = new ActiveRegionIndex(1);
@@ -54,6 +61,8 @@ export class World {
     private static realPlayerObserverCount = 0;
     private static playerUpdateBuckets: Map<string, Player[]> = new Map();
     private static npcUpdateBuckets: Map<string, NPC[]> = new Map();
+    private static playerProcessOrder: Player[] = [];
+    private static nextPlayerOrderShuffleCycle = 0;
 
     /**
      * The collection of active {@link GameObject}s..
@@ -205,6 +214,12 @@ export class World {
         return this.activeNpcsForUpdate;
     }
 
+    public static markNpcCombatActive(npc: NPC, active: boolean): void {
+        if (!npc) return;
+        if (active) World.combatActiveNpcs.add(npc);
+        else World.combatActiveNpcs.delete(npc);
+    }
+
     public static getActiveRegionSnapshot(): ActiveRegionSnapshot {
         return World.activeRegionIndex.getSnapshot();
     }
@@ -225,6 +240,62 @@ export class World {
         return `${z}:${x}:${y}`;
     }
 
+    private static addPlayerToTileOccupants(player: Player, location: Location | null | undefined): void {
+        if (!player || !location) return;
+        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
+        const bucket = World.playerTileOccupants.get(key);
+        if (bucket) {
+            if (!bucket.includes(player)) bucket.push(player);
+        } else {
+            World.playerTileOccupants.set(key, [player]);
+        }
+    }
+
+    private static removePlayerFromTileOccupants(player: Player, location: Location | null | undefined): void {
+        if (!player || !location) return;
+        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
+        const bucket = World.playerTileOccupants.get(key)?.filter((candidate) => candidate !== player);
+        if (!bucket?.length) World.playerTileOccupants.delete(key);
+        else World.playerTileOccupants.set(key, bucket);
+    }
+
+    public static registerPlayerPosition(player: Player, location: Location | null | undefined = player?.getLocation?.()): void {
+        World.addPlayerToTileOccupants(player, location);
+    }
+
+    public static unregisterPlayerPosition(player: Player, location: Location | null | undefined = player?.getLocation?.()): void {
+        World.removePlayerFromTileOccupants(player, location);
+    }
+
+    public static onPlayerMoved(
+        player: Player,
+        previousLocation: Location | null | undefined,
+        nextLocation: Location | null | undefined
+    ): void {
+        if (!player || !previousLocation || !nextLocation || previousLocation.equals(nextLocation)) return;
+        World.removePlayerFromTileOccupants(player, previousLocation);
+        World.addPlayerToTileOccupants(player, nextLocation);
+    }
+
+    public static isPlayerOccupyingTile(
+        location: Location | null | undefined,
+        ignoredPlayer: Player | null = null,
+        size = 1,
+        privateArea?: any
+    ): boolean {
+        if (!location) return false;
+        for (let x = 0; x < Math.max(1, size); x++) {
+            for (let y = 0; y < Math.max(1, size); y++) {
+                const key = World.getNpcTileKey(location.getX() + x, location.getY() + y, location.getZ());
+                if (World.playerTileOccupants.get(key)?.some((player) => player && player !== ignoredPlayer &&
+                    (privateArea === undefined || player.getPrivateArea() === privateArea))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static getBotProcessObserverBucketKey(x: number, y: number, z: number): string {
         return `${z}:${Math.floor(x / World.BOT_PROCESS_LOD_CHUNK_SIZE_TILES)}:${Math.floor(y / World.BOT_PROCESS_LOD_CHUNK_SIZE_TILES)}`;
     }
@@ -233,32 +304,33 @@ export class World {
         if (!npc || !location) {
             return;
         }
-        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
-        const bucket = World.npcTileOccupants.get(key);
-        if (bucket) {
-            if (!bucket.includes(npc)) {
-                bucket.push(npc);
+        const size = Math.max(1, npc.getSize());
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                const key = World.getNpcTileKey(location.getX() + x, location.getY() + y, location.getZ());
+                const bucket = World.npcTileOccupants.get(key);
+                if (bucket) {
+                    if (!bucket.includes(npc)) bucket.push(npc);
+                } else {
+                    World.npcTileOccupants.set(key, [npc]);
+                }
             }
-            return;
         }
-        World.npcTileOccupants.set(key, [npc]);
     }
 
     private static removeNpcFromTileOccupants(npc: NPC, location: Location | null | undefined): void {
         if (!npc || !location) {
             return;
         }
-        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
-        const bucket = World.npcTileOccupants.get(key);
-        if (!bucket || bucket.length === 0) {
-            return;
+        const size = Math.max(1, npc.getSize());
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                const key = World.getNpcTileKey(location.getX() + x, location.getY() + y, location.getZ());
+                const nextBucket = World.npcTileOccupants.get(key)?.filter((candidate) => candidate !== npc);
+                if (!nextBucket?.length) World.npcTileOccupants.delete(key);
+                else World.npcTileOccupants.set(key, nextBucket);
+            }
         }
-        const nextBucket = bucket.filter((candidate) => candidate !== npc);
-        if (nextBucket.length === 0) {
-            World.npcTileOccupants.delete(key);
-            return;
-        }
-        World.npcTileOccupants.set(key, nextBucket);
     }
 
     private static addNpcToRegionOccupants(npc: NPC, location: Location | null | undefined): void {
@@ -321,21 +393,21 @@ export class World {
 
     public static isNpcOccupyingTile(
         location: Location | null | undefined,
-        ignoredNpc: NPC | null = null
+        ignoredNpc: NPC | null = null,
+        size = 1,
+        privateArea?: any
     ): boolean {
         if (!location) {
             return false;
         }
-        const key = World.getNpcTileKey(location.getX(), location.getY(), location.getZ());
-        const bucket = World.npcTileOccupants.get(key);
-        if (!bucket || bucket.length === 0) {
-            return false;
-        }
-        for (const npc of bucket) {
-            if (!npc || npc === ignoredNpc) {
-                continue;
+        for (let x = 0; x < Math.max(1, size); x++) {
+            for (let y = 0; y < Math.max(1, size); y++) {
+                const key = World.getNpcTileKey(location.getX() + x, location.getY() + y, location.getZ());
+                if (World.npcTileOccupants.get(key)?.some((npc) => npc && npc !== ignoredNpc &&
+                    (privateArea === undefined || npc.getPrivateArea() === privateArea))) {
+                    return true;
+                }
             }
-            return true;
         }
         return false;
     }
@@ -385,13 +457,39 @@ export class World {
                 for (const npc of bucket) activeNpcs.add(npc);
             }
         }
-        // Finish combat/death flows that began while the NPC's region was active.
+        // Finish mechanics that began while the NPC's region was active.
         for (const npc of World.activeNpcsForUpdate) {
-            if (npc.isRegistered() && (npc.getInteractingMobile() != null || npc.isDyingFunction?.())) {
+            const definition = npc.getDefinition?.();
+            if (npc.isRegistered() && (
+                npc.getInteractingMobile() != null ||
+                npc.isDyingFunction?.() ||
+                npc.getCombat().hasPendingWork() ||
+                npc.getMovementQueue().hasPendingWork() ||
+                npc.getTimers().hasActive() ||
+                npc.getMovementCoordinator().getCoordinateState() !== CoordinateState.HOME ||
+                (definition != null && npc.getHitpoints() < definition.getHitpoints())
+            )) {
                 activeNpcs.add(npc);
             }
         }
+        for (const npc of World.combatActiveNpcs) {
+            if (npc.isRegistered() &&
+                (npc.getCombat().hasPendingWork() || npc.getMovementQueue().hasPendingWork())) {
+                activeNpcs.add(npc);
+            }
+            else World.combatActiveNpcs.delete(npc);
+        }
         return Array.from(activeNpcs).sort((a, b) => a.getIndex() - b.getIndex());
+    }
+
+    private static processNpcMechanics(npcs: NPC[]): void {
+        for (const npc of npcs) {
+            try {
+                npc.process();
+            } catch (e) {
+                console.error(e);
+            }
+        }
     }
 
     private static rebuildRealPlayerObserverBuckets(): void {
@@ -580,9 +678,50 @@ export class World {
             return true;
         }
 
+        if (player.getCombat?.().hasPendingWork?.() || player.getMovementQueue?.().hasPendingWork?.()) {
+            return true;
+        }
+        if (player.getTimers?.().hasActive?.()) return true;
+
         const index = Number(player.getIndex?.() ?? 0);
         const stride = World.resolveBotProcessStride(player);
         return ((cycle + index) % stride) === 0;
+    }
+
+    private static orderedPlayersForCycle(cycle: number): Player[] {
+        const current: Player[] = [];
+        World.players.forEach((player) => current.push(player));
+        const registered = new Set(current);
+        World.playerProcessOrder = World.playerProcessOrder.filter((player) => registered.has(player));
+        const ordered = new Set(World.playerProcessOrder);
+        for (const player of current) {
+            if (!ordered.has(player)) World.playerProcessOrder.push(player);
+        }
+
+        if (World.nextPlayerOrderShuffleCycle === 0 || cycle >= World.nextPlayerOrderShuffleCycle) {
+            World.shufflePlayerProcessOrder();
+            World.nextPlayerOrderShuffleCycle = cycle + 100 + Math.floor(Math.random() * 51);
+        }
+        return World.playerProcessOrder;
+    }
+
+    /**
+     * Fisher-Yates over the process order, except that duelling players keep their
+     * slots. Both fighters must see stable relative priority for the length of a
+     * duel, so a reshuffle must not flip who lands first mid-fight.
+     */
+    private static shufflePlayerProcessOrder(): void {
+        const order = World.playerProcessOrder;
+        const movable: number[] = [];
+        for (let index = 0; index < order.length; index++) {
+            if (order[index]?.getDueling?.()?.inDuel?.() !== true) movable.push(index);
+        }
+        for (let i = movable.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const a = movable[i];
+            const b = movable[j];
+            [order[a], order[b]] = [order[b], order[a]];
+        }
     }
 
     private static resolveBotProcessStride(player: Player): number {
@@ -760,13 +899,6 @@ export class World {
         const timed = <T>(phase: string, fn: () => T): T =>
             ServerPerf.measurePhase(`world.${phase}`, fn);
 
-        // Re-roll any player's PID whose 100-150 tick window has elapsed,
-        // before same-tick processing order is decided below.
-        timed("pid_reshuffle", () => {
-            const cycle = World.processCycle;
-            World.players.forEach((player) => player.maybeReshufflePid(cycle));
-        });
-
         // Process all active {@link Task}s..
         timed("task_manager", () => {
             try {
@@ -905,21 +1037,20 @@ export class World {
             }
         });
 
-        // Sequential processing to avoid null-slot crashes during bring-up.
-        // Players are processed in PID order so that same-tick ties (who
-        // claims a shared movement tile, whose attack lands first on a
-        // shared target) resolve the way OSRS resolves them.
+        World.rebuildRealPlayerObserverBuckets();
+        timed("process_npcs", () => {
+            // One pass per cycle: the collection scans every occupied bucket,
+            // allocates a Set and sorts. An NPC that only becomes active during
+            // this pass is picked up on the next cycle, one tick later.
+            World.activeNpcsForUpdate = World.collectActiveNpcsForUpdate();
+            World.processNpcMechanics(World.activeNpcsForUpdate);
+        });
+
         timed("process_players", () => {
             const cycle = World.processCycle;
-            World.rebuildRealPlayerObserverBuckets();
-            const orderedPlayers: Player[] = [];
-            World.players.forEach((player) => orderedPlayers.push(player));
-            orderedPlayers.sort((a, b) => a.getPidPriority() - b.getPidPriority());
-            for (const player of orderedPlayers) {
+            for (const player of World.orderedPlayersForCycle(cycle)) {
                 try {
-                    if (!World.shouldProcessBotPlayerThisTick(player, cycle)) {
-                        continue;
-                    }
+                    if (!World.shouldProcessBotPlayerThisTick(player, cycle)) continue;
                     player.process();
                     ShopManager.processPlayer(player);
                     if (player.isPlayerBot?.() !== true) {
@@ -932,16 +1063,9 @@ export class World {
             }
         });
 
-        timed("process_npcs", () => {
-            World.activeNpcsForUpdate = World.collectActiveNpcsForUpdate();
-            for (const npc of World.activeNpcsForUpdate) {
-                try {
-                    npc.process();
-                } catch (e) {
-                    console.error(e);
-                }
-            }
-        });
+        // Owners that did not take a turn this cycle (bot stride) still need their
+        // walk-to interactions ticked, or the interaction hangs until they do.
+        timed("walk_to_sweep", () => TaskManager.processRemainingWalkTo());
 
         timed("combat_hits", () => {
             HitQueue.processAll(World.processCycle);

@@ -343,10 +343,11 @@ export async function cleanUp(host: WebGLOsrsRendererHost, ): Promise<void> {
         host.drawBackend?.dispose();
         host.drawBackend = undefined;
 
-        // Unified actor texture cleanup handled by actorDataTextureBuffer below
-        for (const texture of host.actorDataTextureBuffer) {
+        for (const texture of host.actorDataTextures) {
             texture?.delete();
         }
+        host.actorDataTextures = [undefined, undefined];
+        host.actorDataTextureBuffer.length = 0;
 
         host.clearMaps();
         host.disposeDynamicNpcAnimState();

@@ -41,7 +41,6 @@ import { PlayerRights } from "../../../model/rights/PlayerRights";
 import { TaskManager } from "../../../task/TaskManager";
 import { CombatPoisonEffect } from "../../../task/impl/CombatPoisonEffect";
 import { PlayerDeathTask } from "../../../task/impl/PlayerDeath"
-import { RestoreSpecialAttackTask } from "../../../task/impl/RestoreSpecialAttackTask"
 import { PlayerSession } from "../../../../net/PlayerSession"
 import { ChannelEventHandler } from "../../../../net/channel/ChannelEventHandler";
 import { PacketSender } from "../../../../net/packet/PacketSender"
@@ -170,18 +169,6 @@ export class Player extends Mobile {
     private consecutiveTasks: number;
 
     // Combat
-    /**
-     * OSRS PID: processing priority for same-tick ties (movement onto a
-     * shared tile, attacks landing on the same target, etc - lower goes
-     * first). Randomized on login and re-randomized every 100-150 ticks
-     * (60-90s), per player, matching the mechanic OSRS has used since the
-     * April 2016 "Bank Placeholders & PID" update - PID is NOT a fixed
-     * login-order slot; it was randomized every tick before that update and
-     * has been randomized on this 100-150 tick cycle since.
-     */
-    private pidPriority: number = Misc.getRandomDouble(0x7fffffff);
-    /** Tick this player's PID is next due to reshuffle; 0 forces an immediate roll on first process(). */
-    private nextPidReshuffleTick = 0;
     public skullType: SkullType;
     public combatSpecial: CombatSpecial;
     private recoilDamage: number;
@@ -403,22 +390,29 @@ export class Player extends Mobile {
         // Timers
         timed("timers", () => this.getTimers().process());
 
-        if (isBot) {
-            timed("overlap_break", () => this.tryBreakBotCombatOverlap());
+        const movement = this.getMovementQueue();
+        const combat = this.getCombat();
+        movement.beginCycle();
+        const processCombat = combat.hasPendingWork();
+        if (processCombat) {
+            timed("combat_pre_movement", () => combat.preMovementProcess());
         }
 
         // Process walking queue only when movement/follow state exists.
-        if (this.getMovementQueue().hasPendingWork()) {
-            timed("movement", () => this.getMovementQueue().process());
+        if (movement.hasPendingWork()) {
+            timed("movement", () => movement.process());
         }
-        if (this.getMovementQueue().isMovings()) {
+        if (movement.isMovings()) {
             this.updateFlag.flag(Flag.APPEARANCE);
         }
 
-        // Process combat
-        if (this.getCombat().hasPendingWork()) {
-            timed("combat", () => this.getCombat().process());
+        if (processCombat) {
+            timed("combat_post_movement", () => combat.postMovementProcess());
         }
+
+        // Reach checks for walk-to interactions run here, after this cycle's steps,
+        // so arriving at an object/npc/ground item resolves on the same cycle.
+        timed("walk_to_interaction", () => TaskManager.processWalkTo(this.getIndex()));
 
         // Process aggression
         if (!isBot) {
@@ -533,69 +527,6 @@ export class Player extends Mobile {
         }
     }
 
-    private tryBreakBotCombatOverlap(): void {
-        if (
-            this.getForceMovement() != null ||
-            this.getTimers().has(TimerKey.FREEZE) ||
-            this.getTimers().has(TimerKey.STEPPING_OUT) ||
-            this.getMovementQueue().size() > 0
-        ) {
-            return;
-        }
-
-        const combat = this.getCombat();
-        if (!combat?.hasPendingWork()) {
-            return;
-        }
-
-        const current = this.getLocation();
-        const privateArea = this.getPrivateArea();
-        const locals = this.getLocalPlayers();
-        let overlap: Player = null;
-
-        for (const other of locals) {
-            if (
-                !other ||
-                other === this ||
-                !other.isRegistered() ||
-                !other.isPlayerBot() ||
-                other.getPrivateArea() !== privateArea ||
-                other.getForceMovement() != null ||
-                other.getTimers().has(TimerKey.FREEZE)
-            ) {
-                continue;
-            }
-            const otherCombat = other.getCombat();
-            if (!otherCombat?.hasPendingWork()) {
-                continue;
-            }
-            const otherLoc = other.getLocation();
-            if (
-                otherLoc &&
-                otherLoc.getX() === current.getX() &&
-                otherLoc.getY() === current.getY() &&
-                otherLoc.getZ() === current.getZ()
-            ) {
-                overlap = other;
-                break;
-            }
-        }
-
-        if (!overlap) {
-            return;
-        }
-
-        // Break bot-bot overlap from one side only. If both participants yield,
-        // they can swap tiles and oscillate.
-        if (this.getIndex() > overlap.getIndex()) {
-            return;
-        }
-
-        MovementQueue.clippedStep(this);
-        if (this.getMovementQueue().size() > 0) {
-            this.getTimers().registers(TimerKey.STEPPING_OUT, 2);
-        }
-    }
 
     // Construction
     /*
@@ -684,6 +615,7 @@ export class Player extends Mobile {
         // packet path, so the weapon interface/fight-styles/attack animation
         // (all driven by player.weapon, set here) are never assigned on login.
         WeaponInterfaces.assign(this);
+        CombatSpecial.ensureRestoreTask(this);
         const autocastSpell = this.getCombat().getAutocastSpell();
         if (autocastSpell != null && autocastSpell.getSpellbook?.() !== this.getSpellbook()) {
             Autocasting.setAutocast(this, null);
@@ -1321,29 +1253,6 @@ export class Player extends Mobile {
 
     public getSpecialAttackRestore(): SecondsTimer {
         return this.specialAttackRestore;
-    }
-
-    public getPidPriority(): number {
-        return this.pidPriority;
-    }
-
-    /**
-     * Re-randomizes this player's PID once its 100-150 tick (60-90s) window
-     * has elapsed, matching OSRS's behavior since the April 2016 PID update.
-     * Called once per tick, per player, before same-tick processing order is
-     * decided for that tick. The Duel Arena exception (priority is frozen
-     * for the duration of a duel so both fighters see consistent conditions)
-     * is honored by simply not rolling while the player is dueling.
-     */
-    public maybeReshufflePid(currentTick: number): void {
-        if (currentTick < this.nextPidReshuffleTick) {
-            return;
-        }
-        if (this.getDueling().inDuel()) {
-            return;
-        }
-        this.pidPriority = Misc.getRandomDouble(0x7fffffff);
-        this.nextPidReshuffleTick = currentTick + 100 + Math.floor(Math.random() * 51);
     }
 
     public getSkullType(): SkullType {

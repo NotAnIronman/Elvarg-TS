@@ -1351,7 +1351,7 @@ class BotBehaviorTask extends Task {
       }
       const combatMethod = this.CombatFactory.getMethod(player);
       if (
-        this.CombatFactory.canAttack(player, combatMethod, attacker) !==
+        this.CombatFactory.canAttackPermission(player, attacker, false, combatMethod) !==
         CanAttackResponse.CAN_ATTACK
       ) {
         return false;
@@ -1359,12 +1359,7 @@ class BotBehaviorTask extends Task {
     }
 
     const currentTarget = combat?.getTarget?.();
-    const alreadyEngaged =
-      currentTarget === attacker ||
-      player.getCombatFollowing?.() === attacker ||
-      state?.pvp?.targetPlayer === attacker ||
-      state?.pvp?.targetUsername === attacker.getUsername?.();
-    if (alreadyEngaged) {
+    if (currentTarget) {
       return false;
     }
 

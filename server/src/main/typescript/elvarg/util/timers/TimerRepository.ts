@@ -70,6 +70,11 @@ export class TimerRepository {
         }
     }
 
+    public hasActive(): boolean {
+        for (const timer of this.timer.values()) if (timer.ticks() > 0) return true;
+        return false;
+    }
+
     public timers(): Map<TimerKey, Timer> {
         return this.timer;
     }

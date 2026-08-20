@@ -99,6 +99,7 @@ export class NPC extends Mobile {
     private visible: boolean = true;
     private face: FacingDirection = FacingDirection.SOUTH;
     private pet: boolean;
+    private movementSteps = 1;
 
     constructor(id: number, position: Location) {
         super(position)
@@ -144,15 +145,6 @@ export class NPC extends Mobile {
         return false;
     }
 
-    /**
-     * Can this npc use pathfinding when following its target?
-     * 
-     * @return
-     */
-    public canUsePathFinding(): boolean {
-        return false;
-    }
-
     public NPC(id: number, position: Location) {
         this.id = id;
         this.spawnPosition = position.clone();
@@ -186,8 +178,20 @@ export class NPC extends Mobile {
     public process() {
         if (this.getDefinition() != null) {
             this.getTimers().process();
-            this.getMovementQueue().process();
+            const movement = this.getMovementQueue();
+            const combat = this.getCombat();
+            movement.beginCycle();
             this.movementCoordinator.process();
+            const processCombat = combat.hasPendingWork();
+            if (processCombat) {
+                combat.preMovementProcess();
+            }
+            if (movement.hasPendingWork()) {
+                movement.process();
+            }
+            if (processCombat) {
+                combat.postMovementProcess();
+            }
 
             const interactingMobile = this.getInteractingMobile();
             if (interactingMobile != null) {
@@ -235,7 +239,6 @@ export class NPC extends Mobile {
                 }
             }
 
-            this.getCombat().process();
             AreaManager.process(this);
             if (this.getCombat().getLastAttack().hasElapsed(20000)
                 || this.movementCoordinator.getCoordinateState() == CoordinateState.RETREATING) {
@@ -339,6 +342,15 @@ export class NPC extends Mobile {
 
     public getBaseAttackSpeed(): number {
         return this.getCurrentDefinition().getAttackSpeed();
+    }
+
+    public getMovementSteps(): number {
+        return this.movementSteps;
+    }
+
+    public setMovementSteps(steps: number): NPC {
+        this.movementSteps = Math.max(1, Math.min(2, steps | 0));
+        return this;
     }
 
     public getAttackAnim(): number {

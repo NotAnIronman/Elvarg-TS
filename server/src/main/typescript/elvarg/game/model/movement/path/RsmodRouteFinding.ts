@@ -1,5 +1,4 @@
 import type { PrivateArea } from "../../areas/impl/PrivateArea";
-import { RegionManager } from "../../../collision/RegionManager";
 
 const SEARCH_MAP_SIZE = 128;
 const RING_BUFFER_SIZE = 4096;
@@ -62,6 +61,8 @@ const RECTANGLE_EXCLUSIVE_STRATEGY = 4;
 const WALLDECOR_DIAGONAL_NOOFFSET_SHAPE = 7;
 
 export type RsmodWaypoint = { x: number; y: number; z: number };
+
+type CollisionLookup = (x: number, y: number, level: number, privateArea: PrivateArea | null) => number;
 
 export type RsmodRouteResult = {
   waypoints: RsmodWaypoint[];
@@ -128,6 +129,11 @@ export class RsmodRouteFinding {
   private currLocalY = 0;
   private bufReaderIndex = 0;
   private bufWriterIndex = 0;
+  private getClipping?: CollisionLookup;
+
+  public constructor(getClipping?: CollisionLookup) {
+    this.getClipping = getClipping;
+  }
 
   public findRoute(options: FindRouteOptions): RsmodRouteResult {
     const {
@@ -198,18 +204,10 @@ export class RsmodRouteFinding {
         return { waypoints: [], alternative: false, success: false, endX: srcX, endY: srcY };
       }
       const foundApproachPoint = this.findClosestApproachPoint(
-        baseX,
-        baseY,
-        level,
         localDestX,
         localDestY,
-        destWidth,
-        destLength,
-        srcSize,
-        locAngle,
-        locShape,
-        blockAccessFlags,
-        privateArea
+        rotateDimensions(locAngle, destWidth, destLength),
+        rotateDimensions(locAngle, destLength, destWidth)
       );
       if (!foundApproachPoint) {
         return { waypoints: [], alternative: false, success: false, endX: srcX, endY: srcY };
@@ -218,27 +216,41 @@ export class RsmodRouteFinding {
 
     const endLocalX = this.currLocalX;
     const endLocalY = this.currLocalY;
-    const reversedSteps: RsmodWaypoint[] = [];
+    const waypoints: RsmodWaypoint[] = [];
+    let nextDirection = this.directionAt(this.currLocalX, this.currLocalY);
+    let currentDirection = -1;
 
-    while (this.currLocalX !== localSrcX || this.currLocalY !== localSrcY) {
-      reversedSteps.push({
-        x: baseX + this.currLocalX,
-        y: baseY + this.currLocalY,
-        z: level,
-      });
-      const direction = this.directionAt(this.currLocalX, this.currLocalY);
-      if ((direction & DIR_EAST) !== 0) {
+    // Bounded exactly like RouteFinding.findRoute's `for (i in directions.indices)`.
+    // A direction of 0 advances neither axis, so an unvisited or corrupt cell would
+    // otherwise spin this loop forever and hang the game tick.
+    for (
+      let guard = this.directions.length;
+      guard > 0 && (this.currLocalX !== localSrcX || this.currLocalY !== localSrcY);
+      guard--
+    ) {
+      if (currentDirection !== nextDirection) {
+        currentDirection = nextDirection;
+        if (waypoints.length >= maxWaypoints) {
+          waypoints.pop();
+        }
+        waypoints.unshift({
+          x: baseX + this.currLocalX,
+          y: baseY + this.currLocalY,
+          z: level,
+        });
+      }
+      if ((currentDirection & DIR_EAST) !== 0) {
         this.currLocalX++;
-      } else if ((direction & DIR_WEST) !== 0) {
+      } else if ((currentDirection & DIR_WEST) !== 0) {
         this.currLocalX--;
       }
-      if ((direction & DIR_NORTH) !== 0) {
+      if ((currentDirection & DIR_NORTH) !== 0) {
         this.currLocalY++;
-      } else if ((direction & DIR_SOUTH) !== 0) {
+      } else if ((currentDirection & DIR_SOUTH) !== 0) {
         this.currLocalY--;
       }
+      nextDirection = this.directionAt(this.currLocalX, this.currLocalY);
     }
-    const waypoints = reversedSteps.reverse().slice(0, maxWaypoints);
 
     return {
       waypoints,
@@ -776,25 +788,14 @@ export class RsmodRouteFinding {
   }
 
   private findClosestApproachPoint(
-    baseX: number,
-    baseY: number,
-    level: number,
     localDestX: number,
     localDestY: number,
-    destWidth: number,
-    destLength: number,
-    srcSize: number,
-    locAngle: number,
-    locShape: number,
-    blockAccessFlags: number,
-    privateArea: PrivateArea | null
+    width: number,
+    length: number
   ): boolean {
     let lowestCost = MAX_ALTERNATIVE_ROUTE_LOWEST_COST;
     let maxAlternativePath = MAX_ALTERNATIVE_ROUTE_SEEK_RANGE;
     const alternativeRouteRange = MAX_ALTERNATIVE_ROUTE_DISTANCE_FROM_DESTINATION;
-    const width = rotateDimensions(locAngle, destWidth, destLength);
-    const length = rotateDimensions(locAngle, destLength, destWidth);
-    const exitStrategy = this.exitStrategy(locShape);
     for (let x = localDestX - alternativeRouteRange; x <= localDestX + alternativeRouteRange; x++) {
       for (let y = localDestY - alternativeRouteRange; y <= localDestY + alternativeRouteRange; y++) {
         if (
@@ -806,28 +807,6 @@ export class RsmodRouteFinding {
         ) {
           continue;
         }
-        if (
-          exitStrategy !== NO_STRATEGY &&
-          !this.reached(
-            baseX,
-            baseY,
-            level,
-            x,
-            y,
-            localDestX,
-            localDestY,
-            destWidth,
-            destLength,
-            srcSize,
-            locAngle,
-            locShape,
-            blockAccessFlags,
-            privateArea
-          )
-        ) {
-          continue;
-        }
-
         const dx = x < localDestX ? localDestX - x : x > localDestX + width - 1 ? x - (width + localDestX - 1) : 0;
         const dy = y < localDestY ? localDestY - y : y > localDestY + length - 1 ? y - (localDestY + length - 1) : 0;
         const cost = dx * dx + dy * dy;
@@ -1509,7 +1488,11 @@ export class RsmodRouteFinding {
   }
 
   private absoluteFlag(x: number, y: number, level: number, privateArea: PrivateArea | null): number {
-    return RegionManager.getClipping(x, y, level, privateArea);
+    if (!this.getClipping) {
+      const { RegionManager } = require("../../../collision/RegionManager");
+      this.getClipping = RegionManager.getClipping.bind(RegionManager);
+    }
+    return this.getClipping(x, y, level, privateArea);
   }
 
   private flagAt(

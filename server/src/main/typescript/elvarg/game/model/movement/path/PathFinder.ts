@@ -2,17 +2,12 @@ import { Mobile } from "../../../entity/impl/Mobile";
 import { Server } from "../../../../Server";
 import { RegionManager } from "../../../collision/RegionManager";
 import { Location } from "../../Location";
-import { Graphic } from "../../Graphic";
-import { PlayerRights } from "../../rights/PlayerRights";
-import { GameConstants } from "../../../GameConstants";
-import { CombatConstants } from "../../../content/combat/CombatConstants";
 import { PluginManager } from "../../../../plugins/PluginManager";
 import { RsmodRouteFinding } from "./RsmodRouteFinding";
 import * as fs from "fs";
 import * as path from "path";
 
 export class PathFinder {
-    private static readonly ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
     // Debounce path-blocked events aggressively: repeated retries against the
     // same destination within a short window do not provide extra recovery
     // signal for bot logic, but they do add measurable hook overhead.
@@ -73,45 +68,11 @@ export class PathFinder {
         });
         return true;
     }
-    private static TILE_DISTANCE_DELTAS: Map<number, number[][]> = new Map<number, number[][]>()
-        .set(1, [[-1, 0], [0, -1], [0, 1], [1, 0]])
-        .set(2, [[-2, 0], [-1, -1], [-1, 1], [0, -2], [0, 2], [1, -1], [1, 1], [2, 0]])
-        .set(3, [[-3, 0], [-2, -2], [-2, -1], [-2, 1], [-2, 2], [-1, -2], [-1, 2], [0, -3], [0, 3], [1, -2], [1, 2], [2, -2], [2, -1], [2, 1], [2, 2], [3, 0]])
-        .set(4, [[-4, 0], [-3, -2], [-3, -1], [-3, 1], [-3, 2], [-2, -3], [-2, 3], [-1, -3], [-1, 3], [0, -4], [0, 4], [1, -3], [1, 3], [2, -3], [2, 3], [3, -2], [3, -1], [3, 1], [3, 2], [4, 0]])
-        .set(5, [[-5, 0], [-4, -3], [-4, -2], [-4, -1], [-4, 1], [-4, 2], [-4, 3], [-3, -4], [-3, -3], [-3, 3], [-3, 4], [-2, -4], [-2, 4], [-1, -4], [-1, 4], [0, -5], [0, 5], [1, -4], [1, 4], [2, -4], [2, 4], [3, -4], [3, -3], [3, 3], [3, 4], [4, -3], [4, -2], [4, -1], [4, 1], [4, 2], [4, 3], [5, 0]])
-        .set(6, [[-6, 0], [-5, -3], [-5, -2], [-5, -1], [-5, 1], [-5, 2], [-5, 3], [-4, -4], [-4, 4], [-3, -5], [-3, 5], [-2, -5], [-2, 5], [-1, -5], [-1, 5], [0, -6], [0, 6], [1, -5], [1, 5], [2, -5], [2, 5], [3, -5], [3, 5], [4, -4], [4, 4], [5, -3], [5, -2], [5, -1], [5, 1], [5, 2], [5, 3], [6, 0]])
-        .set(7, [[-7, 0], [-6, -3], [-6, -2], [-6, -1], [-6, 1], [-6, 2], [-6, 3], [-5, -4], [-5, 4], [-4, -5], [-4, 5], [-3, -6], [-3, 6], [-2, -6], [-2, 6], [-1, -6], [-1, 6], [0, -7], [0, 7], [1, -6], [1, 6], [2, -6], [2, 6], [3, -6], [3, 6], [4, -5], [4, 5], [5, -4], [5, 4], [6, -3], [6, -2], [6, -1], [6, 1], [6, 2], [6, 3], [7, 0]])
-        .set(8, [[-8, 0], [-7, -3], [-7, -2], [-7, -1], [-7, 1], [-7, 2], [-7, 3], [-6, -5], [-6, -4],
-        [-6, 4], [-6, 5], [-5, -6], [-5, -5], [-5, 5], [-5, 6], [-4, -6], [-4, 6], [-3, -7], [-3, 7], [-2, -7],
-        [-2, 7], [-1, -7], [-1, 7], [0, -8], [0, 8], [1, -7], [1, 7], [2, -7], [2, 7], [3, -7], [3, 7], [4, -6],
-        [4, 6], [5, -6], [5, -5], [5, 5], [5, 6], [6, -5], [6, -4], [6, 4], [6, 5], [7, -3], [7, -2], [7, -1],
-        [7, 1], [7, 2], [7, 3], [8, 0]])
-
-        // Deltas which are exactly 9 squares away
-        .set(9, [
-            [-9, 0], [-8, -4], [-8, -3], [-8, -2], [-8, -1], [-8, 1], [-8, 2], [-8, 3], [-8, 4],
-            [-7, -5], [-7, -4], [-7, 4], [-7, 5], [-6, -6], [-6, 6], [-5, -7], [-5, 7], [-4, -8], [-4, -7], [-4, 7],
-            [-4, 8], [-3, -8], [-3, 8], [-2, -8], [-2, 8], [-1, -8], [-1, 8], [0, -9], [0, 9], [1, -8], [1, 8],
-            [2, -8], [2, 8], [3, -8], [3, 8], [4, -8], [4, -7], [4, 7], [4, 8], [5, -7], [5, 7], [6, -6], [6, 6],
-            [7, -5], [7, -4], [7, 4], [7, 5], [8, -4], [8, -3], [8, -2], [8, -1], [8, 1], [8, 2], [8, 3], [8, 4], [9, 0]])
-        .set(10, [
-            [-10, 0], [-9, -4], [-9, -3], [-9, -2], [-9, -1], [-9, 1], [-9, 2], [-9, 3], [-9, 4],
-            [-8, -6], [-8, -5], [-8, 5], [-8, 6], [-7, -7], [-7, -6], [-7, 6], [-7, 7], [-6, -8], [-6, -7], [-6, 7],
-            [-6, 8], [-5, -8], [-5, 8], [-4, -9], [-4, 9], [-3, -9], [-3, 9], [-2, -9], [-2, 9], [-1, -9], [-1, 9],
-            [0, -10], [0, 10], [1, -9], [1, 9], [2, -9], [2, 9], [3, -9], [3, 9], [4, -9], [4, 9], [5, -8], [5, 8],
-            [6, -8], [6, -7], [6, 7], [6, 8], [7, -7], [7, -6], [7, 6], [7, 7], [8, -6], [8, -5], [8, 5], [8, 6], [9, -4],
-            [9, -3], [9, -2], [9, -1], [9, 1], [9, 2], [9, 3], [9, 4], [10, 0]
-        ]);
-
     public static isDiagonalTiles(attacker: Location, attacked: Location): boolean {
         return (
             Math.abs(attacker.getX() - attacked.getX()) === 1 &&
             Math.abs(attacker.getY() - attacked.getY()) === 1
         );
-    }
-
-    public static isDiagonalLocation(att: Mobile, def: Mobile): boolean {
-        return PathFinder.isDiagonalTiles(att.getLocation(), def.getLocation());
     }
 
     private static emitNoPath(
@@ -183,21 +144,10 @@ export class PathFinder {
             blockingMask?: number;
         } = {}
     ): number {
-        // Every route calculation starts a fresh queue from the entity's live
-        // position. Without this, addSteps() below interpolates the new
-        // waypoints from the tail of whatever was left in the OLD queue
-        // (MovementQueue.getLast()) instead of from the entity's actual
-        // current tile - harmless for callers that already reset first (this
-        // is a no-op on an empty queue), but combat's routeToward()/
-        // CombatRange.route() re-invoke this every time a chased target's
-        // tile changes without ever resetting, so a mid-chase recompute was
-        // splicing a straight-line "connector" from the stale old waypoints
-        // back to the new ones - visible as the character walking toward the
-        // target, then backtracking, then correcting again.
-        entity.getMovementQueue().reset();
+        // A recalculation replaces the final stretch from the actor's live tile.
+        entity.getMovementQueue().reset(false);
         entity.getMovementQueue().lastDestX = destX;
         entity.getMovementQueue().lastDestY = destY;
-        entity.getMovementQueue().setRoute(false);
 
         const height = entity.getLocation().getZ();
         const srcX = entity.getLocation().getX();
@@ -223,6 +173,8 @@ export class PathFinder {
         });
 
         if (!route.success) {
+            entity.getMovementQueue().setRoute(false, route.alternative);
+            entity.getMovementQueue().syncDestinationFlagToRoute();
             PathFinder.emitNoPath(
                 entity,
                 srcX,
@@ -240,7 +192,7 @@ export class PathFinder {
             return 0;
         }
 
-        entity.getMovementQueue().setRoute(true);
+        entity.getMovementQueue().setRoute(true, route.alternative);
         entity
             .getMovementQueue()
             .setPathX(route.endX - regionBaseX)
@@ -248,9 +200,10 @@ export class PathFinder {
 
         let steps = 0;
         for (const waypoint of route.waypoints) {
-            entity.getMovementQueue().addSteps(new Location(waypoint.x, waypoint.y, waypoint.z));
+            entity.getMovementQueue().addCheckpoint(new Location(waypoint.x, waypoint.y, waypoint.z));
             steps++;
         }
+        entity.getMovementQueue().syncDestinationFlagToRoute();
 
         PathFinder.log(
             `route built entity=${entity.isPlayer() ? "player:" + entity.getAsPlayer().getUsername() : "npc"} steps=${steps} dest=${destX},${destY} alt=${route.alternative ? 1 : 0}`
@@ -318,6 +271,52 @@ export class PathFinder {
         });
     }
 
+    /** OpenRune's footprint-aware destination for one-step NPC pursuit. */
+    static naiveEntityDestination(source: Mobile, target: Mobile): Location {
+        const sourceLocation = source.getLocation();
+        const targetLocation = target.getLocation();
+        const sourceSize = Math.max(1, source.getSize() | 0);
+        const targetSize = Math.max(1, target.getSize() | 0);
+        const diagonal = (sourceLocation.getX() - targetLocation.getX()) +
+            (sourceLocation.getY() - targetLocation.getY());
+        const anti = (sourceLocation.getX() - targetLocation.getX()) -
+            (sourceLocation.getY() - targetLocation.getY());
+        const southWest = anti < 0;
+        const northWest = diagonal >= targetSize - sourceSize;
+        const northEast = anti > 0;
+        const southEast = diagonal <= targetSize - sourceSize;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (southWest && !northWest) {
+            offsetX = -sourceSize;
+            offsetY = diagonal >= -sourceSize
+                ? Math.min(diagonal + sourceSize, targetSize - 1)
+                : anti > -sourceSize ? -(sourceSize + anti) : 0;
+        } else if (northWest && !northEast) {
+            offsetX = anti >= -targetSize
+                ? Math.min(anti + targetSize, targetSize - 1)
+                : diagonal < targetSize ? Math.max(diagonal - targetSize, -(sourceSize - 1)) : 0;
+            offsetY = targetSize;
+        } else if (northEast && !southEast) {
+            offsetX = targetSize;
+            offsetY = anti <= targetSize
+                ? targetSize - anti
+                : diagonal < targetSize ? Math.max(diagonal - targetSize, -(sourceSize - 1)) : 0;
+        } else {
+            offsetX = diagonal > -sourceSize
+                ? Math.min(diagonal + sourceSize, targetSize - 1)
+                : anti < sourceSize ? Math.max(anti - sourceSize, -(sourceSize - 1)) : 0;
+            offsetY = -sourceSize;
+        }
+
+        return new Location(
+            targetLocation.getX() + offsetX,
+            targetLocation.getY() + offsetY,
+            targetLocation.getZ()
+        );
+    }
+
     static calculateWalkRoute(player: Mobile, destX: number, destY: number) {
         if (player.isPlayer()) {
             PathFinder.log(
@@ -337,156 +336,39 @@ export class PathFinder {
         });
     }
 
-    static reachedGroundItem(entity: Mobile, destination: Location): boolean {
+    /** Standing exactly on the destination tile. */
+    static reachedTile(entity: Mobile, destination: Location): boolean {
         return entity.getLocation().equals(destination);
     }
 
-    static calculateObjectRoute(entity: Mobile, size: number, destX: number, destY: number, xLength: number, yLength: number, direction: number, blockingMask: number) {
-        let destWidth = 1;
-        let destLength = 1;
-        let locShape = -1;
-        let locAngle = 0;
-        let blockAccessFlags = 0;
-
-        if (xLength > 0 && yLength > 0) {
-            destWidth = xLength;
-            destLength = yLength;
-            locShape = 10;
-            locAngle = direction;
-            blockAccessFlags = blockingMask;
-        } else if (size !== 0) {
-            locShape = size - 1;
-            locAngle = direction;
+    /**
+     * Operable distance for a ground item: on its tile, or adjacent to it. Upstream
+     * expresses this as reached(shape -1) || reached(shape -2) - shape -1 has no exit
+     * strategy so it only passes on an exact tile match, shape -2 is the exclusive
+     * rectangle used for entities.
+     */
+    static reachedObj(entity: Mobile, destination: Location): boolean {
+        if (PathFinder.reachedTile(entity, destination)) {
+            return true;
         }
-
-        return PathFinder.applyRsmodRoute(entity, destX, destY, {
-            destWidth,
-            destLength,
-            locAngle,
-            locShape,
-            moveNear: true,
-            blockAccessFlags,
-            requestedSize: size,
-            xLength,
-            yLength,
-            direction,
-            blockingMask,
+        return PathFinder.rsmodRouteFinding.reachedAbsolute({
+            level: entity.getLocation().getZ(),
+            srcX: entity.getLocation().getX(),
+            srcY: entity.getLocation().getY(),
+            srcSize: Math.max(entity.getSize(), 1),
+            destX: destination.getX(),
+            destY: destination.getY(),
+            destWidth: 1,
+            destLength: 1,
+            locShape: -2,
+            privateArea: entity.getPrivateArea(),
         });
     }
 
-    public static getClosestAttackableTile(attacker: Mobile, defender: Mobile, distance: number): Location | null {
-        const privateArea = attacker.getPrivateArea();
-        const targetLocation = defender.getLocation();
-        const current = attacker.getLocation();
-        // Chebyshev distance (the metric used below) has wide "plateaus" of
-        // tied values - several candidate approach tiles are often equally
-        // close. Recomputed every tick a moving target's tile changes, a
-        // strict "<" tie-break has no reason to keep picking the same tile
-        // twice in a row, so it can alternate between two equally-valid
-        // tiles as the target shifts by a single tile, making the attacker
-        // waffle between them instead of converging. Preferring whatever
-        // tile the attacker was already walking toward (if it's still just
-        // as good) keeps the choice stable once made.
-        const preferredX = attacker.getMovementQueue().lastDestX;
-        const preferredY = attacker.getMovementQueue().lastDestY;
 
-        if (distance === 1) {
-            const size = attacker.getSize();
-            const followingSize = defender.getSize();
-            let bestTile: Location | null = null;
-            let bestDistance = Number.POSITIVE_INFINITY;
-            let bestPerpendicular = false;
-            let bestPreferred = false;
-            for (const tile of defender.outterTiles()) {
-                if (!RegionManager.canMovestart(attacker.getLocation(), tile, size, size, privateArea)
-                    || RegionManager.blocked(tile, privateArea)) {
-                    continue;
-                }
-                // Projectile attack
-                if (attacker.useProjectileClipping() && !RegionManager.canProjectileAttackReturn(tile, targetLocation, size, privateArea)) {
-                    continue;
-                }
-                const tileDistance = tile.getDistance(current);
-                const tilePerpendicular =
-                    size === 1 &&
-                    followingSize === 1 &&
-                    tile.isPerpendicularTo(current);
-                const tilePreferred = tile.getX() === preferredX && tile.getY() === preferredY;
-                if (
-                    tileDistance < bestDistance ||
-                    (tileDistance === bestDistance && !bestPreferred && (tilePreferred || (tilePerpendicular && !bestPerpendicular)))
-                ) {
-                    bestTile = tile;
-                    bestDistance = tileDistance;
-                    bestPerpendicular = tilePerpendicular;
-                    bestPreferred = tilePreferred;
-                }
-            }
-            if (bestTile != null) {
-                return bestTile;
-            }
-        }
-
-        let tile: Location | undefined = undefined;
-
-        // Starting from the max distance, try to find a suitable tile to attack from
-        while (tile === undefined) {
-            // Fetch the circumference of the closest attackable tiles to the target
-            const possibleTiles = PathFinder.getTilesForDistance(targetLocation, distance);
-
-                if (GameConstants.DEBUG_ATTACK_DISTANCE && attacker.getAsPlayer() && attacker.getAsPlayer().rights === PlayerRights.DEVELOPER) {
-                    // If we're debugging attack range
-                    possibleTiles.forEach(t => attacker.getAsPlayer().packetSender.sendGraphic(PathFinder.ATTACK_RANGE_DEBUG_GRAPHIC, t));
-                }
-
-            let bestTile: Location | undefined = undefined;
-            let bestDistance = Number.POSITIVE_INFINITY;
-            let bestPreferred = false;
-            for (const possibleTile of possibleTiles) {
-                if (RegionManager.blocked(possibleTile, attacker.getPrivateArea())) {
-                    continue;
-                }
-                if (!RegionManager.canProjectileAttack(attacker, possibleTile, targetLocation)) {
-                    continue;
-                }
-                const tileDistance = current.getDistance(possibleTile);
-                const tilePreferred = possibleTile.getX() === preferredX && possibleTile.getY() === preferredY;
-                if (
-                    tileDistance < bestDistance ||
-                    (tileDistance === bestDistance && tilePreferred && !bestPreferred)
-                ) {
-                    bestDistance = tileDistance;
-                    bestTile = possibleTile;
-                    bestPreferred = tilePreferred;
-                }
-            }
-            tile = bestTile;
-
-            if (distance === 1) {
-                // We've reached the closest attackable tile, break out of the loop as we can't get any closer
-                break;
-            } else {
-                // Check 1 square closer if we don't have any valid tiles at this distance
-                distance = Math.max(distance - 1, 1);
-            }
-        }
-
-        if (!tile) {
-            attacker.sendMessage("I can't reach that.");
-            return;
-        }
-
-        return tile;
-    }
-
-    public static getTilesForDistances(center: Location, distance: number): Location[] {
-        const deltas = PathFinder.TILE_DISTANCE_DELTAS.get(Math.min(distance, CombatConstants.MAX_ATTACK_DISTANCE));
-        return deltas.map((d) => center.clone().getTranslate(d[0], d[1]));
-    }
-
-    public static getTilesForDistance(center: Location, distance: number): Location[] {
-        const deltas = PathFinder.TILE_DISTANCE_DELTAS.get(Math.min(distance, CombatConstants.MAX_ATTACK_DISTANCE));
-        return deltas.map((d) => center.clone().getTranslate(d[0], d[1]));
+    /** calculateRoute with move-near enabled; a loc click settles for the closest tile. */
+    static calculateObjectRoute(entity: Mobile, size: number, destX: number, destY: number, xLength: number, yLength: number, direction: number, blockingMask: number) {
+        return PathFinder.calculateRoute(entity, size, destX, destY, xLength, yLength, direction, blockingMask, true);
     }
 
     public static calculateRoute(entity: Mobile, size: number, destX: number, destY: number, xLength: number, yLength: number, direction: number, blockingMask: number, basicPather: boolean): number {

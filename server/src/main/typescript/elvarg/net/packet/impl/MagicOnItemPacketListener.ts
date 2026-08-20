@@ -13,6 +13,7 @@ import { Sound } from "../../../game/Sound";
 import { Sounds } from "../../../game/Sounds";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 import { World } from "../../../game/World";
+import { CombatRange } from "../../../game/content/combat/CombatRange";
 
 export class MagicOnItemPacketListener {
   private static readonly LOW_ALCH_SPELL_ID = 1162;
@@ -26,7 +27,7 @@ export class MagicOnItemPacketListener {
   private static readonly TELEKINETIC_GRAB_SPELL_ID = 1168;
   private static readonly TELEKINETIC_GRAB_LEVEL = 33;
   private static readonly TELEKINETIC_GRAB_XP = 3988;
-  private static readonly TELEKINETIC_GRAB_RANGE = 15;
+  private static readonly TELEKINETIC_GRAB_RANGE = 10;
   private static readonly AIR_STAVES = new Set<number>([1381, 1397, 1405, 6562, 6563, 3053, 3054]);
   private static readonly FIRE_STAVES = new Set<number>([1387, 1393, 1401, 3053, 3054]);
 
@@ -107,8 +108,15 @@ export class MagicOnItemPacketListener {
     }
 
     const position = new Location(x, y, player.getLocation().getZ());
-    if (!player.getLocation().isWithinDistance(position, MagicOnItemPacketListener.TELEKINETIC_GRAB_RANGE)) {
-      player.getPacketSender().sendMessage("You can't reach that.");
+    if (!CombatRange.withinApproachDistance(player, position, MagicOnItemPacketListener.TELEKINETIC_GRAB_RANGE)) {
+      // Out of approach distance: walk in and resolve the cast on arrival, rather
+      // than rejecting the click outright.
+      player.getMovementQueue().walkToTile(
+        position,
+        () => this.castGroundItem(player, groundItemId, x, y, spellId),
+        (entity: any, destination: Location) =>
+          CombatRange.withinApproachDistance(entity, destination, MagicOnItemPacketListener.TELEKINETIC_GRAB_RANGE)
+      );
       return;
     }
 

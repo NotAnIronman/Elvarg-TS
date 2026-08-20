@@ -11,7 +11,7 @@ import { Location } from '../../Location';
 
 export abstract class PrivateArea extends Area {
     public entities: Entity[];
-    private clips: Map<Location, number>;
+    private clips: Map<string, number>;
     private destroyed: boolean;
 
     constructor(boundaries?: Boundary[]) {
@@ -76,16 +76,24 @@ export abstract class PrivateArea extends Area {
         return objects;
     }
 
+    private clipKey(location: Location): string {
+        return `${location.getX()},${location.getY()},${location.getZ()}`;
+    }
+
     public setClip(location: Location, mask: number) {
-        this.clips.set(location, mask);
+        this.clips.set(this.clipKey(location), mask | 0);
     }
 
     public removeClip(location: Location) {
-        this.clips.delete(location);
+        this.clips.delete(this.clipKey(location));
+    }
+
+    public hasClip(location: Location): boolean {
+        return this.clips.has(this.clipKey(location));
     }
 
     public getClip(location: Location) {
-        return this.clips.get(location) || 0;
+        return this.clips.get(this.clipKey(location)) ?? 0;
     }
 
     public isDestroyed() {

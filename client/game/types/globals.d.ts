@@ -18,5 +18,6 @@ declare global {
         DEBUG_PROJECTILES?: boolean;
         DEBUG_PROJECTILES_VERBOSE?: boolean;
         DEBUG_PROJECTILES_TRAJ?: boolean;
+        DEBUG_HITSPLATS?: boolean;
     }
 }

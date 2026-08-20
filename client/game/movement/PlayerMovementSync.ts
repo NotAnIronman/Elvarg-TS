@@ -184,7 +184,22 @@ export class PlayerMovementSync {
 
         let path: MovementPath;
 
-        if (directions.length > 0 && !forcedTeleport) {
+        if (
+            !forcedTeleport &&
+            isRunDisplacement &&
+            chebyshevDist > 0 &&
+            chebyshevDist <= 2 &&
+            typeof this.getCollisionFlagAt === "function"
+        ) {
+            // OSRS reconstructs every run-speed update through its local route finder.
+            // A server run can be encoded as a single +1,+1 endpoint even when the
+            // actual steps were cardinal; using the packed direction directly makes
+            // the rendered player cut diagonally through wall corners.
+            path = this.buildRunTargetPath(fromTile, destTile, update.level | 0);
+            tile = destTile;
+            finalSubX = typeof serverSubX === "number" ? serverSubX : (destTile.x << 7) + 64;
+            finalSubY = typeof serverSubY === "number" ? serverSubY : (destTile.y << 7) + 64;
+        } else if (directions.length > 0 && !forcedTeleport) {
             // Standard step-by-step movement from server directions.
             const steps: MovementStep[] = [];
             let currX = fromTile.x;
@@ -206,18 +221,6 @@ export class PlayerMovementSync {
             finalSubX = (currX << 7) + 64;
             finalSubY = (currY << 7) + 64;
             path = new MovementPath(fromTile, tile, steps, false);
-        } else if (
-            !forcedTeleport &&
-            directions.length === 0 &&
-            isRunDisplacement &&
-            chebyshevDist > 0 &&
-            chebyshevDist <= 2 &&
-            typeof this.getCollisionFlagAt === "function"
-        ) {
-            path = this.buildRunTargetPath(fromTile, destTile, update.level | 0);
-            tile = destTile;
-            finalSubX = typeof serverSubX === "number" ? serverSubX : (destTile.x << 7) + 64;
-            finalSubY = typeof serverSubY === "number" ? serverSubY : (destTile.y << 7) + 64;
         } else if (!forcedTeleport && chebyshevDist > 0) {
             tile = destTile;
             finalSubX = typeof serverSubX === "number" ? serverSubX : (destTile.x << 7) + 64;

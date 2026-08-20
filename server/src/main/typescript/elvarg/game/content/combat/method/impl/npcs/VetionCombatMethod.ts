@@ -23,7 +23,7 @@ class VetionCombatMethodTask extends Task{
     }
 }
 
-export class VetionCombatMethod implements CombatMethod {
+export class VetionCombatMethod extends CombatMethod {
     public onCombatBegan(character: Mobile, target: Mobile): void {
 
     }

@@ -3,9 +3,8 @@ import { Mobile } from './Mobile';
 /**
  * Binary min-heap of free slot indices. World slot indices are assigned
  * lowest-currently-free-first, matching how OSRS assigns entity indices
- * (used for update-block encoding, view-distance culling, etc). Note this is
- * NOT the same thing as PID/processing priority - see Player.pidPriority -
- * which is independently randomized and does not derive from this index.
+ * (used for update-block encoding, view-distance culling, etc). Processing
+ * order is maintained separately by World and does not derive from this index.
  * A plain FIFO free-list would not give lowest-first allocation: once the
  * initial run of virgin slots is consumed, freed slots would only be reused
  * in the order they were freed rather than numeric order, so a long-uptime

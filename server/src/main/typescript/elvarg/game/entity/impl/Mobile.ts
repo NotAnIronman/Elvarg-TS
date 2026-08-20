@@ -74,7 +74,6 @@ export abstract class Mobile extends Entity {
      * Fields
      */
     interactingMobile: any;
-    combatFollowing: any;
     npcTransformationId = -1;
     poisonDamage: number;
     /**
@@ -118,6 +117,8 @@ export abstract class Mobile extends Entity {
         super.setLocation(location);
         if (this.isNpc() && this.isRegistered() && !previousLocation.equals(location)) {
             getWorld().onNpcMoved(this.getAsNpc(), previousLocation, location);
+        } else if (this.isPlayer() && this.isRegistered() && !previousLocation.equals(location)) {
+            getWorld().onPlayerMoved(this.getAsPlayer(), previousLocation, location);
         }
         return this;
     }
@@ -553,6 +554,11 @@ export abstract class Mobile extends Entity {
 
     setNeedsPlacement(needsPlacement: boolean): void {
         this.needsPlacement = needsPlacement;
+        if (needsPlacement) {
+            // The client drops its own destination flag when the local player is
+            // placed, so the cached "already sent" value must not suppress a resend.
+            this.getMovementQueue().invalidateDestinationFlagCache();
+        }
     }
 
     public hasVengeanceReturn(): boolean {
@@ -614,26 +620,28 @@ export abstract class Mobile extends Entity {
         return false;
     }
 
-    getFollowing(): Mobile {
+    getFollowing(): Mobile | null {
         return this.following;
     }
 
-    setFollowing(following: Mobile): void {
+    setFollowing(following: Mobile | null): void {
         if (this.following === following) {
             return;
         }
         this.following = following;
     }
 
-    getCombatFollowing(): Mobile {
-        return this.combatFollowing;
+    getCombatFollowing(): Mobile | null {
+        return this.getCombat().getTarget();
     }
 
-    setCombatFollowing(target: Mobile): void {
-        if (this.combatFollowing === target) {
-            return;
+    setCombatFollowing(target: Mobile | null): void {
+        const combat = this.getCombat();
+        if (target == null) {
+            if (combat.getTarget() != null) combat.reset();
+        } else if (combat.getTarget() !== target) {
+            combat.attack(target);
         }
-        this.combatFollowing = target;
     }
 
     getIndex(): number {

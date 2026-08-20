@@ -34,6 +34,19 @@ export class ObjectActionPacketListener {
     if (clickType < 1 || clickType > 5) return;
 
     const option = object.getDefinition()?.getInteractions()?.[clickType - 1]?.toLowerCase();
+    const routeEvent = {
+      player,
+      object,
+      objectId: object.getId(),
+      clickType,
+      sourceLocation: {
+        x: sourceLocation.getX(),
+        y: sourceLocation.getY(),
+        z: sourceLocation.getZ(),
+      },
+      destination: null as { x: number; y: number; z: number } | null,
+    };
+    PluginManager.emitObjectRoute(routeEvent);
     const executeInteraction = () => {
       player.getMovementQueue().reset();
       player.getMovementQueue().walkToReset();
@@ -72,10 +85,9 @@ export class ObjectActionPacketListener {
       );
     };
 
-    const dx = Math.abs(player.getLocation().getX() - object.getLocation().getX());
-    const dy = Math.abs(player.getLocation().getY() - object.getLocation().getY());
-    if (option === "pass" && dx + dy <= 1) {
-      executeInteraction();
+    if (routeEvent.destination) {
+      const { x: routeX, y: routeY, z: routeZ } = routeEvent.destination;
+      player.getMovementQueue().walkToTile(new Location(routeX, routeY, routeZ), executeInteraction);
       return;
     }
 

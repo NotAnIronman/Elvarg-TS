@@ -1366,7 +1366,7 @@ class PvpBehavior {
 
     for (const candidate of topCandidates) {
       if (
-        this.CombatFactory.canAttack(sourcePlayer, sourceMethod, candidate.player) ===
+        this.CombatFactory.canAttackPermission(sourcePlayer, candidate.player, false, sourceMethod) ===
         CanAttackResponse.CAN_ATTACK
       ) {
         return candidate.player;
