@@ -58,6 +58,52 @@ export class Combat {
     private previousCast: CombatSpell | null = null;
     private generation = 0;
     private deniedNoticeGeneration = -1;
+    private static combatDebugCache?: boolean;
+    /** COMBAT_DEBUG=1. Read lazily so argv/env parsing order cannot defeat it. */
+    private static get DEBUG(): boolean {
+        return (Combat.combatDebugCache ??= process.env.COMBAT_DEBUG === "1");
+    }
+
+    public static debugLog(line: string): void {
+        if (!Combat.DEBUG) return;
+        Combat.writeTrace(line);
+    }
+
+    private static traceFile?: any;
+    private static writeTrace(line: string): void {
+        console.info(line);
+        try {
+            const fs = require("fs");
+            const path = require("path");
+            if (!Combat.traceFile) {
+                const dir = path.join(process.cwd(), "logs");
+                fs.mkdirSync(dir, { recursive: true });
+                Combat.traceFile = path.join(dir, "combat-debug.log");
+            }
+            fs.appendFileSync(Combat.traceFile, line + "\n");
+        } catch {
+            // console output is enough if the file cannot be written
+        }
+    }
+
+    private trace(reason: string, target: Mobile): void {
+        if (!Combat.DEBUG || !this.character.isPlayer()) return;
+        // Bots generate thousands of PvP lines a second and drown out the real player.
+        if (this.character.getAsPlayer().isPlayerBot?.() === true) return;
+        const me = this.character.getLocation();
+        const it = target?.getLocation?.();
+        const attacker = this.attacker;
+        Combat.writeTrace(
+            `[combat] ${this.character.getAsPlayer().getUsername?.()} cycle=${World.getProcessCycle()} ${reason}` +
+            ` me=${me?.getX()},${me?.getY()} target=${it?.getX()},${it?.getY()}` +
+            ` targetHp=${target?.getHitpoints?.()}` +
+            ` myAttacker=${attacker ? (attacker.isNpc?.() ? "npc:" + attacker.getAsNpc?.().getId?.() : "player") : "none"}` +
+            ` attackerHp=${attacker?.getHitpoints?.() ?? "-"}` +
+            ` attackerReg=${attacker?.isRegistered?.() ?? "-"}` +
+            ` pendingIn=${this.hitQueue.hasPendingWork()}` +
+            ` queue=${this.character.getMovementQueue().size()}`
+        );
+    }
     /** Target tile the live route was built for; see shouldRouteToward(). */
     private routedTargetX = Number.MIN_SAFE_INTEGER;
     private routedTargetY = Number.MIN_SAFE_INTEGER;
@@ -88,6 +134,7 @@ export class Combat {
         this.character.setFollowing(null);
         this.character.setPositionToFace(null);
         this.character.setMobileInteraction(target);
+        this.trace("attack() target set", target);
         if (this.character.isNpc()) World.markNpcCombatActive(this.character.getAsNpc(), true);
     }
 
@@ -131,6 +178,7 @@ export class Combat {
         this.method = method;
 
         if (!CombatFactory.validTarget(this.character, target)) {
+            this.trace("bail=invalidTarget", target);
             this.cancelIfCurrent(target, generation);
             return;
         }
@@ -141,6 +189,7 @@ export class Combat {
 
         const permission = CombatFactory.canAttackPermission(this.character, target, true, method);
         if (permission !== CanAttackResponse.CAN_ATTACK) {
+            this.trace(`bail=permission:${CanAttackResponse[permission]}`, target);
             this.handleAttackDenied(permission, target, generation);
             if (!Combat.isTransientDenial(permission) ||
                 this.target !== target || this.generation !== generation) {
@@ -158,12 +207,14 @@ export class Combat {
         }
 
         if (CombatRange.canReach(this.character, method, target)) {
+            this.trace("inRange", target);
             this.character.getMovementQueue().reset();
             return;
         }
 
         const movement = this.character.getMovementQueue();
         if (!movement.getMobility().canMove()) {
+            this.trace(`bail=immobile:${movement.getMobility().constructor.name}`, target);
             state.mobilityBlocked = true;
             return;
         }
@@ -172,6 +223,7 @@ export class Combat {
             movement.setPursuitCheckpoint(PathFinder.naiveEntityDestination(this.character, target));
             state.routeRequested = true;
         } else if (this.shouldRouteToward(movement, location)) {
+            this.trace("route", target);
             state.routeRequested = true;
             this.routedTargetX = location.getX();
             this.routedTargetY = location.getY();
@@ -257,9 +309,11 @@ export class Combat {
 
         this.character.getMovementQueue().reset();
         if (cycle < this.nextAttackCycle) {
+            this.trace(`cooldown next=${this.nextAttackCycle} in=${this.nextAttackCycle - cycle}`, target);
             this.renewInteraction(target, generation);
             return;
         }
+        this.trace(`attacking speed=${method.attackSpeed(this.character)}`, target);
         this.executeAttack(method, target, false, generation, true);
     }
 
@@ -456,6 +510,7 @@ export class Combat {
 
         const response = CombatFactory.canAttack(this.character, method, target, true, true);
         if (response !== CanAttackResponse.CAN_ATTACK) {
+            this.trace(`attackDenied=${CanAttackResponse[response]}`, target);
             this.handleAttackDenied(response, target, generation);
             return false;
         }
@@ -470,7 +525,11 @@ export class Combat {
 
         method.start(this.character, target);
         const hits = method.hits(this.character, target);
-        if (hits == null) return false;
+        if (hits == null) {
+            this.trace("hits=null", target);
+            return false;
+        }
+        this.trace(`hits=${hits.length} dmg=[${hits.map((h: any) => h?.getTotalDamage?.()).join(",")}]`, target);
         if (hits.length > 0 && method.type() === CombatType.MELEE) {
             target.performAnimation(new Animation(target.getBlockAnim()));
         }
