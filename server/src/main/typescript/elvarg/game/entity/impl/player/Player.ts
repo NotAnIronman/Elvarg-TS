@@ -390,6 +390,11 @@ export class Player extends Mobile {
         const timed = <T>(phase: string, fn: () => T): T =>
             ServerPerf.measurePhase(`player.process.${phase}`, fn);
 
+        // Queued impacts land before this player acts, matching LostCity's
+        // processQueues-then-processInteraction order. A hit that kills them here
+        // stops the rest of this turn via the isDying/hitpoints guards below.
+        timed("combat_hits", () => this.getCombat().getHitQueue().process(World.getProcessCycle()));
+
         // Timers
         timed("timers", () => this.getTimers().process());
 

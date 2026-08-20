@@ -1142,6 +1142,9 @@ export class World {
         // walk-to interactions ticked, or the interaction hangs until they do.
         timed("walk_to_sweep", () => TaskManager.processRemainingWalkTo());
 
+        // Sweep for anyone who did not take a turn this cycle: inactive NPCs and
+        // bots skipped by the process stride. Entities that did take a turn drained
+        // at the top of it and are no-ops here.
         timed("combat_hits", () => {
             HitQueue.processAll(World.processCycle);
         });

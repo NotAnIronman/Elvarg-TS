@@ -177,6 +177,8 @@ export class NPC extends Mobile {
 
     public process() {
         if (this.getDefinition() != null) {
+            // Queued impacts land before this NPC acts - see HitQueue.process.
+            this.getCombat().getHitQueue().process(World.getProcessCycle());
             this.getTimers().process();
             const movement = this.getMovementQueue();
             const combat = this.getCombat();
