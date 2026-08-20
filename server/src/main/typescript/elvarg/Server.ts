@@ -197,8 +197,14 @@ export class Server {
         );
         // Stress-test bots replace the normal PvP/economy bot population.
         process.env.DISABLE_PLAYER_BOTS = "1";
+        // Bots are normally excluded from visibility work; a stress run wants that
+        // cost measured, so opt in unless explicitly disabled.
+        if (process.env.STRESS_TEST_BOT_UPDATES !== "0") {
+          process.env.STRESS_TEST_BOT_UPDATES = "1";
+        }
         console.info(
-          `[Server] --stressTest enabled (${process.env.STRESS_TEST_BOT_COUNT} bots, PlayerBots disabled)`
+          `[Server] --stressTest enabled (${process.env.STRESS_TEST_BOT_COUNT} bots, PlayerBots disabled,` +
+          ` botVisibilityUpdates=${process.env.STRESS_TEST_BOT_UPDATES})`
         );
       }
 
