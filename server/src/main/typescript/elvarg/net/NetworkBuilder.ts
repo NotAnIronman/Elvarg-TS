@@ -682,7 +682,9 @@ class ClientConnection {
     player.getMovementQueue().requestWalk(
       new Location(x, y, player.getLocation().getZ())
     );
-    player.getPacketSender().sendDestination(x, y).sendRunStatus();
+    // MovementQueue owns the destination flag and de-duplicates it; sending it
+    // here as well double-posts the marker on every walk click.
+    player.getPacketSender().sendRunStatus();
   }
 
   private inventoryAction(packet: Extract<ReturnType<typeof decodeClientPackets>[number], { type: "inventory_action" }>): void {
@@ -726,7 +728,7 @@ class ClientConnection {
     if (option === "examine") {
       const definition = ItemDefinition.forId(packet.itemId);
       player.getPacketSender().sendMessage(definition.getExamine() || definition.getName());
-    } else if (option === "take" || packet.optionIndex === 1 || packet.optionIndex == null) {
+    } else if (option === "take" || packet.optionIndex === 3 || packet.optionIndex == null) {
       PickupItemPacketListener.pickup(player, packet.itemId, packet.x, packet.y);
     } else {
       SecondGroundItemOptionPacketListener.interact(
