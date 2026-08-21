@@ -662,15 +662,13 @@ export class MovementQueue {
             const multiIcon = Wilderness.isMulti(location.getX(), location.getY()) ? 1 : 0;
             player.setWildernessLevel(wildernessLevel);
             player.setMultiIcon(multiIcon);
+            // The pvp_icons overlay (and its level text) is owned by the Wilderness plugin.
             packetSender.sendInteractionOption("Attack", 2, true);
-            packetSender.sendConfiguredInterface("wilderness-overlay");
-            packetSender.sendString(`Level ${wildernessLevel}`, 199);
             return;
         }
 
         player.setWildernessLevel(0);
         player.setMultiIcon(0);
-        packetSender.sendWalkableInterface(-1);
         packetSender.sendInteractionOption("null", 2, true);
     }
 

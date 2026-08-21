@@ -1,4 +1,7 @@
 const { Wilderness } = require("../../../../src/main/typescript/elvarg/game/content/wilderness/Wilderness");
+const {
+  canAttackByWildernessLevel,
+} = require("../../../areas/Wilderness.plugin");
 const { PrayerHandler } = require("../../../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const {
   CanAttackResponse,
@@ -1218,6 +1221,11 @@ class PvpBehavior {
     if (!Wilderness.isIn(candidatePlayer)) {
       return false;
     }
+    // Out of combat level range for this depth of Wilderness: the attack would be refused,
+    // so drop the candidate here rather than pathing to it for a tick and finding out.
+    if (!canAttackByWildernessLevel(sourcePlayer, candidatePlayer)) {
+      return false;
+    }
     if (sourcePlayer.getPrivateArea?.() !== candidatePlayer.getPrivateArea?.()) {
       return false;
     }
@@ -1303,6 +1311,9 @@ class PvpBehavior {
         return;
       }
       if (!Wilderness.isIn(candidatePlayer)) {
+        return;
+      }
+      if (!canAttackByWildernessLevel(sourcePlayer, candidatePlayer)) {
         return;
       }
       if (sourcePlayer.getPrivateArea?.() !== candidatePlayer.getPrivateArea?.()) {
