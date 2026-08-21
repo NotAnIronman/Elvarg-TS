@@ -38,7 +38,7 @@ const {
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
-const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565];
+const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 4695, 21880, 28929];
 const NPC_SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
 ];
@@ -576,7 +576,7 @@ module.exports = {
         .getPacketSender()
         .sendMessage(
           given === RUNE_IDS.length
-            ? "Spawned 1,000 of each standard rune."
+            ? "Spawned 1,000 of each rune type."
             : `Spawned ${given}/${RUNE_IDS.length} rune types - free up inventory space for the rest.`
         );
       return true;
