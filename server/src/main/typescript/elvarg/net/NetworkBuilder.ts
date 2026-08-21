@@ -14,6 +14,7 @@ import { PlayerPunishment } from "../util/PlayerPunishment";
 import { WebSocketBinaryChannel } from "./BinaryChannel";
 import { PlayerSession } from "./PlayerSession";
 import { CachePipeline } from "../game/cache/CachePipeline";
+import { ContentApi } from "./http/ContentApi";
 import { CacheDefinitions } from "../game/cache/CacheDefinitions";
 import {
   CREATION_MENU_GROUP_ID,
@@ -98,6 +99,19 @@ export class NetworkBuilder {
   public initialize(port: number): WebSocketServer {
     const http = createServer((request, response) => {
       response.setHeader("Access-Control-Allow-Origin", "*");
+      const content = ContentApi.resolve(
+        request.method ?? "GET",
+        request.url ?? "",
+        request.headers["if-none-match"]
+      );
+      if (content) {
+        response.statusCode = content.status;
+        for (const [header, value] of Object.entries(content.headers)) {
+          response.setHeader(header, value);
+        }
+        response.end(content.body);
+        return;
+      }
       if (request.url === "/regions") {
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify({ regions: MapRegionReplacementManager.getRegionIds() }));

@@ -10,7 +10,6 @@ import {
     INTERFACE_QUEST_LIST_ID,
     SIDE_JOURNAL_GROUP_ID,
 } from "../common/ui/sideJournal";
-import { ITEM_SPAWNER_MODAL_GROUP_ID } from "../common/ui/widgets";
 import { isMobileMode, isTouchDevice } from "../common/utils/DeviceUtil";
 import { clamp } from "../common/utils/MathUtil";
 import {
@@ -307,7 +306,12 @@ import {
 import { WidgetInputController } from "./widgets/WidgetInputController";
 import { WidgetInteractionController } from "./widgets/WidgetInteractionController";
 import { WidgetTransmitProcessor } from "./widgets/WidgetTransmitProcessor";
-import { ItemSpawnerUi } from "./widgets/itemSpawner";
+import { CustomInterfaceRuntime } from "../widgets/custom/CustomInterfaceRuntime";
+import { setCustomInterface } from "../common/gamemode/GamemodeContentStore";
+import {
+    fetchInterfaceDefinition,
+    getContentApiBase,
+} from "../network/serverConnection/contentApi";
 import { resolveWidgetIdentifiers } from "./widgets/widgetActionPayload";
 import { RenderDataWorkerPool } from "./worker/RenderDataWorkerPool";
 import { WorldMapController, type WorldMapRenderedIcon } from "./worldMap/WorldMapController";
@@ -694,7 +698,7 @@ export class OsrsClient {
     private enterToTypeChat!: EnterToTypeChat;
     private mobileChatKeyboard!: MobileChatKeyboard;
     private playerDesign!: PlayerDesignController;
-    private itemSpawnerUi!: ItemSpawnerUi;
+    private customInterfaces!: CustomInterfaceRuntime;
     private combatOptions!: CombatOptionsController;
     private worldMap!: WorldMapController;
     private widgetInteraction!: WidgetInteractionController;
@@ -1087,7 +1091,7 @@ export class OsrsClient {
             varManager: this.varManager,
             widgetManager: this.widgetManager,
             isLoggedIn: () => this.isLoggedIn(),
-            isItemSpawnerSearchFocused: () => this.itemSpawnerUi.isSearchFocused(),
+            isCustomInterfaceSearchFocused: () => this.customInterfaces.isSearchFocused(),
         });
         this.mobileChatKeyboard = new MobileChatKeyboard({
             inputManager: this.inputManager,
@@ -1143,13 +1147,43 @@ export class OsrsClient {
         });
     }
 
-    private initItemSpawnerUi(): void {
-        this.itemSpawnerUi = new ItemSpawnerUi({
+    /** Mounts a sub-interface and runs everything the open packet asked for. */
+    private mountSubInterface(payload: any): void {
+        if (!this.widgetManager) {
+            return;
+        }
+        this.widgetManager.openSubInterface(payload.targetUid, payload.groupId, payload.type);
+        this.cs2Vm.clearHandlerCaches();
+        markWidgetsLoaded();
+        if (Array.isArray(payload.postScripts) && this.cs2Vm) {
+            for (const ps of payload.postScripts) {
+                const scriptId = ps?.scriptId | 0;
+                const args = ps?.args || [];
+                this.runWidgetScopedClientScript(payload.targetUid, scriptId, args, "post");
+            }
+        }
+        this.triggerInitialVarTransmitForGroup(payload.groupId);
+        if (Array.isArray(payload.hiddenUids)) {
+            for (const rawUid of payload.hiddenUids) {
+                const uid = Number(rawUid) | 0;
+                const w = this.widgetManager.getWidgetByUid(uid);
+                if (!w) continue;
+                if (w.hidden === true && w.isHidden === true) continue;
+                w.isHidden = true;
+                w.hidden = true;
+                this.widgetManager.invalidateWidgetRender(w);
+            }
+        }
+        this.customInterfaces.onInterfaceOpened(payload.groupId | 0);
+    }
+
+    private initCustomInterfaces(): void {
+        this.customInterfaces = new CustomInterfaceRuntime({
             widgetManager: this.widgetManager,
-            getObjTypeLoader: () => this.objTypeLoader,
             getCacheSystem: () => this.cacheSystem,
             runWidgetScopedClientScript: (widgetUid, scriptId, args, phase) =>
                 this.runWidgetScopedClientScript(widgetUid, scriptId, args, phase),
+            getContentApiBase: () => getContentApiBase(),
         });
     }
 
@@ -1182,7 +1216,7 @@ export class OsrsClient {
             getCs2Vm: () => this.cs2Vm,
             getVarManager: () => this.varManager,
             getWorldMap: () => this.worldMap,
-            getItemSpawnerUi: () => this.itemSpawnerUi,
+            getCustomInterfaces: () => this.customInterfaces,
             getEnterToTypeChat: () => this.enterToTypeChat,
             getPlayerDesign: () => this.playerDesign,
             getObjTypeLoader: () => this.objTypeLoader,
@@ -1236,7 +1270,7 @@ export class OsrsClient {
             getInventory: () => this.inventory,
             getInputManager: () => this.inputManager,
             getWidgetInteraction: () => this.widgetInteraction,
-            getItemSpawnerUi: () => this.itemSpawnerUi,
+            getCustomInterfaces: () => this.customInterfaces,
             getPlayerDesign: () => this.playerDesign,
             getTradeState: () => this.tradeState,
             getTradeOfferInventory: () => this.tradeOfferInventory,
@@ -1929,7 +1963,7 @@ export class OsrsClient {
             },
         });
 
-        this.initItemSpawnerUi();
+        this.initCustomInterfaces();
         this.initWidgetInteractionController();
         this.initSpellSelectionController();
         this.initAudioVarpController();
@@ -2277,39 +2311,20 @@ export class OsrsClient {
                     }
                 }
                 if (this.widgetManager) {
-                    this.widgetManager.openSubInterface(
-                        payload.targetUid,
-                        payload.groupId,
-                        payload.type,
-                    );
-                    this.cs2Vm.clearHandlerCaches();
-                    markWidgetsLoaded();
-                    if (Array.isArray(payload.postScripts) && this.cs2Vm) {
-                        for (const ps of payload.postScripts) {
-                            const scriptId = ps?.scriptId | 0;
-                            const args = ps?.args || [];
-                            this.runWidgetScopedClientScript(
-                                payload.targetUid,
-                                scriptId,
-                                args,
-                                "post",
-                            );
-                        }
-                    }
-                    this.triggerInitialVarTransmitForGroup(payload.groupId);
-                    if (Array.isArray(payload.hiddenUids)) {
-                        for (const rawUid of payload.hiddenUids) {
-                            const uid = Number(rawUid) | 0;
-                            const w = this.widgetManager.getWidgetByUid(uid);
-                            if (!w) continue;
-                            if (w.hidden === true && w.isHidden === true) continue;
-                            w.isHidden = true;
-                            w.hidden = true;
-                            this.widgetManager.invalidateWidgetRender(w);
-                        }
-                    }
-                    if ((payload.groupId | 0) === ITEM_SPAWNER_MODAL_GROUP_ID) {
-                        this.itemSpawnerUi.onInterfaceOpened();
+                    if (this.widgetManager.getGroup(payload.groupId | 0)) {
+                        this.mountSubInterface(payload);
+                    } else {
+                        // A server-defined interface the client has not seen yet: fetch its
+                        // definition, then mount. This costs one round trip on the first
+                        // open of a session, so a server should not send component updates
+                        // in the same batch as that open - they would land before the
+                        // widgets exist.
+                        void fetchInterfaceDefinition(payload.groupId | 0).then((definition) => {
+                            if (definition) {
+                                setCustomInterface(definition);
+                            }
+                            this.mountSubInterface(payload);
+                        });
                     }
                 }
             } else if (payload?.action === "close_sub") {
@@ -2334,15 +2349,13 @@ export class OsrsClient {
                     }
                 }
 
-                if (closingGroupId === ITEM_SPAWNER_MODAL_GROUP_ID) {
-                    this.itemSpawnerUi.onInterfaceClosed();
-                }
+                this.customInterfaces.onInterfaceClosed(closingGroupId | 0);
             } else if (payload?.action === "set_text") {
                 const uid = Number(payload.uid) | 0;
                 const text = typeof payload.text === "string" ? payload.text : String(payload.text);
                 const w = this.widgetManager?.getWidgetByUid(uid);
                 if (w) {
-                    if (!this.itemSpawnerUi.handleSetText(uid, text)) {
+                    if (!this.customInterfaces.handleSetText(uid, text)) {
                         w.text = text;
                         markWidgetInteractionDirty(w);
                         this.widgetManager.invalidateWidgetRender(w);
@@ -5643,7 +5656,7 @@ export class OsrsClient {
                 console.warn("Script event processing failed", err);
             }
             try {
-                this.itemSpawnerUi.tick();
+                this.customInterfaces.tick();
             } catch {}
             try {
                 this.tryWriteVarcs();

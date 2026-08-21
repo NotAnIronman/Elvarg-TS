@@ -7,7 +7,7 @@ import type { Inventory } from "../../rs/inventory/Inventory";
 import type { WidgetManager } from "../../widgets/WidgetManager";
 import { shouldTransmitAction } from "../../widgets/WidgetFlags";
 import type { InputManager } from "../InputManager";
-import type { ItemSpawnerUi } from "./itemSpawner";
+import type { CustomInterfaceRuntime } from "../../widgets/custom/CustomInterfaceRuntime";
 import type { PlayerDesignController } from "./PlayerDesignController";
 import type { WidgetInteractionController } from "./WidgetInteractionController";
 import {
@@ -31,7 +31,7 @@ export type WidgetActionRouterDeps = WidgetActionHandlersDeps &
     WidgetActionTradeDeps & {
         getInputManager: () => InputManager | undefined;
         getWidgetInteraction: () => WidgetInteractionController;
-        getItemSpawnerUi: () => ItemSpawnerUi;
+        getCustomInterfaces: () => CustomInterfaceRuntime;
         getPlayerDesign: () => PlayerDesignController;
         executeScriptListener: (
             widget: any,
@@ -107,7 +107,7 @@ export class WidgetActionRouter {
                   ? w.childIndex
                   : w?.uid & 0xffff;
 
-        if (this.deps.getItemSpawnerUi().handleWidgetClick(groupId | 0, childId | 0)) {
+        if (this.deps.getCustomInterfaces().handleWidgetClick(groupId | 0, childId | 0)) {
             return;
         }
 

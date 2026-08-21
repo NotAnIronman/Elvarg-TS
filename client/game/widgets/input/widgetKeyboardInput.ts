@@ -15,8 +15,8 @@ export function processWidgetKeyboardInput(
         // When inputDialogType > 0, keyboard input is captured for the dialog
         // Type 0 = no dialog, Type 1 = default, Type 2 = interface-scoped, Type 3 = widget-scoped
         const dialogActive = deps.getCs2Vm().inputDialogType > 0;
-        const itemSpawnerSearchHandled =
-            !dialogActive && deps.getItemSpawnerUi().handleSearchKeyEvents(input.keyEvents);
+        const customInterfaceSearchHandled =
+            !dialogActive && deps.getCustomInterfaces().handleSearchKeyEvents(input.keyEvents);
 
         // Process keyboard input for active dialog before widget handlers
         if (dialogActive) {
@@ -110,7 +110,7 @@ export function processWidgetKeyboardInput(
             return;
         }
 
-        if (itemSpawnerSearchHandled) {
+        if (customInterfaceSearchHandled) {
             return;
         }
 

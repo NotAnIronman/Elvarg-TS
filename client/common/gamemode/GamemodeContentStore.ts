@@ -51,6 +51,9 @@ let customEnumOverrides: Map<number, any[]> | null = null;
 let replacedCacheStructIds: Set<number> = new Set();
 
 let dynamicWidgetGroups: Map<number, { root: any; widgets: Map<number, any> }> | null = null;
+// Behaviour declarations for server-defined interfaces, keyed by group id. See
+// widgets/custom/CustomInterfaceRuntime for what the client does with them.
+let customInterfaces: Map<number, any> | null = null;
 let worldLocChanges: WorldLocChangeRow[] = [];
 let worldLocSpawns: WorldLocSpawnRow[] = [];
 let worldTerrainOverrides: WorldTerrainOverrideRow[] = [];
@@ -146,6 +149,20 @@ export function loadFromPayload(payload: {
                     );
                 } catch (err) {
                     console.log("[GamemodeContentStore] failed to load custom widgets", err);
+                }
+                break;
+            case "customInterfaces":
+                try {
+                    customInterfaces = new Map();
+                    for (const declaration of dataset.rows as any[]) {
+                        if (declaration?.groupId == null) continue;
+                        customInterfaces.set(declaration.groupId | 0, declaration);
+                    }
+                    console.log(
+                        `[GamemodeContentStore] registered ${customInterfaces.size} custom interface(s)`,
+                    );
+                } catch (err) {
+                    console.log("[GamemodeContentStore] failed to load custom interfaces", err);
                 }
                 break;
             case "customItems":
@@ -337,6 +354,32 @@ export function getCustomEnumValueOverride(
 
 export function getReplacedChallengeStructIds(): ReadonlySet<number> {
     return replacedCacheStructIds;
+}
+
+/**
+ * Installs a definition fetched from /api/interfaces/<groupId>: its widgets become a
+ * loadable group and the rest of the document becomes the behaviour declaration.
+ */
+export function setCustomInterface(definition: any): boolean {
+    const groupId = definition?.groupId | 0;
+    if (!groupId || !Array.isArray(definition?.widgets)) {
+        return false;
+    }
+    const widgets = new Map<number, any>();
+    let root: any = undefined;
+    for (const widget of definition.widgets) {
+        if (widget?.uid != null) widgets.set(widget.uid, widget);
+        if (widget?.parentUid === -1 || widget?.parentUid === undefined) root = widget;
+    }
+    if (!dynamicWidgetGroups) dynamicWidgetGroups = new Map();
+    dynamicWidgetGroups.set(groupId, { root, widgets });
+    if (!customInterfaces) customInterfaces = new Map();
+    customInterfaces.set(groupId, definition);
+    return true;
+}
+
+export function getCustomInterface(groupId: number): any | undefined {
+    return customInterfaces?.get(groupId | 0);
 }
 
 export function getDynamicWidgetGroup(

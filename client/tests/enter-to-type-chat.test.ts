@@ -13,7 +13,7 @@ const enterToType = new EnterToTypeChat({
     } as any,
     widgetManager: {} as any,
     isLoggedIn: () => true,
-    isItemSpawnerSearchFocused: () => false,
+    isCustomInterfaceSearchFocused: () => false,
 });
 
 assert.equal(enterToType.handleKeyEvent({ keyTyped: 84, keyPressed: 0 }, false), true);

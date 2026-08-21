@@ -55,7 +55,6 @@ type ClientToServer =
           payload: { action: "open" | "close"; groupId: number; modal?: boolean };
       }
     | { type: "widget_action"; payload: WidgetActionClientPayload }
-    | { type: "item_spawner_search"; payload: { query: string } }
     | { type: "trade_action"; payload: TradeActionClientPayload }
     | { type: "bank_deposit_inventory"; payload?: Record<string, never> }
     | { type: "bank_deposit_equipment"; payload?: Record<string, never> }

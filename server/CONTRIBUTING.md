@@ -56,6 +56,36 @@ If in doubt:
 3. Keep guards centralized in core hook dispatch.
 4. Base behavior on OSRS Wiki first, then Java.
 
+## Server-Defined Interfaces
+
+An interface that does not exist in the cache is defined entirely by the server. A plugin
+registers one definition - the widget group plus the behaviour the client drives it with -
+and it becomes an addressable resource:
+
+    api.registerCustomInterface({ groupId, widgets, search, list, status, hint })
+    -> GET /api/interfaces/<groupId>
+
+The client fetches it the first time that group is opened, so opening one only needs the
+usual sub-interface packet. `widgets/custom/CustomInterfaceRuntime.ts` reads the behaviour
+half and owns focus, keystrokes, scrolling and slot binding; see
+`plugins/interface/ItemSpawner.plugin.js` for a worked example.
+
+Row data is a separate resource, registered with
+`api.registerContentEndpoint(name, handler)` and served at `/api/<name>`. Use it for
+request/response shaped, cache-derived data - searches, lists, lookups.
+
+Rules for both:
+
+- Read-only and public. Anything player-specific or privileged stays on the game socket,
+  where the session is already authenticated.
+- Responses carry an ETag and revalidate to 304, so definitions are fetched once per build
+  rather than pushed on every open.
+- Because the first open of a session waits on a fetch, do not send component updates in
+  the same batch as that open; drive the interface from its declaration instead.
+
+Adding an interface of this kind should need no client change. If it does, the missing
+capability belongs in the runtime as a declared option, not in a feature-specific module.
+
 ## Cache Lookup Tooling
 
 Interface, sprite and clientscript ids must come from the cache in `server/caches`, not from

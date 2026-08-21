@@ -587,6 +587,26 @@ export interface PluginApi {
     command: string,
     handler: (event: PluginCommandEvent) => void | boolean
   ): void;
+  /**
+   * Serves a read-only JSON resource at /api/<name> on the game port, for interface data
+   * that is request/response shaped (searches, lists, lookups) rather than a game event.
+   * Public and cache-derived only - anything player-specific belongs on the game socket.
+   * `segments` holds any path after the resource name, e.g. ["30002"] for /api/foo/30002.
+   */
+  registerContentEndpoint(
+    name: string,
+    handler: (query: URLSearchParams, segments: string[]) => unknown
+  ): void;
+  /**
+   * Defines an interface that does not exist in the cache. The definition is served at
+   * /api/interfaces/<groupId>; the client fetches it the first time the interface is
+   * opened, so opening one only needs the usual sub-interface packet.
+   */
+  registerCustomInterface(definition: {
+    groupId: number;
+    widgets: unknown[];
+    [key: string]: unknown;
+  }): void;
   onObjectClick(
     objectIds: number | number[],
     clickType: number,

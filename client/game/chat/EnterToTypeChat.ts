@@ -22,7 +22,7 @@ export type EnterToTypeChatDeps = {
     varManager: VarManager;
     widgetManager: WidgetManager;
     isLoggedIn: () => boolean;
-    isItemSpawnerSearchFocused: () => boolean;
+    isCustomInterfaceSearchFocused: () => boolean;
 };
 
 /**
@@ -67,7 +67,7 @@ export class EnterToTypeChat {
             this.isLocked() &&
             inputDialogType === 0 &&
             !this.isNativeChatboxInputActive() &&
-            !this.deps.isItemSpawnerSearchFocused()
+            !this.deps.isCustomInterfaceSearchFocused()
         );
     }
 

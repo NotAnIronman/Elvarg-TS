@@ -1,3 +1,5 @@
+import { ContentApi } from "../net/http/ContentApi";
+import { CustomInterfaceRegistry } from "../game/interfaces/CustomInterfaceRegistry";
 import * as fs from "fs";
 import * as path from "path";
 import { GameConstants } from "../game/GameConstants";
@@ -2542,6 +2544,23 @@ export class PluginManager {
             handler(event);
           },
         });
+      },
+      registerContentEndpoint: (name, handler) => {
+        if (typeof name !== "string" || typeof handler !== "function") {
+          return;
+        }
+        try {
+          ContentApi.register(name, handler);
+        } catch (error) {
+          console.error(`[plugins] ${pluginName} content endpoint rejected`, error);
+        }
+      },
+      registerCustomInterface: (definition) => {
+        try {
+          CustomInterfaceRegistry.register(definition as any);
+        } catch (error) {
+          console.error(`[plugins] ${pluginName} custom interface rejected`, error);
+        }
       },
       registerCommand: (command, handler) => {
         if (typeof command !== "string" || typeof handler !== "function") {

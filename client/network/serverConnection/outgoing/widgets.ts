@@ -131,14 +131,6 @@ export function sendWidgetActionMessage(payload: WidgetActionClientPayload): voi
     send({ type: "widget_action", payload: normalized });
 }
 
-export function sendItemSpawnerSearchQuery(query: string): void {
-    send({
-        type: "item_spawner_search",
-        payload: {
-            query: String(query ?? ""),
-        },
-    });
-}
 
 /**
  * IF_TRIGGEROPLOCAL (2929) forwarding packet.

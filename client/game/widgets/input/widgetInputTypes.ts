@@ -11,7 +11,7 @@ import type { WorldMapController } from "../../worldMap/WorldMapController";
 import type { PlayerDesignController } from "../PlayerDesignController";
 import type { SpellSelectionController } from "../SpellSelectionController";
 import type { WidgetInteractionController } from "../WidgetInteractionController";
-import type { ItemSpawnerUi } from "../itemSpawner";
+import type { CustomInterfaceRuntime } from "../../../widgets/custom/CustomInterfaceRuntime";
 import type { WidgetActionEvent } from "../widgetActionPayload";
 
 export type WidgetInputState = {
@@ -49,7 +49,7 @@ export type WidgetInputControllerDeps = {
     getCs2Vm: () => Cs2Vm;
     getVarManager: () => VarManager;
     getWorldMap: () => WorldMapController;
-    getItemSpawnerUi: () => ItemSpawnerUi;
+    getCustomInterfaces: () => CustomInterfaceRuntime;
     getEnterToTypeChat: () => EnterToTypeChat;
     getPlayerDesign: () => PlayerDesignController;
     getObjTypeLoader: () => ObjTypeLoader | undefined;
