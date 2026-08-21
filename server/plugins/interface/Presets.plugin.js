@@ -1,4 +1,5 @@
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
+const { CacheDefinitions } = require("../../src/main/typescript/elvarg/game/cache/CacheDefinitions");
 const { PrayerData } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { CombatSpecial } = require("../../src/main/typescript/elvarg/game/content/combat/CombatSpecial");
 const { CombatSpells } = require("../../src/main/typescript/elvarg/game/content/combat/magic/CombatSpells");
@@ -14,6 +15,21 @@ const { Bank } = require("../../src/main/typescript/elvarg/game/model/container/
 const { Task } = require("../../src/main/typescript/elvarg/game/task/Task");
 const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const {
+  GROUP_ID,
+  COMPONENT,
+  GLOBAL_ROW_START,
+  GLOBAL_ROW_COUNT,
+  CUSTOM_ROW_START,
+  CUSTOM_ROW_COUNT,
+  INVENTORY_SLOT_START,
+  INVENTORY_SLOT_COUNT,
+  EQUIPMENT_SLOT_START,
+  EQUIPMENT_SLOT_COUNT,
+  STAT_ROW_START,
+  uid,
+  buildPresetsWidgetGroup,
+} = require("./presetsWidget");
+const {
   isPresetActive,
   hasPresetSnapshot,
   clearPresetState,
@@ -23,18 +39,28 @@ const {
   initPresetsStateCoreAccess,
 } = require("./PresetsState");
 
-const MAX_PRESETS = 10;
-const PRESET_INTERFACE_ID = 45000;
-const OPEN_PRESETS_BUTTON = 31015;
-const TOGGLE_OPEN_ON_DEATH_BUTTON = 45060;
-const EDIT_PRESET_BUTTON = 45061;
-const CLEAR_PRESET_BUTTON = 45062;
-const LOAD_PRESET_BUTTON = 45064;
-const GLOBAL_PRESET_BUTTON_START = 45070;
-const GLOBAL_PRESET_BUTTON_END = 45079;
-const CUSTOM_PRESET_BUTTON_START = 45082;
-const CUSTOM_PRESET_BUTTON_END = 45091;
+const MAX_PRESETS = CUSTOM_ROW_COUNT;
+const MAIN_MODAL_UID = (161 << 16) | 16;
 const OPEN_PRESETS_DELAY_TICKS = 2;
+
+const INTERFACE_DEFINITION = buildPresetsWidgetGroup();
+
+const STAT_LABELS = ["Attack", "Defence", "Strength", "Hitpoints", "Ranged", "Prayer", "Magic"];
+const GLOBAL_ROW_UIDS = Array.from({ length: GLOBAL_ROW_COUNT }, (_, row) =>
+  uid(GLOBAL_ROW_START + row)
+);
+const CUSTOM_ROW_UIDS = Array.from({ length: CUSTOM_ROW_COUNT }, (_, row) =>
+  uid(CUSTOM_ROW_START + row)
+);
+const PRESET_BUTTON_UIDS = [
+  uid(COMPONENT.CLOSE),
+  uid(COMPONENT.LOAD_BUTTON),
+  uid(COMPONENT.SAVE_BUTTON),
+  uid(COMPONENT.CLEAR_BUTTON),
+  uid(COMPONENT.DEATH_BUTTON),
+  ...GLOBAL_ROW_UIDS,
+  ...CUSTOM_ROW_UIDS,
+];
 
 const COMBAT_SKILLS = [
   Skill.ATTACK,
@@ -97,15 +123,6 @@ function resolvePresetPool(options = {}) {
   return resolved.length > 0 ? resolved : getGlobalPresetPool();
 }
 
-function pickRandomGlobalPreset() {
-  const pool = resolvePresetPool();
-  if (pool.length === 0) {
-    return null;
-  }
-  const index = Math.floor(Math.random() * pool.length);
-  return pool[index] ?? null;
-}
-
 function pickRandomGlobalPresetFromPool(options = {}) {
   const pool = resolvePresetPool(options);
   if (pool.length === 0) {
@@ -115,30 +132,24 @@ function pickRandomGlobalPresetFromPool(options = {}) {
   return pool[index] ?? null;
 }
 
-function rangeInclusive(start, end) {
-  const values = [];
-  for (let i = start; i <= end; i++) {
-    values.push(i);
-  }
-  return values;
-}
-
-const PRESET_BUTTON_IDS = [
-  OPEN_PRESETS_BUTTON,
-  TOGGLE_OPEN_ON_DEATH_BUTTON,
-  EDIT_PRESET_BUTTON,
-  CLEAR_PRESET_BUTTON,
-  LOAD_PRESET_BUTTON,
-  ...rangeInclusive(GLOBAL_PRESET_BUTTON_START, GLOBAL_PRESET_BUTTON_END),
-  ...rangeInclusive(CUSTOM_PRESET_BUTTON_START, CUSTOM_PRESET_BUTTON_END),
-];
-
 function isPlayerBot(player) {
   return Boolean(player?.isPlayerBot?.());
 }
 
 function isPresetInterfaceOpen(player) {
-  return player?.getInterfaceId?.() === PRESET_INTERFACE_ID;
+  return player?.getInterfaceId?.() === GROUP_ID;
+}
+
+/**
+ * Equipment slot for an item, straight from the cache. ItemDefinition.equipmentType is
+ * never populated in this port - getEquipmentType().getSlot() returns -1 for every item -
+ * so the cache's wearPos is the only working source.
+ */
+function equipmentSlotOf(itemId) {
+  const wearPos = CacheDefinitions.getItem(itemId)?.wearPos;
+  return Number.isInteger(wearPos) && wearPos >= 0 && wearPos < EQUIPMENT_SLOT_COUNT
+    ? wearPos
+    : -1;
 }
 
 function isValidItem(item) {
@@ -218,18 +229,6 @@ function applyPresetAutocastIfDefined(player, preset) {
   }
 }
 
-function loadoutToPreset(name, player) {
-  return new Presetable(
-    name,
-    player.getInventory().copyValidItemsArray(),
-    player.getEquipment().copyValidItemsArray(),
-    captureCombatStats(player),
-    player.getSpellbook(),
-    false,
-    player.getCombat()?.getAutocastSpell?.()?.spellId?.() ?? -1
-  );
-}
-
 function getSpellbookDisplayName(spellbook) {
   const MagicSpellbook =
     require("../../src/main/typescript/elvarg/game/model/MagicSpellbook").MagicSpellbook;
@@ -266,6 +265,93 @@ function commitPresetIfNeeded(player) {
   return commitPresetState(player);
 }
 
+function customPresets(player) {
+  return ensurePlayerPresets(player);
+}
+
+function renderPresetLists(player) {
+  const sender = player.getPacketSender();
+  const pool = getGlobalPresetPool();
+  for (let row = 0; row < GLOBAL_ROW_COUNT; row++) {
+    const name = pool[row]?.getName?.();
+    sender.sendString(name ? `<col=c5b79b>${name}</col>` : "", uid(GLOBAL_ROW_START + row));
+  }
+
+  const presets = customPresets(player);
+  for (let row = 0; row < CUSTOM_ROW_COUNT; row++) {
+    const name = presets[row]?.getName?.();
+    sender.sendString(
+      name ? `<col=c5b79b>${name}</col>` : "<col=6f6355>Empty slot</col>",
+      uid(CUSTOM_ROW_START + row)
+    );
+  }
+}
+
+function renderButtons(player) {
+  const sender = player.getPacketSender();
+  const selected = player.getCurrentPreset?.() ?? null;
+  const isCustom = selected != null && !selected.getIsGlobal?.();
+  sender
+    .sendString("Clear preset", uid(COMPONENT.CLEAR_BUTTON + 50))
+    .sendString(
+      player.isOpenPresetsOnDeath?.() ? "On death: <col=40ff40>on</col>" : "On death: <col=ff981f>off</col>",
+      uid(COMPONENT.DEATH_BUTTON + 50)
+    )
+    .sendString("Load preset", uid(COMPONENT.LOAD_BUTTON + 50))
+    .sendString(isCustom ? "Overwrite slot" : "Save current", uid(COMPONENT.SAVE_BUTTON + 50));
+}
+
+function renderSelectedPreset(player, preset) {
+  const sender = player.getPacketSender();
+  sender.sendString(preset?.getName?.() ?? "No preset selected", uid(COMPONENT.SELECTED_NAME));
+
+  const stats = Array.isArray(preset?.getStats?.()) ? preset.getStats() : [];
+  for (let index = 0; index < STAT_LABELS.length; index++) {
+    const level = Number(stats[index]);
+    sender.sendString(
+      preset && Number.isFinite(level)
+        ? `${STAT_LABELS[index]}: <col=ffffff>${Math.max(1, Math.floor(level))}</col>`
+        : "",
+      uid(STAT_ROW_START + index)
+    );
+  }
+  sender.sendString(
+    preset ? `Spellbook: <col=ffffff>${getSpellbookDisplayName(preset.getSpellbook())}</col>` : "",
+    uid(COMPONENT.SPELLBOOK)
+  );
+
+  const inventory = Array.isArray(preset?.getInventory?.()) ? preset.getInventory() : [];
+  for (let slot = 0; slot < INVENTORY_SLOT_COUNT; slot++) {
+    const item = inventory[slot];
+    sender.sendItemOnInterfaces(
+      uid(INVENTORY_SLOT_START + slot),
+      isValidItem(item) ? item.getId() : -1,
+      isValidItem(item) ? item.getAmount() : 1
+    );
+  }
+
+  for (let slot = 0; slot < EQUIPMENT_SLOT_COUNT; slot++) {
+    sender.sendItemOnInterfaces(uid(EQUIPMENT_SLOT_START + slot), -1, 1);
+  }
+  const equipment = Array.isArray(preset?.getEquipment?.()) ? preset.getEquipment() : [];
+  for (const item of equipment) {
+    if (!isValidItem(item)) {
+      continue;
+    }
+    const slot = equipmentSlotOf(item.getId());
+    if (slot < 0) {
+      continue;
+    }
+    sender.sendItemOnInterfaces(uid(EQUIPMENT_SLOT_START + slot), item.getId(), item.getAmount());
+  }
+}
+
+function selectPreset(player, preset) {
+  player.setCurrentPreset(preset ?? null);
+  renderSelectedPreset(player, preset ?? null);
+  renderButtons(player);
+}
+
 function openPresetInterface(player, preset = null) {
   if (!player) {
     return false;
@@ -277,72 +363,16 @@ function openPresetInterface(player, preset = null) {
   }
 
   const sender = player.getPacketSender();
-  const selected = preset ?? null;
-  const playerPresets = ensurePlayerPresets(player);
-  const upperGlobalPresets = GLOBAL_PRESETS.slice(0, MAX_PRESETS);
-  const lowerGlobalPresets = GLOBAL_PRESETS.slice(MAX_PRESETS, MAX_PRESETS * 2);
+  player.setInterfaceId(GROUP_ID);
+  sender.sendSubInterface(MAIN_MODAL_UID, GROUP_ID, 0, {
+    postScripts: [
+      { scriptId: 3737, args: [uid(COMPONENT.FRAME), "Presets"] },
+      { scriptId: 2424, args: [uid(COMPONENT.CLOSE), 496, 0, "Close"] },
+    ],
+  });
 
-  if (selected) {
-    sender.sendString(`Presets - ${selected.getName()}`, 45002);
-    sender.sendString(String(selected.getStats()?.[3] ?? ""), 45007); // Hitpoints
-    sender.sendString(String(selected.getStats()?.[0] ?? ""), 45008); // Attack
-    sender.sendString(String(selected.getStats()?.[2] ?? ""), 45009); // Strength
-    sender.sendString(String(selected.getStats()?.[1] ?? ""), 45010); // Defence
-    sender.sendString(String(selected.getStats()?.[4] ?? ""), 45011); // Ranged
-    sender.sendString(String(selected.getStats()?.[5] ?? ""), 45012); // Prayer
-    sender.sendString(String(selected.getStats()?.[6] ?? ""), 45013); // Magic
-    sender.sendString(`@yel@${getSpellbookDisplayName(selected.getSpellbook())}`, 45014);
-  } else {
-    sender.sendString("Presets", 45002);
-    for (let i = 0; i <= 6; i++) {
-      sender.sendString("", 45007 + i);
-    }
-    sender.sendString("", 45014);
-  }
-
-  const inventory = Array.isArray(selected?.getInventory?.())
-    ? selected.getInventory()
-    : [];
-  for (let i = 0; i < 28; i++) {
-    const item = inventory[i];
-    if (isValidItem(item)) {
-      sender.sendItemOnInterfaces(45015 + i, item.getId(), item.getAmount());
-    } else {
-      sender.sendItemOnInterfaces(45015 + i, -1, 1);
-    }
-  }
-
-  for (let i = 0; i < 14; i++) {
-    sender.sendItemOnInterfaces(45044 + i, -1, 1);
-  }
-  const equipment = Array.isArray(selected?.getEquipment?.())
-    ? selected.getEquipment()
-    : [];
-  for (const item of equipment) {
-    if (!isValidItem(item)) {
-      continue;
-    }
-    const slot = item.getDefinition?.()?.getEquipmentType?.()?.getSlot?.();
-    if (!Number.isInteger(slot) || slot < 0 || slot > 13) {
-      continue;
-    }
-    sender.sendItemOnInterfaces(45044 + slot, item.getId(), item.getAmount());
-  }
-
-  sender.sendString("@whi@Global Presets", 45080);
-  sender.sendString("@whi@More Global Presets", 45092);
-
-  for (let i = 0; i < MAX_PRESETS; i++) {
-    sender.sendString(upperGlobalPresets[i]?.getName?.() ?? "Empty", 45070 + i);
-  }
-
-  for (let i = 0; i < MAX_PRESETS; i++) {
-    sender.sendString(lowerGlobalPresets[i]?.getName?.() ?? "Empty", 45082 + i);
-  }
-
-  sender.sendConfig(987, player.isOpenPresetsOnDeath() ? 0 : 1);
-  sender.sendInterface(PRESET_INTERFACE_ID);
-  player.setCurrentPreset(selected);
+  renderPresetLists(player);
+  selectPreset(player, preset ?? null);
   return true;
 }
 
@@ -352,9 +382,11 @@ function applyPreset(player, preset) {
   }
 
   const sender = player.getPacketSender();
-  const oldCombatLevel = player.getSkillManager().getCombatLevel();
 
-  sender.sendInterfaceRemoval();
+  if (isPresetInterfaceOpen(player)) {
+    player.setInterfaceId(-1);
+    sender.closeSubInterface(MAIN_MODAL_UID);
+  }
   if (isPresetBlockedInWilderness(player)) {
     sender.sendMessage("You can't load a preset in the wilderness!");
     return false;
@@ -435,8 +467,8 @@ function applyPreset(player, preset) {
     if (!next) {
       continue;
     }
-    const slot = next.getDefinition?.()?.getEquipmentType?.()?.getSlot?.();
-    if (!Number.isInteger(slot) || slot < 0 || slot > 13) {
+    const slot = equipmentSlotOf(next.getId());
+    if (slot < 0) {
       continue;
     }
     player.getEquipment().setItem(slot, next);
@@ -459,18 +491,6 @@ function applyPreset(player, preset) {
       .setExperience(skill, exp);
     totalExp += exp;
   }
-
-  sender.sendString(
-    `${player.getSkillManager().getCurrentLevel(Skill.PRAYER)}/${player
-      .getSkillManager()
-      .getMaxLevel(Skill.PRAYER)}`,
-    687
-  );
-  sender.sendString(String(player.getSkillManager().getTotalLevel()), 31200);
-
-  const newCombatLevel = player.getSkillManager().getCombatLevel();
-  const combatLevelText = `Combat level: ${newCombatLevel}`;
-  sender.sendString(combatLevelText, 19000).sendString(combatLevelText, 5858);
 
   sender.sendTabInterface(6, player.getSpellbook().getInterfaceId());
   sender.sendConfig(709, PrayerHandler.canUse(player, PrayerData.PRESERVE, false) ? 1 : 0);
@@ -510,7 +530,8 @@ function applyRandomGlobalPreset(player, options = {}) {
   return preset;
 }
 
-function promptCreatePreset(player, index) {
+/** Saves the player's current loadout into `index`, asking for a name first. */
+function promptSavePreset(player, index) {
   player.setEnteredSyntaxAction({
     execute: (rawInput) => {
       const input = Misc.formatText(rawInput ?? "");
@@ -522,11 +543,6 @@ function promptCreatePreset(player, index) {
       }
 
       const presets = ensurePlayerPresets(player);
-      if (presets[index] != null) {
-        openPresetInterface(player, presets[index]);
-        return;
-      }
-
       const inventory = player.getInventory().copyValidItemsArray();
       const equipment = player.getEquipment().copyValidItemsArray();
       for (const item of [...inventory, ...equipment]) {
@@ -547,8 +563,8 @@ function promptCreatePreset(player, index) {
         false,
         player.getCombat()?.getAutocastSpell?.()?.spellId?.() ?? -1
       );
-      player.setCurrentPreset(presets[index]);
-      openPresetInterface(player, presets[index]);
+      renderPresetLists(player);
+      selectPreset(player, presets[index]);
     },
   });
   player
@@ -556,90 +572,99 @@ function promptCreatePreset(player, index) {
     .sendEnterInputPrompt("Enter a name for your preset below.");
 }
 
-function promptEditCurrentPreset(player) {
-  const current = player.getCurrentPreset();
-  if (current?.getIsGlobal?.()) {
-    player.getPacketSender().sendMessage("You can't edit this preset!");
-    return true;
-  }
-
-  player.setEnteredSyntaxAction({
-    execute: (rawInput) => {
-      const input = Misc.formatText(rawInput ?? "");
-      if (!Misc.isValidName(input)) {
-        player
-          .getPacketSender()
-          .sendMessage("Invalid name for preset. Please enter characters only.");
-        player.setCurrentPreset(null);
-        openPresetInterface(player, null);
-        return;
-      }
-
-      const presets = ensurePlayerPresets(player);
-      let changeIndex = -1;
-      for (let i = 0; i < presets.length; i++) {
-        if (presets[i] === player.getCurrentPreset()) {
-          changeIndex = i;
-          break;
-        }
-      }
-
-      if (changeIndex === -1) {
-        player.getPacketSender().sendMessage("You don't have free space left!!");
-        return;
-      }
-
-      const updatedPreset = loadoutToPreset(input, player);
-      presets[changeIndex] = updatedPreset;
-      player.setCurrentPreset(updatedPreset);
-      applyPreset(player, updatedPreset);
-    },
-  });
-  player
-    .getPacketSender()
-    .sendEnterInputPrompt("How would you like to call your preset?");
-  return true;
+function firstFreePresetSlot(player) {
+  return customPresets(player).findIndex((preset) => preset == null);
 }
 
-function handlePresetButton(player, buttonId) {
-  if (!Number.isInteger(buttonId) || !player) {
+function requireOpenInterface(player) {
+  if (isPresetInterfaceOpen(player) || isPlayerBot(player)) {
+    return true;
+  }
+  return false;
+}
+
+function handlePresetRowClick(player, buttonId) {
+  if (!requireOpenInterface(player)) {
     return false;
   }
 
-  ensurePlayerPresets(player);
-
-  if (buttonId === OPEN_PRESETS_BUTTON) {
-    if (player.busy?.()) {
-      player.getPacketSender().sendInterfaceRemoval();
+  const globalRow = GLOBAL_ROW_UIDS.indexOf(buttonId);
+  if (globalRow >= 0) {
+    const preset = getGlobalPresetPool()[globalRow] ?? null;
+    if (!preset) {
+      player.getPacketSender().sendMessage("That preset is currently unavailable.");
+      return true;
     }
-    openPresetInterface(player, player.getCurrentPreset?.() ?? null);
+    selectPreset(player, preset);
     return true;
   }
 
-  if (!isPresetInterfaceOpen(player) && !isPlayerBot(player)) {
+  const customRow = CUSTOM_ROW_UIDS.indexOf(buttonId);
+  if (customRow >= 0) {
+    const preset = customPresets(player)[customRow] ?? null;
+    if (preset) {
+      selectPreset(player, preset);
+    } else {
+      promptSavePreset(player, customRow);
+    }
+    return true;
+  }
+
+  return false;
+}
+
+function handlePresetActionButton(player, buttonId) {
+  if (!requireOpenInterface(player)) {
     return false;
   }
 
   switch (buttonId) {
-    case TOGGLE_OPEN_ON_DEATH_BUTTON:
-      player.setOpenPresetsOnDeath(!player.isOpenPresetsOnDeath());
-      player
-        .getPacketSender()
-        .sendConfig(987, player.isOpenPresetsOnDeath() ? 0 : 1);
+    case uid(COMPONENT.CLOSE):
+      player.setInterfaceId(-1);
+      player.getPacketSender().closeSubInterface(MAIN_MODAL_UID);
       return true;
-    case EDIT_PRESET_BUTTON:
-    case CLEAR_PRESET_BUTTON: {
+
+    case uid(COMPONENT.DEATH_BUTTON):
+      player.setOpenPresetsOnDeath(!player.isOpenPresetsOnDeath());
+      renderButtons(player);
+      return true;
+
+    case uid(COMPONENT.LOAD_BUTTON): {
+      const preset = player.getCurrentPreset();
+      if (!preset) {
+        player.getPacketSender().sendMessage("You haven't selected any preset yet.");
+        return true;
+      }
+      applyPreset(player, preset);
+      return true;
+    }
+
+    case uid(COMPONENT.SAVE_BUTTON): {
+      // Saving over a selected custom preset edits it in place; otherwise it fills the
+      // first free slot, which is the only way to create one.
+      const selected = player.getCurrentPreset();
+      const selectedIndex = selected ? customPresets(player).indexOf(selected) : -1;
+      const index = selectedIndex >= 0 ? selectedIndex : firstFreePresetSlot(player);
+      if (index < 0) {
+        player
+          .getPacketSender()
+          .sendMessage(`You already have ${MAX_PRESETS} presets. Select one to overwrite it.`);
+        return true;
+      }
+      promptSavePreset(player, index);
+      return true;
+    }
+
+    case uid(COMPONENT.CLEAR_BUTTON): {
       if (!isPresetActive(player)) {
         player.getPacketSender().sendMessage("No active preset to clear.");
         return true;
       }
-      const restored = restorePresetSnapshot(player, { preserveLocation: true });
-      if (restored) {
+      if (restorePresetSnapshot(player, { preserveLocation: true })) {
         player
           .getPacketSender()
           .sendMessage("Preset cleared. Your original character state has been restored.");
-        player.setCurrentPreset(null);
-        openPresetInterface(player, null);
+        selectPreset(player, null);
       } else {
         player
           .getPacketSender()
@@ -647,56 +672,10 @@ function handlePresetButton(player, buttonId) {
       }
       return true;
     }
-    case LOAD_PRESET_BUTTON: {
-      const currentPreset = player.getCurrentPreset();
-      if (!currentPreset) {
-        player
-          .getPacketSender()
-          .sendMessage("You haven't selected any preset yet.");
-        return true;
-      }
-      applyPreset(player, currentPreset);
-      return true;
-    }
+
     default:
-      break;
+      return handlePresetRowClick(player, buttonId);
   }
-
-  if (buttonId >= GLOBAL_PRESET_BUTTON_START && buttonId <= GLOBAL_PRESET_BUTTON_END) {
-    const index = buttonId - GLOBAL_PRESET_BUTTON_START;
-    const preset = GLOBAL_PRESETS[index];
-    if (!preset) {
-      player
-        .getPacketSender()
-        .sendMessage("That preset is currently unavailable.");
-      return true;
-    }
-    if (player.getCurrentPreset() === preset) {
-      return true;
-    }
-    openPresetInterface(player, preset);
-    return true;
-  }
-
-  if (buttonId >= CUSTOM_PRESET_BUTTON_START && buttonId <= CUSTOM_PRESET_BUTTON_END) {
-    const index = buttonId - CUSTOM_PRESET_BUTTON_START;
-    const preset = GLOBAL_PRESETS[MAX_PRESETS + index] ?? null;
-    if (!preset) {
-      player
-        .getPacketSender()
-        .sendMessage("That preset is currently unavailable.");
-      return true;
-    }
-
-    if (player.getCurrentPreset() === preset) {
-      return true;
-    }
-
-    openPresetInterface(player, preset);
-    return true;
-  }
-
-  return false;
 }
 
 function isAtDefaultRespawn(player) {
@@ -755,12 +734,19 @@ module.exports = {
       }
     });
 
-    api.onButton(PRESET_BUTTON_IDS, ({ player, buttonId }) =>
-      handlePresetButton(player, buttonId)
-    );
+    api.registerCustomInterface(INTERFACE_DEFINITION);
 
-    api.onInterfaceActionButton(PRESET_BUTTON_IDS, ({ player, buttonId }) =>
-      handlePresetButton(player, buttonId)
+    // Presets are for everyone, not just staff.
+    api.registerCommand("presets", ({ player }) => {
+      if (player.busy?.()) {
+        player.getPacketSender().sendInterfaceRemoval();
+      }
+      openPresetInterface(player, player.getCurrentPreset?.() ?? null);
+      return true;
+    });
+
+    api.onInterfaceActionButton(PRESET_BUTTON_UIDS, ({ player, buttonId }) =>
+      handlePresetActionButton(player, buttonId)
     );
 
     api.onCanTrade((event) => {

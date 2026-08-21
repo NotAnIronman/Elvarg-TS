@@ -1,58 +1,15 @@
+const { FLAG_OP1, FLAG_OP2, createWidgetGroup } = require("./widgetGroup");
+
 const GROUP_ID = 30002;
 const SLOT_COUNT = 32;
 const COLUMNS = 8;
 const BACKGROUND_START = 20;
 const ICON_START = 100;
-const FLAG_OP1 = 1 << 1;
-const FLAG_OP2 = 1 << 2;
 
 const uid = (component) => (GROUP_ID << 16) | component;
 
 function buildItemSpawnerWidgetGroup() {
-  const widgets = [];
-  const add = (component, parent, overrides = {}) => {
-    const id = uid(component);
-    widgets.push({
-      uid: id,
-      id,
-      childIndex: -1,
-      parentUid: parent,
-      groupId: GROUP_ID,
-      fileId: component,
-      isIf3: true,
-      type: 0,
-      contentType: 0,
-      rawX: 0,
-      rawY: 0,
-      rawWidth: 0,
-      rawHeight: 0,
-      widthMode: 0,
-      heightMode: 0,
-      xPositionMode: 0,
-      yPositionMode: 0,
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      scrollX: 0,
-      scrollY: 0,
-      scrollWidth: 0,
-      scrollHeight: 0,
-      isHidden: false,
-      hidden: false,
-      cachedHidden: false,
-      rootIndex: -1,
-      cycle: -1,
-      modelFrame: 0,
-      modelFrameCycle: 0,
-      aspectWidth: 1,
-      aspectHeight: 1,
-      itemId: -1,
-      itemQuantity: 0,
-      ...overrides,
-    });
-    return id;
-  };
+  const { widgets, add } = createWidgetGroup(GROUP_ID);
 
   const root = add(0, -1, {
     rawWidth: 18,
