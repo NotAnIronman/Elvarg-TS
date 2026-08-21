@@ -44,6 +44,7 @@ const declaration = {
         truncated: "Matches: %total (showing %shown)",
     },
     hint: { component: 6, text: "type to search" },
+    scroll: [{ viewComponent: 12, scrollbarComponent: 13, contentHeight: 538 }],
 };
 
 // A definition fetched from /api/interfaces/<groupId> installs both halves: its widgets
@@ -69,7 +70,7 @@ loadFromPayload({
 
 const uid = (component: number) => (GROUP_ID << 16) | component;
 const widgets = new Map<number, any>();
-for (const component of [4, 5, 6, 8, 10, 20, 21, 22, 23, 100, 101, 102, 103]) {
+for (const component of [4, 5, 6, 8, 10, 12, 13, 20, 21, 22, 23, 100, 101, 102, 103]) {
     widgets.set(uid(component), { uid: uid(component), width: 200, height: 88, scrollY: 0 });
 }
 
@@ -111,6 +112,12 @@ assert.equal(runtime.isSearchFocused(), true, "a search interface opens focused"
 assert.equal(widgets.get(uid(6)).text, "type to search", "the hint is server supplied");
 assert.equal(widgets.get(uid(5)).text, "idle", "empty query shows the idle status");
 assert.equal(widgets.get(uid(4)).text, "|", "an empty focused box is just the caret");
+
+// A declared scroll region gets the height it needs to scroll over.
+assert.equal(widgets.get(uid(12)).scrollHeight, 538, "the view scrolls its declared content");
+assert.equal(widgets.get(uid(12)).scrollWidth, 200);
+assert.equal(widgets.get(uid(13)).scrollBarTargetUid, uid(12), "the scrollbar drives the view");
+assert.equal(widgets.get(uid(13)).scrollBarAxis, "y");
 
 // Typing renders through the server's template and respects maxLength.
 const type = (text: string) =>

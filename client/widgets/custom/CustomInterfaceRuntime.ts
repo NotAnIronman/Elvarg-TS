@@ -49,6 +49,15 @@ export type CustomInterfaceDeclaration = {
         /** "%name" and "%id" are replaced per row. */
         itemLabel?: string;
     };
+    /**
+     * Containers that scroll their own children. The rows are part of the definition, so
+     * the client only has to give the view a scroll height and wire up a scrollbar.
+     */
+    scroll?: Array<{
+        viewComponent: number;
+        scrollbarComponent?: number;
+        contentHeight?: number;
+    }>;
     status?: {
         component: number;
         idle?: string;
@@ -129,6 +138,7 @@ export class CustomInterfaceRuntime {
         this.focused = !!declaration.search;
         this.syncInput();
         this.applyHint();
+        this.applyScrollRegions();
         this.renderRows(true);
         return true;
     }
@@ -228,6 +238,7 @@ export class CustomInterfaceRuntime {
             return;
         }
         this.initializeScrollView();
+        this.applyScrollRegions();
         this.refreshVisibleSlots();
     }
 
@@ -517,13 +528,31 @@ export class CustomInterfaceRuntime {
         return ((archiveId & 0xffff) << 16) | (frameIndex & 0xffff);
     }
 
-    private initializeScrollView(): void {
+    /** Applies the scroll height every declared scrolling container needs. */
+    private applyScrollRegions(): void {
+        for (const region of this.declaration?.scroll ?? []) {
+            const view = this.widget(region.viewComponent);
+            if (!view) {
+                continue;
+            }
+            if (region.contentHeight !== undefined) {
+                view.scrollWidth = Math.max(0, view.width | 0);
+                view.scrollHeight = Math.max(view.height | 0, region.contentHeight | 0);
+            }
+            this.initializeScrollView(region.viewComponent, region.scrollbarComponent);
+            this.refreshScrollbar(region.viewComponent, region.scrollbarComponent);
+        }
+    }
+
+    private initializeScrollView(viewComponent?: number, scrollbarComponent?: number): void {
         const list = this.declaration?.list;
-        if (!list?.scrollbarComponent) {
+        const viewId = viewComponent ?? list?.viewComponent;
+        const scrollbarId = scrollbarComponent ?? list?.scrollbarComponent;
+        if (viewId === undefined || scrollbarId === undefined) {
             return;
         }
-        const view = this.widget(list.viewComponent);
-        const scrollbar = this.widget(list.scrollbarComponent);
+        const view = this.widget(viewId);
+        const scrollbar = this.widget(scrollbarId);
         if (!view || !scrollbar) {
             return;
         }
@@ -550,17 +579,19 @@ export class CustomInterfaceRuntime {
         this.deps.widgetManager.invalidateWidget(scrollbar, "custom-interface-scrollbar-init");
     }
 
-    private refreshScrollbar(): void {
+    private refreshScrollbar(viewComponent?: number, scrollbarComponent?: number): void {
         const list = this.declaration?.list;
-        if (!list?.scrollbarComponent) {
+        const viewId = viewComponent ?? list?.viewComponent;
+        const scrollbarId = scrollbarComponent ?? list?.scrollbarComponent;
+        if (viewId === undefined || scrollbarId === undefined) {
             return;
         }
-        const view = this.widget(list.viewComponent);
-        const scrollbar = this.widget(list.scrollbarComponent);
+        const view = this.widget(viewId);
+        const scrollbar = this.widget(scrollbarId);
         if (!view || !scrollbar) {
             return;
         }
-        this.initializeScrollView();
+        this.initializeScrollView(viewId, scrollbarId);
         this.deps.runWidgetScopedClientScript(
             scrollbar.uid | 0,
             SCROLLBAR_RESIZE_SCRIPT_ID,

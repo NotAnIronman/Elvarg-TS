@@ -1,6 +1,5 @@
 const {
   FLAG_OP1,
-  TYPE_RECTANGLE,
   TYPE_TEXT,
   TYPE_GRAPHIC,
   createWidgetGroup,
@@ -8,33 +7,129 @@ const {
 
 const GROUP_ID = 30003;
 
-// Column of global presets, then the player's own slots.
-const GLOBAL_ROW_START = 200;
-const GLOBAL_ROW_COUNT = 17;
-const CUSTOM_ROW_START = 230;
-const CUSTOM_ROW_COUNT = 10;
+// The root fills the modal slot it is mounted in (parent - 18 on both axes), so its size
+// follows the game window. Fixed mode is the smallest that ever gets, so the layout is
+// built to fit that and the button row is anchored to the bottom rather than a fixed y.
+const MIN_MODAL = { width: 512 - 18, height: 334 - 18 };
+const CONTENT_X = 8;
+const CONTENT_RIGHT = MIN_MODAL.width - CONTENT_X;
+// The frame's title bar covers the top of the group, so column headings start below it.
+const HEADER_Y = 40;
+const HEADER_HEIGHT = 14;
+const CONTENT_Y = HEADER_Y + HEADER_HEIGHT;
+const BUTTON_HEIGHT = 22;
+const BUTTON_INSET_Y = 8;
+const CONTENT_BOTTOM = MIN_MODAL.height - BUTTON_HEIGHT - BUTTON_INSET_Y * 2;
 
+// Equipment slots get the cache's slot background and empty-slot silhouette; inventory
+// slots are just the item, the way the real inventory draws them.
+const SLOT_BACKGROUND_SPRITE = 170;
+const SLOT_SHADOW = 0x333333;
+const EQUIPMENT_PITCH = 36;
+const INVENTORY_PITCH = 32;
+// enum 904: equipment slot -> the silhouette shown while that slot is empty.
+const EQUIPMENT_PLACEHOLDER_SPRITES = {
+  0: 156,
+  1: 157,
+  2: 158,
+  3: 159,
+  4: 161,
+  5: 162,
+  7: 163,
+  9: 164,
+  10: 165,
+  12: 160,
+  13: 166,
+};
+
+// Combat levels are drawn as the skills tab draws them (script 393): a two-sprite box with
+// the skill's own icon. enum 255 maps a skill to that icon.
+// The box carries a diagonal divider, so the level is drawn twice - current above it and
+// maximum below - at the offsets the skills tab uses, scaled to this box.
+const STAT_BOX = { width: 64, height: 30, pitch: 32 };
+const STAT_BOX_SPRITE_LEFT = 187;
+const STAT_BOX_SPRITE_RIGHT = 188;
+const STAT_ICON_SIZE = 20;
+const STAT_ICON_INSET = { x: 4, y: 5 };
+const STAT_LEVEL_SIZE = { width: 15, height: 12 };
+const STAT_CURRENT_INSET = { x: 30, y: 2 };
+const STAT_MAX_INSET = { x: 45, y: 15 };
+const STAT_LEVEL_COLOUR = 0xffff00;
+const STAT_SKILL_ICONS = [197, 199, 198, 203, 200, 201, 202];
+
+const LIST_X = CONTENT_X;
+const LIST_WIDTH = 128;
+const LIST_SCROLLBAR_WIDTH = 16;
+const ROW_PITCH = 18;
+
+// Equipment sits above the spellbook; the combat levels are their own column beside it.
+const EQUIPMENT_X = 160;
+const EQUIPMENT_WIDTH = 108;
+const EQUIPMENT_HEADER_Y = CONTENT_Y + 4;
+const EQUIPMENT_Y = EQUIPMENT_HEADER_Y + HEADER_HEIGHT + 2;
+const EQUIPMENT_COLUMNS = 3;
+const EQUIPMENT_ROWS = 5;
+const SPELLBOOK_Y = EQUIPMENT_Y + EQUIPMENT_ROWS * EQUIPMENT_PITCH + 8;
+
+const STAT_X = 276;
+
+const INVENTORY_COLUMNS = 4;
+const INVENTORY_ROWS = 7;
+const INVENTORY_WIDTH = INVENTORY_PITCH * INVENTORY_COLUMNS;
+const INVENTORY_X = CONTENT_RIGHT - INVENTORY_WIDTH;
+
+const BUTTON_GAP = 8;
+const BUTTON_COUNT = 4;
+const BUTTON_WIDTH = Math.floor(
+  (CONTENT_RIGHT - CONTENT_X - (BUTTON_COUNT - 1) * BUTTON_GAP) / BUTTON_COUNT
+);
+
+// One list for every preset: the predefined ones first, then the player's own slots.
+const PRESET_ROW_START = 200;
+const GLOBAL_ROW_COUNT = 17;
+const CUSTOM_ROW_COUNT = 10;
+const PRESET_ROW_COUNT = GLOBAL_ROW_COUNT + CUSTOM_ROW_COUNT;
+
+// The client sorts a parent's children by fileId and paints them in that order, so a
+// slot's background must number below its icon or it covers it.
 const INVENTORY_SLOT_START = 100;
 const INVENTORY_SLOT_COUNT = 28;
-const INVENTORY_COLUMNS = 4;
-const INVENTORY_BACKGROUND_START = 60;
 
-const EQUIPMENT_SLOT_START = 140;
-const EQUIPMENT_SLOT_COUNT = 14;
-const EQUIPMENT_COLUMNS = 4;
-const EQUIPMENT_BACKGROUND_START = 160;
+// Equipment is laid out the way the equipment tab does it, keyed by the cache's wearPos so
+// a slot's component is always EQUIPMENT_SLOT_START + wearPos.
+const EQUIPMENT_BACKGROUND_START = 140;
+const EQUIPMENT_PLACEHOLDER_START = 160;
+const EQUIPMENT_SLOT_START = 180;
+const EQUIPMENT_LAYOUT = [
+  { slot: 0, column: 1, row: 0 }, // head
+  { slot: 1, column: 0, row: 1 }, // cape
+  { slot: 2, column: 1, row: 1 }, // amulet
+  { slot: 13, column: 2, row: 1 }, // ammo
+  { slot: 3, column: 0, row: 2 }, // weapon
+  { slot: 4, column: 1, row: 2 }, // body
+  { slot: 5, column: 2, row: 2 }, // shield
+  { slot: 7, column: 1, row: 3 }, // legs
+  { slot: 9, column: 0, row: 4 }, // hands
+  { slot: 10, column: 1, row: 4 }, // feet
+  { slot: 12, column: 2, row: 4 }, // ring
+];
+const EQUIPMENT_SLOTS = EQUIPMENT_LAYOUT.map((entry) => entry.slot);
 
-const STAT_ROW_START = 20;
-const STAT_ROW_COUNT = 7;
+const STAT_ROW_COUNT = STAT_SKILL_ICONS.length;
+const STAT_BOX_LEFT_START = 240;
+const STAT_BOX_RIGHT_START = 250;
+const STAT_ICON_START = 260;
+const STAT_ROW_START = 270;
+const STAT_MAX_ROW_START = 280;
 
 const COMPONENT = {
   ROOT: 0,
   FRAME: 1,
-  CLOSE: 7,
-  GLOBAL_HEADER: 10,
-  CUSTOM_HEADER: 11,
+  LIST_HEADER: 10,
   EQUIPMENT_HEADER: 13,
   INVENTORY_HEADER: 14,
+  LIST_VIEW: 15,
+  LIST_SCROLLBAR: 16,
   SELECTED_NAME: 30,
   SPELLBOOK: 31,
   LOAD_BUTTON: 40,
@@ -45,33 +140,14 @@ const COMPONENT = {
 
 const uid = (component) => (GROUP_ID << 16) | component;
 
-// The cache frame draws a border and title bar over the group, so content lives inside
-// roughly x 8..512, y 26..390 of the 520x412 modal. Anything past that is clipped.
-const LEFT_X = 8;
-const CUSTOM_X = 112;
-const MIDDLE_X = 220;
-const INVENTORY_X = 352;
-const COLUMN_WIDTH = 100;
-const MIDDLE_WIDTH = 124;
-const INVENTORY_WIDTH = 152;
-const HEADER_Y = 26;
-const ROW_Y = 44;
-const ROW_PITCH = 17;
-const STAT_Y = 46;
-const STAT_PITCH = 16;
-const EQUIPMENT_HEADER_Y = 186;
-const EQUIPMENT_Y = 204;
-const EQUIPMENT_CELL = { width: 30, height: 30 };
-const INVENTORY_CELL = { width: 38, height: 32 };
-const BUTTON_Y = 344;
-const BUTTON_HEIGHT = 22;
+const LIST_HEIGHT = CONTENT_BOTTOM - CONTENT_Y;
+const LIST_CONTENT_HEIGHT = PRESET_ROW_COUNT * ROW_PITCH + 4;
 
 const FONT_SMALL = 494;
 const FONT_BOLD = 496;
 const COLOUR_HEADER = 0xffd27f;
 const COLOUR_TEXT = 0xe8ded0;
 const COLOUR_MUTED = 0xc5b79b;
-const SLOT_BACKGROUND = 0x241e16;
 const BUTTON_COLOUR = 0x2b241b;
 const BUTTON_HOVER_COLOUR = 0x3a3125;
 
@@ -83,33 +159,27 @@ function buildPresetsWidgetGroup() {
     rawHeight: 18,
     widthMode: 1,
     heightMode: 1,
-    width: 520,
-    height: 412,
+    width: MIN_MODAL.width,
+    height: MIN_MODAL.height,
     xPositionMode: 1,
     yPositionMode: 1,
   });
-  add(COMPONENT.FRAME, root, { widthMode: 1, heightMode: 1, width: 520, height: 412 });
-  add(COMPONENT.CLOSE, root, {
-    rawY: 24,
-    rawWidth: 110,
-    rawHeight: 30,
-    xPositionMode: 1,
-    yPositionMode: 2,
-    width: 110,
-    height: 30,
-    actions: ["Close"],
-    flags: FLAG_OP1,
+  add(COMPONENT.FRAME, root, {
+    widthMode: 1,
+    heightMode: 1,
+    width: MIN_MODAL.width,
+    height: MIN_MODAL.height,
   });
 
-  const header = (component, x, y, width, text) =>
-    add(component, root, {
+  const header = (component, parent, x, y, width, text) =>
+    add(component, parent, {
       type: TYPE_TEXT,
       rawX: x,
       rawY: y,
       rawWidth: width,
-      rawHeight: 16,
+      rawHeight: HEADER_HEIGHT,
       width,
-      height: 16,
+      height: HEADER_HEIGHT,
       text,
       fontId: FONT_BOLD,
       textColor: COLOUR_HEADER,
@@ -117,8 +187,8 @@ function buildPresetsWidgetGroup() {
       yTextAlignment: 1,
     });
 
-  const label = (component, x, y, width, overrides = {}) =>
-    add(component, root, {
+  const label = (component, parent, x, y, width, overrides = {}) =>
+    add(component, parent, {
       type: TYPE_TEXT,
       rawX: x,
       rawY: y,
@@ -134,42 +204,52 @@ function buildPresetsWidgetGroup() {
       ...overrides,
     });
 
-  const slot = (iconComponent, backgroundComponent, x, y, size) => {
-    add(backgroundComponent, root, {
-      type: TYPE_RECTANGLE,
+  const graphic = (component, x, y, width, height, spriteId, overrides = {}) =>
+    add(component, root, {
+      type: TYPE_GRAPHIC,
       rawX: x,
       rawY: y,
-      rawWidth: size.width,
-      rawHeight: size.height,
-      width: size.width,
-      height: size.height,
-      filled: true,
-      color: SLOT_BACKGROUND,
-      mouseOverColor: SLOT_BACKGROUND,
-      textColor: SLOT_BACKGROUND,
-      opacity: 64,
+      rawWidth: width,
+      rawHeight: height,
+      width,
+      height,
+      spriteId,
+      ...overrides,
     });
-    add(iconComponent, root, {
-      type: TYPE_GRAPHIC,
-      rawX: x + 2,
-      rawY: y + 2,
-      rawWidth: size.width - 4,
-      rawHeight: size.height - 4,
-      width: size.width - 4,
-      height: size.height - 4,
+
+  /**
+   * A slot is background, then the empty-slot silhouette, then the item icon. They are
+   * numbered in that order because the client paints a parent's children by fileId.
+   */
+  const slot = (iconComponent, x, y, pitch, background) => {
+    const cell = pitch - 2;
+    if (background) {
+      graphic(background.component, x, y, cell, cell, SLOT_BACKGROUND_SPRITE);
+      const inset = Math.floor((cell - (cell - 8)) / 2);
+      graphic(
+        background.placeholderComponent,
+        x + inset,
+        y + inset,
+        cell - 8,
+        cell - 8,
+        background.placeholderSpriteId
+      );
+    }
+    graphic(iconComponent, x + 1, y + 2, cell - 2, cell - 6, -1, {
       itemQuantityMode: 2,
       borderType: 1,
-      graphicShadow: 0x333333,
-      shadowColor: 0x333333,
+      graphicShadow: SLOT_SHADOW,
+      shadowColor: SLOT_SHADOW,
       text: "",
     });
   };
 
-  const button = (component, x, y, width) => {
+  const button = (component, x, insetY, width) => {
     add(component, root, {
-      type: TYPE_RECTANGLE,
+      type: 3,
       rawX: x,
-      rawY: y,
+      rawY: insetY,
+      yPositionMode: 2,
       rawWidth: width,
       rawHeight: BUTTON_HEIGHT,
       width,
@@ -183,69 +263,132 @@ function buildPresetsWidgetGroup() {
       flags: FLAG_OP1,
     });
     // Server-set label, so a button can say what it currently does.
-    label(component + 50, x, y + 4, width, {
+    label(component + 50, root, x, insetY + 4, width, {
       xTextAlignment: 1,
       textColor: COLOUR_HEADER,
+      yPositionMode: 2,
     });
   };
 
-  // Two columns of preset names down the left.
-  header(COMPONENT.GLOBAL_HEADER, LEFT_X, HEADER_Y, COLUMN_WIDTH, "Global presets");
-  for (let row = 0; row < GLOBAL_ROW_COUNT; row++) {
-    label(GLOBAL_ROW_START + row, LEFT_X, ROW_Y + row * ROW_PITCH, COLUMN_WIDTH, {
-      textColor: COLOUR_MUTED,
-      actions: ["Select"],
-      flags: FLAG_OP1,
-    });
-  }
-  header(COMPONENT.CUSTOM_HEADER, CUSTOM_X, HEADER_Y, COLUMN_WIDTH, "Your presets");
-  for (let row = 0; row < CUSTOM_ROW_COUNT; row++) {
-    label(CUSTOM_ROW_START + row, CUSTOM_X, ROW_Y + row * ROW_PITCH, COLUMN_WIDTH, {
+  // One scrolling column of presets. The rows are children of the view, so the client
+  // scrolls them natively; adding presets only makes the column longer.
+  header(COMPONENT.LIST_HEADER, root, LIST_X, HEADER_Y, LIST_WIDTH, "Presets");
+  const listView = add(COMPONENT.LIST_VIEW, root, {
+    rawX: LIST_X,
+    rawY: CONTENT_Y,
+    rawWidth: LIST_WIDTH,
+    rawHeight: LIST_HEIGHT,
+    width: LIST_WIDTH,
+    height: LIST_HEIGHT,
+    scrollWidth: LIST_WIDTH,
+    scrollHeight: LIST_CONTENT_HEIGHT,
+  });
+  add(COMPONENT.LIST_SCROLLBAR, root, {
+    rawX: LIST_X + LIST_WIDTH,
+    rawY: CONTENT_Y,
+    rawWidth: LIST_SCROLLBAR_WIDTH,
+    rawHeight: LIST_HEIGHT,
+    width: LIST_SCROLLBAR_WIDTH,
+    height: LIST_HEIGHT,
+    noClickThrough: true,
+  });
+  for (let row = 0; row < PRESET_ROW_COUNT; row++) {
+    label(PRESET_ROW_START + row, listView, 0, row * ROW_PITCH, LIST_WIDTH, {
       textColor: COLOUR_MUTED,
       actions: ["Select"],
       flags: FLAG_OP1,
     });
   }
 
-  // Middle column: the selected preset's name, combat levels, spellbook and equipment.
-  header(COMPONENT.SELECTED_NAME, MIDDLE_X, HEADER_Y, MIDDLE_WIDTH, "");
-  for (let row = 0; row < STAT_ROW_COUNT; row++) {
-    label(STAT_ROW_START + row, MIDDLE_X, STAT_Y + row * STAT_PITCH, MIDDLE_WIDTH);
-  }
-  label(COMPONENT.SPELLBOOK, MIDDLE_X, STAT_Y + STAT_ROW_COUNT * STAT_PITCH + 4, MIDDLE_WIDTH, {
-    textColor: COLOUR_MUTED,
-  });
-  header(COMPONENT.EQUIPMENT_HEADER, MIDDLE_X, EQUIPMENT_HEADER_Y, MIDDLE_WIDTH, "Equipment");
-  for (let index = 0; index < EQUIPMENT_SLOT_COUNT; index++) {
-    const column = index % EQUIPMENT_COLUMNS;
-    const row = Math.floor(index / EQUIPMENT_COLUMNS);
+  // The selected preset: its name across the middle, then its equipment and spellbook.
+  header(
+    COMPONENT.SELECTED_NAME,
+    root,
+    EQUIPMENT_X,
+    HEADER_Y,
+    STAT_X + STAT_BOX.width - EQUIPMENT_X,
+    ""
+  );
+  header(
+    COMPONENT.EQUIPMENT_HEADER,
+    root,
+    EQUIPMENT_X,
+    EQUIPMENT_HEADER_Y,
+    EQUIPMENT_WIDTH,
+    "Equipment"
+  );
+  const equipmentX =
+    EQUIPMENT_X + Math.floor((EQUIPMENT_WIDTH - EQUIPMENT_COLUMNS * EQUIPMENT_PITCH) / 2);
+  for (const entry of EQUIPMENT_LAYOUT) {
     slot(
-      EQUIPMENT_SLOT_START + index,
-      EQUIPMENT_BACKGROUND_START + index,
-      MIDDLE_X + column * EQUIPMENT_CELL.width,
-      EQUIPMENT_Y + row * EQUIPMENT_CELL.height,
-      EQUIPMENT_CELL
+      EQUIPMENT_SLOT_START + entry.slot,
+      equipmentX + entry.column * EQUIPMENT_PITCH,
+      EQUIPMENT_Y + entry.row * EQUIPMENT_PITCH,
+      EQUIPMENT_PITCH,
+      {
+        component: EQUIPMENT_BACKGROUND_START + entry.slot,
+        placeholderComponent: EQUIPMENT_PLACEHOLDER_START + entry.slot,
+        placeholderSpriteId: EQUIPMENT_PLACEHOLDER_SPRITES[entry.slot],
+      }
     );
   }
+  label(COMPONENT.SPELLBOOK, root, EQUIPMENT_X, SPELLBOOK_Y, EQUIPMENT_WIDTH, {
+    textColor: COLOUR_MUTED,
+    xTextAlignment: 1,
+  });
 
-  // Right column: the selected preset's inventory.
-  header(COMPONENT.INVENTORY_HEADER, INVENTORY_X, HEADER_Y, INVENTORY_WIDTH, "Inventory");
+  // Combat levels, one boxed row per skill, drawn the way the skills tab draws them.
+  for (let index = 0; index < STAT_ROW_COUNT; index++) {
+    const y = CONTENT_Y + index * STAT_BOX.pitch;
+    const halfWidth = Math.ceil(STAT_BOX.width / 2) + 2;
+    graphic(STAT_BOX_LEFT_START + index, STAT_X, y, halfWidth, STAT_BOX.height, STAT_BOX_SPRITE_LEFT);
+    graphic(
+      STAT_BOX_RIGHT_START + index,
+      STAT_X + STAT_BOX.width - halfWidth,
+      y,
+      halfWidth,
+      STAT_BOX.height,
+      STAT_BOX_SPRITE_RIGHT
+    );
+    graphic(
+      STAT_ICON_START + index,
+      STAT_X + STAT_ICON_INSET.x,
+      y + STAT_ICON_INSET.y,
+      STAT_ICON_SIZE,
+      STAT_ICON_SIZE,
+      STAT_SKILL_ICONS[index]
+    );
+    for (const [component, inset] of [
+      [STAT_ROW_START + index, STAT_CURRENT_INSET],
+      [STAT_MAX_ROW_START + index, STAT_MAX_INSET],
+    ]) {
+      label(component, root, STAT_X + inset.x, y + inset.y, STAT_LEVEL_SIZE.width, {
+        rawHeight: STAT_LEVEL_SIZE.height,
+        height: STAT_LEVEL_SIZE.height,
+        textColor: STAT_LEVEL_COLOUR,
+        xTextAlignment: 1,
+      });
+    }
+  }
+
+  // The selected preset's inventory - plain item slots, no slot art.
+  header(COMPONENT.INVENTORY_HEADER, root, INVENTORY_X, HEADER_Y, INVENTORY_WIDTH, "Inventory");
   for (let index = 0; index < INVENTORY_SLOT_COUNT; index++) {
-    const column = index % INVENTORY_COLUMNS;
-    const row = Math.floor(index / INVENTORY_COLUMNS);
     slot(
       INVENTORY_SLOT_START + index,
-      INVENTORY_BACKGROUND_START + index,
-      INVENTORY_X + column * INVENTORY_CELL.width,
-      ROW_Y + row * INVENTORY_CELL.height,
-      INVENTORY_CELL
+      INVENTORY_X + (index % INVENTORY_COLUMNS) * INVENTORY_PITCH,
+      CONTENT_Y + Math.floor(index / INVENTORY_COLUMNS) * INVENTORY_PITCH,
+      INVENTORY_PITCH,
+      null
     );
   }
 
-  button(COMPONENT.CLEAR_BUTTON, LEFT_X, BUTTON_Y, COLUMN_WIDTH);
-  button(COMPONENT.DEATH_BUTTON, CUSTOM_X, BUTTON_Y, COLUMN_WIDTH);
-  button(COMPONENT.LOAD_BUTTON, MIDDLE_X, BUTTON_Y, MIDDLE_WIDTH);
-  button(COMPONENT.SAVE_BUTTON, INVENTORY_X, BUTTON_Y, INVENTORY_WIDTH);
+  // One row of buttons, anchored to the bottom of whatever height the modal has.
+  const buttonX = (index) => CONTENT_X + index * (BUTTON_WIDTH + BUTTON_GAP);
+  button(COMPONENT.LOAD_BUTTON, buttonX(0), BUTTON_INSET_Y, BUTTON_WIDTH);
+  button(COMPONENT.SAVE_BUTTON, buttonX(1), BUTTON_INSET_Y, BUTTON_WIDTH);
+  button(COMPONENT.CLEAR_BUTTON, buttonX(2), BUTTON_INSET_Y, BUTTON_WIDTH);
+  button(COMPONENT.DEATH_BUTTON, buttonX(3), BUTTON_INSET_Y, BUTTON_WIDTH);
 
   return { groupId: GROUP_ID, widgets };
 }
@@ -253,16 +396,50 @@ function buildPresetsWidgetGroup() {
 module.exports = {
   GROUP_ID,
   COMPONENT,
-  GLOBAL_ROW_START,
+  CONTENT_X,
+  CONTENT_RIGHT,
+  CONTENT_BOTTOM,
+  MIN_MODAL,
+  // Components that are meant to sit on top of each other: a slot's icon and placeholder
+  // over its own background, a stat box's icon and level over its two halves, and a
+  // button's label over its own button.
+  LAYERED_COMPONENT_PAIRS: [
+    ...EQUIPMENT_SLOTS.flatMap((slot) => [
+      [EQUIPMENT_SLOT_START + slot, EQUIPMENT_BACKGROUND_START + slot],
+      [EQUIPMENT_PLACEHOLDER_START + slot, EQUIPMENT_BACKGROUND_START + slot],
+      [EQUIPMENT_PLACEHOLDER_START + slot, EQUIPMENT_SLOT_START + slot],
+    ]),
+    ...Array.from({ length: STAT_ROW_COUNT }, (_, index) => index).flatMap((index) => [
+      [STAT_BOX_LEFT_START + index, STAT_BOX_RIGHT_START + index],
+      [STAT_ICON_START + index, STAT_BOX_LEFT_START + index],
+      [STAT_ICON_START + index, STAT_BOX_RIGHT_START + index],
+      [STAT_ROW_START + index, STAT_BOX_LEFT_START + index],
+      [STAT_ROW_START + index, STAT_BOX_RIGHT_START + index],
+      [STAT_ROW_START + index, STAT_ICON_START + index],
+      [STAT_MAX_ROW_START + index, STAT_BOX_LEFT_START + index],
+      [STAT_MAX_ROW_START + index, STAT_BOX_RIGHT_START + index],
+      [STAT_MAX_ROW_START + index, STAT_ICON_START + index],
+    ]),
+    ...[
+      COMPONENT.LOAD_BUTTON,
+      COMPONENT.SAVE_BUTTON,
+      COMPONENT.CLEAR_BUTTON,
+      COMPONENT.DEATH_BUTTON,
+    ].map((component) => [component, component + 50]),
+  ],
+  PRESET_ROW_START,
+  PRESET_ROW_COUNT,
   GLOBAL_ROW_COUNT,
-  CUSTOM_ROW_START,
   CUSTOM_ROW_COUNT,
   INVENTORY_SLOT_START,
   INVENTORY_SLOT_COUNT,
   EQUIPMENT_SLOT_START,
-  EQUIPMENT_SLOT_COUNT,
+  EQUIPMENT_PLACEHOLDER_START,
+  EQUIPMENT_SLOTS,
   STAT_ROW_START,
+  STAT_MAX_ROW_START,
   STAT_ROW_COUNT,
+  LIST_CONTENT_HEIGHT,
   uid,
   buildPresetsWidgetGroup,
 };

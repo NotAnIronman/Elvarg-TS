@@ -17,15 +17,18 @@ const { Misc } = require("../../src/main/typescript/elvarg/util/Misc");
 const {
   GROUP_ID,
   COMPONENT,
-  GLOBAL_ROW_START,
+  PRESET_ROW_START,
+  PRESET_ROW_COUNT,
   GLOBAL_ROW_COUNT,
-  CUSTOM_ROW_START,
   CUSTOM_ROW_COUNT,
   INVENTORY_SLOT_START,
   INVENTORY_SLOT_COUNT,
   EQUIPMENT_SLOT_START,
-  EQUIPMENT_SLOT_COUNT,
+  EQUIPMENT_PLACEHOLDER_START,
+  EQUIPMENT_SLOTS,
   STAT_ROW_START,
+  STAT_MAX_ROW_START,
+  LIST_CONTENT_HEIGHT,
   uid,
   buildPresetsWidgetGroup,
 } = require("./presetsWidget");
@@ -43,17 +46,28 @@ const MAX_PRESETS = CUSTOM_ROW_COUNT;
 const MAIN_MODAL_UID = (161 << 16) | 16;
 const OPEN_PRESETS_DELAY_TICKS = 2;
 
-const INTERFACE_DEFINITION = buildPresetsWidgetGroup();
+const INTERFACE_DEFINITION = {
+  ...buildPresetsWidgetGroup(),
+  // The preset column scrolls: there are more presets than fit, and adding one should not
+  // mean rearranging the interface.
+  scroll: [
+    {
+      viewComponent: COMPONENT.LIST_VIEW,
+      scrollbarComponent: COMPONENT.LIST_SCROLLBAR,
+      contentHeight: LIST_CONTENT_HEIGHT,
+    },
+  ],
+};
 
 const STAT_LABELS = ["Attack", "Defence", "Strength", "Hitpoints", "Ranged", "Prayer", "Magic"];
+// One list: the predefined presets, then the player's own slots.
 const GLOBAL_ROW_UIDS = Array.from({ length: GLOBAL_ROW_COUNT }, (_, row) =>
-  uid(GLOBAL_ROW_START + row)
+  uid(PRESET_ROW_START + row)
 );
 const CUSTOM_ROW_UIDS = Array.from({ length: CUSTOM_ROW_COUNT }, (_, row) =>
-  uid(CUSTOM_ROW_START + row)
+  uid(PRESET_ROW_START + GLOBAL_ROW_COUNT + row)
 );
 const PRESET_BUTTON_UIDS = [
-  uid(COMPONENT.CLOSE),
   uid(COMPONENT.LOAD_BUTTON),
   uid(COMPONENT.SAVE_BUTTON),
   uid(COMPONENT.CLEAR_BUTTON),
@@ -147,9 +161,7 @@ function isPresetInterfaceOpen(player) {
  */
 function equipmentSlotOf(itemId) {
   const wearPos = CacheDefinitions.getItem(itemId)?.wearPos;
-  return Number.isInteger(wearPos) && wearPos >= 0 && wearPos < EQUIPMENT_SLOT_COUNT
-    ? wearPos
-    : -1;
+  return EQUIPMENT_SLOTS.includes(wearPos) ? wearPos : -1;
 }
 
 function isValidItem(item) {
@@ -272,17 +284,19 @@ function customPresets(player) {
 function renderPresetLists(player) {
   const sender = player.getPacketSender();
   const pool = getGlobalPresetPool();
-  for (let row = 0; row < GLOBAL_ROW_COUNT; row++) {
-    const name = pool[row]?.getName?.();
-    sender.sendString(name ? `<col=c5b79b>${name}</col>` : "", uid(GLOBAL_ROW_START + row));
-  }
-
   const presets = customPresets(player);
-  for (let row = 0; row < CUSTOM_ROW_COUNT; row++) {
-    const name = presets[row]?.getName?.();
+  const selected = player.getCurrentPreset?.() ?? null;
+  for (let row = 0; row < PRESET_ROW_COUNT; row++) {
+    const custom = row >= GLOBAL_ROW_COUNT;
+    const preset = custom ? presets[row - GLOBAL_ROW_COUNT] : pool[row];
+    const name = preset?.getName?.();
     sender.sendString(
-      name ? `<col=c5b79b>${name}</col>` : "<col=6f6355>Empty slot</col>",
-      uid(CUSTOM_ROW_START + row)
+      name
+        ? `<col=${preset === selected ? "ffffff" : "c5b79b"}>${name}</col>`
+        : custom
+          ? "<col=6f6355>Empty slot</col>"
+          : "",
+      uid(PRESET_ROW_START + row)
     );
   }
 }
@@ -308,12 +322,10 @@ function renderSelectedPreset(player, preset) {
   const stats = Array.isArray(preset?.getStats?.()) ? preset.getStats() : [];
   for (let index = 0; index < STAT_LABELS.length; index++) {
     const level = Number(stats[index]);
-    sender.sendString(
-      preset && Number.isFinite(level)
-        ? `${STAT_LABELS[index]}: <col=ffffff>${Math.max(1, Math.floor(level))}</col>`
-        : "",
-      uid(STAT_ROW_START + index)
-    );
+    const text = preset && Number.isFinite(level) ? String(Math.max(1, Math.floor(level))) : "";
+    sender
+      .sendString(text, uid(STAT_ROW_START + index))
+      .sendString(text, uid(STAT_MAX_ROW_START + index));
   }
   sender.sendString(
     preset ? `Spellbook: <col=ffffff>${getSpellbookDisplayName(preset.getSpellbook())}</col>` : "",
@@ -330,8 +342,10 @@ function renderSelectedPreset(player, preset) {
     );
   }
 
-  for (let slot = 0; slot < EQUIPMENT_SLOT_COUNT; slot++) {
+  for (const slot of EQUIPMENT_SLOTS) {
     sender.sendItemOnInterfaces(uid(EQUIPMENT_SLOT_START + slot), -1, 1);
+    // An empty slot shows the cache's silhouette for that slot.
+    sender.sendInterfaceDisplayState(uid(EQUIPMENT_PLACEHOLDER_START + slot), false);
   }
   const equipment = Array.isArray(preset?.getEquipment?.()) ? preset.getEquipment() : [];
   for (const item of equipment) {
@@ -343,11 +357,13 @@ function renderSelectedPreset(player, preset) {
       continue;
     }
     sender.sendItemOnInterfaces(uid(EQUIPMENT_SLOT_START + slot), item.getId(), item.getAmount());
+    sender.sendInterfaceDisplayState(uid(EQUIPMENT_PLACEHOLDER_START + slot), true);
   }
 }
 
 function selectPreset(player, preset) {
   player.setCurrentPreset(preset ?? null);
+  renderPresetLists(player);
   renderSelectedPreset(player, preset ?? null);
   renderButtons(player);
 }
@@ -365,13 +381,12 @@ function openPresetInterface(player, preset = null) {
   const sender = player.getPacketSender();
   player.setInterfaceId(GROUP_ID);
   sender.sendSubInterface(MAIN_MODAL_UID, GROUP_ID, 0, {
-    postScripts: [
-      { scriptId: 3737, args: [uid(COMPONENT.FRAME), "Presets"] },
-      { scriptId: 2424, args: [uid(COMPONENT.CLOSE), 496, 0, "Close"] },
-    ],
+    // Script 227 is the frame script with the standard close button - the same widget
+    // every other interface uses, hover and pressed states included. Its op closes the
+    // interface client-side and the client tells us via IF_CLOSE.
+    postScripts: [{ scriptId: 227, args: [uid(COMPONENT.FRAME), "Presets"] }],
   });
 
-  renderPresetLists(player);
   selectPreset(player, preset ?? null);
   return true;
 }
@@ -619,11 +634,6 @@ function handlePresetActionButton(player, buttonId) {
   }
 
   switch (buttonId) {
-    case uid(COMPONENT.CLOSE):
-      player.setInterfaceId(-1);
-      player.getPacketSender().closeSubInterface(MAIN_MODAL_UID);
-      return true;
-
     case uid(COMPONENT.DEATH_BUTTON):
       player.setOpenPresetsOnDeath(!player.isOpenPresetsOnDeath());
       renderButtons(player);
