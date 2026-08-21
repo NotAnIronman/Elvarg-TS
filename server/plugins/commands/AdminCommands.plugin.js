@@ -37,6 +37,7 @@ const {
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
+const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565];
 const NPC_SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
 ];
@@ -558,9 +559,25 @@ module.exports = {
       if (!requireRights(player, ownerOrDev)) {
         return true;
       }
-      [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565].forEach((rune) => {
-        player.getInventory().adds(rune, 1000);
-      });
+      const inventory = player.getInventory();
+      let given = 0;
+      for (const rune of RUNE_IDS) {
+        // Each new rune type needs its own slot; skip the ones that cannot fit
+        // instead of letting the container spam "You couldn't hold all those
+        // items." once per rune.
+        if (!inventory.contains(rune) && inventory.getFreeSlots() <= 0) {
+          continue;
+        }
+        inventory.adds(rune, 1000);
+        given++;
+      }
+      player
+        .getPacketSender()
+        .sendMessage(
+          given === RUNE_IDS.length
+            ? "Spawned 1,000 of each standard rune."
+            : `Spawned ${given}/${RUNE_IDS.length} rune types - free up inventory space for the rest.`
+        );
       return true;
     });
 
