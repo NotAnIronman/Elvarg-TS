@@ -307,6 +307,7 @@ import { WidgetInputController } from "./widgets/WidgetInputController";
 import { WidgetInteractionController } from "./widgets/WidgetInteractionController";
 import { WidgetTransmitProcessor } from "./widgets/WidgetTransmitProcessor";
 import { CustomInterfaceRuntime } from "../widgets/custom/CustomInterfaceRuntime";
+import { PendingInterfaceUpdates } from "../widgets/custom/PendingInterfaceUpdates";
 import { setCustomInterface } from "../common/gamemode/GamemodeContentStore";
 import {
     fetchInterfaceDefinition,
@@ -836,6 +837,8 @@ export class OsrsClient {
     }
 
     private unsubscribeWidgetEvents?: () => void;
+    private pendingInterfaceUpdates = new PendingInterfaceUpdates();
+    private handleWidgetPayload?: (payload: any) => void;
     private unsubscribeNpcInfo?: () => void;
     private unsubscribeCombat?: () => void;
     private unsubscribePlayerSync?: () => void;
@@ -2190,7 +2193,10 @@ export class OsrsClient {
         });
         this.npcMovementSync = new NpcMovementSync(this.npcEcs);
         this.widgetSessionManager = new WidgetSessionManager();
-        this.unsubscribeWidgetEvents = subscribeWidgetEvents((payload) => {
+        const handleWidgetPayload = (payload: any) => {
+            if (this.pendingInterfaceUpdates.defer(payload)) {
+                return;
+            }
             if (payload.action !== "set_text" && (payload as any).uid !== 10616865) {
                 console.log("[OsrsClient] widget event", payload);
             }
@@ -2325,14 +2331,22 @@ export class OsrsClient {
                         // open of a session, so a server should not send component updates
                         // in the same batch as that open - they would land before the
                         // widgets exist.
-                        void fetchInterfaceDefinition(payload.groupId | 0).then((definition) => {
+                        const pendingGroupId = payload.groupId | 0;
+                        this.pendingInterfaceUpdates.open(pendingGroupId);
+                        void fetchInterfaceDefinition(pendingGroupId).then((definition) => {
                             if (!definition || !setCustomInterface(definition)) {
                                 console.error(
-                                    `[OsrsClient] cannot open group ${payload.groupId}: it is not in the cache and has no server definition`,
+                                    `[OsrsClient] cannot open group ${pendingGroupId}: it is not in the cache and has no server definition`,
                                 );
+                                this.pendingInterfaceUpdates.cancel(pendingGroupId);
                                 return;
                             }
                             this.mountSubInterface(payload);
+                            // The interface's contents were sent with the open; apply them
+                            // now that its widgets exist.
+                            this.pendingInterfaceUpdates.flush(pendingGroupId, (queued) =>
+                                this.handleWidgetPayload?.(queued),
+                            );
                         });
                     }
                 }
@@ -2665,7 +2679,9 @@ export class OsrsClient {
                     }
                 }
             }
-        });
+        };
+        this.handleWidgetPayload = handleWidgetPayload;
+        this.unsubscribeWidgetEvents = subscribeWidgetEvents(handleWidgetPayload);
         this.unsubscribeNpcInfo = subscribeNpcInfo((payload: NpcInfoPayload) => {
             try {
                 this.applyNpcInfo(payload);

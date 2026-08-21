@@ -21,7 +21,7 @@ const INVENTORY_BACKGROUND_START = 60;
 
 const EQUIPMENT_SLOT_START = 140;
 const EQUIPMENT_SLOT_COUNT = 14;
-const EQUIPMENT_COLUMNS = 3;
+const EQUIPMENT_COLUMNS = 4;
 const EQUIPMENT_BACKGROUND_START = 160;
 
 const STAT_ROW_START = 20;
@@ -44,6 +44,27 @@ const COMPONENT = {
 };
 
 const uid = (component) => (GROUP_ID << 16) | component;
+
+// The cache frame draws a border and title bar over the group, so content lives inside
+// roughly x 8..512, y 26..390 of the 520x412 modal. Anything past that is clipped.
+const LEFT_X = 8;
+const CUSTOM_X = 112;
+const MIDDLE_X = 220;
+const INVENTORY_X = 352;
+const COLUMN_WIDTH = 100;
+const MIDDLE_WIDTH = 124;
+const INVENTORY_WIDTH = 152;
+const HEADER_Y = 26;
+const ROW_Y = 44;
+const ROW_PITCH = 17;
+const STAT_Y = 46;
+const STAT_PITCH = 16;
+const EQUIPMENT_HEADER_Y = 186;
+const EQUIPMENT_Y = 204;
+const EQUIPMENT_CELL = { width: 30, height: 30 };
+const INVENTORY_CELL = { width: 38, height: 32 };
+const BUTTON_Y = 344;
+const BUTTON_HEIGHT = 22;
 
 const FONT_SMALL = 494;
 const FONT_BOLD = 496;
@@ -113,15 +134,15 @@ function buildPresetsWidgetGroup() {
       ...overrides,
     });
 
-  const slot = (iconComponent, backgroundComponent, x, y, actions) => {
+  const slot = (iconComponent, backgroundComponent, x, y, size) => {
     add(backgroundComponent, root, {
       type: TYPE_RECTANGLE,
       rawX: x,
       rawY: y,
-      rawWidth: 36,
-      rawHeight: 32,
-      width: 36,
-      height: 32,
+      rawWidth: size.width,
+      rawHeight: size.height,
+      width: size.width,
+      height: size.height,
       filled: true,
       color: SLOT_BACKGROUND,
       mouseOverColor: SLOT_BACKGROUND,
@@ -132,16 +153,15 @@ function buildPresetsWidgetGroup() {
       type: TYPE_GRAPHIC,
       rawX: x + 2,
       rawY: y + 2,
-      rawWidth: 32,
-      rawHeight: 28,
-      width: 32,
-      height: 28,
+      rawWidth: size.width - 4,
+      rawHeight: size.height - 4,
+      width: size.width - 4,
+      height: size.height - 4,
       itemQuantityMode: 2,
       borderType: 1,
       graphicShadow: 0x333333,
       shadowColor: 0x333333,
       text: "",
-      ...(actions ? { actions, flags: FLAG_OP1 } : {}),
     });
   };
 
@@ -151,9 +171,9 @@ function buildPresetsWidgetGroup() {
       rawX: x,
       rawY: y,
       rawWidth: width,
-      rawHeight: 22,
+      rawHeight: BUTTON_HEIGHT,
       width,
-      height: 22,
+      height: BUTTON_HEIGHT,
       filled: true,
       color: BUTTON_COLOUR,
       mouseOverColor: BUTTON_HOVER_COLOUR,
@@ -163,68 +183,69 @@ function buildPresetsWidgetGroup() {
       flags: FLAG_OP1,
     });
     // Server-set label, so a button can say what it currently does.
-    label(component + 50, x, y + 3, width, {
+    label(component + 50, x, y + 4, width, {
       xTextAlignment: 1,
       textColor: COLOUR_HEADER,
     });
   };
 
-  // Preset lists.
-  header(COMPONENT.GLOBAL_HEADER, 14, 26, 110, "Global presets");
+  // Two columns of preset names down the left.
+  header(COMPONENT.GLOBAL_HEADER, LEFT_X, HEADER_Y, COLUMN_WIDTH, "Global presets");
   for (let row = 0; row < GLOBAL_ROW_COUNT; row++) {
-    label(GLOBAL_ROW_START + row, 14, 44 + row * 19, 110, {
+    label(GLOBAL_ROW_START + row, LEFT_X, ROW_Y + row * ROW_PITCH, COLUMN_WIDTH, {
       textColor: COLOUR_MUTED,
       actions: ["Select"],
       flags: FLAG_OP1,
     });
   }
-  header(COMPONENT.CUSTOM_HEADER, 132, 26, 110, "Your presets");
+  header(COMPONENT.CUSTOM_HEADER, CUSTOM_X, HEADER_Y, COLUMN_WIDTH, "Your presets");
   for (let row = 0; row < CUSTOM_ROW_COUNT; row++) {
-    label(CUSTOM_ROW_START + row, 132, 44 + row * 19, 110, {
+    label(CUSTOM_ROW_START + row, CUSTOM_X, ROW_Y + row * ROW_PITCH, COLUMN_WIDTH, {
       textColor: COLOUR_MUTED,
       actions: ["Select"],
       flags: FLAG_OP1,
     });
   }
 
-  // Selected preset: name, combat levels, spellbook.
-  header(COMPONENT.SELECTED_NAME, 256, 26, 110, "");
+  // Middle column: the selected preset's name, combat levels, spellbook and equipment.
+  header(COMPONENT.SELECTED_NAME, MIDDLE_X, HEADER_Y, MIDDLE_WIDTH, "");
   for (let row = 0; row < STAT_ROW_COUNT; row++) {
-    label(STAT_ROW_START + row, 256, 46 + row * 16, 110);
+    label(STAT_ROW_START + row, MIDDLE_X, STAT_Y + row * STAT_PITCH, MIDDLE_WIDTH);
   }
-  label(COMPONENT.SPELLBOOK, 256, 46 + STAT_ROW_COUNT * 16 + 4, 110, {
+  label(COMPONENT.SPELLBOOK, MIDDLE_X, STAT_Y + STAT_ROW_COUNT * STAT_PITCH + 4, MIDDLE_WIDTH, {
     textColor: COLOUR_MUTED,
   });
-
-  // Equipment, then inventory.
-  header(COMPONENT.EQUIPMENT_HEADER, 256, 186, 110, "Equipment");
+  header(COMPONENT.EQUIPMENT_HEADER, MIDDLE_X, EQUIPMENT_HEADER_Y, MIDDLE_WIDTH, "Equipment");
   for (let index = 0; index < EQUIPMENT_SLOT_COUNT; index++) {
     const column = index % EQUIPMENT_COLUMNS;
     const row = Math.floor(index / EQUIPMENT_COLUMNS);
     slot(
       EQUIPMENT_SLOT_START + index,
       EQUIPMENT_BACKGROUND_START + index,
-      256 + column * 38,
-      204 + row * 34
+      MIDDLE_X + column * EQUIPMENT_CELL.width,
+      EQUIPMENT_Y + row * EQUIPMENT_CELL.height,
+      EQUIPMENT_CELL
     );
   }
 
-  header(COMPONENT.INVENTORY_HEADER, 380, 26, 160, "Inventory");
+  // Right column: the selected preset's inventory.
+  header(COMPONENT.INVENTORY_HEADER, INVENTORY_X, HEADER_Y, INVENTORY_WIDTH, "Inventory");
   for (let index = 0; index < INVENTORY_SLOT_COUNT; index++) {
     const column = index % INVENTORY_COLUMNS;
     const row = Math.floor(index / INVENTORY_COLUMNS);
     slot(
       INVENTORY_SLOT_START + index,
       INVENTORY_BACKGROUND_START + index,
-      380 + column * 38,
-      44 + row * 34
+      INVENTORY_X + column * INVENTORY_CELL.width,
+      ROW_Y + row * INVENTORY_CELL.height,
+      INVENTORY_CELL
     );
   }
 
-  button(COMPONENT.CLEAR_BUTTON, 14, 384, 110);
-  button(COMPONENT.DEATH_BUTTON, 132, 384, 110);
-  button(COMPONENT.LOAD_BUTTON, 256, 384, 110);
-  button(COMPONENT.SAVE_BUTTON, 380, 384, 110);
+  button(COMPONENT.CLEAR_BUTTON, LEFT_X, BUTTON_Y, COLUMN_WIDTH);
+  button(COMPONENT.DEATH_BUTTON, CUSTOM_X, BUTTON_Y, COLUMN_WIDTH);
+  button(COMPONENT.LOAD_BUTTON, MIDDLE_X, BUTTON_Y, MIDDLE_WIDTH);
+  button(COMPONENT.SAVE_BUTTON, INVENTORY_X, BUTTON_Y, INVENTORY_WIDTH);
 
   return { groupId: GROUP_ID, widgets };
 }

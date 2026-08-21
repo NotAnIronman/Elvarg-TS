@@ -80,8 +80,9 @@ Rules for both:
   where the session is already authenticated.
 - Responses carry an ETag and revalidate to 304, so definitions are fetched once per build
   rather than pushed on every open.
-- Because the first open of a session waits on a fetch, do not send component updates in
-  the same batch as that open; drive the interface from its declaration instead.
+- The first open of a session waits on a fetch. Updates sent in the same batch are held by
+  the client and applied once the widgets exist, so an interface can be populated straight
+  after opening it.
 
 Adding an interface of this kind should need no client change. If it does, the missing
 capability belongs in the runtime as a declared option, not in a feature-specific module.
