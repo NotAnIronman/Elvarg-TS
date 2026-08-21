@@ -23,14 +23,105 @@ const PVPW_SAFE_UID = (90 << 16) | 47;
 const MOUNT_RETRY_TICKS = 3;
 
 // ---------------------------------------------------------------------------
-// Attack policy
+// Combat rules
 // ---------------------------------------------------------------------------
 
+// OSRS: in the Wilderness you may attack anyone whose combat level is within the
+// wilderness level of your tile, and theirs. Deeper wilderness on one side alone does
+// not widen the range, so the usable range is the lower of the two levels.
 const TELEPORT_BLOCK_LEVEL = 20;
+// Combat level is derived from seven skills on every call, and target selection asks for
+// it once per candidate per tick. Memoising for a tick turns that from O(players^2)
+// recomputes into O(players), while staying fresh enough to notice a level up.
+const COMBAT_LEVEL_TTL_MS = 600;
+const combatLevels = new WeakMap();
+// Derived levels only change when the player moves, so they are cached against the tile.
+const derivedLevels = new WeakMap();
+// The attack loop re-checks permission twice a cycle, and splash targeting checks every
+// nearby candidate, so denial messages are throttled per player rather than per check.
+const DENY_MESSAGE_INTERVAL_MS = 1200;
+const denyMessageBlockedUntil = new WeakMap();
+const LEVEL_DIFFERENCE_MESSAGES = [
+  "Your level difference is too great.",
+  "You need to move deeper into the Wilderness.",
+];
+const CLAN_CHAT_MESSAGES = ["You cannot attack a player who is in your clan chat."];
+
+function combatLevelOf(player) {
+  const cached = combatLevels.get(player);
+  const now = Date.now();
+  if (cached && now < cached.expiresAt) {
+    return cached.level;
+  }
+  const level = player?.getSkillManager?.()?.getCombatLevel?.() | 0;
+  combatLevels.set(player, { level, expiresAt: now + COMBAT_LEVEL_TTL_MS });
+  return level;
+}
 
 function wildernessLevelOf(player) {
-  const level = player?.getWildernessLevel?.() | 0;
-  return level > 0 ? level : 0;
+  const stored = player?.getWildernessLevel?.() | 0;
+  if (stored > 0) {
+    return stored;
+  }
+  // World only emits the player-process hook for real players, so a bot's stored level is
+  // always 0. Deriving it from the tile keeps the rule honest for anyone core forgets to
+  // update - otherwise the pair looks unlevelled and the level range is never applied.
+  const location = player?.getLocation?.();
+  if (!location) {
+    return 0;
+  }
+  const x = location.getX();
+  const y = location.getY();
+  const cached = derivedLevels.get(player);
+  if (cached && cached.x === x && cached.y === y) {
+    return cached.level;
+  }
+  const level = Wilderness.isInLocation(location)
+    ? Math.max(0, Wilderness.levelForY(y))
+    : 0;
+  derivedLevels.set(player, { x, y, level });
+  return level;
+}
+
+/**
+ * Combat level range shared by two players, i.e. the largest level difference that still
+ * allows an attack. 0 means the pair isn't subject to the rule - one of them is outside
+ * the levelled Wilderness, and whether they may fight at all is decided elsewhere.
+ */
+function wildernessAttackRange(attacker, target) {
+  return Math.min(wildernessLevelOf(attacker), wildernessLevelOf(target));
+}
+
+/**
+ * The OSRS level-range rule on its own. Exported so bot target selection can skip
+ * unattackable candidates before spending a tick pathing towards them.
+ */
+function canAttackByWildernessLevel(attacker, target) {
+  const range = wildernessAttackRange(attacker, target);
+  if (range <= 0) {
+    return true;
+  }
+  return Math.abs(combatLevelOf(attacker) - combatLevelOf(target)) <= range;
+}
+
+function denyAttack(event, messages) {
+  event.allow = false;
+  sendThrottled(event.attacker, messages);
+}
+
+function sendThrottled(player, messages) {
+  if (!player || player?.isPlayerBot?.() === true) {
+    return;
+  }
+  const now = Date.now();
+  if (now < (denyMessageBlockedUntil.get(player) ?? 0)) {
+    return;
+  }
+  denyMessageBlockedUntil.set(player, now + DENY_MESSAGE_INTERVAL_MS);
+  const sender = player.getPacketSender?.();
+  for (const message of messages) {
+    sender?.sendMessage?.(message);
+  }
 }
 
 function shareClanChat(attacker, target) {
@@ -114,7 +205,7 @@ function syncPvpIcons(player) {
   if (!player || player?.isPlayerBot?.() === true) {
     return;
   }
-  const visible = wildernessLevelOf(player) > 0;
+  const visible = (player.getWildernessLevel?.() | 0) > 0;
   if (lastIconsVisible.get(player) === visible) {
     return;
   }
@@ -259,22 +350,27 @@ function onCanAttack(state, event) {
   }
 
   if (shareClanChat(attacker, target)) {
-    attacker
-      .getPacketSender?.()
-      .sendMessage?.("You cannot attack a player who is in your clan chat.");
-    event.allow = false;
+    denyAttack(event, CLAN_CHAT_MESSAGES);
     return;
   }
 
   const attackerInWild = isInWilderness(state, attacker);
   const targetInWild = isInWilderness(state, target);
-  if (attackerInWild && targetInWild) {
-    event.allow = true;
-  } else if (attackerInWild || targetInWild) {
+  if (!attackerInWild || !targetInWild) {
     // One side in the Wilderness and one outside is never a fight; neither side in it is
     // somebody else's rule to make (duel arena, minigames).
-    event.allow = false;
+    if (attackerInWild || targetInWild) {
+      event.allow = false;
+    }
+    return;
   }
+
+  if (!canAttackByWildernessLevel(attacker, target)) {
+    denyAttack(event, LEVEL_DIFFERENCE_MESSAGES);
+    return;
+  }
+
+  event.allow = true;
 }
 
 function onCanTeleport(state, event) {
@@ -334,4 +430,7 @@ module.exports = {
 
     api.log("registered");
   },
+  // Shared with bot target selection so the rule has one home.
+  canAttackByWildernessLevel,
+  wildernessAttackRange,
 };
