@@ -5,6 +5,7 @@ const { Server } = require("../../src/main/typescript/elvarg/Server");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
+const { MagicSpellbook } = require("../../src/main/typescript/elvarg/game/model/MagicSpellbook");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
@@ -580,6 +581,20 @@ module.exports = {
         );
       return true;
     });
+
+    function registerSpellbookCommand(command, spellbook) {
+      api.registerCommand(command, ({ player }) => {
+        if (!requireRights(player, devOnly)) {
+          return true;
+        }
+        MagicSpellbook.changeSpellbook(player, spellbook, true);
+        return true;
+      });
+    }
+
+    registerSpellbookCommand("normal", MagicSpellbook.NORMAL);
+    registerSpellbookCommand("lunar", MagicSpellbook.LUNAR);
+    registerSpellbookCommand("ancients", MagicSpellbook.ANCIENT);
 
     api.registerCommand("master", ({ player }) => {
       if (!requireRights(player, ownerOrDev)) {

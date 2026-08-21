@@ -30,12 +30,12 @@ export class MagicSpellbook {
         return MagicSpellbook.NORMAL;
     }
 
-    public static changeSpellbook(player: Player, book: MagicSpellbook) {
+    public static changeSpellbook(player: Player, book: MagicSpellbook, bypassRequirements = false) {
         if (book === player.getSpellbook()) {
             // Already using this spellbook
             return;
         }
-        if (book === MagicSpellbook.LUNAR) {
+        if (!bypassRequirements && book === MagicSpellbook.LUNAR) {
             if (player.getSkillManager().getMaxLevel(Skill.DEFENCE) < 40) {
                 player.getPacketSender().sendMessage("You need at least level 40 Defence to use the Lunar spellbook.");
                 return;
