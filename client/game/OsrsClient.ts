@@ -1152,6 +1152,12 @@ export class OsrsClient {
         if (!this.widgetManager) {
             return;
         }
+        if (!this.widgetManager.getGroup(payload.groupId | 0)) {
+            console.error(
+                `[OsrsClient] group ${payload.groupId} could not be loaded; nothing was mounted`,
+            );
+            return;
+        }
         this.widgetManager.openSubInterface(payload.targetUid, payload.groupId, payload.type);
         this.cs2Vm.clearHandlerCaches();
         markWidgetsLoaded();
@@ -2320,8 +2326,11 @@ export class OsrsClient {
                         // in the same batch as that open - they would land before the
                         // widgets exist.
                         void fetchInterfaceDefinition(payload.groupId | 0).then((definition) => {
-                            if (definition) {
-                                setCustomInterface(definition);
+                            if (!definition || !setCustomInterface(definition)) {
+                                console.error(
+                                    `[OsrsClient] cannot open group ${payload.groupId}: it is not in the cache and has no server definition`,
+                                );
+                                return;
                             }
                             this.mountSubInterface(payload);
                         });

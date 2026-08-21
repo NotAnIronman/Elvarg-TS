@@ -32,14 +32,22 @@ export async function fetchInterfaceDefinition(groupId: number): Promise<any | u
     if (!base) {
         return undefined;
     }
+    const url = `${base}/api/interfaces/${groupId | 0}`;
     try {
-        const response = await fetch(`${base}/api/interfaces/${groupId | 0}`);
+        const response = await fetch(url);
         if (!response.ok) {
+            console.warn(`[content-api] ${url} -> ${response.status}`);
             return undefined;
         }
-        return await response.json();
+        const definition = await response.json();
+        console.log(
+            `[content-api] loaded interface ${groupId} (${
+                Array.isArray(definition?.widgets) ? definition.widgets.length : 0
+            } widgets)`,
+        );
+        return definition;
     } catch (error) {
-        console.warn(`[content-api] interface ${groupId} fetch failed`, error);
+        console.warn(`[content-api] ${url} failed`, error);
         return undefined;
     }
 }
