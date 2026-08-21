@@ -56,6 +56,22 @@ If in doubt:
 3. Keep guards centralized in core hook dispatch.
 4. Base behavior on OSRS Wiki first, then Java.
 
+## Cache Lookup Tooling
+
+Interface, sprite and clientscript ids must come from the cache in `server/caches`, not from
+317-era RSPS code. To resolve one:
+
+1. Name to id: RuneLite's generated `net/runelite/api/gameval/InterfaceID.java` (also
+   `VarbitID`, `VarPlayerID`, `ItemID`) maps a feature to its group and component ids.
+2. Confirm against this cache: `yarn dump:widget <groupId>` prints every component with its
+   type, parent, sprite, text and CS2 listeners. Its header documents the output.
+3. Read the cache's own logic: `yarn dump:cs2 <scriptId>` disassembles a clientscript, which
+   is how you find which varp/varbit renders a value and whether a script will overwrite
+   text the server sends.
+
+Prefer feeding the varps/varbits a cache script already reads over writing component text
+the same script will overwrite.
+
 ## Coding Conventions
 
 - Prefer enums/constants over magic numbers.

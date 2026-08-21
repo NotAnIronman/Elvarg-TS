@@ -1,6 +1,43 @@
-// Decodes IF3 widget components for a group from the cache (port of xrsps-typescript's
-// WidgetLoader.decodeIf3, kept minimal - just enough to see actions/text/listeners per child).
-// Usage: TS_NODE_COMPILER_OPTIONS='{"target":"es2020"}' yarn ts-node ./scripts/dump-widget.ts <groupId>
+// Dumps the components of one IF3 interface group straight from the active OSRS cache.
+// Port of xrsps-typescript's WidgetLoader.decodeIf3, kept minimal: enough to see the shape,
+// text, sprites and scripts of every child.
+//
+//   yarn dump:widget <groupId>        # e.g. yarn dump:widget 90
+//
+// Needs the cache in server/caches - run `yarn ensure-cache` first.
+//
+// OUTPUT
+// One line per component that carries anything worth seeing:
+//
+//   43: type=0 parent=2
+//   47: type=5 sprite=1047 parent=45
+//   50: type=4 parent=44 onTimer=[388,-2147483645] onVarTransmit=[388,-2147483645]
+//
+//   fileId  The component's id within the group. The server addresses it by PACKED UID:
+//           (groupId << 16) | fileId. Component 43 of group 90 is (90 << 16) | 43, which is
+//           what sendString / sendInterfaceDisplayState / sendSubInterface expect.
+//   type    0 layer (container), 3 rectangle, 4 text, 5 graphic (sprite), 6 model, 9 line.
+//   parent  fileId this component hangs off, "-" for a root. Hiding a component hides its
+//           whole subtree, so pick the ancestor when you want a block gone.
+//   hidden  Present when the component starts hidden in the cache.
+//   on*     [scriptId, ...args] - the cache's own CS2 code. Large int args are packed
+//           component uids (decode as above). Disassemble a script with:
+//               yarn dump:cs2 <scriptId>
+//
+// BEFORE WRITING TO A COMPONENT FROM THE SERVER
+// Check its listeners, and its ancestors' listeners, first. If a cache script sets the same
+// text or hidden flag on a timer or var transmit, it will overwrite whatever the server
+// sends, usually within a tick. Two ways out: feed the varp/varbit the script reads and let
+// it render (the faithful option), or target a component no script touches.
+//
+// FINDING A GROUP ID
+// RuneLite's generated names are the fastest map from feature to id:
+// runelite-api/src/main/java/net/runelite/api/gameval/InterfaceID.java - e.g.
+// CASTLEWARS_STATUS_OVERLAY_SARADOMIN = 58, plus a nested class naming every component.
+// Ids move between revisions, so confirm against this cache with this script. Failing that,
+// grep the interface index for a known string from the interface.
+//
+// The ids in older RSPS code (11146, 11479, 197, ...) are 317-era and do not exist here.
 import path = require("path");
 import { CachePipeline } from "../src/main/typescript/elvarg/game/cache/CachePipeline";
 import { CacheIndexDat2 } from "../src/main/typescript/elvarg/game/cache/codec/rs/cache/CacheIndex";
@@ -46,7 +83,7 @@ function decodeIf3(uid: number, data: Int8Array): any {
         buf.readUnsignedShort(); buf.readUnsignedShort();
         buf.readUnsignedByte();
     } else if (type === 5) {
-        buf.readInt(); buf.readUnsignedShort(); buf.readUnsignedByte();
+        w.spriteId = buf.readInt(); buf.readUnsignedShort(); buf.readUnsignedByte();
         buf.readUnsignedByte(); buf.readUnsignedByte(); buf.readInt();
         buf.readUnsignedByte(); buf.readUnsignedByte();
     } else if (type === 6) {
@@ -126,6 +163,9 @@ async function main() {
             const w = decodeIf3((groupId << 16) | fileId, data);
             const bits: string[] = [`type=${w.type}`];
             if (w.text) bits.push(`text=${JSON.stringify(w.text)}`);
+            if (w.spriteId !== undefined) bits.push(`sprite=${w.spriteId}`);
+            if (w.hidden) bits.push("hidden");
+            bits.push(`parent=${w.parentId === 65535 ? "-" : w.parentId & 0xffff}`);
             if (w.actions) bits.push(`actions=${JSON.stringify(w.actions)}`);
             if (w.onOp) bits.push(`onOp=${JSON.stringify(w.onOp)}`);
             if (w.onClick) bits.push(`onClick=${JSON.stringify(w.onClick)}`);
