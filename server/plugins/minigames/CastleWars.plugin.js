@@ -34,6 +34,16 @@ const TEAM_DATA = {
   [TEAM.SARADOMIN]: { id: TEAM.SARADOMIN, name: "Saradomin", capeId: ItemIdentifiers.SARADOMIN_CLOAK_3, hoodId: ItemIdentifiers.CASTLEWARS_HOOD, bannerId: ItemIdentifiers.SARADOMIN_BANNER, waitingRoom: loc(2381, 9489, 0), startRoom: loc(2426, 3076, 1), respawnBounds: box(2423, 2431, 3072, 3080, 1), standLocation: loc(2429, 3074, 3), safeStandId: ObjectIdentifiers.SARADOMIN_STANDARD_2, emptyStandId: ObjectIdentifiers.STANDARD_STAND, droppedFlagObjectId: ObjectIdentifiers.SARADOMIN_STANDARD, waitingBounds: [box(2368, 2392, 9481, 9497, 0)] },
   [TEAM.ZAMORAK]: { id: TEAM.ZAMORAK, name: "Zamorak", capeId: ItemIdentifiers.ZAMORAK_CLOAK_3, hoodId: ItemIdentifiers.CASTLEWARS_HOOD_2, bannerId: ItemIdentifiers.ZAMORAK_BANNER, waitingRoom: loc(2421, 9524, 0), startRoom: loc(2372, 3131, 1), respawnBounds: box(2368, 2376, 3127, 3135, 1), standLocation: loc(2370, 3133, 3), safeStandId: ObjectIdentifiers.ZAMORAK_STANDARD_2, emptyStandId: ObjectIdentifiers.STANDARD_STAND_2, droppedFlagObjectId: ObjectIdentifiers.ZAMORAK_STANDARD, waitingBounds: [box(2408, 2432, 9512, 9535, 0)] },
 };
+// OSRS interfaces (cache 237). The old 317 ids (11146/11479/...) don't exist in this cache.
+const OVERLAY_HUD_UID = (161 << 16) | 8; // component.toplevel_osrs_stretch:overlay_hud
+const WAITING_ROOM_INTERFACE = 131; // interface.castlewars_waitingroom
+const STATUS_OVERLAY_INTERFACE = { [TEAM.SARADOMIN]: 58, [TEAM.ZAMORAK]: 59 }; // interface.castlewars_status_overlay_*
+const EJECT_TEXT_UID = { [TEAM.SARADOMIN]: (58 << 16) | 26, [TEAM.ZAMORAK]: (59 << 16) | 25 };
+// Scores, flag states and the timer are drawn by the cache's own scripts (887/888/2375),
+// so the server only feeds the vars they read.
+const TIMER_VARP = 380; // seconds until start in the waiting room, minutes remaining in game
+const FLAG_VARBIT = { [TEAM.SARADOMIN]: 143, [TEAM.ZAMORAK]: 153 };
+const SCORE_VARBIT = { [TEAM.SARADOMIN]: 145, [TEAM.ZAMORAK]: 155 };
 const LOBBY_BOUNDS = [box(2435, 2446, 3081, 3098, 0)];
 const GAME_BOUNDS = [box(2365, 2404, 9500, 9530, 0), box(2394, 2431, 9474, 9499, 0), box(2405, 2424, 9500, 9509, 0), new PolygonalBoundary([[2377, 3079], [2368, 3079], [2368, 3136], [2416, 3136], [2432, 3120], [2432, 3080], [2432, 3072], [2384, 3072]])];
 const CLEANUP_ITEM_IDS = new Set([ItemIdentifiers.BANDAGES, ItemIdentifiers.BRONZE_PICKAXE, ItemIdentifiers.EXPLOSIVE_POTION, BARRICADE_ITEM_ID, ItemIdentifiers.SARADOMIN_CLOAK_3, ItemIdentifiers.ZAMORAK_CLOAK_3, ItemIdentifiers.CASTLEWARS_HOOD, ItemIdentifiers.CASTLEWARS_HOOD_2, ItemIdentifiers.SARADOMIN_BANNER, ItemIdentifiers.ZAMORAK_BANNER, ItemIdentifiers.ROCK_5, ItemIdentifiers.TINDERBOX, ItemIdentifiers.ROPE, ItemIdentifiers.TOOLKIT_2]);
@@ -68,6 +78,30 @@ const ALTAR_SPAWNS = [[411, [2431, 3076, 1], 1], [411, [2373, 3135, 1], 0]];
 
 function createCastleWars(api) {
   const teamByPlayer = new WeakMap();
+  const sentVars = new WeakMap();
+
+  function setVar(player, id, value, varbit) {
+    let cache = sentVars.get(player);
+    if (!cache) {
+      sentVars.set(player, (cache = new Map()));
+    }
+    const key = `${varbit ? "b" : "p"}${id}`;
+    if (cache.get(key) === value) {
+      return;
+    }
+    cache.set(key, value);
+    const sender = player.getPacketSender();
+    if (varbit) {
+      sender.sendVarbit(id, value);
+    } else {
+      sender.sendConfig(id, value);
+    }
+  }
+
+  function closeOverlay(player) {
+    sentVars.delete(player);
+    player.getPacketSender().closeSubInterface(OVERLAY_HUD_UID);
+  }
   const flagStatus = {
     [TEAM.SARADOMIN]: 0,
     [TEAM.ZAMORAK]: 0,
@@ -385,7 +419,7 @@ function createCastleWars(api) {
       rewardPlayer(player);
       clearCastleWarsItems(player);
       setTeamId(player, null);
-      player.getPacketSender().sendWalkableInterface(-1);
+      closeOverlay(player);
       player.getPacketSender().sendInteractionOption("null", 2, true);
       returnToLobby(player);
     }
@@ -413,7 +447,7 @@ function createCastleWars(api) {
       for (const player of [...area.getPlayers()]) {
         player.resetCastlewarsIdleTime();
         player.setAttribute(TRANSITION_TO_GAME_KEY, true);
-        player.getPacketSender().sendWalkableInterface(-1);
+        closeOverlay(player);
         player.smartMove(team.startRoom, 3);
       }
     }
@@ -939,6 +973,7 @@ function createCastleWars(api) {
       }
 
       equipTeamColours(player, getTeamData(this.teamId));
+      player.getPacketSender().sendSubInterface(OVERLAY_HUD_UID, WAITING_ROOM_INTERFACE, 1);
       beginStartCountdown();
       const secondsLeft = startTask?.isRunning?.()
         ? Math.ceil((startTask.getRemainingTicks() | 0) * 0.6)
@@ -972,7 +1007,7 @@ function createCastleWars(api) {
       clearCastleWarsItems(player);
       player.resetAttributes();
       setTeamId(player, null);
-      player.getPacketSender().sendWalkableInterface(-1);
+      closeOverlay(player);
 
       const counts = queueCounts();
       if (
@@ -989,15 +1024,13 @@ function createCastleWars(api) {
         return;
       }
 
-      player.getPacketSender().sendString(
+      setVar(
+        player,
+        TIMER_VARP,
         startTask?.isRunning?.()
-          ? `Time until next game starts: ${Math.ceil(
-              (startTask.getRemainingTicks() | 0) * 0.6
-            )} seconds.`
-          : "Waiting for players to join the other team.",
-        11480
+          ? Math.ceil((startTask.getRemainingTicks() | 0) * 0.6)
+          : 0
       );
-      player.getPacketSender().sendWalkableInterface(11479);
     }
 
   }
@@ -1023,6 +1056,13 @@ function createCastleWars(api) {
       }
 
       player.setAttribute(TRANSITION_TO_GAME_KEY, false);
+      player
+        .getPacketSender()
+        .sendSubInterface(
+          OVERLAY_HUD_UID,
+          STATUS_OVERLAY_INTERFACE[getTeamId(player)],
+          1
+        );
       player.getPacketSender().sendInteractionOption("Attack", 2, true);
     }
 
@@ -1033,7 +1073,7 @@ function createCastleWars(api) {
       }
 
       player.getPacketSender().sendInteractionOption("null", 2, true);
-      player.getPacketSender().sendWalkableInterface(-1);
+      closeOverlay(player);
       player.getPacketSender().sendEntityHintRemoval(true);
       clearCastleWarsItems(player);
 
@@ -1070,25 +1110,22 @@ function createCastleWars(api) {
       const team = getTeamData(teamId);
       const inSpawn = team.respawnBounds.inside(player.getLocation());
 
-      player.getPacketSender().sendWalkableInterface(11146);
-      player
-        .getPacketSender()
-        .sendString(`Zamorak = ${score[TEAM.ZAMORAK]}`, 11147);
-      player
-        .getPacketSender()
-        .sendString(`${score[TEAM.SARADOMIN]} = Saradomin`, 11148);
-      player
-        .getPacketSender()
-        .sendString(formatTicks(endTask?.getRemainingTicks?.() ?? 0), 11155);
-      player.getPacketSender().sendToggle(378, 2097152 * flagStatus[TEAM.SARADOMIN]);
-      player.getPacketSender().sendToggle(377, 2097152 * flagStatus[TEAM.ZAMORAK]);
+      setVar(player, SCORE_VARBIT[TEAM.SARADOMIN], score[TEAM.SARADOMIN], true);
+      setVar(player, SCORE_VARBIT[TEAM.ZAMORAK], score[TEAM.ZAMORAK], true);
+      setVar(player, FLAG_VARBIT[TEAM.SARADOMIN], flagStatus[TEAM.SARADOMIN], true);
+      setVar(player, FLAG_VARBIT[TEAM.ZAMORAK], flagStatus[TEAM.ZAMORAK], true);
+      setVar(
+        player,
+        TIMER_VARP,
+        Math.ceil(((endTask?.getRemainingTicks?.() ?? 0) * 0.6) / 60)
+      );
       player
         .getPacketSender()
         .sendString(
           inSpawn
             ? `You have ${formatTicks(player.castlewarsIdleTime | 0)} to leave the respawn room.`
             : "",
-          12837
+          EJECT_TEXT_UID[teamId]
         );
 
       if (inSpawn && player?.isPlayerBot?.() !== true) {
