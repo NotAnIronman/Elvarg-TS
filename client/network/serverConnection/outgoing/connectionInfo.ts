@@ -1,5 +1,6 @@
 import { send } from "../connection/send";
 import { state } from "../state";
+import type { WebRtcConnectionConfig } from "../connection/GameSocket";
 
 export function sendTeleport(to: { x: number; y: number }, level?: number): void {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
@@ -14,6 +15,14 @@ export function getLastUrl(): string {
     return state.lastUrl;
 }
 
-export function setServerUrl(url: string): void {
+export function setServerUrl(url: string, webRtcConfig?: WebRtcConnectionConfig): void {
+    const changed = state.lastUrl !== url
+        || JSON.stringify(state.webRtcConfig) !== JSON.stringify(webRtcConfig);
+    if (changed && state.socket) {
+        const previous = state.socket;
+        state.socket = null;
+        try { previous.close(1000, "server change"); } catch {}
+    }
     state.lastUrl = url;
+    state.webRtcConfig = webRtcConfig;
 }

@@ -6,14 +6,16 @@ import { processServerMessage } from "../handlers/dispatch";
 import { state } from "../state";
 import { clearLoginConnectRetryTimer } from "./loginHelpers";
 import { initSocketCloseHandler } from "./closeHandler";
+import type { GameSocket } from "./GameSocket";
 import { send } from "./send";
+import { WebRtcGameSocket } from "./WebRtcGameSocket";
 
 export function initServerConnection(url: string = DEFAULT_URL): void {
     state.lastUrl = url;
     // On HMR refresh, proactively close any previous live state.socket stored globally
     try {
         const g: any = (typeof window !== "undefined" ? window : globalThis) as any;
-        const existing: WebSocket | null | undefined = g[WS_GLOBAL_KEY];
+        const existing: GameSocket | null | undefined = g[WS_GLOBAL_KEY];
         // If a prior cycle marked suppression (HMR), respect it until re-init is called
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const _sup: boolean = !!g[WS_SUPPRESS_RECONNECT_KEY];
@@ -36,7 +38,9 @@ export function initServerConnection(url: string = DEFAULT_URL): void {
     try {
         state.playerSyncContext = new PlayerSyncContext();
         state.playerUpdateDecoder = new PlayerUpdateDecoder();
-        state.socket = new WebSocket(url);
+        state.socket = state.webRtcConfig
+            ? new WebRtcGameSocket(state.webRtcConfig)
+            : new WebSocket(url);
         const ws = state.socket;
         try {
             ws.binaryType = "arraybuffer";
@@ -103,7 +107,7 @@ export function initServerConnection(url: string = DEFAULT_URL): void {
             if (state.socket !== ws) return;
 
             try {
-                const raw = evt.data;
+                const raw = (evt as MessageEvent).data;
                 let messages: any[] = [];
 
                 // Handle binary packets (ArrayBuffer) or JSON strings

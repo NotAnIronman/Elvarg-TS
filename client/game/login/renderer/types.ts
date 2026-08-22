@@ -81,4 +81,9 @@ export interface ServerListEntry {
     secure: boolean;
     playerCount: number | null;
     maxPlayers: number;
+    transport?: "websocket" | "webrtc";
+    signalUrl?: string;
+    worldId?: string;
+    iceServers?: RTCIceServer[];
+    relayDiscovered?: boolean;
 }

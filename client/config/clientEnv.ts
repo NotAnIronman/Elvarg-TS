@@ -17,6 +17,15 @@ export type ConfiguredServer = {
     address: string;
     secure: boolean;
     maxPlayers: number;
+    transport?: "websocket" | "webrtc";
+    signalUrl?: string;
+    worldId?: string;
+    iceServers?: RTCIceServer[];
+};
+
+export type WebRtcRelayConfig = {
+    signalUrl: string;
+    iceServers: RTCIceServer[];
 };
 
 function readBoolean(value: unknown, fallback: boolean): boolean {
@@ -31,6 +40,12 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
+}
+
+function isIceServer(value: unknown): value is RTCIceServer {
+    if (!isRecord(value)) return false;
+    return typeof value.urls === "string"
+        || (Array.isArray(value.urls) && value.urls.every((url) => typeof url === "string"));
 }
 
 /** Base URL for OSRS cache files. Trailing slash always present. */
@@ -72,17 +87,53 @@ export function getConfiguredServers(): ConfiguredServer[] | undefined {
         if (!Array.isArray(parsed)) return undefined;
         return parsed.map((entry): ConfiguredServer => {
             const server = isRecord(entry) ? entry : {};
+            const transport = server.transport === "webrtc" ? "webrtc" : "websocket";
+            const signalUrl = typeof server.signalUrl === "string" ? server.signalUrl : undefined;
             return {
                 name: typeof server.name === "string" ? server.name : "Server",
                 address:
-                    typeof server.address === "string" ? server.address : "localhost:43594",
+                    typeof server.address === "string"
+                        ? server.address
+                        : transport === "webrtc" && signalUrl
+                          ? new URL(signalUrl).host
+                          : "localhost:43594",
                 secure: readBoolean(server.secure, false),
                 maxPlayers: typeof server.maxPlayers === "number" ? server.maxPlayers : 2047,
+                transport,
+                signalUrl,
+                worldId: typeof server.worldId === "string" ? server.worldId : undefined,
+                iceServers: Array.isArray(server.iceServers)
+                    ? server.iceServers.filter(isIceServer)
+                    : [],
             };
         });
     } catch {
         console.warn("[clientEnv] Failed to parse REACT_APP_SERVERS_JSON");
         return undefined;
+    }
+}
+
+/** Public relay directory used to discover WebRTC worlds. Local development needs no config. */
+export function getWebRtcRelayConfig(): WebRtcRelayConfig | undefined {
+    const configuredUrl = read(process.env.REACT_APP_WEBRTC_SIGNAL_URL);
+    const localUrl = typeof window !== "undefined" &&
+        ["localhost", "127.0.0.1", "::1", "[::1]"].includes(window.location.hostname.toLowerCase())
+        ? "ws://127.0.0.1:8787"
+        : undefined;
+    const signalUrl = configuredUrl ?? localUrl;
+    if (!signalUrl) return undefined;
+
+    const rawIceServers = read(process.env.REACT_APP_WEBRTC_ICE_SERVERS);
+    if (!rawIceServers) return { signalUrl, iceServers: [] };
+    try {
+        const parsed = JSON.parse(rawIceServers);
+        return {
+            signalUrl,
+            iceServers: Array.isArray(parsed) ? parsed.filter(isIceServer) : [],
+        };
+    } catch {
+        console.warn("[clientEnv] Failed to parse REACT_APP_WEBRTC_ICE_SERVERS");
+        return { signalUrl, iceServers: [] };
     }
 }
 

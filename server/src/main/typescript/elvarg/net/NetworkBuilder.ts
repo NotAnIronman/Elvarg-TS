@@ -11,7 +11,8 @@ import { PlayerRights } from "../game/model/rights/PlayerRights";
 import { PluginManager } from "../plugins/PluginManager";
 import { Misc } from "../util/Misc";
 import { PlayerPunishment } from "../util/PlayerPunishment";
-import { WebSocketBinaryChannel } from "./BinaryChannel";
+import { BinaryChannel, MAX_GAME_MESSAGE_BYTES, WebSocketBinaryChannel } from "./BinaryChannel";
+import { WebRtcGameConnector } from "./webrtc/WebRtcGameConnector";
 import { PlayerSession } from "./PlayerSession";
 import { CachePipeline } from "../game/cache/CachePipeline";
 import { ContentApi } from "./http/ContentApi";
@@ -128,11 +129,16 @@ export class NetworkBuilder {
       response.setHeader("Content-Length", pack.length);
       response.end(pack);
     });
-    const server = new WebSocketServer({ server: http, perMessageDeflate: false, maxPayload: 4096 });
+    const server = new WebSocketServer({
+      server: http,
+      perMessageDeflate: false,
+      maxPayload: MAX_GAME_MESSAGE_BYTES,
+    });
     server.on("connection", (socket) => new ClientConnection(new WebSocketBinaryChannel(socket)));
     server.on("listening", () => console.info(`[network] client websocket listening on ${port}`));
     server.on("error", (error) => console.error("[network] websocket error", error));
     http.listen(port);
+    WebRtcGameConnector.startFromEnv((channel) => new ClientConnection(channel));
     return server;
   }
 }
@@ -145,14 +151,14 @@ class ClientConnection {
   private closed = false;
   private input = Promise.resolve();
 
-  constructor(private readonly channel: WebSocketBinaryChannel) {
+  constructor(private readonly channel: BinaryChannel) {
     channel.onData((frame) => {
       this.input = this.input.then(() => this.handle(frame)).catch((error) => {
         console.warn("[network] client packet rejected", error);
       });
     });
     channel.onError((error) => {
-      console.warn("[network] websocket client error", error.message);
+      console.warn(`[network] ${channel.kind} client error`, error.message);
       this.cleanup("socket_error");
     });
     channel.onClose(() => this.cleanup("socket_close"));

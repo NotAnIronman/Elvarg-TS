@@ -1,7 +1,9 @@
 import { Socket } from "net";
 import { RawData, WebSocket } from "ws";
 
-export type BinaryChannelKind = "websocket" | "tcp";
+export const MAX_GAME_MESSAGE_BYTES = 4096;
+
+export type BinaryChannelKind = "websocket" | "webrtc" | "tcp";
 
 export interface BinaryChannel {
   readonly kind: BinaryChannelKind;

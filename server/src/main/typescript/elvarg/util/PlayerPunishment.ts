@@ -81,11 +81,11 @@ export class PlayerPunishment {
     }
 
     public static IPBanned(IP: string): boolean {
-        return this.IPSBanned.includes(IP);
+        return IP.trim().length > 0 && this.IPSBanned.includes(IP);
     }
 
     public static IPMuted(IP: string): boolean {
-        return this.IPSMuted.includes(IP);
+        return IP.trim().length > 0 && this.IPSMuted.includes(IP);
     }
 
     public static unban(player: string) {

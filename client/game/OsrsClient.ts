@@ -4928,6 +4928,15 @@ export class OsrsClient {
             // Apply persisted server URL so sendLogin connects to the right place
             setServerUrl(
                 `${this.loginState.serverSecure ? "wss" : "ws"}://${this.loginState.serverAddress}`,
+                this.loginState.serverTransport === "webrtc" &&
+                    this.loginState.serverSignalUrl &&
+                    this.loginState.serverWorldId
+                    ? {
+                          signalUrl: this.loginState.serverSignalUrl,
+                          worldId: this.loginState.serverWorldId,
+                          iceServers: this.loginState.serverIceServers,
+                      }
+                    : undefined,
             );
         }
 
@@ -5384,9 +5393,22 @@ export class OsrsClient {
                     this.loginState.serverAddress = server.address;
                     this.loginState.serverName = server.name;
                     this.loginState.serverSecure = server.secure;
+                    this.loginState.serverTransport = server.transport ?? "websocket";
+                    this.loginState.serverSignalUrl = server.signalUrl;
+                    this.loginState.serverWorldId = server.worldId;
+                    this.loginState.serverIceServers = server.iceServers ?? [];
                     this.loginState.serverListOpen = false;
                     this.loginState.hoveredServerIndex = -1;
-                    setServerUrl(`${server.secure ? "wss" : "ws"}://${server.address}`);
+                    setServerUrl(
+                        `${server.secure ? "wss" : "ws"}://${server.address}`,
+                        server.transport === "webrtc" && server.signalUrl && server.worldId
+                            ? {
+                                  signalUrl: server.signalUrl,
+                                  worldId: server.worldId,
+                                  iceServers: server.iceServers ?? [],
+                              }
+                            : undefined,
+                    );
                     this.loginState.saveLastServer();
                 }
                 return undefined;
@@ -5467,6 +5489,10 @@ export class OsrsClient {
             this.loginState.serverAddress = serverAddress;
             this.loginState.serverName = getDefaultServerName();
             this.loginState.serverSecure = getDefaultServerSecure();
+            this.loginState.serverTransport = "websocket";
+            this.loginState.serverSignalUrl = undefined;
+            this.loginState.serverWorldId = undefined;
+            this.loginState.serverIceServers = [];
 
             // Set credentials and trigger login
             this.loginState.username = username;

@@ -2,9 +2,11 @@ import { setPacketSocket } from "../../packet";
 import { WS_GLOBAL_KEY, WS_SUPPRESS_RECONNECT_KEY, RECONNECT_DELAY_MAX_MS, RECONNECT_MAX_ATTEMPTS } from "../constants";
 import { clearLoginConnectRetryTimer } from "./loginHelpers";
 import { state } from "../state";
+import type { GameSocket } from "./GameSocket";
 
-export function initSocketCloseHandler(ws: WebSocket, initConnection: (url: string) => void): void {
-    ws.addEventListener("close", (evt: CloseEvent) => {
+export function initSocketCloseHandler(ws: GameSocket, initConnection: (url: string) => void): void {
+    ws.addEventListener("close", (event) => {
+        const evt = event as CloseEvent;
         if (state.socket !== ws) {
             return;
         }
@@ -27,12 +29,14 @@ export function initSocketCloseHandler(ws: WebSocket, initConnection: (url: stri
             // Don't reconnect if: suppressed (HMR/logout), clean close with specific reasons, or max attempts reached
             const isIntentionalClose =
                 evt.wasClean && (evt.reason === "logout" || evt.reason === "page unload");
+            const terminalConnectFailure = evt.code === 4000;
             // Only reconnect if we have stored session credentials (were previously logged in)
             const hasSession = state.sessionUsername !== null && state.sessionPassword !== null;
             const shouldReconnect =
                 hasSession &&
                 !suppress &&
                 !isIntentionalClose &&
+                !terminalConnectFailure &&
                 state.reconnectAttempts < RECONNECT_MAX_ATTEMPTS;
 
             console.log(
@@ -59,18 +63,20 @@ export function initSocketCloseHandler(ws: WebSocket, initConnection: (url: stri
             }
 
             // Notify disconnect listeners
-            for (const cb of state.disconnectListeners) {
-                try {
-                    cb({
-                        code: evt.code,
-                        reason: evt.reason || "",
-                        willReconnect: shouldReconnect,
-                    });
-                } catch {}
+            if (!terminalConnectFailure) {
+                for (const cb of state.disconnectListeners) {
+                    try {
+                        cb({
+                            code: evt.code,
+                            reason: evt.reason || "",
+                            willReconnect: shouldReconnect,
+                        });
+                    } catch {}
+                }
             }
 
             // If reconnection not possible and we were trying to reconnect, notify failure
-            if (!shouldReconnect && state.isReconnecting) {
+            if (!shouldReconnect && (state.isReconnecting || terminalConnectFailure)) {
                 // Reconnection attempts exhausted - notify failure
                 state.isReconnecting = false;
                 // eslint-disable-next-line no-console

@@ -3,6 +3,7 @@ import { PlayerUpdateDecoder } from "../../game/sync/PlayerUpdateDecoder";
 import type { PlayerSyncFrame } from "../../game/sync/PlayerSyncTypes";
 import type { ProjectileLaunch } from "../../common/projectiles/ProjectileLaunch";
 import { CombatStateStore } from "../combat/CombatStateStore";
+import type { GameSocket, WebRtcConnectionConfig } from "./connection/GameSocket";
 import { DEFAULT_URL } from "./constants";
 import {
     createDefaultShopState,
@@ -66,8 +67,9 @@ export type PathCallback = (res: {
 }) => void;
 
 export const state = {
-    socket: null as WebSocket | null,
+    socket: null as GameSocket | null,
     lastUrl: DEFAULT_URL,
+    webRtcConfig: undefined as WebRtcConnectionConfig | undefined,
     reconnectTimer: null as ReturnType<typeof setTimeout> | null,
     reconnectDelayMs: 250,
     reconnectAttempts: 0,
