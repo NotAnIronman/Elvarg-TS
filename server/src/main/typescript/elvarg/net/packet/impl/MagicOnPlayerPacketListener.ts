@@ -33,6 +33,11 @@ export class MagicOnPlayerPacketListener {
       return false;
     }
 
+    if (!spell.canCastOnTarget(player, attacked)) {
+      player.getMovementQueue().reset();
+      return false;
+    }
+
     player.getCombat().castSpellOn(attacked, spell);
     return true;
   }

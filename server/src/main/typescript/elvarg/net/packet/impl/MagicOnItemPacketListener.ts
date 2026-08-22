@@ -14,6 +14,7 @@ import { Sounds } from "../../../game/Sounds";
 import { ItemIdentifiers } from "../../../util/ItemIdentifiers";
 import { World } from "../../../game/World";
 import { CombatRange } from "../../../game/content/combat/CombatRange";
+import { ArceuusItemSpells } from "../../../game/content/combat/magic/ArceuusItemSpells";
 
 export class MagicOnItemPacketListener {
   private static readonly LOW_ALCH_SPELL_ID = 1162;
@@ -39,6 +40,14 @@ export class MagicOnItemPacketListener {
         return MagicOnItemPacketListener.HIGH_ALCH_SPELL_ID;
       case "telekinetic grab":
         return MagicOnItemPacketListener.TELEKINETIC_GRAB_SPELL_ID;
+      case "basic reanimation":
+        return ArceuusItemSpells.BASIC_REANIMATION;
+      case "adept reanimation":
+        return ArceuusItemSpells.ADEPT_REANIMATION;
+      case "expert reanimation":
+        return ArceuusItemSpells.EXPERT_REANIMATION;
+      case "master reanimation":
+        return ArceuusItemSpells.MASTER_REANIMATION;
       default:
         return -1;
     }
@@ -250,6 +259,9 @@ export class MagicOnItemPacketListener {
   }
 
   public castOnItem(player: any, spellId: number, itemId: number, slot: number): boolean {
+    if (ArceuusItemSpells.castOnItem(player, spellId, itemId, slot)) {
+      return true;
+    }
     if (
       !player ||
       slot < 0 ||

@@ -42,6 +42,7 @@ async function main() {
     assert.equal(NpcDefinition.forId(5243).getAttackAnim(), 5327);
     assert.equal(NpcDefinition.forId(5243).getDefenceAnim(), 5328);
     assert.equal(NpcDefinition.forId(5243).getDeathAnim(), 5329);
+    assert(NpcDefinition.forId(3129).isDemon(), "expected K'ril Tsutsaroth to retain the monster-dump demon attribute");
     assert(NpcDefinition.forId(239).getMaxHit() > 1);
     require("../plugins/items/ItemDefinitionLoader.plugin.js").register({ log() {} });
     assert.equal(ItemDefinition.forId(4151).getEquipmentType(), EquipmentType.WEAPON);

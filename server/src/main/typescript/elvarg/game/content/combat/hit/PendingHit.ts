@@ -7,6 +7,7 @@ import type { Player } from "../../../entity/impl/player/Player";
 import { AccuracyFormulasDpsCalc } from "../formula/AccuracyFormulasDpsCalc";
 import { HitMask } from "./HitMask";
 import { ServerPerf } from "../../../../util/ServerPerf";
+import { ArceuusSpells } from "../magic/ArceuusSpells";
 
 type PendingHitConfig = {
     delay?: number;
@@ -152,6 +153,9 @@ export class PendingHit {
                     () => CombatFactory.getHitDamage(this.attacker, this.target, this.combatType)
                 )
                 : new HitDamage(0, HitMask.BLUE);
+            if (this.accurate && this.attacker.isPlayer() && this.target.isPlayer()) {
+                ArceuusSpells.applyCorruption(this.attacker.getAsPlayer(), this.target.getAsPlayer());
+            }
             ServerPerf.measurePhase(
                 "combat.process.method_hits.extra_rolls",
                 () => CombatFactory.applyExtraHitRolls(
@@ -178,6 +182,9 @@ export class PendingHit {
                 "combat.process.method_hits.damage",
                 () => CombatFactory.getHitDamage(this.attacker, this.target, this.combatType)
             ) : new HitDamage(0, HitMask.BLUE);
+            if (this.accurate && this.attacker.isPlayer() && this.target.isPlayer()) {
+                ArceuusSpells.applyCorruption(this.attacker.getAsPlayer(), this.target.getAsPlayer());
+            }
             ServerPerf.measurePhase(
                 "combat.process.method_hits.extra_rolls",
                 () => CombatFactory.applyExtraHitRolls(

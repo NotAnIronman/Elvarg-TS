@@ -10,6 +10,8 @@ import { NPCRespawnTask } from '../impl/NPCRespawnTask'
 import { PluginManager } from "../../../plugins/PluginManager";
 import { Sound } from "../../Sound";
 import { Sounds } from "../../Sounds";
+import { ArceuusSpells } from "../../content/combat/magic/ArceuusSpells";
+import { CombatSpecial } from "../../content/combat/CombatSpecial";
 
 
 export class NPCDeathTask extends Task {
@@ -54,6 +56,10 @@ export class NPCDeathTask extends Task {
                         },
                     });
                     NPCDropGenerator.start(this.killer, this.npc);
+                    if (ArceuusSpells.hasDeathCharge(this.killer)) {
+                        this.killer.setSpecialPercentage(Math.min(100, this.killer.getSpecialPercentage() + 15));
+                        CombatSpecial.updateBar(this.killer);
+                    }
                 }
                 this.stop();
                 break;

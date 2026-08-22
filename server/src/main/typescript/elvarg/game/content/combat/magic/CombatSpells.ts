@@ -71,6 +71,58 @@ class TridentSpell extends CombatNormalSpell {
     }
 }
 
+class CombatArceuusSpell extends CombatNormalSpell {
+    constructor(
+        options: CombatNormalSpellOptions,
+        private readonly demonbane = false,
+    ) {
+        super(options);
+    }
+
+    public getSpellbook(): MagicSpellbook {
+        return MagicSpellbook.ARCEUUS;
+    }
+
+    public demonbaneDamageMultiplier(caster: Mobile | null): number {
+        return this.demonbane && caster?.isPlayer() && hasArceuusMark(caster) ? 1.25 : 1;
+    }
+
+    public demonbaneAccuracyMultiplier(caster: Mobile | null): number {
+        return this.demonbane && caster?.isPlayer() && hasArceuusMark(caster) ? 1.25 : 1;
+    }
+
+    public canCastOnTarget(cast: Mobile, target: Mobile): boolean {
+        if (!this.demonbane || !target.isNpc()) {
+            return !this.demonbane || this.rejectInvalidDemonbaneTarget(cast);
+        }
+
+        if (target.getAsNpc().getCurrentDefinition()?.isDemon?.()) {
+            return true;
+        }
+        return this.rejectInvalidDemonbaneTarget(cast);
+    }
+
+    private rejectInvalidDemonbaneTarget(cast: Mobile): false {
+        if (cast.isPlayer()) {
+            cast.getAsPlayer().getPacketSender().sendMessage("Demonbane spells can only be cast on demons.");
+        }
+        return false;
+    }
+}
+
+class CombatArceuusEffectSpell extends CombatEffectSpell {
+    public getSpellbook(): MagicSpellbook {
+        return MagicSpellbook.ARCEUUS;
+    }
+}
+
+const ARCEUUS_MARK_UNTIL = "arceuus:markUntil";
+
+const hasArceuusMark = (target: Mobile): boolean =>
+    Number(target.getAttribute(ARCEUUS_MARK_UNTIL) ?? 0) > Date.now();
+const hasArceuusWard = (target: Mobile): boolean =>
+    Number(target.getAttribute("arceuus:wardUntil") ?? 0) > Date.now();
+
 const getCombatFactory = () =>
     require("../CombatFactory").CombatFactory as typeof import("../CombatFactory").CombatFactory;
 
@@ -1273,6 +1325,196 @@ export class CombatSpells {
         spellId() {
             return 1189;
         }
+    });
+
+    public static WIND_SURGE = new CombatNormalSpell({
+        castAnimation: () => new Animation(7855),
+        castProjectile: (cast, castOn) => Projectile.createProjectile(cast, castOn, 1456, 0, 20, 43, 31),
+        endGraphic: () => new Graphic(1457, GraphicHeight.HIGH),
+        maximumHit: () => 21,
+        startGraphic: () => new Graphic(1455, GraphicHeight.MIDDLE),
+        baseExperience: () => 44.5,
+        itemsRequired: () => [new Item(556, 7), new Item(21880)],
+        levelRequired: () => 81,
+        spellId: () => 21876,
+    });
+
+    public static WATER_SURGE = new CombatNormalSpell({
+        castAnimation: () => new Animation(7855),
+        castProjectile: (cast, castOn) => Projectile.createProjectile(cast, castOn, 1459, 0, 20, 43, 31),
+        endGraphic: () => new Graphic(1460, GraphicHeight.HIGH),
+        maximumHit: () => 22,
+        startGraphic: () => new Graphic(1458, GraphicHeight.MIDDLE),
+        baseExperience: () => 46.5,
+        itemsRequired: () => [new Item(556, 7), new Item(555, 10), new Item(21880)],
+        levelRequired: () => 85,
+        spellId: () => 21877,
+    });
+
+    public static EARTH_SURGE = new CombatNormalSpell({
+        castAnimation: () => new Animation(7855),
+        castProjectile: (cast, castOn) => Projectile.createProjectile(cast, castOn, 1462, 0, 20, 43, 31),
+        endGraphic: () => new Graphic(1463, GraphicHeight.HIGH),
+        maximumHit: () => 23,
+        startGraphic: () => new Graphic(1461, GraphicHeight.MIDDLE),
+        baseExperience: () => 48.5,
+        itemsRequired: () => [new Item(556, 7), new Item(557, 10), new Item(21880)],
+        levelRequired: () => 90,
+        spellId: () => 21878,
+    });
+
+    public static FIRE_SURGE = new CombatNormalSpell({
+        castAnimation: () => new Animation(7855),
+        castProjectile: (cast, castOn) => Projectile.createProjectile(cast, castOn, 1465, 0, 20, 43, 31),
+        endGraphic: () => new Graphic(1466, GraphicHeight.HIGH),
+        maximumHit: () => 24,
+        startGraphic: () => new Graphic(1464, GraphicHeight.MIDDLE),
+        baseExperience: () => 50.5,
+        itemsRequired: () => [new Item(556, 7), new Item(554, 10), new Item(21880)],
+        levelRequired: () => 95,
+        spellId: () => 21879,
+    });
+
+    public static GHOSTLY_GRASP = new CombatArceuusSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        maximumHit: () => 12,
+        startGraphic: () => null,
+        baseExperience: () => 22.5,
+        itemsRequired: () => [new Item(556, 4), new Item(562)],
+        levelRequired: () => 35,
+        spellId: () => 21826,
+        finishCast: (_cast, target, accurate, damage) => {
+            if (accurate && damage > 0) getCombatFactory().freeze(target, hasArceuusWard(target) ? 0.6 : hasArceuusMark(_cast) ? 2.4 : 1.2);
+        },
+    });
+
+    public static INFERIOR_DEMONBANE = new CombatArceuusSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        maximumHit: () => 16,
+        startGraphic: () => null,
+        baseExperience: () => 27,
+        itemsRequired: () => [new Item(554, 3), new Item(566)],
+        levelRequired: () => 44,
+        spellId: () => 20398,
+    }, true);
+
+    public static SKELETAL_GRASP = new CombatArceuusSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        maximumHit: () => 17,
+        startGraphic: () => null,
+        baseExperience: () => 33,
+        itemsRequired: () => [new Item(557, 8), new Item(560)],
+        levelRequired: () => 56,
+        spellId: () => 21829,
+        finishCast: (_cast, target, accurate, damage) => {
+            if (accurate && damage > 0) getCombatFactory().freeze(target, hasArceuusWard(target) ? 0.6 : hasArceuusMark(_cast) ? 3.6 : 1.8);
+        },
+    });
+
+    public static SUPERIOR_DEMONBANE = new CombatArceuusSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        maximumHit: () => 23,
+        startGraphic: () => null,
+        baseExperience: () => 36,
+        itemsRequired: () => [new Item(554, 5), new Item(566)],
+        levelRequired: () => 62,
+        spellId: () => 20399,
+    }, true);
+
+    public static UNDEAD_GRASP = new CombatArceuusSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        maximumHit: () => 24,
+        startGraphic: () => null,
+        baseExperience: () => 46.5,
+        itemsRequired: () => [new Item(554, 12), new Item(565)],
+        levelRequired: () => 79,
+        spellId: () => 21832,
+        finishCast: (_cast, target, accurate, damage) => {
+            if (accurate && damage > 0) getCombatFactory().freeze(target, hasArceuusWard(target) ? 0.6 : hasArceuusMark(_cast) ? 4.8 : 2.4);
+        },
+    });
+
+    public static DARK_DEMONBANE = new CombatArceuusSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        maximumHit: () => 30,
+        startGraphic: () => null,
+        baseExperience: () => 43.5,
+        itemsRequired: () => [new Item(554, 7), new Item(566, 2)],
+        levelRequired: () => 82,
+        spellId: () => 20400,
+    }, true);
+
+    public static MARK_OF_DARKNESS = new CombatArceuusEffectSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        startGraphic: () => null,
+        baseExperience: () => 70,
+        itemsRequired: () => [new Item(566), new Item(564)],
+        levelRequired: () => 59,
+        spellId: () => 20392,
+        spellEffect: (cast, target) => {
+            if (!cast.isPlayer()) return;
+            const magicLevel = cast.getAsPlayer().getSkillManager().getCurrentLevel(Skill.MAGIC);
+            cast.setAttribute(ARCEUUS_MARK_UNTIL, Date.now() + magicLevel * 600);
+        },
+    });
+
+    public static LESSER_CORRUPTION = new CombatArceuusEffectSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        startGraphic: () => null,
+        baseExperience: () => 75,
+        itemsRequired: () => [new Item(560), new Item(566, 2)],
+        levelRequired: () => 64,
+        spellId: () => 10511,
+        spellEffect: (cast) => {
+            if (cast.isPlayer()) cast.getAsPlayer().setAttribute("arceuus:corruption", 6);
+        },
+    });
+
+    public static GREATER_CORRUPTION = new CombatArceuusEffectSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        startGraphic: () => null,
+        baseExperience: () => 95,
+        itemsRequired: () => [new Item(565), new Item(566, 3)],
+        levelRequired: () => 85,
+        spellId: () => 20762,
+        spellEffect: (cast) => {
+            if (cast.isPlayer()) cast.getAsPlayer().setAttribute("arceuus:corruption", 12);
+        },
+    });
+
+    public static DARK_LURE = new CombatArceuusEffectSpell({
+        castAnimation: () => new Animation(711),
+        castProjectile: () => null,
+        endGraphic: () => null,
+        startGraphic: () => null,
+        baseExperience: () => 60,
+        itemsRequired: () => [new Item(560), new Item(561)],
+        levelRequired: () => 50,
+        spellId: () => 15303,
+        spellEffect: (_cast, target) => {
+            if (!target.isNpc()) return;
+            target.getMovementQueue().reset();
+            target.setAttribute("arceuus:darkLureUntil", Date.now() + 20_000);
+            target.getCombat().attack(_cast);
+        },
     });
 
     public static ENTANGLE = new CombatEffectSpell({

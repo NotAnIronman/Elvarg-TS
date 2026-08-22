@@ -29,6 +29,8 @@ export class Autocasting {
         [11, CombatSpells.EARTH_BLAST], [12, CombatSpells.FIRE_BLAST],
         [13, CombatSpells.WIND_WAVE], [14, CombatSpells.WATER_WAVE],
         [15, CombatSpells.EARTH_WAVE], [16, CombatSpells.FIRE_WAVE],
+        [48, CombatSpells.WIND_SURGE], [49, CombatSpells.WATER_SURGE],
+        [50, CombatSpells.EARTH_SURGE], [51, CombatSpells.FIRE_SURGE],
         [17, CombatSpells.CRUMBLE_UNDEAD], [18, CombatSpells.MAGIC_DART],
         [19, CombatSpells.IBAN_BLAST],
         [31, CombatSpells.SMOKE_RUSH], [32, CombatSpells.SHADOW_RUSH],

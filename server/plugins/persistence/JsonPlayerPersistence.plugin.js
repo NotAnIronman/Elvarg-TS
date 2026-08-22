@@ -414,6 +414,9 @@ class JsonPlayerPersistence extends PlayerPersistence {
     if (interfaceId === MagicSpellbook.LUNAR.getInterfaceId()) {
       return MagicSpellbook.LUNAR;
     }
+    if (interfaceId === MagicSpellbook.ARCEUUS.getInterfaceId()) {
+      return MagicSpellbook.ARCEUUS;
+    }
     return MagicSpellbook.NORMAL;
   }
 

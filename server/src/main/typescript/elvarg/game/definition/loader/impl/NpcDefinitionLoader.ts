@@ -19,6 +19,7 @@ type CombatStats = {
     aggressive?: boolean;
     poisonous?: boolean;
     venomous?: boolean;
+    demon?: boolean;
     attackType?: CombatType;
     slayerLevel?: number;
     attackBonuses?: {
@@ -75,6 +76,7 @@ export class NpcDefinitionLoader extends DefinitionLoader {
             aggressive: monster.aggressive === true,
             poisonous: monster.poisonous === true,
             venomous: monster.venomous === true,
+            demon: Array.isArray(monster.attributes) && monster.attributes.includes("demon"),
             attackType: NpcDefinitionLoader.resolveAttackType(monster.attack_type),
             slayerLevel:
                 monster.slayer_monster === true && monster.slayer_level > 0
@@ -220,6 +222,7 @@ export class NpcDefinitionLoader extends DefinitionLoader {
                     aggressive: stat.aggressive ?? definition.isAggressive(),
                     poisonous: stat.poisonous ?? definition.isPoisonous(),
                     venomous: stat.venomous ?? definition.isVenomous(),
+                    demon: stat.demon ?? definition.isDemon(),
                     attackType: stat.attackType ?? definition.getAttackType(),
                     slayerLevel: stat.slayerLevel ?? definition.getSlayerLevel(),
                 });

@@ -9,6 +9,7 @@ const { Sounds } = require("../../src/main/typescript/elvarg/game/Sounds");
 const { TimerKey } = require("../../src/main/typescript/elvarg/util/timers/TimerKey");
 const { NpcIds, ObjectIds, ItemIds } = require("../../src/main/typescript/elvarg/util/IdEnums");
 const { Pets } = require("../npcs/Pets.plugin");
+const { ArceuusSpells } = require("../../src/main/typescript/elvarg/game/content/combat/magic/ArceuusSpells");
 
 const THIEVING_ANIMATION = new Animation(881);
 const NPC_ATTACK_ANIMATION = new Animation(401);
@@ -224,6 +225,11 @@ module.exports = {
               .sendMessage(`You steal ${loot.getAmount()} x ${loot.getDefinition().getName()}.`);
             player.getSkillManager().addExperiences(Skill.THIEVING, def.xp);
             Pets.onSkill(player, Skill.THIEVING);
+            return;
+          }
+
+          if (ArceuusSpells.hasShadowVeil(player) && Math.random() < 0.15) {
+            player.getPacketSender().sendMessage("Your shadow veil prevents you from being noticed.");
             return;
           }
 

@@ -63,8 +63,10 @@ import { CombatSpecial } from "../game/content/combat/CombatSpecial";
 import { WeaponInterfaces } from "../game/content/combat/WeaponInterfaces";
 import { PrayerHandler } from "../game/content/PrayerHandler";
 import { Autocasting } from "../game/content/combat/magic/Autocasting";
+import { EffectSpells } from "../game/content/combat/magic/EffectSpells";
 import { CombatSpells } from "../game/content/combat/magic/CombatSpells";
 import { TeleportHandler } from "../game/model/teleportation/TeleportHandler";
+import { ArceuusSpells } from "../game/content/combat/magic/ArceuusSpells";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -387,6 +389,13 @@ class ClientConnection {
               this.player, actionPacket.groupId, actionPacket.childId, actionPacket.slot
             )) {
               // Cache-native combat autocast controls reuse the existing spell state.
+            } else if (EffectSpells.handleSpell(this.player, actionPacket.itemId ?? -1)) {
+              // Utility and self-cast spells are represented by their cache item id.
+            } else if (ArceuusSpells.handleSpell(
+              this.player,
+              CacheDefinitions.getSpellName(actionPacket.widgetId, actionPacket.itemId ?? -1),
+            )) {
+              // Arceuus self-cast spells are identified by their cache spell name.
             } else if (actionPacket.itemId != null && actionPacket.slot != null &&
                 this.player.getInventory().getItems()[actionPacket.slot]?.getId() === actionPacket.itemId) {
               this.inventoryAction({
