@@ -12,7 +12,7 @@ import { PlayerRights } from "../src/main/typescript/elvarg/game/model/rights/Pl
 import { Inventory } from "../src/main/typescript/elvarg/game/model/container/impl/Inventory";
 import { Item } from "../src/main/typescript/elvarg/game/model/Item";
 
-const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565];
+const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 9075, 21880, 28929];
 
 function makePlayer(rights: PlayerRights, filler: Array<[number, number]>) {
   const messages: string[] = [];
@@ -49,7 +49,7 @@ async function main() {
     RUNE_IDS.map((id) => [id, 1000]),
     "every standard rune is spawned"
   );
-  assert.deepEqual(empty.messages, ["Spawned 1,000 of each standard rune."]);
+  assert.deepEqual(empty.messages, ["Spawned 1,000 of each rune type."]);
 
   // Full inventory, no runes held: nothing fits, exactly one message.
   const full = makePlayer(
@@ -58,7 +58,7 @@ async function main() {
   );
   CommandPacketListener.execute(full.player, "runes");
   assert.deepEqual(runeStacks(full.inventory), [], "no runes spawn without space");
-  assert.deepEqual(full.messages, ["Spawned 0/12 rune types - free up inventory space for the rest."]);
+  assert.deepEqual(full.messages, ["Spawned 0/16 rune types - free up inventory space for the rest."]);
 
   // One free slot plus a held rune stack: the stack tops up, one new type lands.
   const partial = makePlayer(PlayerRights.DEVELOPER, [

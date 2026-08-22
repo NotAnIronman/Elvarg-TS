@@ -8,6 +8,7 @@ export class TeleportType {
     public static readonly NORMAL = new TeleportType(3, new Animation(714, Priority.HIGH), null, new Animation(715, Priority.HIGH), new Graphic(308, 0, GraphicHeight.HIGH), null, null);
     public static readonly ANCIENT = new TeleportType(5, new Animation(1979, Priority.HIGH), null, Animation.DEFAULT_RESET_ANIMATION, new Graphic(392, GraphicHeight.LOW, Priority.HIGH), null, null);
     public static readonly LUNAR = new TeleportType(4, new Animation(1816, Priority.HIGH), null, new Animation(715, Priority.HIGH), new Graphic(308, GraphicHeight.LOW, Priority.HIGH), null, null);
+    public static readonly ARCEUUS = new TeleportType(4, new Animation(1816, Priority.HIGH), null, new Animation(715, Priority.HIGH), new Graphic(747, GraphicHeight.HIGH, Priority.HIGH), null, null);
     // Ladders
     public static readonly LADDER_DOWN = new TeleportType(1, new Animation(827, Priority.HIGH), null, Animation.DEFAULT_RESET_ANIMATION, null, null, null);
     public static readonly LADDER_UP = new TeleportType(1, new Animation(828, Priority.HIGH), null, Animation.DEFAULT_RESET_ANIMATION, null, null, null);

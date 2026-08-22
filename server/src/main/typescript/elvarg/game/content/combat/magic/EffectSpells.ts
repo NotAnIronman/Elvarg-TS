@@ -138,7 +138,7 @@ export class EffectSpells extends Spell {
         () => { }
     )
     public static BAKE_PIE = new EffectSpells(
-        () => { return 30017; },
+        () => { return 9107; },
         () => { return 65; },
         () => { return 5121; },
         () => { return [new Item(9075, 1), new Item(554, 5), new Item(555, 4)]; },
@@ -148,7 +148,7 @@ export class EffectSpells extends Spell {
     )
 
     public static VENGEANCE_OTHER = new EffectSpells(
-        () => { return 30298; },
+        () => { return 9135; },
         () => { return 93; },
         () => { return 10000; },
         () => { return [new Item(9075, 3), new Item(557, 10), new Item(560, 2)]; },
@@ -158,7 +158,7 @@ export class EffectSpells extends Spell {
     )
 
     public static VENGEANCE = new EffectSpells(
-        () => { return 30306; },
+        () => { return 9136; },
         () => { return 94; },
         () => { return 14000; },
         () => { return [new Item(9075, 4), new Item(557, 10), new Item(560, 2)]; },

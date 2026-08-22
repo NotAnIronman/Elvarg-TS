@@ -38,7 +38,7 @@ const {
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
-const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 4695, 21880, 28929];
+const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 9075, 21880, 28929];
 const NPC_SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
 ];
@@ -595,6 +595,7 @@ module.exports = {
     registerSpellbookCommand("normal", MagicSpellbook.NORMAL);
     registerSpellbookCommand("lunar", MagicSpellbook.LUNAR);
     registerSpellbookCommand("ancients", MagicSpellbook.ANCIENT);
+    registerSpellbookCommand("arceuus", MagicSpellbook.ARCEUUS);
 
     api.registerCommand("master", ({ player }) => {
       if (!requireRights(player, ownerOrDev)) {

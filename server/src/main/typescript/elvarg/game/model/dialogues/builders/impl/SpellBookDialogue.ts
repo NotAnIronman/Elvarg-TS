@@ -30,11 +30,15 @@ export class SpellBookDialogue extends DynamicDialogueBuilder {
                     player.getPacketSender().sendInterfaceRemoval();
                     MagicSpellbook.changeSpellbook(player, MagicSpellbook.LUNAR);
                     break;
+                case DialogueOption.FOURTH_OPTION:
+                    player.getPacketSender().sendInterfaceRemoval();
+                    MagicSpellbook.changeSpellbook(player, MagicSpellbook.ARCEUUS);
+                    break;
                 default:
                     player.getPacketSender().sendInterfaceRemoval();
                     break;
             }
-        }), "Normal", "Ancient", "Lunar"));
+        }), "Normal", "Ancient", "Lunar", "Arceuus"));
 
     }
 }

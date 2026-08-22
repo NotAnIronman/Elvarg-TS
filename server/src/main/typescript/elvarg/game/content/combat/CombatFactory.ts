@@ -8,6 +8,7 @@ import { HitDamage } from "./hit/HitDamage";
 import { HitMask } from "./hit/HitMask";
 import { PendingHit } from "./hit/PendingHit";
 import { CombatSpells } from "./magic/CombatSpells";
+import { ArceuusSpells } from "./magic/ArceuusSpells";
 import { CombatMethod } from "./method/CombatMethod";
 import { MagicCombatMethod } from "./method/impl/MagicCombatMethod";
 import { MeleeCombatMethod } from "./method/impl/MeleeCombatMethod";
@@ -180,6 +181,10 @@ export class CombatFactory {
             }
         } else if (type == CombatType.MAGIC) {
             damage = Misc.randomInclusive(0, DamageFormulas.getMagicMaxhit(entity));
+        }
+
+        if (entity.isNpc() && victim.isPlayer() && ArceuusSpells.hasWard(victim)) {
+            if (entity.getAsNpc().getCurrentDefinition()?.isDemon?.()) damage = Math.floor(damage * 0.9);
         }
 
         // Do magic effects with the calculated damage..

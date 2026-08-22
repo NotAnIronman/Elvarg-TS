@@ -469,6 +469,7 @@ export class Combat {
     private shouldRetreat(): boolean {
         if (!this.character.isNpc()) return false;
         const npc = this.character.getAsNpc();
+        if (Number(npc.getAttribute("arceuus:darkLureUntil") ?? 0) > Date.now()) return false;
         if (!npc.getCurrentDefinition().doesRetreat()) return false;
         const coordinator = npc.getMovementCoordinator();
         if (coordinator.getCoordinateState() === CoordinateState.RETREATING ||
