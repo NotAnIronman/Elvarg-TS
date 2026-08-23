@@ -159,6 +159,12 @@ export class World {
         });
     }
 
+    public static getNetworkPlayerCount(): number {
+        let count = 0;
+        World.forEachNetworkPlayer(() => count++);
+        return count;
+    }
+
     /**
     * Broadcasts a message to all players in the game.
     *

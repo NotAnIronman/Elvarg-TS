@@ -212,29 +212,9 @@ export function refreshServerList(host: LoginRendererHost) {
                 }
                 return;
             }
-            const protocol = server.secure ? "https" : "http";
-            let httpOk = false;
-            try {
-                const res = await fetch(`${protocol}://${server.address}/status`, {
-                    signal: AbortSignal.timeout(8000),
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    server.playerCount =
-                        typeof data.playerCount === "number" ? data.playerCount : null;
-                    if (typeof data.maxPlayers === "number") server.maxPlayers = data.maxPlayers;
-                    if (typeof data.serverName === "string") server.name = data.serverName;
-                    httpOk = true;
-                }
-            } catch {
-                /* fall through to ws probe */
-            }
-
-            if (!httpOk) {
-                const wsProto = server.secure ? "wss" : "ws";
-                const alive = await probeWebSocket(`${wsProto}://${server.address}`, 5000);
-                server.playerCount = alive ? -1 : null;
-            }
+            const wsProto = server.secure ? "wss" : "ws";
+            const alive = await probeWebSocket(`${wsProto}://${server.address}`, 5000);
+            server.playerCount = alive ? -1 : null;
         });
 
         Promise.all([Promise.all(promises), discoverRelayWorlds()]).then(([, discovered]) => {

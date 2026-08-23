@@ -140,11 +140,7 @@ export class NetworkBuilder {
     http.listen(port);
     WebRtcGameConnector.startFromEnv(
       (channel) => new ClientConnection(channel),
-      () => {
-        let count = 0;
-        World.forEachNetworkPlayer(() => count++);
-        return count;
-      }
+      World.getNetworkPlayerCount
     );
     return server;
   }
