@@ -73,6 +73,10 @@ export class LoginState {
         this.serverName = lastServer.name;
         this.serverAddress = lastServer.address;
         this.serverSecure = lastServer.secure;
+        this.serverTransport = lastServer.transport ?? "websocket";
+        this.serverSignalUrl = lastServer.signalUrl;
+        this.serverWorldId = lastServer.worldId;
+        this.serverIceServers = lastServer.iceServers ?? [];
     }
 
     /** Save title music disabled setting to localStorage */
@@ -245,12 +249,21 @@ export class LoginState {
     /** Whether the current server uses secure WebSocket */
     serverSecure: boolean = getDefaultServerSecure();
 
+    serverTransport: "websocket" | "webrtc" = "websocket";
+    serverSignalUrl?: string;
+    serverWorldId?: string;
+    serverIceServers: RTCIceServer[] = [];
+
     /** Persist the last selected server to localStorage */
     saveLastServer(): void {
         setClientPreference("lastServer", {
             name: this.serverName,
             address: this.serverAddress,
             secure: this.serverSecure,
+            transport: this.serverTransport,
+            signalUrl: this.serverSignalUrl,
+            worldId: this.serverWorldId,
+            iceServers: this.serverIceServers,
         });
     }
 

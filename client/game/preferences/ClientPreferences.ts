@@ -16,6 +16,10 @@ export type LastServerPreference = {
     name: string;
     address: string;
     secure: boolean;
+    transport?: "websocket" | "webrtc";
+    signalUrl?: string;
+    worldId?: string;
+    iceServers?: RTCIceServer[];
 };
 
 export type ClientPreferences = {
@@ -50,7 +54,16 @@ function normalizeLastServer(
     ) {
         return undefined;
     }
-    return { name: value.name, address: value.address, secure: value.secure };
+    const transport = value.transport === "webrtc" ? "webrtc" : "websocket";
+    return {
+        name: value.name,
+        address: value.address,
+        secure: value.secure,
+        transport,
+        signalUrl: typeof value.signalUrl === "string" ? value.signalUrl : undefined,
+        worldId: typeof value.worldId === "string" ? value.worldId : undefined,
+        iceServers: Array.isArray(value.iceServers) ? value.iceServers : [],
+    };
 }
 
 function normalize(raw: Partial<ClientPreferences> | undefined): ClientPreferences {

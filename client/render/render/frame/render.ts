@@ -1544,6 +1544,10 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
             if (!host.uiHidden) {
                 host.overlayManager?.update(args);
                 host.overlayManager?.draw(RenderPhase.PostPresent);
+                if (host.loginOverlay) {
+                    host.loginOverlay.setGameState(host.osrsClient.gameState);
+                    host.loginOverlay.update(args);
+                }
             }
         } catch {}
         profiler.endPhase();

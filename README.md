@@ -46,6 +46,23 @@ the client is normally available at <http://localhost:3000>.
 The first start downloads the OSRS cache from the OpenRS2 Archive. The selected
 cache is recorded in [`server/target.txt`](server/target.txt).
 
+## Publish your world
+
+1. Register or sign in at [RSPS.app](https://rsps.app/public/), then open **Settings → Server tokens**.
+2. Click **Create server token** and copy it immediately; it is only shown once.
+3. Create `.env` in the repository root:
+
+```dotenv
+WEBRTC_WORLD_ID=my-world
+WEBRTC_WORLD_TOKEN=paste-your-token-here
+```
+
+`WEBRTC_WORLD_ID` is both the unique ID and the name players see. It may contain letters, numbers, `.`, `_` or `-`. To show a friendlier name, optionally add `WEBRTC_WORLD_NAME="My World"`.
+
+Run `yarn start`. When the server logs `registered world my-world with signalling relay`, it will appear automatically in every client's world list. The public relay and STUN server are already configured, so most home connections need no port forwarding; restrictive NATs may still require TURN.
+
+Keep the token private. `.env` is ignored by Git, and tokens can be revoked from the same forum settings page.
+
 ## Commands
 
 | Command | Purpose |

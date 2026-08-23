@@ -3,6 +3,7 @@ import { clearLoginConnectRetryTimer } from "./connection/loginHelpers";
 import { initServerConnection } from "./connection/init";
 import { send } from "./connection/send";
 import { state } from "./state";
+import type { GameSocket } from "./connection/GameSocket";
 
 export function setAutoSendHandshake(auto: boolean): void {
     state.autoSendHandshake = auto;
@@ -54,7 +55,7 @@ export function sendLogin(username: string, password: string, revision: number =
         } as any);
     };
 
-    const attachLoginOnOpen = (targetSocket: WebSocket) => {
+    const attachLoginOnOpen = (targetSocket: GameSocket) => {
         const sendLoginOnOpen = () => {
             targetSocket.removeEventListener("open", sendLoginOnOpen);
             if (attemptId !== state.loginConnectAttemptId) return;
@@ -98,6 +99,9 @@ export function sendLogin(username: string, password: string, revision: number =
         console.log("[ws] Socket not open, reconnecting before login...");
         clearLoginConnectRetryTimer();
         connectForLogin(state.lastUrl, false);
+
+        // WebRTC owns its ICE timeout and reports a terminal connect failure to the login UI.
+        if (state.webRtcConfig) return;
 
         state.loginConnectRetryTimer = setTimeout(() => {
             state.loginConnectRetryTimer = null;

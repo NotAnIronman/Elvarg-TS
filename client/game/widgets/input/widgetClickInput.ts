@@ -362,6 +362,20 @@ export function processWidgetClickInput(
                             // Confirm sends the OSRS appearance packet separately.
                             const groupId = (payload.widgetId >>> 16) & 0xffff;
                             const childId = payload.widgetId & 0xffff;
+                            if (groupId === 182 && childId === 3) {
+                                deps.handleWidgetAction({
+                                    widget: w,
+                                    option,
+                                    target,
+                                    source: "primary",
+                                    cursorX: widgetInteraction.clickedWidgetX,
+                                    cursorY: widgetInteraction.clickedWidgetY,
+                                    slot,
+                                    itemId,
+                                    opIndex,
+                                });
+                                break;
+                            }
                             if ((groupId | 0) === 679) {
                                 if (deps.getPlayerDesign().handleWidgetAction(childId | 0)) {
                                     break;

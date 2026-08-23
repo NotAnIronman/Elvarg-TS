@@ -11,7 +11,8 @@ import { PlayerRights } from "../game/model/rights/PlayerRights";
 import { PluginManager } from "../plugins/PluginManager";
 import { Misc } from "../util/Misc";
 import { PlayerPunishment } from "../util/PlayerPunishment";
-import { WebSocketBinaryChannel } from "./BinaryChannel";
+import { BinaryChannel, MAX_GAME_MESSAGE_BYTES, WebSocketBinaryChannel } from "./BinaryChannel";
+import { WebRtcGameConnector } from "./webrtc/WebRtcGameConnector";
 import { PlayerSession } from "./PlayerSession";
 import { CachePipeline } from "../game/cache/CachePipeline";
 import { ContentApi } from "./http/ContentApi";
@@ -42,7 +43,6 @@ import { ChatPacketListener } from "./packet/impl/ChatPacketListener";
 import { DialogueOption } from "../game/model/dialogues/DialogueOption";
 import { PlayerOptionPacketListener } from "./packet/impl/PlayerOptionPacketListener";
 import { MagicOnPlayerPacketListener } from "./packet/impl/MagicOnPlayerPacketListener";
-import { LunarSpells } from "../game/content/combat/magic/LunarSpells";
 import { MagicOnItemPacketListener } from "./packet/impl/MagicOnItemPacketListener";
 import { UseItemPacketListener } from "./packet/impl/UseItemPacketListener";
 import { ItemActionPacketListener } from "./packet/impl/ItemActionPacketListener";
@@ -64,10 +64,8 @@ import { CombatSpecial } from "../game/content/combat/CombatSpecial";
 import { WeaponInterfaces } from "../game/content/combat/WeaponInterfaces";
 import { PrayerHandler } from "../game/content/PrayerHandler";
 import { Autocasting } from "../game/content/combat/magic/Autocasting";
-import { EffectSpells } from "../game/content/combat/magic/EffectSpells";
 import { CombatSpells } from "../game/content/combat/magic/CombatSpells";
 import { TeleportHandler } from "../game/model/teleportation/TeleportHandler";
-import { ArceuusSpells } from "../game/content/combat/magic/ArceuusSpells";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -131,11 +129,19 @@ export class NetworkBuilder {
       response.setHeader("Content-Length", pack.length);
       response.end(pack);
     });
-    const server = new WebSocketServer({ server: http, perMessageDeflate: false, maxPayload: 4096 });
+    const server = new WebSocketServer({
+      server: http,
+      perMessageDeflate: false,
+      maxPayload: MAX_GAME_MESSAGE_BYTES,
+    });
     server.on("connection", (socket) => new ClientConnection(new WebSocketBinaryChannel(socket)));
     server.on("listening", () => console.info(`[network] client websocket listening on ${port}`));
     server.on("error", (error) => console.error("[network] websocket error", error));
     http.listen(port);
+    WebRtcGameConnector.startFromEnv(
+      (channel) => new ClientConnection(channel),
+      World.getNetworkPlayerCount
+    );
     return server;
   }
 }
@@ -148,14 +154,14 @@ class ClientConnection {
   private closed = false;
   private input = Promise.resolve();
 
-  constructor(private readonly channel: WebSocketBinaryChannel) {
+  constructor(private readonly channel: BinaryChannel) {
     channel.onData((frame) => {
       this.input = this.input.then(() => this.handle(frame)).catch((error) => {
         console.warn("[network] client packet rejected", error);
       });
     });
     channel.onError((error) => {
-      console.warn("[network] websocket client error", error.message);
+      console.warn(`[network] ${channel.kind} client error`, error.message);
       this.cleanup("socket_error");
     });
     channel.onClose(() => this.cleanup("socket_close"));
@@ -172,7 +178,6 @@ class ClientConnection {
     }
 
     for (const packet of packets) {
-      if (this.player) LunarSpells.expireSpellbookSwap(this.player);
       if (this.player && WORLD_INTERACTIONS.has(packet.type)) {
         if (this.player.getStatus() === PlayerStatus.TRADING) continue;
         if (packet.type !== "move" || this.player.getMovementQueue().getMobility().canMove()) {
@@ -211,11 +216,6 @@ class ClientConnection {
           continue;
         case "spell_on_player":
           if (this.player) {
-            const spellName = CacheDefinitions.getSpellName(packet.spellWidget, packet.spellItemId);
-            const target = World.getPlayers().get(packet.targetIndex);
-            if (target && LunarSpells.handlePlayerTarget(this.player, target, spellName)) {
-              continue;
-            }
             MagicOnPlayerPacketListener.cast(
               this.player,
               packet.targetIndex,
@@ -224,18 +224,11 @@ class ClientConnection {
           }
           continue;
         case "spell_on_npc":
-          if (this.player) {
-            const spellName = CacheDefinitions.getSpellName(packet.spellWidget, packet.spellItemId);
-            const target = World.getNpcs().get(packet.targetIndex);
-            if (target && LunarSpells.handleNpcTarget(this.player, target, spellName)) {
-              continue;
-            }
-            NPCOptionPacketListener.castSpell(
-              this.player,
-              packet.targetIndex,
-              this.resolveClientCombatSpellId(packet.spellWidget, packet.spellChild, packet.spellItemId)
-            );
-          }
+          if (this.player) NPCOptionPacketListener.castSpell(
+            this.player,
+            packet.targetIndex,
+            this.resolveClientCombatSpellId(packet.spellWidget, packet.spellChild, packet.spellItemId)
+          );
           continue;
         case "spell_on_object":
           if (this.player) UseItemPacketListener.spellOnObject(
@@ -403,18 +396,6 @@ class ClientConnection {
               this.player, actionPacket.groupId, actionPacket.childId, actionPacket.slot
             )) {
               // Cache-native combat autocast controls reuse the existing spell state.
-            } else if (LunarSpells.handleSelf(
-              this.player,
-              this.resolveSpellName(actionPacket.widgetId, actionPacket.groupId, actionPacket.childId, actionPacket.itemId),
-            )) {
-              // Lunar self-casts and teleports are identified by their cache spell name.
-            } else if (EffectSpells.handleSpell(this.player, actionPacket.itemId ?? -1)) {
-              // Utility and self-cast spells are represented by their cache item id.
-            } else if (ArceuusSpells.handleSpell(
-              this.player,
-              CacheDefinitions.getSpellName(actionPacket.widgetId, actionPacket.itemId ?? -1),
-            )) {
-              // Arceuus self-cast spells are identified by their cache spell name.
             } else if (actionPacket.itemId != null && actionPacket.slot != null &&
                 this.player.getInventory().getItems()[actionPacket.slot]?.getId() === actionPacket.itemId) {
               this.inventoryAction({
@@ -466,12 +447,7 @@ class ClientConnection {
           if (this.player && packet.action === "close") this.player.getPacketSender().closeInterface(packet.groupId);
           continue;
         case "widget_target":
-          if (this.player && !LunarSpells.handleItemTarget(
-            this.player,
-            packet.targetItemId,
-            packet.targetSlot,
-            CacheDefinitions.getSpellName(packet.sourceWidgetId, packet.sourceItemId),
-          ) && !MAGIC_ITEMS.castOnItem(
+          if (this.player && !MAGIC_ITEMS.castOnItem(
             this.player,
             this.resolveClientCombatSpellId(
               packet.sourceWidgetId,
@@ -767,13 +743,6 @@ class ClientConnection {
       // Invalid cache-backed selections are rejected by the combat listener.
     }
     return -1;
-  }
-
-  private resolveSpellName(widgetId: number, groupId: number, childId: number, itemId?: number): string | undefined {
-    const packed = (groupId << 16) | (childId & 0xffff);
-    return CacheDefinitions.getSpellName(widgetId, itemId ?? -1) ??
-      CacheDefinitions.getSpellName(packed, itemId ?? -1) ??
-      CacheDefinitions.getSpellName(childId, itemId ?? -1);
   }
 
   private groundItemAction(packet: Extract<ReturnType<typeof decodeClientPackets>[number], { type: "ground_item_action" }>): void {

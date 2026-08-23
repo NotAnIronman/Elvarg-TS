@@ -3536,7 +3536,50 @@ export class OsrsClient {
     }
 
     handleWidgetAction(event: Parameters<WidgetActionRouter["handleWidgetAction"]>[0]): void {
+        if ((event.widget?.uid | 0) === ((182 << 16) | 3)) {
+            this.processLoginAction({ type: "open_server_list" });
+            return;
+        }
         this.widgetActionRouter.handleWidgetAction(event);
+    }
+
+    handleInGameServerListInput(): void {
+        const input = this.inputManager;
+        if (input.clickMode3 === 0 || input.saveClickX < 0 || input.saveClickY < 0) return;
+
+        const action = this.loginRenderer.handleMouseClick(
+            this.loginState,
+            input.saveClickX,
+            input.saveClickY,
+            input.clickMode3,
+            GameState.LOGGED_IN,
+        );
+        input.clickMode3 = 0;
+        input.saveClickX = -1;
+        input.saveClickY = -1;
+        if (!action) return;
+
+        if (action.type === "select_server") {
+            const server = this.loginRenderer.serverList[action.index];
+            const transport = server?.transport ?? "websocket";
+            const isCurrent =
+                transport === this.loginState.serverTransport &&
+                (transport === "webrtc"
+                    ? server?.worldId === this.loginState.serverWorldId &&
+                      server?.signalUrl === this.loginState.serverSignalUrl
+                    : server?.address === this.loginState.serverAddress &&
+                      server?.secure === this.loginState.serverSecure);
+            if (isCurrent) {
+                this.processLoginAction({ type: "close_server_list" });
+                return;
+            }
+
+            this.loginState.serverListOpen = false;
+            this.performLogout(() => this.processLoginAction(action));
+            return;
+        }
+
+        this.processLoginAction(action);
     }
 
     private runClientScriptWithInts(scriptId: number, args: number[]): void {
@@ -4910,6 +4953,15 @@ export class OsrsClient {
             // Apply persisted server URL so sendLogin connects to the right place
             setServerUrl(
                 `${this.loginState.serverSecure ? "wss" : "ws"}://${this.loginState.serverAddress}`,
+                this.loginState.serverTransport === "webrtc" &&
+                    this.loginState.serverSignalUrl &&
+                    this.loginState.serverWorldId
+                    ? {
+                          signalUrl: this.loginState.serverSignalUrl,
+                          worldId: this.loginState.serverWorldId,
+                          iceServers: this.loginState.serverIceServers,
+                      }
+                    : undefined,
             );
         }
 
@@ -5366,9 +5418,22 @@ export class OsrsClient {
                     this.loginState.serverAddress = server.address;
                     this.loginState.serverName = server.name;
                     this.loginState.serverSecure = server.secure;
+                    this.loginState.serverTransport = server.transport ?? "websocket";
+                    this.loginState.serverSignalUrl = server.signalUrl;
+                    this.loginState.serverWorldId = server.worldId;
+                    this.loginState.serverIceServers = server.iceServers ?? [];
                     this.loginState.serverListOpen = false;
                     this.loginState.hoveredServerIndex = -1;
-                    setServerUrl(`${server.secure ? "wss" : "ws"}://${server.address}`);
+                    setServerUrl(
+                        `${server.secure ? "wss" : "ws"}://${server.address}`,
+                        server.transport === "webrtc" && server.signalUrl && server.worldId
+                            ? {
+                                  signalUrl: server.signalUrl,
+                                  worldId: server.worldId,
+                                  iceServers: server.iceServers ?? [],
+                              }
+                            : undefined,
+                    );
                     this.loginState.saveLastServer();
                 }
                 return undefined;
@@ -5449,6 +5514,10 @@ export class OsrsClient {
             this.loginState.serverAddress = serverAddress;
             this.loginState.serverName = getDefaultServerName();
             this.loginState.serverSecure = getDefaultServerSecure();
+            this.loginState.serverTransport = "websocket";
+            this.loginState.serverSignalUrl = undefined;
+            this.loginState.serverWorldId = undefined;
+            this.loginState.serverIceServers = [];
 
             // Set credentials and trigger login
             this.loginState.username = username;
@@ -5500,7 +5569,7 @@ export class OsrsClient {
      * Perform logout - called by CS2 LOGOUT opcode.
      * Sends logout request to server and waits for consent before completing.
      */
-    performLogout(): void {
+    performLogout(afterLogout?: () => void): void {
         console.log("[OsrsClient] Requesting logout from server...");
 
         // Subscribe to logout response (one-shot)
@@ -5525,6 +5594,7 @@ export class OsrsClient {
 
                 // Transition to login screen
                 this.updateGameState(GameState.LOGIN_SCREEN);
+                afterLogout?.();
 
                 console.log("[OsrsClient] Logout complete - returned to login screen");
             } else {

@@ -1,7 +1,5 @@
 /**
  * Build-time client config from CRA `REACT_APP_*` env vars.
- * Domain-specific values must never be hardcoded — set them in Vercel / `.env*`.
- *
  * IMPORTANT: CRA only inlines env vars referenced as static property access
  * (`process.env.REACT_APP_FOO`). Dynamic `process.env[key]` is left undefined.
  */
@@ -17,7 +15,19 @@ export type ConfiguredServer = {
     address: string;
     secure: boolean;
     maxPlayers: number;
+    transport?: "websocket" | "webrtc";
+    signalUrl?: string;
+    worldId?: string;
+    iceServers?: RTCIceServer[];
 };
+
+export type WebRtcRelayConfig = {
+    signalUrl: string;
+    iceServers: RTCIceServer[];
+};
+
+const DEFAULT_WEBRTC_SIGNAL_URL = "wss://worlds.rsps.app";
+const DEFAULT_WEBRTC_ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.rsps.app:3478" }];
 
 function readBoolean(value: unknown, fallback: boolean): boolean {
     if (typeof value === "boolean") return value;
@@ -31,6 +41,12 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
+}
+
+function isIceServer(value: unknown): value is RTCIceServer {
+    if (!isRecord(value)) return false;
+    return typeof value.urls === "string"
+        || (Array.isArray(value.urls) && value.urls.every((url) => typeof url === "string"));
 }
 
 /** Base URL for OSRS cache files. Trailing slash always present. */
@@ -72,17 +88,47 @@ export function getConfiguredServers(): ConfiguredServer[] | undefined {
         if (!Array.isArray(parsed)) return undefined;
         return parsed.map((entry): ConfiguredServer => {
             const server = isRecord(entry) ? entry : {};
+            const transport = server.transport === "webrtc" ? "webrtc" : "websocket";
+            const signalUrl = typeof server.signalUrl === "string" ? server.signalUrl : undefined;
             return {
                 name: typeof server.name === "string" ? server.name : "Server",
                 address:
-                    typeof server.address === "string" ? server.address : "localhost:43594",
+                    typeof server.address === "string"
+                        ? server.address
+                        : transport === "webrtc" && signalUrl
+                          ? new URL(signalUrl).host
+                          : "localhost:43594",
                 secure: readBoolean(server.secure, false),
                 maxPlayers: typeof server.maxPlayers === "number" ? server.maxPlayers : 2047,
+                transport,
+                signalUrl,
+                worldId: typeof server.worldId === "string" ? server.worldId : undefined,
+                iceServers: Array.isArray(server.iceServers)
+                    ? server.iceServers.filter(isIceServer)
+                    : [],
             };
         });
     } catch {
         console.warn("[clientEnv] Failed to parse REACT_APP_SERVERS_JSON");
         return undefined;
+    }
+}
+
+/** Public relay directory used to discover WebRTC worlds. */
+export function getWebRtcRelayConfig(): WebRtcRelayConfig | undefined {
+    const signalUrl = read(process.env.REACT_APP_WEBRTC_SIGNAL_URL) ?? DEFAULT_WEBRTC_SIGNAL_URL;
+
+    const rawIceServers = read(process.env.REACT_APP_WEBRTC_ICE_SERVERS);
+    if (!rawIceServers) return { signalUrl, iceServers: DEFAULT_WEBRTC_ICE_SERVERS };
+    try {
+        const parsed = JSON.parse(rawIceServers);
+        return {
+            signalUrl,
+            iceServers: Array.isArray(parsed) ? parsed.filter(isIceServer) : [],
+        };
+    } catch {
+        console.warn("[clientEnv] Failed to parse REACT_APP_WEBRTC_ICE_SERVERS");
+        return { signalUrl, iceServers: DEFAULT_WEBRTC_ICE_SERVERS };
     }
 }
 

@@ -5,6 +5,7 @@
  */
 import { CLIENT_PACKET_LENGTHS, ClientPacketId } from "./ClientPacket";
 import { PacketBuffer } from "./PacketBuffer";
+import type { GameSocket } from "../serverConnection/connection/GameSocket";
 
 /**
  * A node in the packet queue containing a packet buffer and its type
@@ -178,8 +179,8 @@ export class PacketWriter {
     private readonly buffer: Uint8Array = new Uint8Array(5000);
     /** Current write offset in the buffer */
     private bufferOffset: number = 0;
-    /** WebSocket connection */
-    private socket: WebSocket | null = null;
+    /** Binary game connection (WebSocket or WebRTC DataChannel adapter). */
+    private socket: GameSocket | null = null;
     /** ISAAC cipher for opcode encryption */
     private isaacCipher: IsaacCipher | null = null;
     /** Pending write count (for tracking) */
@@ -190,7 +191,7 @@ export class PacketWriter {
     /**
      * Set the WebSocket connection
      */
-    setSocket(socket: WebSocket | null): void {
+    setSocket(socket: GameSocket | null): void {
         this.socket = socket;
         if (socket) {
             socket.binaryType = "arraybuffer";
@@ -597,6 +598,6 @@ export function flushPackets(): void {
 /**
  * Set the WebSocket for binary packet sending
  */
-export function setPacketSocket(socket: WebSocket | null): void {
+export function setPacketSocket(socket: GameSocket | null): void {
     getPacketWriter().setSocket(socket);
 }
