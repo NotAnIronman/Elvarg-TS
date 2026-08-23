@@ -138,7 +138,10 @@ export class NetworkBuilder {
     server.on("listening", () => console.info(`[network] client websocket listening on ${port}`));
     server.on("error", (error) => console.error("[network] websocket error", error));
     http.listen(port);
-    WebRtcGameConnector.startFromEnv((channel) => new ClientConnection(channel));
+    WebRtcGameConnector.startFromEnv(
+      (channel) => new ClientConnection(channel),
+      () => World.getPlayers().sizeReturn()
+    );
     return server;
   }
 }

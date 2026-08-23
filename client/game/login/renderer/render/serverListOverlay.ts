@@ -1,5 +1,10 @@
 import type { LoginState } from "../../LoginState";
 import type { LoginRendererHost, RenderContext } from "../host";
+import {
+    SERVER_LIST_ADDRESS_COLUMN_START,
+    SERVER_LIST_OWNER_COLUMN_START,
+    SERVER_LIST_PANEL_WIDTH,
+} from "../constants";
 import { drawGradientRect, drawButton, drawCenteredText, drawText, ellipsis } from "./drawUtils";
 
 export function drawServerListOverlay(host: LoginRendererHost, ctx: RenderContext, state: LoginState) {
@@ -9,7 +14,7 @@ export function drawServerListOverlay(host: LoginRendererHost, ctx: RenderContex
         const servers = host.serverList;
         const rowH = 24;
         const headerH = 30;
-        const panelW = 350;
+        const panelW = SERVER_LIST_PANEL_WIDTH;
         const showRows = host.probed;
         const contentH = showRows ? servers.length * rowH : 30;
         const panelH = headerH + contentH;
@@ -51,12 +56,14 @@ export function drawServerListOverlay(host: LoginRendererHost, ctx: RenderContex
 
         // Column headers
         const col1X = panelX + 10;
-        const col2X = panelX + 140;
-        const col3X = panelX + 265;
+        const col2X = panelX + SERVER_LIST_OWNER_COLUMN_START;
+        const col3X = panelX + SERVER_LIST_ADDRESS_COLUMN_START;
+        const col4X = panelX + 380;
         const headerTextY = panelY + 20;
         drawText(host, ctx, host.fontBold12, "Server Name", col1X, headerTextY, 0xffcc00);
-        drawText(host, ctx, host.fontBold12, "Address", col2X, headerTextY, 0xffcc00);
-        drawText(host, ctx, host.fontBold12, "Players", col3X, headerTextY, 0xffcc00);
+        drawText(host, ctx, host.fontBold12, "Owner", col2X, headerTextY, 0xffcc00);
+        drawText(host, ctx, host.fontBold12, "Address", col3X, headerTextY, 0xffcc00);
+        drawText(host, ctx, host.fontBold12, "Players", col4X, headerTextY, 0xffcc00);
 
         // Separator line
         ctx.fillStyle = "#6b5a3e";
@@ -79,7 +86,7 @@ export function drawServerListOverlay(host: LoginRendererHost, ctx: RenderContex
                     ctx,
                     host.fontPlain12,
                     "Refreshing...",
-                    col3X - 30,
+                    col4X - 30,
                     panelY + panelH - 4,
                     0xffcc00,
                 );
@@ -105,7 +112,8 @@ export function drawServerListOverlay(host: LoginRendererHost, ctx: RenderContex
 
                 const textY = ry + 16;
                 const nameMaxW = col2X - col1X - 4;
-                const addrMaxW = col3X - col2X - 4;
+                const ownerMaxW = col3X - col2X - 4;
+                const addrMaxW = col4X - col3X - 4;
                 drawText(host, 
                     ctx,
                     host.fontPlain12,
@@ -117,18 +125,26 @@ export function drawServerListOverlay(host: LoginRendererHost, ctx: RenderContex
                 drawText(host, 
                     ctx,
                     host.fontPlain12,
-                    ellipsis(host, server.address, addrMaxW),
+                    ellipsis(host, server.ownerUsername ?? "—", ownerMaxW),
                     col2X,
+                    textY,
+                    server.ownerUsername ? 0xffcc00 : 0x777777,
+                );
+                drawText(host,
+                    ctx,
+                    host.fontPlain12,
+                    ellipsis(host, server.address, addrMaxW),
+                    col3X,
                     textY,
                     0xaaaaaa,
                 );
                 if (server.playerCount === null) {
-                    drawText(host, ctx, host.fontPlain12, "Offline", col3X, textY, 0xff0000);
+                    drawText(host, ctx, host.fontPlain12, "Offline", col4X, textY, 0xff0000);
                 } else if (server.playerCount === -1) {
-                    drawText(host, ctx, host.fontPlain12, "Online", col3X, textY, 0x00ff00);
+                    drawText(host, ctx, host.fontPlain12, "Online", col4X, textY, 0x00ff00);
                 } else {
                     const playersStr = `${server.playerCount}/${server.maxPlayers}`;
-                    drawText(host, ctx, host.fontPlain12, playersStr, col3X, textY, 0x00ff00);
+                    drawText(host, ctx, host.fontPlain12, playersStr, col4X, textY, 0x00ff00);
                 }
             }
         }
@@ -139,7 +155,7 @@ export function drawServerListOverlay(host: LoginRendererHost, ctx: RenderContex
         drawCenteredText(host, 
             ctx,
             host.fontPlain12!,
-            "Get your server added through the Discord",
+            "Register on RSPS.app to publish your own world",
             panelX + panelW / 2,
             panelY - 8,
             0xaaaaaa,

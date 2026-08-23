@@ -2,6 +2,7 @@ import type { LoginState } from "../LoginState";
 import type { LoginRendererHost } from "./host";
 import { toLayoutPoint } from "./layout/config";
 import { getGridLayout, getSortedWorlds, findHoveredWorld } from "./world/worldData";
+import { SERVER_LIST_PANEL_WIDTH } from "./constants";
 
 export function computeHoveredWorldIndex(host: LoginRendererHost, state: LoginState, _width: number, _height: number) {
 
@@ -26,7 +27,7 @@ export function computeHoveredServerIndex(host: LoginRendererHost, state: LoginS
         const servers = host.serverList;
         const rowH = 24;
         const headerH = 30;
-        const panelW = 350;
+        const panelW = SERVER_LIST_PANEL_WIDTH;
         const panelH = headerH + servers.length * rowH;
         const panelX = Math.floor((host.canvasWidth - panelW) / 2);
         const panelY = Math.floor((host.canvasHeight - panelH) / 2);

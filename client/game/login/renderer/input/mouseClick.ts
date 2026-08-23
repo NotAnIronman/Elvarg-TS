@@ -9,6 +9,12 @@ import { isTitleMuteHit } from "../controls";
 import { getServerListButtonPosition } from "../layout/geometry";
 import { getMobileWorldIndexAtPosition } from "../world/worldSelectMobile";
 import {
+    SERVER_LIST_ADDRESS_COLUMN_START,
+    SERVER_LIST_OWNER_COLUMN_START,
+    SERVER_LIST_PANEL_WIDTH,
+} from "../constants";
+import { forumProfileUrl } from "../serverList";
+import {
     handleWelcomeClick,
     handleWarningClick,
     handleLoginFormClick,
@@ -25,7 +31,7 @@ import {
 
 export function handleServerListClick(host: LoginRendererHost, state: LoginState, x: number, y: number): LoginAction | undefined {
 
-        const panelW = 350;
+        const panelW = SERVER_LIST_PANEL_WIDTH;
         const contentH = host.probed ? host.serverList.length * 24 : 30;
         const panelH = 30 + contentH;
         const panelX = Math.floor((host.canvasWidth - panelW) / 2);
@@ -49,6 +55,12 @@ export function handleServerListClick(host: LoginRendererHost, state: LoginState
             for (let i = 0; i < host.serverList.length; i++) {
                 const ry = rowStartY + i * rowH;
                 if (x >= panelX + 4 && x <= panelX + panelW - 4 && y >= ry && y < ry + rowH) {
+                    const owner = host.serverList[i].ownerUsername;
+                    if (owner && x >= panelX + SERVER_LIST_OWNER_COLUMN_START
+                        && x < panelX + SERVER_LIST_ADDRESS_COLUMN_START) {
+                        window.open(forumProfileUrl(owner), "_blank", "noopener,noreferrer");
+                        return undefined;
+                    }
                     return { type: "select_server", index: i } as const;
                 }
             }

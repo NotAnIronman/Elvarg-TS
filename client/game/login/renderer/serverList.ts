@@ -46,8 +46,17 @@ function serverEntry(server: any): ServerListEntry {
         transport,
         signalUrl,
         worldId: typeof server?.worldId === "string" ? server.worldId : undefined,
+        ownerUsername: typeof server?.ownerUsername === "string" ? server.ownerUsername : undefined,
         iceServers: Array.isArray(server?.iceServers) ? server.iceServers : [],
     };
+}
+
+function validPublicText(value: unknown, maxLength: number): value is string {
+    if (typeof value !== "string" || value.length < 1 || value.length > maxLength) return false;
+    return !Array.from(value).some((character) => {
+        const code = character.charCodeAt(0);
+        return code < 32 || code === 127;
+    });
 }
 
 export function relayWorldEntries(
@@ -61,17 +70,31 @@ export function relayWorldEntries(
     return worlds
         .filter((world: any) => typeof world?.worldId === "string" && /^[A-Za-z0-9._-]{1,64}$/.test(world.worldId))
         .map((world: any) => ({
-            name: world.worldId,
+            name:
+                validPublicText(world.name, 64) && world.name === world.name.trim()
+                    ? world.name
+                    : world.worldId,
             address: relayUrl.host,
             secure: relayUrl.protocol === "wss:",
-            playerCount: -1,
+            playerCount:
+                Number.isInteger(world.playerCount) && world.playerCount >= 0 && world.playerCount <= 2047
+                    ? world.playerCount
+                    : -1,
             maxPlayers: 2047,
             transport: "webrtc" as const,
             signalUrl,
             worldId: world.worldId,
+            ownerUsername:
+                validPublicText(world.ownerUsername, 100)
+                    ? world.ownerUsername
+                    : undefined,
             iceServers,
             relayDiscovered: true,
         }));
+}
+
+export function forumProfileUrl(ownerUsername: string): string {
+    return `https://rsps.app/public/u/${encodeURIComponent(ownerUsername)}`;
 }
 
 export function replaceRelayWorlds(
@@ -182,11 +205,8 @@ export function refreshServerList(host: LoginRendererHost) {
                     statusUrl.pathname = "/worlds";
                     const response = await fetch(statusUrl, { signal: AbortSignal.timeout(8000) });
                     const data = response.ok ? await response.json() : undefined;
-                    server.playerCount = data?.worlds?.some(
-                        (world: any) => world?.worldId === server.worldId,
-                    )
-                        ? -1
-                        : null;
+                    const world = data?.worlds?.find((entry: any) => entry?.worldId === server.worldId);
+                    server.playerCount = Number.isInteger(world?.playerCount) ? world.playerCount : world ? -1 : null;
                 } catch {
                     server.playerCount = null;
                 }

@@ -40,9 +40,13 @@ export class WebRtcGameConnector {
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private readonly peers = new Map<string, PeerState>();
 
-  public static startFromEnv(accept: (channel: BinaryChannel) => void): WebRtcGameConnector | undefined {
+  public static startFromEnv(
+    accept: (channel: BinaryChannel) => void,
+    playerCount: () => number = () => 0
+  ): WebRtcGameConnector | undefined {
     const signalUrl = process.env.WEBRTC_SIGNAL_URL?.trim();
     const worldId = process.env.WEBRTC_WORLD_ID?.trim();
+    const worldName = process.env.WEBRTC_WORLD_NAME?.trim() || worldId;
     const token = process.env.WEBRTC_WORLD_TOKEN?.trim();
     if (!signalUrl && !worldId && !token) return undefined;
     if (!signalUrl || !worldId || !token) {
@@ -53,9 +57,11 @@ export class WebRtcGameConnector {
       const connector = new WebRtcGameConnector(
         signallingEndpoint(signalUrl),
         worldId,
+        worldName,
         token,
         parseIceServers(process.env.WEBRTC_ICE_SERVERS),
-        accept
+        accept,
+        playerCount
       );
       connector.connect();
       return connector;
@@ -68,9 +74,11 @@ export class WebRtcGameConnector {
   constructor(
     private readonly signalUrl: string,
     private readonly worldId: string,
+    private readonly worldName: string,
     private readonly token: string,
     private readonly iceServers: RTCIceServer[],
-    private readonly accept: (channel: BinaryChannel) => void
+    private readonly accept: (channel: BinaryChannel) => void,
+    private readonly playerCount: () => number
   ) {}
 
   public connect(): void {
@@ -78,7 +86,13 @@ export class WebRtcGameConnector {
     const socket = new WebSocket(this.signalUrl, { maxPayload: 64 * 1024 });
     this.socket = socket;
     socket.on("open", () => {
-      this.send({ type: "register", worldId: this.worldId, token: this.token });
+      this.send({
+        type: "register",
+        worldId: this.worldId,
+        name: this.worldName,
+        playerCount: this.playerCount(),
+        token: this.token,
+      });
     });
     socket.on("message", (raw, isBinary) => {
       if (socket !== this.socket || isBinary) return;
@@ -104,6 +118,15 @@ export class WebRtcGameConnector {
     if (!message || typeof message.type !== "string") return;
     if (message.type === "registered") {
       console.info(`[webrtc] registered world ${this.worldId} with signalling relay`);
+      return;
+    }
+    if (message.type === "status-request") {
+      this.send({ type: "world-status", playerCount: this.playerCount() });
+      return;
+    }
+    if (message.type === "error" && typeof message.sessionId !== "string"
+      && typeof message.message === "string") {
+      console.warn(`[webrtc] signalling relay rejected registration: ${message.message}`);
       return;
     }
     const sessionId = typeof message.sessionId === "string" ? message.sessionId : "";
@@ -140,7 +163,7 @@ export class WebRtcGameConnector {
       peer,
       pendingCandidates: [],
       remoteDescriptionSet: false,
-      timeout: setTimeout(() => this.closePeer(sessionId), 15_000),
+      timeout: setTimeout(() => this.closePeer(sessionId), 30_000),
     };
     state.timeout.unref?.();
     this.peers.set(sessionId, state);

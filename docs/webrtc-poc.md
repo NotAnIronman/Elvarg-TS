@@ -34,6 +34,7 @@ are set:
 ```dotenv
 WEBRTC_SIGNAL_URL=wss://relay.example.com
 WEBRTC_WORLD_ID=toby
+WEBRTC_WORLD_NAME=TobyScape
 WEBRTC_WORLD_TOKEN=dev-token
 WEBRTC_ICE_SERVERS=[{"urls":"stun:relay.example.com:3478"}]
 ```

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { getWebRtcRelayConfig } from "../config/clientEnv";
-import { relayWorldEntries, replaceRelayWorlds } from "../game/login/renderer/serverList";
+import { forumProfileUrl, relayWorldEntries, replaceRelayWorlds } from "../game/login/renderer/serverList";
 
 (globalThis as any).window = { location: { hostname: "localhost" } };
 assert.deepEqual(getWebRtcRelayConfig(), {
@@ -11,11 +11,18 @@ assert.deepEqual(getWebRtcRelayConfig(), {
 delete (globalThis as any).window;
 
 const discovered = relayWorldEntries("ws://127.0.0.1:8787", [], {
-    worlds: [{ worldId: "toby" }, { worldId: "alice" }, { worldId: "invalid world" }],
+    worlds: [
+        { worldId: "toby", name: "TobyScape", ownerUsername: "toby", playerCount: 12 },
+        { worldId: "alice" },
+        { worldId: "invalid world", name: "Ignored" },
+    ],
 });
 assert.deepEqual(discovered.map((world) => world.worldId), ["toby", "alice"]);
 assert.equal(discovered[0].transport, "webrtc");
-assert.equal(discovered[0].playerCount, -1);
+assert.equal(discovered[0].playerCount, 12);
+assert.equal(discovered[0].name, "TobyScape");
+assert.equal(discovered[0].ownerUsername, "toby");
+assert.equal(forumProfileUrl("toby"), "https://rsps.app/public/u/toby");
 
 const configured = {
     ...discovered[0],

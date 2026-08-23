@@ -31,6 +31,9 @@ export const FALLBACK_SERVERS: ServerListEntry[] = [
 ];
 
 export const SERVER_LIST_URL = getServerListUrl();
+export const SERVER_LIST_PANEL_WIDTH = 460;
+export const SERVER_LIST_OWNER_COLUMN_START = 150;
+export const SERVER_LIST_ADDRESS_COLUMN_START = 270;
 
 export const LOGIN_LAYOUT = {
     LOGIN_BOX_X: 202,

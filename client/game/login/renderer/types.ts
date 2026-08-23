@@ -84,6 +84,7 @@ export interface ServerListEntry {
     transport?: "websocket" | "webrtc";
     signalUrl?: string;
     worldId?: string;
+    ownerUsername?: string;
     iceServers?: RTCIceServer[];
     relayDiscovered?: boolean;
 }
