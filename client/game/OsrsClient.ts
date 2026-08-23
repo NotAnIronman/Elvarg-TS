@@ -352,6 +352,7 @@ const DEFAULT_LOD_DISTANCE = deriveLodDistanceFromRenderDistance(DEFAULT_RENDER_
 const VARBIT_ACCOUNT_TYPE = 1777;
 const VARBIT_POPOUT_OPEN = 13090;
 const VARBIT_POPOUT_PANEL_DESKTOP_DISABLED = 13982;
+const VARC_CHATBOX_SELECTED_TAB = 41;
 const ACCOUNT_TYPE_MAIN = 0;
 const SCRIPT_HIGHLIGHT_SCREEN_COMPONENT = 2463;
 const SCRIPT_HIGHLIGHT_TEXTBOX_DEFAULT = 2465;
@@ -5473,6 +5474,7 @@ export class OsrsClient {
      */
     onLoginSuccess(): void {
         this.loginState.savePersistedLoginState();
+        this.varManager.setVarcInt(VARC_CHATBOX_SELECTED_TAB, 0);
 
         // Restore uncapped desktop pacing if CS2 previously applied a mobile FPS cap.
         this.applyDisplayDefaults();
