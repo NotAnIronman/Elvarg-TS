@@ -2186,7 +2186,7 @@ export class PlayerRenderer {
                     baseRec.baseCenterZ,
                     group.seqId,
                     group.frameIdx,
-                    this.isControlledPid(inst.pid) ? `local:${inst.pid | 0}|${batchKey}` : batchKey,
+                    this.isControlledPid(inst.pid) ? undefined : batchKey,
                     inst.pid,
                     inst.mode,
                     group.overlaySeqId,
@@ -2506,9 +2506,7 @@ export class PlayerRenderer {
                         baseRec.baseCenterZ,
                         group.seqId,
                         group.frameIdx,
-                        this.isControlledPid(inst.pid)
-                            ? `local:${inst.pid | 0}|${batchKey}`
-                            : batchKey,
+                        this.isControlledPid(inst.pid) ? undefined : batchKey,
                         inst.pid,
                         inst.mode,
                         group.overlaySeqId,
