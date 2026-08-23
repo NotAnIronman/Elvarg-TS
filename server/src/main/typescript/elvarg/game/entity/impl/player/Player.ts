@@ -899,13 +899,11 @@ export class Player extends Mobile {
     }
 
     public getRunEnergy(): number {
-        // TODO: Restore normal run-energy depletion/recovery once unlimited run is no longer needed.
-        return 100;
+        return this.runEnergy;
     }
 
     public setRunEnergy(runEnergy: number) {
-        // TODO: Restore normal run-energy depletion/recovery once unlimited run is no longer needed.
-        this.runEnergy = 100;
+        this.runEnergy = Math.max(0, Math.min(100, Math.floor(runEnergy)));
     }
 
     public isDrainingPrayer(): boolean {

@@ -760,6 +760,16 @@ function handlePotionDrink(player, itemId, slot) {
   inventory.setItem(slot, new Item(entry.replacementId)).refreshItems();
   entry.potion.effect(player);
 
+  const share = player.getAttribute("lunar:potion-share");
+  if (share && Date.now() < share.expiresAt) {
+    const restorative = /restore|prayer|energy|stamina|antipoison|antidote|antifire|guthix rest/i.test(entry.potion.name);
+    if ((share.type === "restore") === restorative) {
+      entry.potion.effect(share.target);
+      share.target.getPacketSender().sendMessage(`${player.getUsername()} shares their ${entry.potion.name}.`);
+      player.setAttribute("lunar:potion-share", null);
+    }
+  }
+
   if (entry.replacementId === entry.potion.emptyItemId) {
     player.getPacketSender().sendMessage("You have finished your potion.");
   }

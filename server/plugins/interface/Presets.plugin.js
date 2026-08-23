@@ -250,6 +250,9 @@ function getSpellbookDisplayName(spellbook) {
   if (spellbook === MagicSpellbook.LUNAR) {
     return "Lunar";
   }
+  if (spellbook === MagicSpellbook.ARCEUUS) {
+    return "Arceuus";
+  }
   if (spellbook === MagicSpellbook.NORMAL) {
     return "Normal";
   }

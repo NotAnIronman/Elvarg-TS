@@ -59,6 +59,38 @@ import {
 } from "../protocol/WorldMapProtocol";
 import { CacheDefinitions } from "../../game/cache/CacheDefinitions";
 const CHATBOX_MODAL_TARGET_UID = (162 << 16) | 567;
+// Quest completion states consulted by spellbook CS2 scripts. Keep these client
+// flags separate from server-side spell casting so quests can be enforced later.
+// These are the state variables used by this cache's spell definitions. Values
+// are deliberately at their completed state: the server does not enforce quest
+// requirements yet, but the client must still render the spell as available.
+const SPELL_UNLOCK_VARPS: ReadonlyArray<readonly [number, number]> = [
+  [68, 0x7fffffff],   // Plague City (West Ardougne Teleport)
+  [139, 180],
+  [161, 0x7fffffff],  // Underground Pass (Iban Blast)
+  [165, 0x7fffffff],  // Plague City (Ardougne Teleport)
+  [212, 0x7fffffff],  // Watchtower
+  [267, 0x7fffffff],  // Mage Arena (god spells and Charge)
+  [335, 0x7fffffff],  // Eadgar's Ruse (Trollheim Teleport)
+  [440, 15],
+  [823, 190],         // Lunar Diplomacy's direct spellbook state
+  [980, 0x7fffffff],  // The Great Brain Robbery (Harmony Island Teleport)
+  [1003, 0x7fffffff], // Mage Arena spellbook refresh dependency
+];
+const SPELL_UNLOCK_VARBITS: ReadonlyArray<readonly [number, number]> = [
+  [358, 0x7fffffff],   // Desert Treasure (Ancient spellbook)
+  [2448, 0x7fffffff],  // Lunar Diplomacy (Lunar spells)
+  [3618, 0x7fffffff],  // Dream Mentor
+  [4500, 0x7fffffff],  // Karamja diary (Tan Leather / Recharge Dragonstone)
+  [4896, 1000],
+  [6067, 6],
+  [5619, 0x7fffffff],  // Client of Kourend
+  [9133, 1],
+  [9631, 1],
+  [9649, 0x7fffffff],  // Varlamore spell teleport
+  [12296, 0x7fffffff], // Arceuus spell requirements
+  [18314, 0x7fffffff], // Sailing spell teleport
+];
 // The native OSRS "skillmulti" production list (clientscript 2046, group 270) mounted into
 // the chatbox modal slot - same interface smelting/smithing use. Exported so NetworkBuilder
 // can recognize clicks against it without duplicating these numbers.
@@ -296,7 +328,15 @@ export class PacketSender {
       return this;
     }
     if (tabId === 6) {
-      const spellbook = interfaceId === 12855 ? 1 : interfaceId === 29999 ? 2 : 0;
+      const spellbook = interfaceId === 12855 ? 1 : interfaceId === 29999 ? 2 : interfaceId === 39999 ? 3 : 0;
+      // A varbit can share storage with a quest varp. Send all varbits first,
+      // then the canonical quest varps so their exact completion stages win.
+      for (const [id, value] of SPELL_UNLOCK_VARBITS) {
+        this.player.getSession().sendClientPacket(encodeVarbit(id, value));
+      }
+      for (const [id, value] of SPELL_UNLOCK_VARPS) {
+        this.player.getSession().sendClientPacket(encodeVarp(id, value));
+      }
       this.player.getSession().sendClientPacket(encodeVarbit(4070, spellbook));
       this.player.getSession().sendClientPacket(encodeWidgetOpenSub((161 << 16) | 82, 218));
       return this;

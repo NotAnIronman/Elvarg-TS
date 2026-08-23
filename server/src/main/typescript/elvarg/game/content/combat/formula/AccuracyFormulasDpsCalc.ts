@@ -465,6 +465,11 @@ export class AccuracyFormulasDpsCalc {
         let attRoll = AccuracyFormulasDpsCalc.effectiveMagicLevel(entity);
         attRoll *= (accuracyBonus + 64);
 
+        const demonbaneMultiplier = (entity.getCombat().getSelectedSpell() as any)?.demonbaneAccuracyMultiplier?.(entity);
+        if (typeof demonbaneMultiplier === "number") {
+            attRoll *= demonbaneMultiplier;
+        }
+
         cache.attackMagicRoll = Math.floor(attRoll);
         return cache.attackMagicRoll;
     }

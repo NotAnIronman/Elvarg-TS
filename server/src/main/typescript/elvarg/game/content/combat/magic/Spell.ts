@@ -88,6 +88,11 @@ export abstract class Spell {
                     }
                 }
             }
+
+            if (del && player.getAttribute?.("lunar:spellbook-swap")) {
+                player.setAttribute("lunar:spellbook-swap", null);
+                MagicSpellbook.changeSpellbook(player, MagicSpellbook.LUNAR, true);
+            }
         }
 
         return true;

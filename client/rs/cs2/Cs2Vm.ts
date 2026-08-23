@@ -1,4 +1,5 @@
 import { markWidgetInteractionDirty } from "../../widgets/WidgetInteraction";
+import { EMOTE_SHORTCUT_SCRIPT_ID, isEmoteShortcut } from "./EmoteShortcuts";
 import type { FriendsChatAction } from "../../common/social/FriendsChat";
 import type { WidgetManager, WidgetNode } from "../../widgets/WidgetManager";
 import type { TypeLoader } from "../config/TypeLoader";
@@ -1679,6 +1680,22 @@ export class Cs2Vm {
 
                         if (this.callStackDepth >= Cs2Vm.MAX_CALL_DEPTH) {
                             throw new Error("RuntimeException");
+                        }
+
+                        // The emote shortcut script claims any line *starting* with an
+                        // emote name, so "::runes" would fire the Run emote and the chat
+                        // script would then discard the command. Only let it run on a
+                        // real emote; everything else stays a server command.
+                        if (
+                            scriptId === EMOTE_SHORTCUT_SCRIPT_ID &&
+                            subScript.objArgCount === 1 &&
+                            !isEmoteShortcut(this.stringStack[this.stringStackSize - 1] ?? "")
+                        ) {
+                            this.intStackSize -= subScript.intArgCount;
+                            this.stringStackSize -= subScript.objArgCount;
+                            this.longStackSize -= subScript.longArgCount;
+                            this.pushInt(0);
+                            break;
                         }
 
                         const subFrame = allocateFrameLocals(subScript);

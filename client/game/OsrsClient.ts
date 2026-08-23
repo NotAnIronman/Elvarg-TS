@@ -228,7 +228,6 @@ import { AudioVarpController } from "./audio/AudioVarpController";
 import { MusicSystem } from "./audio/MusicSystem";
 import { type SequenceSoundContext, SoundEffectSystem } from "./audio/SoundEffectSystem";
 import { ChatTextMetrics } from "./chat/ChatTextMetrics";
-import { EnterToTypeChat } from "./chat/EnterToTypeChat";
 import { MobileChatKeyboard } from "./chat/MobileChatKeyboard";
 import { CombatOptionsController } from "./combat/CombatOptionsController";
 import { HitsplatFlushController } from "./combat/HitsplatFlushController";
@@ -695,8 +694,7 @@ export class OsrsClient {
     isTradeQuantityInputActive(): boolean {
         return this.pendingTradeQuantityAction !== null && this.cs2Vm.inputDialogType > 0;
     }
-    // RuneLite-style press-enter-to-type (desktop) + mobile soft-keyboard bridge.
-    private enterToTypeChat!: EnterToTypeChat;
+    // Mobile soft-keyboard bridge.
     private mobileChatKeyboard!: MobileChatKeyboard;
     private playerDesign!: PlayerDesignController;
     private customInterfaces!: CustomInterfaceRuntime;
@@ -1089,13 +1087,6 @@ export class OsrsClient {
      */
 
     private initChatControllers(): void {
-        this.enterToTypeChat = new EnterToTypeChat({
-            cs2Vm: this.cs2Vm,
-            varManager: this.varManager,
-            widgetManager: this.widgetManager,
-            isLoggedIn: () => this.isLoggedIn(),
-            isCustomInterfaceSearchFocused: () => this.customInterfaces.isSearchFocused(),
-        });
         this.mobileChatKeyboard = new MobileChatKeyboard({
             inputManager: this.inputManager,
             varManager: this.varManager,
@@ -1226,7 +1217,6 @@ export class OsrsClient {
             getVarManager: () => this.varManager,
             getWorldMap: () => this.worldMap,
             getCustomInterfaces: () => this.customInterfaces,
-            getEnterToTypeChat: () => this.enterToTypeChat,
             getPlayerDesign: () => this.playerDesign,
             getObjTypeLoader: () => this.objTypeLoader,
             getInventory: () => this.inventory,
@@ -3704,9 +3694,6 @@ export class OsrsClient {
             }
         }
 
-        // Keep the "Press Enter to Chat" placeholder on the chat input line while
-        // chat typing is locked (re-applied whenever chat_promptinput rewrites it).
-        this.enterToTypeChat?.applyLockPlaceholder();
     }
 
     /**
@@ -3787,10 +3774,6 @@ export class OsrsClient {
     private applyMinimapWheelZoom(deltaY: number): void {
         const wheelStep = deltaY > 0 ? 1 : -1;
         this.minimapZoom = Math.max(2, Math.min(8, this.minimapZoom + -wheelStep * 0.25));
-    }
-
-    isWasdCameraActive(): boolean {
-        return this.enterToTypeChat.isWasdCameraActive(this.cs2Vm.inputDialogType | 0);
     }
 
     handleUiInput() {
@@ -4957,8 +4940,6 @@ export class OsrsClient {
         // Setup new state
         if (newState === GameState.LOGIN_SCREEN) {
             this.rememberLoginPlugin.restore(this.loginState);
-            // Chat starts locked ("Press Enter to Chat") on the next login.
-            this.enterToTypeChat?.reset();
             this.loginState.networkState = 0;
             // Reset loading tracker on return to login
             this.loadingTracker.reset();

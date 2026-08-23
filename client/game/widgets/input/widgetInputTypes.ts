@@ -6,7 +6,6 @@ import type { WidgetManager } from "../../../widgets/WidgetManager";
 import type { GameRenderer } from "../../GameRenderer";
 import type { InputManager } from "../../InputManager";
 import type { TransmitCycles } from "../../TransmitCycles";
-import type { EnterToTypeChat } from "../../chat/EnterToTypeChat";
 import type { WorldMapController } from "../../worldMap/WorldMapController";
 import type { PlayerDesignController } from "../PlayerDesignController";
 import type { SpellSelectionController } from "../SpellSelectionController";
@@ -50,7 +49,6 @@ export type WidgetInputControllerDeps = {
     getVarManager: () => VarManager;
     getWorldMap: () => WorldMapController;
     getCustomInterfaces: () => CustomInterfaceRuntime;
-    getEnterToTypeChat: () => EnterToTypeChat;
     getPlayerDesign: () => PlayerDesignController;
     getObjTypeLoader: () => ObjTypeLoader | undefined;
     getInventory: () => Inventory;

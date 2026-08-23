@@ -5,6 +5,7 @@ const { Server } = require("../../src/main/typescript/elvarg/Server");
 const { GameConstants } = require("../../src/main/typescript/elvarg/game/GameConstants");
 const { PlayerRights } = require("../../src/main/typescript/elvarg/game/model/rights/PlayerRights");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
+const { MagicSpellbook } = require("../../src/main/typescript/elvarg/game/model/MagicSpellbook");
 const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
 const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
@@ -37,6 +38,7 @@ const {
 
 const ATTACK_RANGE_DEBUG_GRAPHIC = new Graphic(332, 0);
 const MAX_NPC_COMMAND_SPAWNS = 20;
+const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 9075, 21880, 28929];
 const NPC_SPAWN_FILE_CANDIDATES = [
   path.join(process.cwd(), "data", "definitions", "npc_spawns.json"),
 ];
@@ -558,11 +560,42 @@ module.exports = {
       if (!requireRights(player, ownerOrDev)) {
         return true;
       }
-      [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565].forEach((rune) => {
-        player.getInventory().adds(rune, 1000);
-      });
+      const inventory = player.getInventory();
+      let given = 0;
+      for (const rune of RUNE_IDS) {
+        // Each new rune type needs its own slot; skip the ones that cannot fit
+        // instead of letting the container spam "You couldn't hold all those
+        // items." once per rune.
+        if (!inventory.contains(rune) && inventory.getFreeSlots() <= 0) {
+          continue;
+        }
+        inventory.adds(rune, 1000);
+        given++;
+      }
+      player
+        .getPacketSender()
+        .sendMessage(
+          given === RUNE_IDS.length
+            ? "Spawned 1,000 of each rune type."
+            : `Spawned ${given}/${RUNE_IDS.length} rune types - free up inventory space for the rest.`
+        );
       return true;
     });
+
+    function registerSpellbookCommand(command, spellbook) {
+      api.registerCommand(command, ({ player }) => {
+        if (!requireRights(player, devOnly)) {
+          return true;
+        }
+        MagicSpellbook.changeSpellbook(player, spellbook, true);
+        return true;
+      });
+    }
+
+    registerSpellbookCommand("normal", MagicSpellbook.NORMAL);
+    registerSpellbookCommand("lunar", MagicSpellbook.LUNAR);
+    registerSpellbookCommand("ancients", MagicSpellbook.ANCIENT);
+    registerSpellbookCommand("arceuus", MagicSpellbook.ARCEUUS);
 
     api.registerCommand("master", ({ player }) => {
       if (!requireRights(player, ownerOrDev)) {

@@ -10,6 +10,15 @@ import { PendingHit } from "../hit/PendingHit";
 
 
 export abstract class CombatSpell extends Spell {
+  /**
+   * Allows spells with a restricted target type to reject a cast before the
+   * combat cycle consumes runes. Most combat spells may target anything that
+   * the normal combat rules allow.
+   */
+  public canCastOnTarget(cast: Mobile, target: Mobile): boolean {
+    return true;
+  }
+
   public startCast(cast: Mobile, castOn: Mobile): void {
     let castAnimation = -1;
 

@@ -122,6 +122,11 @@ export class DamageFormulas {
             maxHit *= 1 + (magicStrength / 100);
         }
 
+        const demonbaneMultiplier = (spell as any)?.demonbaneDamageMultiplier?.(c);
+        if (typeof demonbaneMultiplier === "number") {
+            maxHit *= demonbaneMultiplier;
+        }
+
         return Math.floor(maxHit);
     }
 

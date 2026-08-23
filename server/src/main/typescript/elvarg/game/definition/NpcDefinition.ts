@@ -25,6 +25,7 @@ export class NpcDefinition {
     private aggressiveTolerance: boolean = true;
     private poisonous: boolean = false;
     private venomous: boolean = false;
+    private demon: boolean = false;
     /** Which default CombatMethod this NPC fights with; see NPC.getCombatMethod(). */
     private attackType: CombatType = CombatType.MELEE;
     /** Projectile graphic for ranged/magic attacks; -1 falls back to the generic one. */
@@ -181,6 +182,10 @@ export class NpcDefinition {
     
     public isVenomous(): boolean {
         return this.venomous;
+    }
+
+    public isDemon(): boolean {
+        return this.demon;
     }
 
     public getAttackType(): CombatType {

@@ -13,6 +13,7 @@ export class MagicSpellbook {
     public static NORMAL = new MagicSpellbook( 1151, TeleportType.NORMAL );
     public static ANCIENT = new MagicSpellbook(  12855, TeleportType.ANCIENT );
     public static LUNAR = new MagicSpellbook( 29999, TeleportType.LUNAR );
+    public static ARCEUUS = new MagicSpellbook( 39999, TeleportType.ARCEUUS );
     
     private teleportType: TeleportType;
 
@@ -30,12 +31,14 @@ export class MagicSpellbook {
         return MagicSpellbook.NORMAL;
     }
 
-    public static changeSpellbook(player: Player, book: MagicSpellbook) {
+    public static changeSpellbook(player: Player, book: MagicSpellbook, bypassRequirements = false) {
         if (book === player.getSpellbook()) {
-            // Already using this spellbook
+            // Refresh the client spellbook. This also reapplies the client-side
+            // spell unlock states when a developer runs the current-book command.
+            player.getPacketSender().sendTabInterface(6, book.getInterfaceId());
             return;
         }
-        if (book === MagicSpellbook.LUNAR) {
+        if (!bypassRequirements && book === MagicSpellbook.LUNAR) {
             if (player.getSkillManager().getMaxLevel(Skill.DEFENCE) < 40) {
                 player.getPacketSender().sendMessage("You need at least level 40 Defence to use the Lunar spellbook.");
                 return;

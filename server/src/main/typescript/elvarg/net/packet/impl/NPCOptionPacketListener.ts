@@ -87,6 +87,10 @@ export class NPCOptionPacketListener {
       player.getMovementQueue().reset();
       return false;
     }
+    if (!spell.canCastOnTarget(player, npc)) {
+      player.getMovementQueue().reset();
+      return false;
+    }
     player.getCombat().castSpellOn(npc, spell);
     return true;
   }
