@@ -9,11 +9,12 @@ import { isTitleMuteHit } from "../controls";
 import { getServerListButtonPosition } from "../layout/geometry";
 import { getMobileWorldIndexAtPosition } from "../world/worldSelectMobile";
 import {
-    SERVER_LIST_ADDRESS_COLUMN_START,
     SERVER_LIST_OWNER_COLUMN_START,
     SERVER_LIST_PANEL_WIDTH,
+    SERVER_LIST_PLAYERS_COLUMN_START,
 } from "../constants";
 import { forumProfileUrl } from "../serverList";
+import { ellipsis } from "../render/drawUtils";
 import {
     handleWelcomeClick,
     handleWarningClick,
@@ -56,8 +57,14 @@ export function handleServerListClick(host: LoginRendererHost, state: LoginState
                 const ry = rowStartY + i * rowH;
                 if (x >= panelX + 4 && x <= panelX + panelW - 4 && y >= ry && y < ry + rowH) {
                     const owner = host.serverList[i].ownerUsername;
-                    if (owner && x >= panelX + SERVER_LIST_OWNER_COLUMN_START
-                        && x < panelX + SERVER_LIST_ADDRESS_COLUMN_START) {
+                    const ownerX = panelX + SERVER_LIST_OWNER_COLUMN_START;
+                    const ownerText = owner && ellipsis(
+                        host,
+                        owner,
+                        SERVER_LIST_PLAYERS_COLUMN_START - SERVER_LIST_OWNER_COLUMN_START - 4,
+                    );
+                    if (owner && ownerText && host.fontPlain12 && x >= ownerX
+                        && x < ownerX + host.fontPlain12.measure(ownerText)) {
                         window.open(forumProfileUrl(owner), "_blank", "noopener,noreferrer");
                         return undefined;
                     }

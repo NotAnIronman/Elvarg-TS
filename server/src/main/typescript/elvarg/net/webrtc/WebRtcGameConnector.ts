@@ -17,8 +17,11 @@ type PeerState = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+const DEFAULT_SIGNAL_URL = "wss://worlds.rsps.app";
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.rsps.app:3478" }];
+
 function parseIceServers(raw: string | undefined): RTCIceServer[] {
-  if (!raw) return [];
+  if (!raw) return DEFAULT_ICE_SERVERS;
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) throw new Error("WEBRTC_ICE_SERVERS must be a JSON array");
   return parsed.map((entry) => {
@@ -44,13 +47,13 @@ export class WebRtcGameConnector {
     accept: (channel: BinaryChannel) => void,
     playerCount: () => number = () => 0
   ): WebRtcGameConnector | undefined {
-    const signalUrl = process.env.WEBRTC_SIGNAL_URL?.trim();
+    const signalUrl = process.env.WEBRTC_SIGNAL_URL?.trim() || DEFAULT_SIGNAL_URL;
     const worldId = process.env.WEBRTC_WORLD_ID?.trim();
     const worldName = process.env.WEBRTC_WORLD_NAME?.trim() || worldId;
     const token = process.env.WEBRTC_WORLD_TOKEN?.trim();
-    if (!signalUrl && !worldId && !token) return undefined;
-    if (!signalUrl || !worldId || !token) {
-      console.warn("[webrtc] WEBRTC_SIGNAL_URL, WEBRTC_WORLD_ID and WEBRTC_WORLD_TOKEN are all required");
+    if (!worldId && !token) return undefined;
+    if (!worldId || !token) {
+      console.warn("[webrtc] WEBRTC_WORLD_ID and WEBRTC_WORLD_TOKEN are both required");
       return undefined;
     }
     try {

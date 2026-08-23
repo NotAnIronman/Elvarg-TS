@@ -10,6 +10,8 @@ import {
 
 import type { OsrsClient } from "../../game/OsrsClient";
 import { GameState } from "../../game/login";
+import { withRenderTransform } from "../../game/login/renderer/layout/config";
+import { drawServerListOverlay } from "../../game/login/renderer/render/serverListOverlay";
 import { getCanvasCssSize } from "../../common/utils/DeviceUtil";
 import { Overlay, OverlayInitArgs, OverlayUpdateArgs, RenderPhase } from "./Overlay";
 
@@ -32,6 +34,7 @@ export class LoginOverlay implements Overlay {
     private positions?: VertexBuffer;
     private uvs?: VertexBuffer;
     private uiTexture?: Texture;
+    private inGameServerListCanvas?: HTMLCanvasElement;
 
     // Fire rendering (separate small texture)
     private fireProgram!: Program;
@@ -170,9 +173,13 @@ export class LoginOverlay implements Overlay {
             this.uiNeedsRedraw = true;
         }
 
-        // Only render if on login screen (not logged in / loading game)
+        const inGameServerList =
+            this.gameState === GameState.LOGGED_IN && this.osrsClient.loginState.serverListOpen;
+        if (!inGameServerList) {
+            this.hideInGameServerListCanvas();
+        }
         if (
-            this.gameState === GameState.LOGGED_IN ||
+            (this.gameState === GameState.LOGGED_IN && !inGameServerList) ||
             this.gameState === GameState.LOADING_GAME ||
             this.gameState === GameState.RECONNECTING ||
             this.gameState === GameState.PLEASE_WAIT
@@ -245,6 +252,12 @@ export class LoginOverlay implements Overlay {
                     this.uiNeedsRedraw = true;
                 }
             }
+        }
+
+        if (inGameServerList) {
+            loginState.hoveredServerIndex = loginRenderer.computeHoveredServerIndex(loginState);
+            this.drawInGameServerList(renderLayoutWidth, renderLayoutHeight, width, height);
+            return;
         }
 
         // The cached login UI and separate fire overlay are authored in the UI layout
@@ -407,6 +420,53 @@ export class LoginOverlay implements Overlay {
         }
     }
 
+    private drawInGameServerList(
+        layoutWidth: number,
+        layoutHeight: number,
+        surfaceWidth: number,
+        surfaceHeight: number,
+    ): void {
+        this.osrsClient.loginRenderer.updateLayout(
+            layoutWidth,
+            layoutHeight,
+            surfaceWidth,
+            surfaceHeight,
+        );
+        const hostCanvas = this.app.gl.canvas as HTMLCanvasElement;
+        const parent = hostCanvas.parentElement;
+        if (!parent) return;
+
+        const canvas = (this.inGameServerListCanvas ??= document.createElement("canvas"));
+        if (canvas.width !== surfaceWidth || canvas.height !== surfaceHeight) {
+            canvas.width = surfaceWidth;
+            canvas.height = surfaceHeight;
+        }
+        canvas.style.position = "absolute";
+        canvas.style.inset = "0";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.pointerEvents = "none";
+        canvas.style.display = "";
+        parent.appendChild(canvas);
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.clearRect(0, 0, surfaceWidth, surfaceHeight);
+        withRenderTransform(this.osrsClient.loginRenderer, ctx, () =>
+            drawServerListOverlay(
+                this.osrsClient.loginRenderer,
+                ctx,
+                this.osrsClient.loginState,
+            ),
+        );
+    }
+
+    private hideInGameServerListCanvas(): void {
+        if (this.inGameServerListCanvas) {
+            this.inGameServerListCanvas.style.display = "none";
+        }
+    }
+
     /** Compute a hash of state values that affect rendering */
     private computeStateHash(
         loginState: import("../../game/login/LoginState").LoginState,
@@ -438,7 +498,7 @@ export class LoginOverlay implements Overlay {
     }
 
     draw(phase: RenderPhase): void {
-        // Only draw during PostPresent phase and when not logged in
+        // Only draw during PostPresent phase and when not logged in.
         if (phase !== RenderPhase.PostPresent) {
             return;
         }
@@ -516,6 +576,8 @@ export class LoginOverlay implements Overlay {
     }
 
     dispose(): void {
+        this.inGameServerListCanvas?.remove();
+        this.inGameServerListCanvas = undefined;
         try {
             this.uiTexture?.delete();
             this.fireTexture?.delete();

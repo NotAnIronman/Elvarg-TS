@@ -1,7 +1,5 @@
 /**
  * Build-time client config from CRA `REACT_APP_*` env vars.
- * Domain-specific values must never be hardcoded — set them in Vercel / `.env*`.
- *
  * IMPORTANT: CRA only inlines env vars referenced as static property access
  * (`process.env.REACT_APP_FOO`). Dynamic `process.env[key]` is left undefined.
  */
@@ -27,6 +25,9 @@ export type WebRtcRelayConfig = {
     signalUrl: string;
     iceServers: RTCIceServer[];
 };
+
+const DEFAULT_WEBRTC_SIGNAL_URL = "wss://worlds.rsps.app";
+const DEFAULT_WEBRTC_ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.rsps.app:3478" }];
 
 function readBoolean(value: unknown, fallback: boolean): boolean {
     if (typeof value === "boolean") return value;
@@ -113,18 +114,12 @@ export function getConfiguredServers(): ConfiguredServer[] | undefined {
     }
 }
 
-/** Public relay directory used to discover WebRTC worlds. Local development needs no config. */
+/** Public relay directory used to discover WebRTC worlds. */
 export function getWebRtcRelayConfig(): WebRtcRelayConfig | undefined {
-    const configuredUrl = read(process.env.REACT_APP_WEBRTC_SIGNAL_URL);
-    const localUrl = typeof window !== "undefined" &&
-        ["localhost", "127.0.0.1", "::1", "[::1]"].includes(window.location.hostname.toLowerCase())
-        ? "ws://127.0.0.1:8787"
-        : undefined;
-    const signalUrl = configuredUrl ?? localUrl;
-    if (!signalUrl) return undefined;
+    const signalUrl = read(process.env.REACT_APP_WEBRTC_SIGNAL_URL) ?? DEFAULT_WEBRTC_SIGNAL_URL;
 
     const rawIceServers = read(process.env.REACT_APP_WEBRTC_ICE_SERVERS);
-    if (!rawIceServers) return { signalUrl, iceServers: [] };
+    if (!rawIceServers) return { signalUrl, iceServers: DEFAULT_WEBRTC_ICE_SERVERS };
     try {
         const parsed = JSON.parse(rawIceServers);
         return {
@@ -133,7 +128,7 @@ export function getWebRtcRelayConfig(): WebRtcRelayConfig | undefined {
         };
     } catch {
         console.warn("[clientEnv] Failed to parse REACT_APP_WEBRTC_ICE_SERVERS");
-        return { signalUrl, iceServers: [] };
+        return { signalUrl, iceServers: DEFAULT_WEBRTC_ICE_SERVERS };
     }
 }
 
