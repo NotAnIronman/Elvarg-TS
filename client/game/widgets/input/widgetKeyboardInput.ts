@@ -154,16 +154,7 @@ export function processWidgetKeyboardInput(
 
         // Process all key events for all widgets with onKey handlers
         for (const keyEvent of input.keyEvents) {
-            // Enter-to-type gate (desktop): Enter/Escape toggle chat typing mode and
-            // are consumed; while locked, no keys are delivered to chatbox widgets.
-            if (deps.getEnterToTypeChat().handleKeyEvent(keyEvent, dialogActive)) {
-                continue;
-            }
-            const blockChatboxKeys = deps.getEnterToTypeChat().shouldBlockChatboxKeys(dialogActive);
             for (const w of keyWidgetsByUid.values()) {
-                if (blockChatboxKeys && deps.getEnterToTypeChat().isChatboxGroupUid((w?.uid ?? 0) | 0)) {
-                    continue;
-                }
                 const keyCtx: Partial<ScriptEvent> = {
                     mouseX: mx - (w._absX ?? w.x ?? 0),
                     mouseY: my - (w._absY ?? w.y ?? 0),
@@ -175,16 +166,6 @@ export function processWidgetKeyboardInput(
                 } else if (w.onKey) {
                     deps.executeScriptListener(w, w.onKey, keyCtx);
                 }
-            }
-            // Enter while typing sends the message (handled by the chatbox scripts
-            // above); re-lock so movement keys are captured again (RuneLite behavior).
-            if (
-                !dialogActive &&
-                deps.getEnterToTypeChat().isUnlocked &&
-                deps.getEnterToTypeChat().isEnabled() &&
-                keyEvent.keyTyped === 84
-            ) {
-                deps.getEnterToTypeChat().setUnlocked(false);
             }
         }
     }

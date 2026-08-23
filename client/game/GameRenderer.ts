@@ -212,24 +212,6 @@ export abstract class GameRenderer<T extends MapSquare = MapSquare> extends Rend
             camera.updateYaw(camera.yaw, deltaYaw);
         }
 
-        // RuneLite-style WASD camera: while chat typing is locked ("press enter to
-        // type"), WASD rotates the camera exactly like the arrow keys. Only in the
-        // normal follow-player camera — free-cam already uses WASD for movement.
-        if (this.osrsClient.followPlayerCamera && this.osrsClient.isWasdCameraActive()) {
-            if (inputManager.isKeyDown("KeyW")) {
-                camera.updatePitch(camera.pitch, deltaPitch);
-            }
-            if (inputManager.isKeyDown("KeyS")) {
-                camera.updatePitch(camera.pitch, -deltaPitch);
-            }
-            if (inputManager.isKeyDown("KeyD")) {
-                camera.updateYaw(camera.yaw, -deltaYaw);
-            }
-            if (inputManager.isKeyDown("KeyA")) {
-                camera.updateYaw(camera.yaw, deltaYaw);
-            }
-        }
-
         // camera position controls
         let deltaX = 0;
         let deltaY = 0;
