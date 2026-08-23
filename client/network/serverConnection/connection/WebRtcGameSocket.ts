@@ -4,7 +4,7 @@ const CONNECTING = 0;
 const OPEN = 1;
 const CLOSING = 2;
 const CLOSED = 3;
-const CONNECT_TIMEOUT_MS = 12_000;
+const CONNECT_TIMEOUT_MS = 30_000;
 
 function signallingEndpoint(raw: string): string {
     const url = new URL(raw);
@@ -66,7 +66,7 @@ export class WebRtcGameSocket extends EventTarget implements GameSocket {
         this.channel.binaryType = "arraybuffer";
         this.signal = new WebSocket(this.url);
         this.timeout = setTimeout(
-            () => this.fail(`WebRTC connection to world ${config.worldId} timed out`),
+            () => this.state === CONNECTING && this.fail(`WebRTC connection to world ${config.worldId} timed out`),
             CONNECT_TIMEOUT_MS,
         );
         this.bindPeer();
