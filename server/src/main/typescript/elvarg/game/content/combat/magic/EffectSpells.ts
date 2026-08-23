@@ -76,7 +76,7 @@ export class EffectSpells extends Spell {
                 player.getPacketSender().sendEffectTimer(30, EffectTimer.VENGEANCE)
                     .sendMessage("You now have Vengeance's effect.");
                 player.getInventory().deleteItemSet(spell.itemsRequired(player));
-                player.performAnimation(new Animation(4410));
+                player.performAnimation(new Animation(8316));
                 player.performGraphic(new Graphic(726, GraphicHeight.HIGH));
                 break;
         }
