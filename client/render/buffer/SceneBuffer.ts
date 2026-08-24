@@ -496,6 +496,7 @@ export class SceneBuffer {
             const index = face.index;
             const alpha = face.alpha;
             const priority = face.priority;
+            const renderLayer = face.renderLayer;
             const textureId = face.textureId;
             const textureIndex = this.textureIdIndexMap.get(textureId) ?? -1;
 
@@ -567,7 +568,8 @@ export class SceneBuffer {
                 v0,
                 textureIndex,
                 reuseVertices,
-                priority,
+                renderLayer ?? priority,
+                renderLayer !== undefined,
             );
             const index1 = this.vertexBuf.addVertex(
                 vxb,
@@ -579,7 +581,8 @@ export class SceneBuffer {
                 v1,
                 textureIndex,
                 reuseVertices,
-                priority,
+                renderLayer ?? priority,
+                renderLayer !== undefined,
             );
             const index2 = this.vertexBuf.addVertex(
                 vxc,
@@ -591,7 +594,8 @@ export class SceneBuffer {
                 v2,
                 textureIndex,
                 reuseVertices,
-                priority,
+                renderLayer ?? priority,
+                renderLayer !== undefined,
             );
 
             this.indices.push(index0, index1, index2);
@@ -603,6 +607,7 @@ export type ModelFace = {
     index: number;
     alpha: number;
     priority: number;
+    renderLayer?: number;
     textureId: number;
 };
 
@@ -623,6 +628,7 @@ export function getModelFaces(model: Model): ModelFace[] {
     const faceTransparencies = model.faceAlphas;
 
     const priorities = model.faceRenderPriorities;
+    const renderLayers = model.faceRenderLayers;
 
     for (let index = 0; index < model.faceCount; index++) {
         let hslC = model.faceColors3[index];
@@ -655,6 +661,7 @@ export function getModelFaces(model: Model): ModelFace[] {
             index,
             alpha,
             priority,
+            renderLayer: renderLayers?.[index],
             textureId,
         });
     }
@@ -675,6 +682,7 @@ export function getModelFacesFiltered(
 
     const faceTransparencies = model.faceAlphas;
     const priorities = model.faceRenderPriorities;
+    const renderLayers = model.faceRenderLayers;
 
     for (let index = 0; index < model.faceCount; index++) {
         let hslC = model.faceColors3[index];
@@ -714,6 +722,7 @@ export function getModelFacesFiltered(
             index,
             alpha,
             priority,
+            renderLayer: renderLayers?.[index],
             textureId,
         });
     }

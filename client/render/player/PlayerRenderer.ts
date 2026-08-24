@@ -1319,6 +1319,7 @@ export class PlayerRenderer {
                 // Build stable face metadata without per-frame alpha (alpha can be animated).
                 const faces: any[] = [];
                 const priorities = baseModel.faceRenderPriorities;
+                const renderLayers = baseModel.faceRenderLayers;
                 for (let index = 0; index < (baseModel.faceCount | 0); index++) {
                     const hslC = baseModel.faceColors3[index];
                     if (hslC === -2) continue;
@@ -1326,7 +1327,13 @@ export class PlayerRenderer {
                     if (baseModel.faceTextures) textureId = baseModel.faceTextures[index];
                     let priority = 0;
                     if (priorities) priority = priorities[index];
-                    faces.push({ index, alpha: 0xff, priority, textureId });
+                    faces.push({
+                        index,
+                        alpha: 0xff,
+                        priority,
+                        renderLayer: renderLayers?.[index],
+                        textureId,
+                    });
                 }
                 meta = { faces };
                 this.baseModelFaceMetaCache.set(baseModel, meta);

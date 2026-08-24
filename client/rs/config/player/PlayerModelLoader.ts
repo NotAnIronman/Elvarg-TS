@@ -32,6 +32,18 @@ const compositionSlotToKitPart: Record<number, number> = {
     11: 1,
 };
 
+const equipmentModelRenderOrder = (slot: EquipmentSlot): number => {
+    if (slot === EquipmentSlot.BODY) return EquipmentSlot.AMULET;
+    if (slot === EquipmentSlot.AMULET) return EquipmentSlot.BODY;
+    return slot;
+};
+
+const equipmentRenderLayer = (slot: EquipmentSlot): number => {
+    if (slot === EquipmentSlot.BODY) return 0;
+    if (slot === EquipmentSlot.AMULET) return 4;
+    return 7;
+};
+
 // Phase A: compose body from IdentityKits only (no equipment yet)
 export class PlayerModelLoader {
     private readonly defaultKitsCache = new Map<number, number[]>();
@@ -43,9 +55,14 @@ export class PlayerModelLoader {
         readonly textureLoader: TextureLoader,
     ) {}
 
-    buildStaticModel(appearance: PlayerAppearance, extraObjTypes?: ObjType[]): Model | undefined {
+    buildStaticModel(
+        appearance: PlayerAppearance,
+        extraObjTypes?: ObjType[],
+        extraRenderLayers?: number[],
+    ): Model | undefined {
         const missesBefore = this.modelLoader.missCount ?? 0;
         const modelDatas: ModelData[] = [];
+        const modelRenderLayers: number[] = [];
         const colors = Array.isArray(appearance.colors) ? appearance.colors : [];
 
         // Body parts 0..6 per Idk: 0 head, 1 jaw, 2 torso, 3 arms, 4 hands, 5 legs, 6 feet
@@ -89,6 +106,7 @@ export class PlayerModelLoader {
                         }
                     }
                     modelDatas.push(md);
+                    modelRenderLayers.push(part === 2 ? 0 : 7);
                 }
             } catch {}
         }
@@ -96,7 +114,9 @@ export class PlayerModelLoader {
         // Merge extra wearable object models (e.g., boots, helms)
         if (extraObjTypes && extraObjTypes.length > 0) {
             const isFemale = appearance.gender === (1 as any);
-            for (const obj of extraObjTypes) {
+            for (let objIndex = 0; objIndex < extraObjTypes.length; objIndex++) {
+                const obj = extraObjTypes[objIndex];
+                const renderLayer = extraRenderLayers?.[objIndex] ?? 0;
                 const ids: number[] = [];
                 const wearModel0 = isFemale ? obj.femaleModel : obj.maleModel;
                 const wearModel1 = isFemale ? obj.femaleModel1 : obj.maleModel1;
@@ -137,6 +157,7 @@ export class PlayerModelLoader {
                         }
                     } catch {}
                     modelDatas.push(md);
+                    modelRenderLayers.push(renderLayer);
                 }
             }
         }
@@ -152,6 +173,13 @@ export class PlayerModelLoader {
 
         const merged = ModelData.merge(modelDatas, modelDatas.length);
         const model = merged.light(this.textureLoader, 64, 850, -30, -50, -30);
+        model.faceRenderLayers = new Uint8Array(merged.faceCount);
+        let faceOffset = 0;
+        for (let i = 0; i < modelDatas.length; i++) {
+            const faceEnd = faceOffset + modelDatas[i].faceCount;
+            model.faceRenderLayers.fill(modelRenderLayers[i], faceOffset, faceEnd);
+            faceOffset = faceEnd;
+        }
         // do not baseline-align the merged player model (PlayerComposition.getModel
         // returns the lit model without translating it to force bottomY=0). Widget modelOffsetY
         // and modelZoom handle framing for UI renders.
@@ -211,7 +239,7 @@ export class PlayerModelLoader {
             if (this.partCoveredByEquipment(part, equippedSlots, hiddenParts)) continue;
             if (fallbackKits[part] !== -1) kits[part] = fallbackKits[part];
         }
-        const extras: ObjType[] = [];
+        const extras: Array<{ obj: ObjType; slot: EquipmentSlot }> = [];
         if (equippedItemIdsBySlot && equippedItemIdsBySlot.length > 0) {
             // Walk the equipped items and apply coverage/suppression based on metadata when available
             for (let slot = 0; slot < equippedItemIdsBySlot.length; slot++) {
@@ -260,11 +288,16 @@ export class PlayerModelLoader {
                     kits[6] = -1; // feet
                 }
 
-                extras.push(obj);
+                extras.push({ obj, slot: metaSlot });
             }
         }
 
-        return this.buildStaticModel(workingAppearance, extras);
+        extras.sort((a, b) => equipmentModelRenderOrder(a.slot) - equipmentModelRenderOrder(b.slot));
+        return this.buildStaticModel(
+            workingAppearance,
+            extras.map(({ obj }) => obj),
+            extras.map(({ slot }) => equipmentRenderLayer(slot)),
+        );
     }
 
     private partCoveredByEquipment(
