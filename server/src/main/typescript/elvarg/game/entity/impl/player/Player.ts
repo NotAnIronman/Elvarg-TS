@@ -61,6 +61,13 @@ import { PluginManager } from "../../../../plugins/PluginManager";
 import { ServerPerf } from "../../../../util/ServerPerf";
 
 const ATTR_SKIP_PERSISTENCE = "botSkipPersistence";
+const DEFAULT_AUDIO_SETTINGS: Readonly<Record<number, number>> = {
+    18: 0,
+    168: 100,
+    169: 100,
+    872: 100,
+    3796: 100,
+};
 
 export class Player extends Mobile {
     private static readonly MAX_PLAYER_PRESETS = 10;
@@ -207,6 +214,7 @@ export class Player extends Mobile {
     private fightType = FightType.UNARMED_KICK;
     public weapon: WeaponInterfaces = WeaponInterfaces.UNARMED;
     private autoRetaliate = true;
+    private audioSettings: Record<number, number> = { ...DEFAULT_AUDIO_SETTINGS };
 
     // Rights
     public rights = PlayerRights.NONE;
@@ -627,10 +635,11 @@ export class Player extends Mobile {
         const autocastSpell = this.getCombat().getAutocastSpell();
         if (autocastSpell != null && autocastSpell.getSpellbook?.() !== this.getSpellbook()) {
             Autocasting.setAutocast(this, null);
-        } else if (autocastSpell != null && this.getEquipment().hasStaffEquipped()) {
+        } else if (autocastSpell == null || this.getEquipment().hasStaffEquipped()) {
             Autocasting.setAutocast(this, autocastSpell);
-        } else {
-            Autocasting.setAutocast(this, null);
+        }
+        for (const [varpId, value] of Object.entries(this.audioSettings)) {
+            this.getPacketSender().sendConfig(Number(varpId), value);
         }
     }
 
@@ -687,6 +696,25 @@ export class Player extends Mobile {
 
     public getCreationDate(): Date {
         return this.creationDate;
+    }
+
+    public getAudioSettings(): Readonly<Record<number, number>> {
+        return this.audioSettings;
+    }
+
+    public setAudioSettings(settings?: Record<number, number>): void {
+        this.audioSettings = { ...DEFAULT_AUDIO_SETTINGS };
+        if (!settings || typeof settings !== "object") return;
+        for (const varpId of Object.keys(DEFAULT_AUDIO_SETTINGS).map(Number)) {
+            this.setAudioSetting(varpId, settings[varpId]);
+        }
+    }
+
+    public setAudioSetting(varpId: number, value: number): boolean {
+        if (!(varpId in DEFAULT_AUDIO_SETTINGS) || !Number.isFinite(value)) return false;
+        const maximum = varpId === 18 ? 2 : 100;
+        this.audioSettings[varpId] = Math.max(0, Math.min(maximum, Math.trunc(value)));
+        return true;
     }
 
     public setCreationDate(timestamp: Date) {

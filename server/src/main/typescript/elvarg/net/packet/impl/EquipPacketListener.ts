@@ -3,6 +3,7 @@ import { Server } from "../../../Server";
 import { PluginManager } from "../../../plugins/PluginManager";
 import { Sound } from "../../../game/Sound";
 import { Sounds } from "../../../game/Sounds";
+import { Wilderness } from "../../../game/content/wilderness/Wilderness";
 
 const getWeaponInterfaces = () =>
   require("../../../game/content/combat/WeaponInterfaces")
@@ -47,10 +48,15 @@ export class EquipPacketListener {
       player.setSpecialActivated(false);
     }
     player.getPacketSender().sendSpecialAttackState(false);
-    if (player.getCombat().getAutocastSpell() != null) {
+    const autocastSpell = player.getCombat().getAutocastSpell();
+    const inWilderness = Wilderness.isIn(player);
+    if (autocastSpell != null && inWilderness) {
       getAutocasting().setAutocast(player, null);
     }
     getWeaponInterfaces().assign(player);
+    if (autocastSpell != null && !inWilderness && player.getEquipment().hasStaffEquipped()) {
+      getAutocasting().setAutocast(player, autocastSpell);
+    }
   }
 
   public static equipFromInventory(player: any, itemInSlot: any) {

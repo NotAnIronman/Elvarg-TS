@@ -83,6 +83,38 @@ assert.strictEqual(Autocasting.autocastSpell(1), CombatSpells.WIND_STRIKE);
 assert.strictEqual(Autocasting.autocastSpell(17), CombatSpells.CRUMBLE_UNDEAD);
 assert.strictEqual(Autocasting.autocastSpell(46), CombatSpells.ICE_BARRAGE);
 assert.strictEqual(Autocasting.autocastSpell(59), null);
+
+const originalAssignWeapon = WeaponInterfaces.assign;
+const originalSetAutocast = Autocasting.setAutocast;
+let equippedStaff = false;
+let selectedAutocast: any = CombatSpells.WIND_STRIKE;
+let autocastSyncs = 0;
+let autocastLocation = new Location(3200, 3200);
+(WeaponInterfaces as any).assign = () => undefined;
+(Autocasting as any).setAutocast = (_player: any, spell: any) => {
+  selectedAutocast = spell;
+  autocastSyncs++;
+};
+const autocastPlayer: any = {
+  getCombat: () => ({ getAutocastSpell: () => selectedAutocast }),
+  getEquipment: () => ({ hasStaffEquipped: () => equippedStaff }),
+  getLocation: () => autocastLocation,
+  getPacketSender: () => ({ sendSpecialAttackState: () => undefined }),
+  setSpecialActivated: () => undefined,
+};
+EquipPacketListener.resetWeapon(autocastPlayer, true);
+assert.strictEqual(selectedAutocast, CombatSpells.WIND_STRIKE);
+assert.strictEqual(autocastSyncs, 0);
+equippedStaff = true;
+EquipPacketListener.resetWeapon(autocastPlayer, true);
+assert.strictEqual(selectedAutocast, CombatSpells.WIND_STRIKE);
+assert.strictEqual(autocastSyncs, 1);
+autocastLocation = new Location(3200, 3600);
+EquipPacketListener.resetWeapon(autocastPlayer, true);
+assert.strictEqual(selectedAutocast, null);
+(WeaponInterfaces as any).assign = originalAssignWeapon;
+(Autocasting as any).setAutocast = originalSetAutocast;
+
 assert.strictEqual(WeaponInterfaces.WHIP.getCategory(), 20);
 assert.strictEqual(WeaponInterfaces.STAFF.getCategory(), 18);
 assert.strictEqual(WeaponInterfaces.BLOWPIPE.getCategory(), 19);
