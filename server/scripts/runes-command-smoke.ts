@@ -5,6 +5,7 @@
  */
 import * as assert from "node:assert/strict";
 import * as path from "node:path";
+import { CacheDefinitions } from "../src/main/typescript/elvarg/game/cache/CacheDefinitions";
 import { CachePipeline } from "../src/main/typescript/elvarg/game/cache/CachePipeline";
 import { PluginManager } from "../src/main/typescript/elvarg/plugins/PluginManager";
 import { CommandPacketListener } from "../src/main/typescript/elvarg/net/packet/impl/CommandPacketListener";
@@ -50,6 +51,18 @@ async function main() {
     "every standard rune is spawned"
   );
   assert.deepEqual(empty.messages, ["Spawned 1,000 of each rune type."]);
+  assert.equal(new Item(28929).getDefinition().isDropable(), true, "Sunfire runes should drop");
+
+  const itemCount = CacheDefinitions.getCounts().items;
+  for (let id = 0; id < itemCount; id++) {
+    const cached = CacheDefinitions.getItem(id);
+    const shouldDrop = cached.inventoryActions[4]?.toLowerCase() === "drop";
+    assert.equal(
+      new Item(id).getDefinition().isDropable(),
+      shouldDrop,
+      `${id} (${cached.name}) should follow its cache drop action`,
+    );
+  }
 
   // Full inventory, no runes held: nothing fits, exactly one message.
   const full = makePlayer(
@@ -79,7 +92,7 @@ async function main() {
   assert.deepEqual(runeStacks(mortal.inventory), [], "players cannot spawn runes");
   assert.deepEqual(mortal.messages, ["You do not have permission to use this command."]);
 
-  console.log("::runes command OK");
+  console.log(`::runes command and item drop definitions OK (${itemCount} items)`);
   process.exit(0);
 }
 main();
