@@ -4,7 +4,6 @@ import { NpcDefinition } from "../../../definition/NpcDefinition"
 import { Player } from "../player/Player";
 import { AreaManager } from "../../../model/areas/AreaManager";
 import { PrivateArea } from "../../../model/areas/impl/PrivateArea";
-import { Misc } from "../../../../util/Misc";
 import { NPC } from "./NPC";
 import { PluginManager } from "../../../../plugins/PluginManager";
 
@@ -42,25 +41,15 @@ export class NpcAggression {
             if (npcDefinition.buildsAggressionTolerance() && player.getAggressionTolerance().finished()
                 && PluginManager.emitNpcAggressionTolerance(player, npc) !== true) {
                 // If Player has obtained tolerance to this NPC, don't be aggressive.
-                return;
+                // Tolerance is per-npc, so skip just this one - the rest of the
+                // list may still contain npcs the player isn't tolerant to.
+                continue;
             }
 
             if (CombatFactory.inCombat(npc)) {
-                if (AreaManager.inMulti(npc) && player.getLocalPlayers().length > 0) {
-                    // Randomly attack different players if they're a team.
-                    if (Misc.getRandom(9) <= 2) {
-                        // Get a random player from the player's local players list.
-                        let randomPlayer = player.getLocalPlayers()[Misc.getRandom(player.getLocalPlayers().length - 1)];
-
-                        // Attack the new player if they're a valid target.
-                        if (CombatFactory.validTarget(npc, randomPlayer)) {
-                            npc.getCombat().attack(randomPlayer);
-                            break;
-                        }
-                    }
-                }
-
-                // Don't process tolerance if NPC is already in combat.
+                // An npc keeps the target it acquired until combat ends - it never
+                // re-hunts (or randomly re-rolls) while it has one, multi or not.
+                // Matches LostCity's consumeHuntTarget()/huntAll() and OSRS.
                 continue;
             }
 
