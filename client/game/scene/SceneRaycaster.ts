@@ -20,6 +20,9 @@ import {
 } from "./PlaneResolver";
 
 const PLAYER_INTERACT_BASE = 0x8000;
+// The OSRS client clamps player model AABBs to 32 model units, then adds 8 units
+// of clickable padding. The old 0.6-tile box was almost twice this width.
+const PLAYER_PICK_HALF_SIZE = 40 / 128;
 const MODEL_WORLD_SCALE = 1.0 / 128.0;
 // Fog boundary corner rounding in tiles; must match FOG_CORNER_ROUNDING in the shaders.
 const FOG_CORNER_ROUNDING = 0.0;
@@ -682,6 +685,7 @@ export class SceneRaycaster {
 
         const byMap = new Map<number, number[]>();
         for (let i = 0; i < n; i++) {
+            if (pe.getIsHidden(i)) continue;
             const playerPlane = pe.getLevel(i) | 0;
             if (typeof basePlane === "number" && (playerPlane | 0) !== (basePlane | 0)) {
                 continue;
@@ -722,18 +726,25 @@ export class SceneRaycaster {
                 const worldX = px / 128.0;
                 const worldZ = py / 128.0;
                 const interactId = PLAYER_INTERACT_BASE + (indexInMap & 0x7fff);
-                const half = 0.6;
                 const playerPlane = pe.getLevel(pid) | 0;
                 if (typeof basePlane === "number" && (playerPlane | 0) !== (basePlane | 0)) {
                     continue;
                 }
                 const groundY = this.sampleHeightAt(worldX, worldZ, playerPlane | 0);
-                const topY = groundY - 2.5;
+                const topY = groundY - Math.max(0.5, pe.getDefaultHeightTiles(pid) ?? 1.8);
                 const minY = Math.min(groundY, topY);
                 const maxY = Math.max(groundY, topY);
 
-                const min: [number, number, number] = [worldX - half, minY, worldZ - half];
-                const max: [number, number, number] = [worldX + half, maxY, worldZ + half];
+                const min: [number, number, number] = [
+                    worldX - PLAYER_PICK_HALF_SIZE,
+                    minY,
+                    worldZ - PLAYER_PICK_HALF_SIZE,
+                ];
+                const max: [number, number, number] = [
+                    worldX + PLAYER_PICK_HALF_SIZE,
+                    maxY,
+                    worldZ + PLAYER_PICK_HALF_SIZE,
+                ];
 
                 const boxHit = rayIntersectsBox(ray, min, max);
                 if (!boxHit) continue;
