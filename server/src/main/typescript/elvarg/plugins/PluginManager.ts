@@ -935,12 +935,14 @@ export class PluginManager {
   public static emitSpellRuneBypass(
     player: any,
     spellbook: any,
-    spellId: number
+    spellId: number,
+    runeId?: number
   ): boolean | null {
     const event: PluginSpellRuneBypassEvent = {
       player,
       spellbook,
       spellId,
+      runeId,
       bypass: null,
     };
     for (const hook of PluginManager.spellRuneBypassHooks) {

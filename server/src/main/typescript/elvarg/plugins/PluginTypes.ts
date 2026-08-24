@@ -257,6 +257,7 @@ export interface PluginSpellRuneBypassEvent {
   player: any;
   spellbook: any;
   spellId: number;
+  runeId?: number;
   bypass: boolean | null;
 }
 

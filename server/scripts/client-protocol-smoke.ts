@@ -64,6 +64,10 @@ import { packWorldMapCoord } from "../src/main/typescript/elvarg/net/protocol/Wo
 import { CombatFactory } from "../src/main/typescript/elvarg/game/content/combat/CombatFactory";
 import { HitQueue } from "../src/main/typescript/elvarg/game/content/combat/hit/HitQueue";
 import { TeleportHandler } from "../src/main/typescript/elvarg/game/model/teleportation/TeleportHandler";
+import { PluginManager } from "../src/main/typescript/elvarg/plugins/PluginManager";
+import { ItemIdentifiers } from "../src/main/typescript/elvarg/util/ItemIdentifiers";
+
+const ElementalStaves = require("../plugins/items/ElementalStaves.plugin");
 
 assert.strictEqual(EquipPacketListener.resolveEquipmentSlot(387, 15), 0);
 assert.strictEqual(EquipPacketListener.resolveEquipmentSlot(387, 25), 13);
@@ -118,6 +122,27 @@ assert.strictEqual(selectedAutocast, null);
 assert.strictEqual(WeaponInterfaces.WHIP.getCategory(), 20);
 assert.strictEqual(WeaponInterfaces.STAFF.getCategory(), 18);
 assert.strictEqual(WeaponInterfaces.BLOWPIPE.getCategory(), 19);
+
+ElementalStaves.register((PluginManager as any).createApi("elemental-staves-smoke"));
+let magicWeaponId = ItemIdentifiers.STAFF_OF_AIR;
+const staffPlayer = {
+  getEquipment: () => ({ get: () => ({ getId: () => magicWeaponId }) }),
+};
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0), null);
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0, ItemIdentifiers.AIR_RUNE), true);
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0, ItemIdentifiers.FIRE_RUNE), null);
+assert.deepStrictEqual(
+  CombatSpells.WIND_STRIKE.itemsToConsume(staffPlayer as any).map((rune) => rune.id),
+  [ItemIdentifiers.MIND_RUNE]
+);
+magicWeaponId = ItemIdentifiers.MYSTIC_SMOKE_STAFF;
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0, ItemIdentifiers.AIR_RUNE), true);
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0, ItemIdentifiers.FIRE_RUNE), true);
+magicWeaponId = ItemIdentifiers.KODAI_WAND;
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0, ItemIdentifiers.WATER_RUNE), true);
+magicWeaponId = ItemIdentifiers.TWINFLAME_STAFF;
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0, ItemIdentifiers.FIRE_RUNE), true);
+assert.strictEqual(PluginManager.emitSpellRuneBypass(staffPlayer, null, 0, ItemIdentifiers.WATER_RUNE), true);
 
 let hitTargetHp = 10;
 let hitAttackerHp = 10;

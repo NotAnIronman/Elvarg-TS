@@ -5,7 +5,6 @@ import { Equipment } from "../../../model/container/impl/Equipment";
 import { Item } from "../../../model/Item";
 import { MagicSpellbook } from "../../../model/MagicSpellbook";
 import { Skill } from "../../../model/Skill";
-import { PlayerMagicStaff } from "./PlayerMagicStaff";
 import { PluginManager } from "../../../../plugins/PluginManager";
 
 export abstract class Spell {
@@ -19,6 +18,17 @@ export abstract class Spell {
 
     public getSpellbook(): MagicSpellbook {
         return MagicSpellbook.NORMAL;
+    }
+
+    public itemsToConsume(player: Player, items = this.itemsRequired(player)): Item[] {
+        if (!Array.isArray(items) || PluginManager.emitSpellRuneBypass(
+            player, this.getSpellbook(), this.spellId()
+        ) === true) {
+            return [];
+        }
+        return items.filter((item) => item != null && PluginManager.emitSpellRuneBypass(
+            player, this.getSpellbook(), this.spellId(), item.id
+        ) !== true);
     }
 
     canCast(player: Player, del: boolean): boolean {
@@ -50,15 +60,9 @@ export abstract class Spell {
 
         const items = this.itemsRequired(player);
         if (Array.isArray(items) && items.length > 0) {
-            const bypassRunes =
-                PluginManager.emitSpellRuneBypass(
-                    player,
-                    this.getSpellbook(),
-                    this.spellId()
-                ) === true;
-            const suppressedItems = bypassRunes ? [] : PlayerMagicStaff.suppressRunes(player, items);
+            const itemsToConsume = this.itemsToConsume(player, items);
 
-            if (!bypassRunes && !player.getInventory().containsAllItem(suppressedItems)) {
+            if (!player.getInventory().containsAllItem(itemsToConsume)) {
                 player.getPacketSender().sendMessage("You do not have the required items to cast this spell.");
                 player.getCombat().setCastSpell(null);
                 player.getCombat().reset();
@@ -80,12 +84,10 @@ export abstract class Spell {
                 }
             }
 
-            if (del && !bypassRunes) {
+            if (del) {
                 let item: Item
-                for (item of suppressedItems) {
-                    if (item !== null) {
-                        player.getInventory().deletes(item);
-                    }
+                for (item of itemsToConsume) {
+                    player.getInventory().deletes(item);
                 }
             }
 

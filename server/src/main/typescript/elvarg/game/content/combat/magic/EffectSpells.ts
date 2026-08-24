@@ -35,7 +35,7 @@ export class EffectSpells extends Spell {
                     player.getPacketSender().sendMessage("You do not have any bones in your inventory.");
                     return true;
                 }
-                player.getInventory().deleteItemSet(spell.itemsRequired(player));
+                player.getInventory().deleteItemSet(spell.itemsToConsume(player));
                 let i = 0;
                 player.getInventory().getValidItems().forEach(invItem => {
                     if (invItem.getId() == 526) {
@@ -75,7 +75,7 @@ export class EffectSpells extends Spell {
                 player.getVengeanceTimer().start(30);
                 player.getPacketSender().sendEffectTimer(30, EffectTimer.VENGEANCE)
                     .sendMessage("You now have Vengeance's effect.");
-                player.getInventory().deleteItemSet(spell.itemsRequired(player));
+                player.getInventory().deleteItemSet(spell.itemsToConsume(player));
                 player.performAnimation(new Animation(8316));
                 player.performGraphic(new Graphic(726, GraphicHeight.HIGH));
                 break;
