@@ -67,6 +67,7 @@ import { Autocasting } from "../game/content/combat/magic/Autocasting";
 import { CombatSpells } from "../game/content/combat/magic/CombatSpells";
 import { TeleportHandler } from "../game/model/teleportation/TeleportHandler";
 import { FriendsChatManager } from "../game/content/FriendsChatManager";
+import { Equipment } from "../game/model/container/impl/Equipment";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -180,8 +181,14 @@ class ClientConnection {
 
     for (const packet of packets) {
       if (this.player && WORLD_INTERACTIONS.has(packet.type)) {
+        const equipmentStatsItemAction =
+          packet.type === "inventory_action" &&
+          this.player.getInterfaceId() === Equipment.EQUIPMENT_SCREEN_INTERFACE_ID;
         if (this.player.getStatus() === PlayerStatus.TRADING) continue;
-        if (packet.type !== "move" || this.player.getMovementQueue().getMobility().canMove()) {
+        if (
+          !equipmentStatsItemAction &&
+          (packet.type !== "move" || this.player.getMovementQueue().getMobility().canMove())
+        ) {
           this.player.closeInterruptibleInterfaces();
         }
       }
@@ -388,6 +395,20 @@ class ClientConnection {
           if (this.player) {
             const actionPacket = { ...packet, buttonNum: packet.buttonNum ?? 0 };
             const equipmentSlot = EquipPacketListener.resolveEquipmentSlot(actionPacket.groupId, actionPacket.childId);
+            const pluginAction = actionPacket.opId ?? actionPacket.buttonNum;
+            const handlePluginAction = () => InterfaceActionClickOpcode.handle(
+              this.player,
+              actionPacket.widgetId,
+              pluginAction,
+              {
+                groupId: actionPacket.groupId,
+                childId: actionPacket.childId,
+                opId: actionPacket.opId,
+                itemId: actionPacket.itemId,
+                slot: actionPacket.slot,
+                option: actionPacket.option,
+              },
+            );
             if (FriendsChatManager.handleWidgetAction(
               this.player,
               actionPacket.groupId,
@@ -400,10 +421,13 @@ class ClientConnection {
               this.player.getPacketSender().toggleWorldMap();
             } else if (actionPacket.widgetId === WORLD_MAP_CLOSE_WIDGET_ID) {
               this.player.getPacketSender().closeWorldMap();
-            } else if (equipmentSlot >= 0) {
+            } else if (
+              (actionPacket.groupId === 84 || actionPacket.groupId === 85) &&
+              handlePluginAction()
+            ) {
+              // The equipment-stats plugin owns its worn and side-inventory actions.
+            } else if (equipmentSlot >= 0 && pluginAction === 1) {
               EquipPacketListener.unequip(this.player, equipmentSlot);
-            } else if (actionPacket.groupId === 387 && actionPacket.childId === 1) {
-              BonusManager.open(this.player);
             } else if (Bank.handleWidgetAction(this.player, actionPacket)) {
               // Bank owns its cache-native widgets while the bank modal is open.
             } else if (ShopManager.handleWidgetAction(this.player, actionPacket)) {
@@ -434,14 +458,7 @@ class ClientConnection {
                 itemId: actionPacket.itemId, option: actionPacket.option, optionIndex: actionPacket.buttonNum,
               });
             } else {
-              const handled = InterfaceActionClickOpcode.handle(this.player, actionPacket.widgetId, actionPacket.buttonNum, {
-                groupId: actionPacket.groupId,
-                childId: actionPacket.childId,
-                opId: actionPacket.opId,
-                itemId: actionPacket.itemId,
-                slot: actionPacket.slot,
-                option: actionPacket.option,
-              });
+              const handled = handlePluginAction();
               if (!handled && actionPacket.simple) {
                 PluginManager.emitButtonClick({
                   player: this.player,
