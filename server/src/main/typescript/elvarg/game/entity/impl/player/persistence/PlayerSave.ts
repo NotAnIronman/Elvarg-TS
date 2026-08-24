@@ -95,6 +95,12 @@ export class PlayerSave {
     private quickPrayers: PrayerData[];
     private friends: string[];
     private ignores: string[];
+    private friendRanks: Record<string, number>;
+    private friendsChatChannelName: string;
+    private friendsChatLastOwner: string;
+    private friendsChatEntryRank: number;
+    private friendsChatTalkRank: number;
+    private friendsChatKickRank: number;
     private banks: Map<number, Item[]>;
     private presets: Presetable[];
     private questPoints: number;
@@ -446,6 +452,26 @@ export class PlayerSave {
         this.ignores = ignores;
     }
 
+    public getFriendRanks(): Record<string, number> {
+        return this.friendRanks ?? {};
+    }
+
+    public getFriendsChatChannelName(): string {
+        return this.friendsChatChannelName ?? "";
+    }
+
+    public getFriendsChatEntryRank(): number {
+        return Number.isFinite(this.friendsChatEntryRank) ? this.friendsChatEntryRank : -1;
+    }
+
+    public getFriendsChatTalkRank(): number {
+        return Number.isFinite(this.friendsChatTalkRank) ? this.friendsChatTalkRank : -1;
+    }
+
+    public getFriendsChatKickRank(): number {
+        return Number.isFinite(this.friendsChatKickRank) ? this.friendsChatKickRank : 2;
+    }
+
     public getBanks(): Map<number, Item[]> {
         return this.banks;
     }
@@ -709,6 +735,15 @@ export class PlayerSave {
                 PlayerSave.MAX_IGNORES
             )
         );
+        const relations = player.getRelations();
+        relations.loadFriendRanks(this.friendRanks);
+        relations.setFriendsChatChannelName(this.friendsChatChannelName ?? "");
+        relations.setFriendsChatLastOwner(this.friendsChatLastOwner ?? "");
+        relations.setFriendsChatRanks(
+            this.getFriendsChatEntryRank(),
+            this.getFriendsChatTalkRank(),
+            this.getFriendsChatKickRank()
+        );
 
         for (let i = 0; i < player.getBanks().length; i++) {
             if (i == Bank.BANK_SEARCH_TAB_INDEX) {
@@ -802,6 +837,13 @@ export class PlayerSave {
             player.getRelations().getIgnoreList(),
             PlayerSave.MAX_IGNORES
         );
+        const relations = player.getRelations();
+        playerSave.friendRanks = relations.getFriendRanks();
+        playerSave.friendsChatChannelName = relations.getFriendsChatChannelName();
+        playerSave.friendsChatLastOwner = relations.getFriendsChatLastOwner();
+        playerSave.friendsChatEntryRank = relations.getFriendsChatEntryRank();
+        playerSave.friendsChatTalkRank = relations.getFriendsChatTalkRank();
+        playerSave.friendsChatKickRank = relations.getFriendsChatKickRank();
 
         playerSave.presets = [...(player.getPresets() ?? [])];
 

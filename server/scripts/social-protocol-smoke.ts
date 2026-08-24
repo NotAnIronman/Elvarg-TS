@@ -6,6 +6,7 @@ import {
   encodeFriendsChatSnapshot,
 } from "../src/main/typescript/elvarg/net/protocol/ClientProtocol";
 import { FriendsChatManager } from "../src/main/typescript/elvarg/game/content/FriendsChatManager";
+import { PlayerSave } from "../src/main/typescript/elvarg/game/entity/impl/player/persistence/PlayerSave";
 import { PlayerRelations } from "../src/main/typescript/elvarg/game/model/PlayerRelations";
 import { World } from "../src/main/typescript/elvarg/game/World";
 import { Misc } from "../src/main/typescript/elvarg/util/Misc";
@@ -25,6 +26,20 @@ persistedRelations.friendList.push(123n);
 persistedRelations.loadFriendRanks({ "123": 6, "456": 5 });
 assert.strictEqual(persistedRelations.getFriendRank(123n), 6);
 assert.strictEqual(persistedRelations.getFriendRank(456n), 0);
+
+const persistedProfile = new PlayerSave() as any;
+persistedProfile.friendRanks = { "123": 6 };
+persistedProfile.friendsChatChannelName = "Owner Chat";
+persistedProfile.friendsChatEntryRank = 1;
+persistedProfile.friendsChatTalkRank = 2;
+persistedProfile.friendsChatKickRank = 3;
+assert.deepStrictEqual(persistedProfile.getFriendRanks(), { "123": 6 });
+assert.strictEqual(persistedProfile.getFriendsChatChannelName(), "Owner Chat");
+assert.deepStrictEqual([
+  persistedProfile.getFriendsChatEntryRank(),
+  persistedProfile.getFriendsChatTalkRank(),
+  persistedProfile.getFriendsChatKickRank(),
+], [1, 2, 3]);
 
 const setupOpens: Array<{ targetUid: number; groupId: number; type: number }> = [];
 const setupSender: any = {
