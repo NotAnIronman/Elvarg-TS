@@ -4,6 +4,10 @@ import { WeaponProfiles } from "../src/main/typescript/elvarg/game/content/comba
 import { WeaponInterfaces } from "../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces";
 import { CachePipeline } from "../src/main/typescript/elvarg/game/cache/CachePipeline";
 import { RegionManager } from "../src/main/typescript/elvarg/game/collision/RegionManager";
+import { GameObject } from "../src/main/typescript/elvarg/game/entity/impl/object/GameObject";
+import { Player } from "../src/main/typescript/elvarg/game/entity/impl/player/Player";
+import { Location } from "../src/main/typescript/elvarg/game/model/Location";
+import { TaskManager } from "../src/main/typescript/elvarg/game/task/TaskManager";
 import { RsmodRouteFinding } from "../src/main/typescript/elvarg/game/model/movement/path/RsmodRouteFinding";
 
 void FightType;
@@ -101,7 +105,42 @@ async function verifyCacheCollision(): Promise<void> {
   assert.strictEqual(RegionManager.canMove(3092, 3508, 3093, 3508, 0, 1, 1, null), false);
 }
 
+function verifyObjectInteractionRequiresStationaryReach(): void {
+  const originalClipping = RegionManager.getClipping;
+  (RegionManager as any).getClipping = (x: number, y: number) => x === 3 && y === 0 ? 0x100 : 0;
+  try {
+    const player = new Player({ write() {}, sendClientPacket() {} } as any, new Location(0, 0, 0));
+    const gangplank = new GameObject(14315, new Location(3, 0, 0), 10, 0, null);
+    let interactions = 0;
+    player.setIndex(1);
+    player.setRunning(true);
+    player.getMovementQueue().walkToObject(gangplank, { execute: () => interactions++ });
+
+    TaskManager.process();
+    player.getMovementQueue().beginCycle();
+    player.getMovementQueue().process();
+    TaskManager.processWalkTo(player.getIndex());
+    assert.equal(player.getLocation().getX(), 2);
+    assert.equal(interactions, 0, "running into range must not count as stationary object reach");
+
+    TaskManager.process();
+    player.getMovementQueue().beginCycle();
+    player.getMovementQueue().process();
+    TaskManager.processWalkTo(player.getIndex());
+    assert.equal(interactions, 1);
+
+    const adjacent = new Player({ write() {}, sendClientPacket() {} } as any, new Location(2, 0, 0));
+    adjacent.setIndex(2);
+    let adjacentInteractions = 0;
+    adjacent.getMovementQueue().walkToObject(gangplank, { execute: () => adjacentInteractions++ });
+    assert.equal(adjacentInteractions, 1, "an adjacent stationary click must resolve without a delay");
+  } finally {
+    (RegionManager as any).getClipping = originalClipping;
+  }
+}
+
 verifyCacheCollision()
+  .then(() => verifyObjectInteractionRequiresStationaryReach())
   .then(() => console.log("pathfinding smoke test passed"))
   .catch((error) => {
     console.error(error);

@@ -1243,7 +1243,7 @@ export class MovementQueue {
                 routeSpec.reachAngle,
                 routeSpec.reachShape,
                 routeSpec.reachBlockAccessFlags
-            )) {
+            ) && !this.player.getMovementQueue().didMoveThisCycle()) {
                 if (objectX === this.player.getLocation().getX() && objectY === this.player.getLocation().getY()) {
                     this.player.setDirection([Direction.WEST, Direction.NORTH, Direction.EAST, Direction.SOUTH][direction]);
                 }
