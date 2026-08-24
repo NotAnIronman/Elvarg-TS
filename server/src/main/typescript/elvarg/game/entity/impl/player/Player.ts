@@ -571,6 +571,8 @@ export class Player extends Mobile {
     }
 
     onLogout() {
+        // Also covers world-driven removals that do not originate from a socket close.
+        require("../../../content/FriendsChatManager").FriendsChatManager.onLogout(this);
         // Notify us
         if (!this.isPlayerBot()) {
             console.log("[World] Deregistering player - [username, host] : [" + this.getUsername() + ", " + this.getHostAddress() + "]");

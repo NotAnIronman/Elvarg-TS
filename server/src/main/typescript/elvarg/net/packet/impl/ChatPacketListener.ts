@@ -47,7 +47,7 @@ export class ChatPacketListener {
       if (
         !recipient ||
         sent.has(recipient.getIndex()) ||
-        recipient.getRelations?.().hasIgnore?.(player.getLongUsername())
+        (recipient !== player && !recipient.getRelations?.().canReceivePublicChatFrom?.(player))
       ) continue;
       sent.add(recipient.getIndex());
       recipient.getPacketSender().sendPublicChat(text, player.getUsername(), player.getIndex());

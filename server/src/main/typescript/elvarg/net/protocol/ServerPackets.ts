@@ -81,6 +81,7 @@ export const enum ServerPacketId {
     // CHAT/MESSAGES (120-129)
     // ========================================
     CHAT_MESSAGE = 120,
+    FRIENDS_CHAT_UPDATE = 121,
 
     // ========================================
     // WORLD UPDATES (130-149)
@@ -204,6 +205,7 @@ export const SERVER_PACKET_LENGTHS: Record<ServerPacketId, number> = {
     [ServerPacketId.WIDGET_SET_QUEST_LIST]: -2,
 
     [ServerPacketId.CHAT_MESSAGE]: -1,
+    [ServerPacketId.FRIENDS_CHAT_UPDATE]: -2,
 
     [ServerPacketId.LOC_CHANGE]: -1,
     [ServerPacketId.LOC_ADD_CHANGE]: -1,

@@ -480,6 +480,21 @@ export class ClientBinaryEncoder {
         return this.buffer.toPacket(ClientPacketId.FRIENDS_CHAT_ACTION);
     }
 
+    encodePrivateMessage(recipient: string, text: string): Uint8Array {
+        this.buffer.reset();
+        this.buffer.writeString(recipient);
+        this.buffer.writeString(text);
+        return this.buffer.toPacket(ClientPacketId.PRIVATE_MESSAGE);
+    }
+
+    encodeChatFilter(publicMode: number, privateMode: number, tradeMode: number): Uint8Array {
+        this.buffer.reset();
+        this.buffer.writeByte(publicMode);
+        this.buffer.writeByte(privateMode);
+        this.buffer.writeByte(tradeMode);
+        return this.buffer.toPacket(ClientPacketId.CHAT_FILTER);
+    }
+
     encodeVarpTransmit(varpId: number, value: number): Uint8Array {
         this.buffer.reset();
         this.buffer.writeShort(varpId);
@@ -613,6 +628,16 @@ export function encodeClientMessage(msg: { type: string; payload: any }): Uint8A
 
         case "friends_chat_action":
             return clientEncoder.encodeFriendsChatAction(payload);
+
+        case "private_message":
+            return clientEncoder.encodePrivateMessage(payload.recipient, payload.text);
+
+        case "chat_filter":
+            return clientEncoder.encodeChatFilter(
+                payload.publicMode,
+                payload.privateMode,
+                payload.tradeMode,
+            );
 
         case "varp_transmit":
             return clientEncoder.encodeVarpTransmit(payload.varpId, payload.value);

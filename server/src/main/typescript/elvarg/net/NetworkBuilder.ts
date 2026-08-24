@@ -66,6 +66,7 @@ import { PrayerHandler } from "../game/content/PrayerHandler";
 import { Autocasting } from "../game/content/combat/magic/Autocasting";
 import { CombatSpells } from "../game/content/combat/magic/CombatSpells";
 import { TeleportHandler } from "../game/model/teleportation/TeleportHandler";
+import { FriendsChatManager } from "../game/content/FriendsChatManager";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -302,8 +303,30 @@ class ClientConnection {
           }
           continue;
         case "chat":
-          if (this.player && packet.messageType === "public") {
-            ChatPacketListener.handleText(this.player, packet.text);
+          if (this.player) {
+            if (packet.messageType === "friends_chat") {
+              FriendsChatManager.handleChat(this.player, packet.text);
+            } else if (packet.messageType === "public") {
+              ChatPacketListener.handleText(this.player, packet.text);
+            }
+          }
+          continue;
+        case "friends_chat_action":
+          if (this.player) FriendsChatManager.handleAction(this.player, packet.action);
+          continue;
+        case "private_message":
+          if (this.player) {
+            FriendsChatManager.handlePrivateMessage(this.player, packet.recipient, packet.text);
+          }
+          continue;
+        case "chat_filter":
+          if (this.player) {
+            FriendsChatManager.setChatFilters(
+              this.player,
+              packet.publicMode,
+              packet.privateMode,
+              packet.tradeMode,
+            );
           }
           continue;
         case "dialogue_continue": {
@@ -365,7 +388,15 @@ class ClientConnection {
           if (this.player) {
             const actionPacket = { ...packet, buttonNum: packet.buttonNum ?? 0 };
             const equipmentSlot = EquipPacketListener.resolveEquipmentSlot(actionPacket.groupId, actionPacket.childId);
-            if (WORLD_MAP_ORB_WIDGET_IDS.includes(actionPacket.widgetId) && actionPacket.buttonNum === 2) {
+            if (FriendsChatManager.handleWidgetAction(
+              this.player,
+              actionPacket.groupId,
+              actionPacket.childId,
+              actionPacket.option,
+              actionPacket.opId ?? actionPacket.buttonNum ?? 1,
+            )) {
+              // Friends Chat owns the channel tab and setup widgets.
+            } else if (WORLD_MAP_ORB_WIDGET_IDS.includes(actionPacket.widgetId) && actionPacket.buttonNum === 2) {
               this.player.getPacketSender().toggleWorldMap();
             } else if (actionPacket.widgetId === WORLD_MAP_CLOSE_WIDGET_ID) {
               this.player.getPacketSender().closeWorldMap();
@@ -693,6 +724,7 @@ class ClientConnection {
       .sendItemContainer(player.getInventory(), 3214)
       .sendSkillsSnapshot()
       .sendRunEnergy();
+    FriendsChatManager.onLogin(player);
   }
 
   private walk(x: number, y: number, modifierFlags: number): void {
@@ -826,6 +858,7 @@ class ClientConnection {
     this.closed = true;
     this.releasePendingName();
     if (!this.player) return;
+    FriendsChatManager.onLogout(this.player);
     if (!World.getRemovePlayerQueue().includes(this.player)) {
       World.getRemovePlayerQueue().push(this.player);
     }

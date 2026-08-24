@@ -1001,6 +1001,11 @@ export class PacketSender {
     type = 1,
     options: Parameters<typeof encodeWidgetOpenSub>[3] = {}
   ): this {
+    for (const [mountedGroupId, mounted] of this.subInterfaceTargets) {
+      if (mounted.targetUid === targetUid && mountedGroupId !== groupId) {
+        this.subInterfaceTargets.delete(mountedGroupId);
+      }
+    }
     this.subInterfaceTargets.set(groupId, { targetUid, type });
     this.player.getSession().sendClientPacket(encodeWidgetOpenSub(targetUid, groupId, type, options));
     if (groupId === MAIN_INVENTORY_GROUP_ID) {

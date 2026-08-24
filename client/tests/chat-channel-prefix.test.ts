@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { decodeClientPacket } from "../../server/src/network/packet/ClientBinaryDecoder";
+import { decodeClientPacket } from "../../server/src/main/typescript/elvarg/net/protocol/ClientProtocol";
 import { state } from "../network/serverConnection/state";
 import { Opcodes } from "../rs/cs2/Opcodes";
 import { registerChatOps } from "../rs/cs2/handlers/ChatOps";
@@ -19,8 +19,12 @@ const handlers: HandlerMap = new Map();
 registerChatOps(handlers);
 const sendPublic = handlers.get(Opcodes.CHAT_SENDPUBLIC);
 const sendClan = handlers.get(Opcodes.CHAT_SENDCLAN);
+const sendPrivate = handlers.get(Opcodes.CHAT_SENDPRIVATE);
+const setFilter = handlers.get(Opcodes.CHAT_SETFILTER);
 assert.ok(sendPublic);
 assert.ok(sendClan);
+assert.ok(sendPrivate);
+assert.ok(setFilter);
 
 const clearedVarcs: Array<[number, string]> = [];
 sendPublic(
@@ -37,12 +41,10 @@ sendPublic(
 );
 
 assert.ok(sentPacket);
-assert.deepEqual(decodeClientPacket(sentPacket), {
+assert.deepEqual(decodeClientPacket(Buffer.from(sentPacket)), {
     type: "chat",
-    payload: {
-        text: "hello channel",
-        messageType: "friends_chat",
-    },
+    text: "hello channel",
+    messageType: "friends_chat",
 });
 assert.deepEqual(clearedVarcs, [[335, ""]]);
 
@@ -58,12 +60,10 @@ sendPublic(
     0,
 );
 assert.ok(sentPacket);
-assert.deepEqual(decodeClientPacket(sentPacket), {
+assert.deepEqual(decodeClientPacket(Buffer.from(sentPacket)), {
     type: "chat",
-    payload: {
-        text: "hello public",
-        messageType: "public",
-    },
+    text: "hello public",
+    messageType: "public",
 });
 
 sentPacket = undefined;
@@ -78,6 +78,35 @@ sendClan(
     0,
 );
 assert.equal(sentPacket, undefined);
+
+sendPrivate(
+    {
+        stringStack: ["Alice", "Meet me in Lumbridge."],
+        stringStackSize: 2,
+    } as any,
+    0,
+);
+assert.ok(sentPacket);
+assert.deepEqual(decodeClientPacket(Buffer.from(sentPacket)), {
+    type: "private_message",
+    recipient: "Alice",
+    text: "Meet me in Lumbridge.",
+});
+
+setFilter(
+    {
+        intStack: Int32Array.from([1, 2, 0]),
+        intStackSize: 3,
+    } as any,
+    0,
+);
+assert.ok(sentPacket);
+assert.deepEqual(decodeClientPacket(Buffer.from(sentPacket)), {
+    type: "chat_filter",
+    publicMode: 1,
+    privateMode: 2,
+    tradeMode: 0,
+});
 
 state.socket = null;
 console.log("chat-channel-prefix.test.ts: all tests passed");

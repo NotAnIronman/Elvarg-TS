@@ -2808,11 +2808,20 @@ export class OsrsClient {
                     );
                 }
                 const text = isTradeRequest && msg.from ? `${msg.from} ${msg.text}` : msg.text;
+                const normalizedSender = (msg.from ?? "").replace(/<img=\d+>/g, "").trim().toLowerCase();
+                const isFromFriend = (this.cs2Vm.context.friendList ?? []).some(
+                    (friend) => friend.name.toLowerCase() === normalizedSender,
+                );
+                const isFromIgnored = (this.cs2Vm.context.ignoreList ?? []).some(
+                    (ignored) => ignored.name.toLowerCase() === normalizedSender,
+                );
                 chatHistory.addMessage(
                     msg.chatType ?? msg.messageType,
                     text,
                     msg.from ?? "",
                     msg.prefix ?? "",
+                    isFromFriend,
+                    isFromIgnored,
                 );
                 // Note: chatCycle is now marked by onMessageAdded callback below
             });

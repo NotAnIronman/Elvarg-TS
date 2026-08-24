@@ -159,11 +159,42 @@ export type GroundItemView = {
   ownership?: 0 | 1 | 2 | 3;
 };
 
+export type FriendsChatAction =
+  | { action: "join"; name: string }
+  | { action: "leave" }
+  | { action: "kick"; name: string }
+  | { action: "add_friend"; name: string }
+  | { action: "remove_friend"; name: string }
+  | { action: "set_friend_rank"; name: string; rank: number }
+  | { action: "add_ignore"; name: string }
+  | { action: "remove_ignore"; name: string };
+
+export type FriendsChatSnapshot = {
+  channel?: {
+    name: string;
+    owner: string;
+    minKickRank: number;
+    localRank: number;
+    members: Array<{ name: string; world: number; rank: number }>;
+  };
+  friends: Array<{
+    name: string;
+    previousName: string;
+    world: number;
+    rank: number;
+    isOnline: boolean;
+  }>;
+  ignores: Array<{ name: string; previousName: string }>;
+};
+
 export type ClientMessage =
   | { type: "move"; worldX: number; worldY: number; modifierFlags: number }
   | { type: "npc_option"; index: number; clickType: number }
   | { type: "object_option"; id: number; x: number; y: number; clickType?: number; action?: string }
-  | { type: "chat"; text: string; messageType: "public" | "game" }
+  | { type: "chat"; text: string; messageType: "public" | "game" | "friends_chat" }
+  | { type: "friends_chat_action"; action: FriendsChatAction }
+  | { type: "private_message"; recipient: string; text: string }
+  | { type: "chat_filter"; publicMode: number; privateMode: number; tradeMode: number }
   | { type: "widget_action"; widgetId: number; groupId: number; childId: number; buttonNum?: number; opId?: number; option?: string; target?: string; slot?: number; itemId?: number; subOpId?: number; simple?: boolean }
   | { type: "widget"; action: "open" | "close"; groupId: number; modal?: boolean }
   | { type: "widget_target"; targetWidgetId: number; targetSlot: number; targetItemId: number; sourceWidgetId: number; sourceSlot: number; sourceItemId: number }
@@ -636,8 +667,40 @@ export function decodeClientPacket(frame: Buffer): ClientMessage {
     case ClientPacket.CHAT:
       return {
         type: "chat",
-        messageType: reader.byte() === 1 ? "game" : "public",
+        messageType: (["public", "game", "friends_chat"] as const)[reader.byte()] ?? "public",
         text: reader.string(),
+      };
+    case HighClientPacket.FRIENDS_CHAT_ACTION: {
+      const actionCode = reader.byte();
+      const name = reader.string();
+      const rankByte = reader.byte();
+      const rank = rankByte > 0x7f ? rankByte - 0x100 : rankByte;
+      const namedActions = [
+        "join",
+        "leave",
+        "kick",
+        "add_friend",
+        "remove_friend",
+        "set_friend_rank",
+        "add_ignore",
+        "remove_ignore",
+      ] as const;
+      const action = namedActions[actionCode];
+      if (!action) return { type: "raw", opcode, payload: frame.subarray(frame.length) };
+      if (action === "leave") return { type: "friends_chat_action", action: { action } };
+      if (action === "set_friend_rank") {
+        return { type: "friends_chat_action", action: { action, name, rank } };
+      }
+      return { type: "friends_chat_action", action: { action, name } };
+    }
+    case HighClientPacket.PRIVATE_MESSAGE:
+      return { type: "private_message", recipient: reader.string(), text: reader.string() };
+    case HighClientPacket.CHAT_FILTER:
+      return {
+        type: "chat_filter",
+        publicMode: reader.byte(),
+        privateMode: reader.byte(),
+        tradeMode: reader.byte(),
       };
     case HighClientPacket.VARP_TRANSMIT:
       return { type: "varp_transmit", varpId: reader.short(), value: reader.int() };
@@ -808,15 +871,67 @@ export function encodeChatMessage(
   text: string,
   from = "",
   prefix = "",
-  playerId = -1
+  playerId = -1,
+  chatType?: number
 ): Buffer {
-  const type = ["game", "public", "private_in", "private_out", "channel", "clan", "trade", "server"]
-    .indexOf(messageType);
+  const defaultTypes: Record<typeof messageType, number> = {
+    game: 0,
+    public: 2,
+    private_in: 3,
+    private_out: 6,
+    channel: 9,
+    clan: 7,
+    trade: 4,
+    server: 0,
+  };
+  const type = chatType ?? defaultTypes[messageType];
   const id = Buffer.alloc(2);
   id.writeUInt16BE(playerId & 0xffff);
   return encodeServerPacket(ServerPacketId.CHAT_MESSAGE, Buffer.concat([
-    string(text), Buffer.from([type]), string(from), string(prefix), id,
+    string(text), Buffer.from([type & 0xff]), string(from), string(prefix), id,
   ]));
+}
+
+export function encodeFriendsChatSnapshot(snapshot: FriendsChatSnapshot): Buffer {
+  const parts: Buffer[] = [Buffer.from([snapshot.channel ? 1 : 0])];
+  if (snapshot.channel) {
+    const channel = snapshot.channel;
+    const count = Buffer.alloc(2);
+    count.writeUInt16BE(channel.members.length);
+    parts.push(
+      string(channel.name),
+      string(channel.owner),
+      Buffer.from([channel.minKickRank & 0xff, channel.localRank & 0xff]),
+      count,
+    );
+    for (const member of channel.members) {
+      const world = Buffer.alloc(2);
+      world.writeUInt16BE(member.world & 0xffff);
+      parts.push(string(member.name), world, Buffer.from([member.rank & 0xff]));
+    }
+  }
+
+  const friendCount = Buffer.alloc(2);
+  friendCount.writeUInt16BE(snapshot.friends.length);
+  parts.push(friendCount);
+  for (const friend of snapshot.friends) {
+    const world = Buffer.alloc(2);
+    world.writeUInt16BE(friend.world & 0xffff);
+    parts.push(
+      string(friend.name),
+      string(friend.previousName),
+      world,
+      Buffer.from([friend.rank & 0xff, friend.isOnline ? 1 : 0]),
+    );
+  }
+
+  const ignoreCount = Buffer.alloc(2);
+  ignoreCount.writeUInt16BE(snapshot.ignores.length);
+  parts.push(ignoreCount);
+  for (const ignored of snapshot.ignores) {
+    parts.push(string(ignored.name), string(ignored.previousName));
+  }
+  return encodeServerPacket(ServerPacketId.FRIENDS_CHAT_UPDATE, Buffer.concat(parts));
 }
 
 export function encodeVarp(id: number, value: number): Buffer {

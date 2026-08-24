@@ -290,7 +290,8 @@ export function processWidgetClickInput(
                     const clickCtx: Partial<ScriptEvent> = {
                         mouseX: widgetInteraction.clickedWidgetX,
                         mouseY: widgetInteraction.clickedWidgetY,
-                        opIndex: 1,
+                        opIndex: primaryAction.opIndex ?? 1,
+                        targetName: primaryAction.target,
                     };
                     let handled = false;
                     let invokedAnyHandler = false;
