@@ -1330,7 +1330,37 @@ export function encodeWidgetSetAnimation(uid: number, animationId: number): Buff
   return encodeServerPacket(ServerPacketId.WIDGET_SET_ANIMATION, payload);
 }
 
-export function encodeWidgetRunScript(scriptId: number, args: (number | string)[] = [], varps?: Record<number, number>, varbits?: Record<number, number>): Buffer {
+export type ScriptInventorySnapshot = {
+  capacity: number;
+  slots: Array<{ slot: number; itemId: number; quantity: number }>;
+};
+
+function scriptInventories(inventories?: Record<number, ScriptInventorySnapshot>): Buffer {
+  if (!inventories) return Buffer.alloc(0);
+  const entries = Object.entries(inventories);
+  const parts: Buffer[] = [Buffer.from([entries.length])];
+  for (const [inventoryId, inventory] of entries) {
+    const header = Buffer.alloc(6);
+    header.writeUInt16BE(Number(inventoryId) & 0xffff);
+    header.writeUInt16BE(inventory.capacity & 0xffff, 2);
+    header.writeUInt16BE(inventory.slots.length & 0xffff, 4);
+    parts.push(
+      header,
+      ...inventory.slots.map(({ slot, itemId, quantity }) =>
+        encodeItemSlot(slot, itemId, quantity)
+      )
+    );
+  }
+  return Buffer.concat(parts);
+}
+
+export function encodeWidgetRunScript(
+  scriptId: number,
+  args: (number | string)[] = [],
+  varps?: Record<number, number>,
+  varbits?: Record<number, number>,
+  inventories?: Record<number, ScriptInventorySnapshot>
+): Buffer {
   const id = Buffer.alloc(4);
   id.writeInt32BE(scriptId | 0);
   const vars = (values?: Record<number, number>) => {
@@ -1339,7 +1369,16 @@ export function encodeWidgetRunScript(scriptId: number, args: (number | string)[
     count.writeUInt16BE(pairs[0]);
     return Buffer.concat([count, pairs.subarray(1)]);
   };
-  return encodeServerPacket(ServerPacketId.WIDGET_RUN_SCRIPT, Buffer.concat([id, scriptArgs(args), vars(varps), vars(varbits)]));
+  return encodeServerPacket(
+    ServerPacketId.WIDGET_RUN_SCRIPT,
+    Buffer.concat([
+      id,
+      scriptArgs(args),
+      vars(varps),
+      vars(varbits),
+      scriptInventories(inventories),
+    ])
+  );
 }
 
 export function encodeRunClientScript(scriptId: number, args: (number | string)[] = []): Buffer {

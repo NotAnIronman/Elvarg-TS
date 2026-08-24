@@ -2587,6 +2587,26 @@ export class OsrsClient {
                             this._serverVarpSync = false;
                         }
                     }
+                    if (payload.inventories) {
+                        for (const [id, snapshot] of Object.entries(
+                            payload.inventories as Record<
+                                number,
+                                { capacity: number; slots: any[] }
+                            >,
+                        )) {
+                            const inventoryId = Number(id) | 0;
+                            const capacity = Math.max(0, Number(snapshot.capacity) | 0);
+                            let inventory = inventoriesMap.get(inventoryId);
+                            if (!inventory || inventory.capacity !== capacity) {
+                                inventory = new Inventory(capacity);
+                                inventoriesMap.set(inventoryId, inventory);
+                            }
+                            inventory.setSnapshot(
+                                Array.isArray(snapshot.slots) ? snapshot.slots : [],
+                                { selectedSlot: null },
+                            );
+                        }
+                    }
                     const script = this.cs2Vm.context.loadScript(scriptId);
                     if (script) {
                         // Separate int and string args

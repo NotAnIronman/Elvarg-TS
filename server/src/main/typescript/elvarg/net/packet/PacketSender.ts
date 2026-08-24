@@ -45,6 +45,7 @@ import {
   encodeWidgetSetPlayerHead,
   encodeWidgetSetRoot,
   encodeWidgetSetText,
+  type ScriptInventorySnapshot,
   MAIN_INVENTORY_GROUP_ID,
   MAIN_INVENTORY_SLOT_FLAGS,
   MAIN_INVENTORY_WIDGET_UID,
@@ -1055,8 +1056,18 @@ export class PacketSender {
     return this;
   }
 
-  sendInterfaceScript(scriptId: number, args: (number | string)[] = [], varps?: Record<number, number>, varbits?: Record<number, number>): this {
-    this.player.getSession().sendClientPacket(encodeWidgetRunScript(scriptId, args, varps, varbits));
+  sendInterfaceScript(
+    scriptId: number,
+    args: (number | string)[] = [],
+    varps?: Record<number, number>,
+    varbits?: Record<number, number>,
+    inventories?: Record<number, ScriptInventorySnapshot>
+  ): this {
+    this.player
+      .getSession()
+      .sendClientPacket(
+        encodeWidgetRunScript(scriptId, args, varps, varbits, inventories)
+      );
     return this;
   }
 

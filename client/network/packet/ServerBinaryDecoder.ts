@@ -922,6 +922,29 @@ export function decodeServerPacket(data: Uint8Array | ArrayBuffer): DecodedServe
             };
             const varps = readVars();
             const varbits = readVars();
+            const inventories: Record<
+                number,
+                { capacity: number; slots: any[] }
+            > = {};
+            if (reader.remaining > 0) {
+                const inventoryCount = reader.readByte();
+                for (let i = 0; i < inventoryCount; i++) {
+                    const inventoryId = reader.readShort();
+                    const capacity = reader.readShort();
+                    const slotCount = reader.readShort();
+                    const slots: any[] = [];
+                    for (let slotIndex = 0; slotIndex < slotCount; slotIndex++) {
+                        const slot = reader.readShort();
+                        const itemId = reader.readShort() - 1;
+                        let quantity = reader.readByte();
+                        if (quantity === 255) {
+                            quantity = reader.readInt();
+                        }
+                        slots.push({ slot, itemId, quantity });
+                    }
+                    inventories[inventoryId] = { capacity, slots };
+                }
+            }
             return {
                 type: "widget",
                 payload: {
@@ -930,6 +953,7 @@ export function decodeServerPacket(data: Uint8Array | ArrayBuffer): DecodedServe
                     args,
                     varps,
                     varbits,
+                    inventories,
                 },
             };
         }
