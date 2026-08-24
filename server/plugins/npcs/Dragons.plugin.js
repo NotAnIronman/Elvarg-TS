@@ -11,22 +11,45 @@ const {
   initDragonfireProtectionCoreAccess,
 } = require("../combat/DragonfireProtection");
 
-const GREEN_DRAGON_IDS = [
-  NpcIdentifiers.GREEN_DRAGON,
-  NpcIdentifiers.GREEN_DRAGON_2,
-  NpcIdentifiers.GREEN_DRAGON_3,
-  NpcIdentifiers.GREEN_DRAGON_4,
-  NpcIdentifiers.GREEN_DRAGON_5,
-];
+const idsForFamilies = (families) => Object.entries(NpcIdentifiers)
+  .filter(([name, id]) =>
+    Number.isInteger(id) && families.some((family) => name === family || name.startsWith(`${family}_`)))
+  .map(([, id]) => id);
 
-const GREEN_DRAGON_MELEE_ANIMATION = new Animation(80);
-const GREEN_DRAGON_DRAGONFIRE_ANIMATION = new Animation(81);
-const GREEN_DRAGON_DRAGONFIRE_PROJECTILE_ID = 393;
-const GREEN_DRAGON_DRAGONFIRE_IMPACT_GFX = new Graphic(1);
+const STANDARD_DRAGON_IDS = idsForFamilies([
+  "GREEN_DRAGON",
+  "BLUE_DRAGON",
+  "RED_DRAGON",
+  "BLACK_DRAGON",
+  "LAVA_DRAGON",
+  "REANIMATED_DRAGON",
+  "FROST_DRAGON",
+]);
+const BRUTAL_DRAGON_IDS = idsForFamilies([
+  "BRUTAL_GREEN_DRAGON",
+  "BRUTAL_BLUE_DRAGON",
+  "BRUTAL_RED_DRAGON",
+  "BRUTAL_BLACK_DRAGON",
+]);
+const METALLIC_DRAGON_IDS = idsForFamilies([
+  "BRONZE_DRAGON",
+  "IRON_DRAGON",
+  "STEEL_DRAGON",
+  "MITHRIL_DRAGON",
+  "ADAMANT_DRAGON",
+  "RUNE_DRAGON",
+]);
 
-class GreenDragonCombatMethod extends CombatMethod {
-  constructor() {
+const DRAGON_MELEE_ANIMATION = new Animation(80);
+const DRAGONFIRE_ANIMATION = new Animation(81);
+const DRAGONFIRE_PROJECTILE_ID = 393;
+const DRAGONFIRE_IMPACT_GFX = new Graphic(1);
+
+class DragonCombatMethod extends CombatMethod {
+  constructor({ longRange = false, prayerProtects = true } = {}) {
     super();
+    this.longRange = longRange;
+    this.prayerProtects = prayerProtects;
     this.useDragonfire = false;
     this.currentAttackType = CombatType.MELEE;
   }
@@ -34,11 +57,11 @@ class GreenDragonCombatMethod extends CombatMethod {
   start(character, target) {
     this.selectAttack(character, target);
     if (this.useDragonfire) {
-      character.performAnimation(GREEN_DRAGON_DRAGONFIRE_ANIMATION);
+      character.performAnimation(DRAGONFIRE_ANIMATION);
       Projectile.createProjectile(
         character,
         target,
-        GREEN_DRAGON_DRAGONFIRE_PROJECTILE_ID,
+        DRAGONFIRE_PROJECTILE_ID,
         40,
         55,
         31,
@@ -46,7 +69,7 @@ class GreenDragonCombatMethod extends CombatMethod {
       ).sendProjectile();
       return;
     }
-    character.performAnimation(GREEN_DRAGON_MELEE_ANIMATION);
+    character.performAnimation(DRAGON_MELEE_ANIMATION);
   }
 
   attackSpeed() {
@@ -54,8 +77,7 @@ class GreenDragonCombatMethod extends CombatMethod {
   }
 
   attackDistance() {
-    // Green dragons only use dragonfire when they are already in melee reach.
-    return 1;
+    return this.longRange ? 8 : 1;
   }
 
   type() {
@@ -76,7 +98,7 @@ class GreenDragonCombatMethod extends CombatMethod {
       const player = target.getAsPlayer();
       const dragonfire = resolveChromaticDragonfireDamage(character, player, {
         maxHit: 50,
-        closeRange: true,
+        closeRange: this.prayerProtects,
       });
       hit.setTotalDamage(dragonfire.damage);
       player.getPacketSender().sendMessage(dragonfire.message);
@@ -92,25 +114,38 @@ class GreenDragonCombatMethod extends CombatMethod {
       return;
     }
     const target = hit?.getTarget?.();
-    target?.performGraphic?.(GREEN_DRAGON_DRAGONFIRE_IMPACT_GFX);
+    target?.performGraphic?.(DRAGONFIRE_IMPACT_GFX);
   }
 
   finished() {
   }
 
   selectAttack(character, target) {
-    const canUseCloseRangeDragonfire =
+    const distance = character?.calculateDistance?.(target) ?? 99;
+    const canUseDragonfire =
       !!character &&
       !!target &&
       target.isPlayer?.() === true &&
-      character.calculateDistance(target) <= 1;
+      (this.longRange || distance <= 1);
 
     this.useDragonfire =
-      canUseCloseRangeDragonfire &&
-      Misc.randomInclusive(0, 5) === 0;
+      canUseDragonfire &&
+      ((this.longRange && distance > 1) || Misc.randomInclusive(0, 5) === 0);
     this.currentAttackType = this.useDragonfire
       ? CombatType.MAGIC
       : CombatType.MELEE;
+  }
+}
+
+class BrutalDragonCombatMethod extends DragonCombatMethod {
+  constructor() {
+    super({ longRange: true });
+  }
+}
+
+class MetallicDragonCombatMethod extends DragonCombatMethod {
+  constructor() {
+    super({ longRange: true, prayerProtects: false });
   }
 }
 
@@ -119,8 +154,18 @@ module.exports = {
   register(api) {
     initDragonfireProtectionCoreAccess(api);
     api.registerNpcCombatMethodProvider(
-      GREEN_DRAGON_IDS,
-      GreenDragonCombatMethod,
+      STANDARD_DRAGON_IDS,
+      DragonCombatMethod,
+      { singleton: false }
+    );
+    api.registerNpcCombatMethodProvider(
+      BRUTAL_DRAGON_IDS,
+      BrutalDragonCombatMethod,
+      { singleton: false }
+    );
+    api.registerNpcCombatMethodProvider(
+      METALLIC_DRAGON_IDS,
+      MetallicDragonCombatMethod,
       { singleton: false }
     );
   },
