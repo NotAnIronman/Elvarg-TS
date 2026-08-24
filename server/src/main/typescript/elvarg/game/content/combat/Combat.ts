@@ -38,6 +38,8 @@ type CombatCycleState = {
     skipPost: boolean;
 };
 
+const COMBAT_TARGET_PLAYER_VARP = 1075;
+
 /** Owns one character's target, attack deadline, approach route, and delayed hits. */
 export class Combat {
     private readonly hitQueue = new HitQueue(this.character);
@@ -134,6 +136,9 @@ export class Combat {
         this.character.setFollowing(null);
         this.character.setPositionToFace(null);
         this.character.setMobileInteraction(target);
+        if (this.character.isPlayer()) {
+            this.character.getAsPlayer().getPacketSender().sendConfig(COMBAT_TARGET_PLAYER_VARP, target.isPlayer() ? target.getIndex() : -1);
+        }
         this.trace("attack() target set", target);
         if (this.character.isNpc()) World.markNpcCombatActive(this.character.getAsNpc(), true);
     }
@@ -379,6 +384,7 @@ export class Combat {
         this.character.getMovementQueue().reset();
         this.character.setMobileInteraction(null);
         this.character.setPositionToFace(null);
+        if (this.character.isPlayer()) this.character.getAsPlayer().getPacketSender().sendConfig(COMBAT_TARGET_PLAYER_VARP, -1);
         this.graniteMaulSpecialQueued = false;
         if (this.character.isNpc()) World.markNpcCombatActive(this.character.getAsNpc(), this.attacker != null);
     }

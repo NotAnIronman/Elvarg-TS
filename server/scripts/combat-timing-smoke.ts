@@ -95,6 +95,7 @@ try {
     let valid = true;
     const cancelledTaskKeys: any[] = [];
     const messages: string[] = [];
+    const configs: Array<[number, number]> = [];
     const order: string[] = [];
     let targetX = 3200;
     let targetSize = 1;
@@ -104,6 +105,7 @@ try {
         getLocation: () => location,
         getCombat: () => targetCombat,
         getBlockAnim: () => 425,
+        getIndex: () => 7,
         performAnimation: () => undefined,
         getSize: () => targetSize,
         isPlayer: () => true,
@@ -129,7 +131,10 @@ try {
         getIndex: () => 1,
         getAsPlayer: () => ({
             isPlayerBot: () => false,
-            getPacketSender: () => ({ sendMessage: (message: string) => messages.push(message) }),
+            getPacketSender: () => ({
+                sendMessage: (message: string) => messages.push(message),
+                sendConfig: (id: number, value: number) => configs.push([id, value]),
+            }),
         }),
         setFollowing: () => undefined,
         setMobileInteraction: () => character,
@@ -174,6 +179,7 @@ try {
 
     positionToFace = { old: true };
     combat.attack(combatTarget);
+    assert.deepEqual(configs.at(-1), [1075, 7], "the client must prioritize its player combat target");
     assert.equal(attackAttempts, 0, "attack() must only establish intent");
     assert.deepEqual(cancelledTaskKeys, [1], "attack intent must cancel the player's stale movement action");
     assert.equal(positionToFace, null, "attack intent must clear stale fixed facing");
@@ -309,6 +315,7 @@ try {
     const incomingAttacker = { id: "incoming" } as any;
     combat.setUnderAttack(incomingAttacker);
     combat.reset();
+    assert.deepEqual(configs.at(-1), [1075, -1], "combat reset must clear the client combat target");
     assert.equal(combat.getAttacker(), incomingAttacker, "outgoing cancellation must preserve incoming attribution");
     combat.setUnderAttack(null);
 
@@ -378,6 +385,7 @@ try {
         getLocation: () => ({ getX: () => 0, getY: () => 0, getZ: () => 0, getDistance: () => 5, transform: () => ({}) }),
         getSize: () => 1,
         getPrivateArea: () => null,
+        getAttribute: () => null,
         getMovementQueue: () => npcMovement,
         setFollowing: () => undefined,
         setMobileInteraction: () => npcCharacter,
