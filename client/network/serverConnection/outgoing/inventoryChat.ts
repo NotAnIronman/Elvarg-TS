@@ -124,3 +124,21 @@ export function sendChat(
 export function sendFriendsChatAction(payload: FriendsChatAction): void {
     send({ type: "friends_chat_action", payload } as any);
 }
+
+export function sendPrivateMessage(recipient: string, text: string): void {
+    const cleanRecipient = String(recipient ?? "").trim().slice(0, 12);
+    const cleanText = sanitizeChatText(String(text ?? "")).slice(0, 160);
+    if (!cleanRecipient || !cleanText) return;
+    send({ type: "private_message", payload: { recipient: cleanRecipient, text: cleanText } } as any);
+}
+
+export function sendChatFilter(publicMode: number, privateMode: number, tradeMode: number): void {
+    send({
+        type: "chat_filter",
+        payload: {
+            publicMode: publicMode | 0,
+            privateMode: privateMode | 0,
+            tradeMode: tradeMode | 0,
+        },
+    } as any);
+}

@@ -1,8 +1,5 @@
 import { Player } from "../../entity/impl/player/Player";
 import { ItemDefinition } from "../../definition/ItemDefinition";
-import { DamageFormulas } from "../../content/combat/formula/DamageFormulas";
-import { RangedWeapon } from "../../content/combat/ranged/RangedData";
-import { Ammunition } from "../../content/combat/ranged/RangedData";
 import { Equipment } from "../container/impl/Equipment";
 import { getCrystalBowAttackBonus, getCrystalBowRangedStrength, isCrystalBow } from "../../content/combat/ranged/CrystalBow";
 import { PluginManager } from "../../../plugins/PluginManager";
@@ -24,49 +21,19 @@ export class BonusManager {
     public static readonly RANGED_STRENGTH = 1;
     public static readonly MAGIC_STRENGTH = 2;
     public static readonly PRAYER = 3;
-    public static readonly INTERFACE_ID = 15106;
-    private static readonly STRING_ID = [["1675", "Stab"],
-    ["1676", "Slash"],
-    ["1677", "Crush"],
-    ["1678", "Magic"],
-    ["1679", "Range"],
-    ["1680", "Stab"],
-    ["1681", "Slash"],
-    ["1682", "Crush"],
-    ["1683", "Magic"],
-    ["1684", "Range"],
-    ["1686", "Strength"],
-    ["15118", "Ranged Strength"],
-    ["1671", "Magic Strength"],
-    ["1687", "Prayer"],
-    ];
-    private static readonly MELEE_MAXHIT_FRAME = 15115;
-    private static readonly RANGED_MAXHIT_FRAME = 15116;
-    private static readonly MAGIC_MAXHIT_FRAME = 15117;
+    private static readonly BONUS_COUNT = 14;
 
     private attackBonus: number[] = new Array(5).fill(0);
     private defenceBonus: number[] = new Array(5).fill(0);
     private otherBonus: number[] = new Array(4).fill(0);
 
-    public static open(player: Player) {
-        const sender = player.getPacketSender();
-        player.setInterfaceId(84);
-        sender.sendVarbit(12393, 1)
-            .sendSubInterface((161 << 16) | 16, 84, 0)
-            .sendSubInterface((161 << 16) | 74, 85, 3)
-            .sendInterfaceFlagsRange(85 << 16, 0, 27, 1180674)
-            .sendInterfaceScript(149, [85 << 16, 93, 4, 7, 1, -1, "Equip", "", "", "", ""])
-            .sendInterfaceScript(151, [85 << 16, 93, 4, 7, 1, -1, "Equip", "", "", "", "", "", "", "", ""]);
-        BonusManager.update(player);
-    }
-
     public static update(player: Player) {
-        let totalBonuses = BonusManager.STRING_ID.length;
-        let bonuses = new Array(totalBonuses).fill(0);
+        const bonuses = new Array(BonusManager.BONUS_COUNT).fill(0);
         for (const item of player.getEquipment().getItems()) {
+            if (!item || item.getId() <= 0) continue;
             const definition = ItemDefinition.forId(item.getId());
             if (definition.getBonuses() != null) {
-                for (let i = 0; i < definition.getBonuses().length; i++) {
+                for (let i = 0; i < Math.min(definition.getBonuses().length, bonuses.length); i++) {
                     bonuses[i] += definition.getBonuses()[i];
                 }
             }
@@ -88,46 +55,17 @@ export class BonusManager {
         }
         PluginManager.applyBonusProviders(player, bonuses);
 
-        for (let i = 0; i < totalBonuses; i++) {
+        for (let i = 0; i < bonuses.length; i++) {
             if (i <= 4) {
                 player.getBonusManager().attackBonus[i] = bonuses[i];
             } else if (i <= 9) {
-                let index = i - 5;
+                const index = i - 5;
                 player.getBonusManager().defenceBonus[index] = bonuses[i];
             } else {
-                let index = i - 10;
+                const index = i - 10;
                 player.getBonusManager().otherBonus[index] = bonuses[i];
             }
-            player.getPacketSender().sendString( BonusManager.STRING_ID[i][1] + ": " + bonuses[i], Number.parseInt(BonusManager.STRING_ID[i][0]));
         }
-
-        /**
-         * Update maxhit frames on the interface.
-         */
-        if (player.getInterfaceId() == BonusManager.INTERFACE_ID) {
-
-            // Update some combat data first,
-            // including ranged ammunition/weapon
-            player.getCombat().setAmmunition(Ammunition.getFor(player));
-            player.getCombat().setRangedWeapon(RangedWeapon.getFor(player));
-
-            player.getPacketSender().sendString("Melee maxhit: " + this.getDamageString(DamageFormulas.calculateMaxMeleeHit(player)), BonusManager.MELEE_MAXHIT_FRAME);
-            player.getPacketSender().sendString("Ranged maxhit: " + this.getDamageString(DamageFormulas.calculateMaxRangedHit(player)), BonusManager.RANGED_MAXHIT_FRAME);
-            player.getPacketSender().sendString("Magic maxhit: " + this.getDamageString(DamageFormulas.getMagicMaxhit(player)), BonusManager.MAGIC_MAXHIT_FRAME);
-        }
-    }
-
-    public static getDamageString(damage: number): string {
-        if (damage == 0) {
-            return "---";
-        }
-        if (damage <= 10) {
-            return "@red@" + damage;
-        }
-        if (damage <= 25) {
-            return "@yel@" + damage;
-        }
-        return "@gre@" + damage;
     }
 
     public getAttackBonus(): number[] {

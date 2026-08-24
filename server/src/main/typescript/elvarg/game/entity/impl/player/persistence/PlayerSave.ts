@@ -93,6 +93,12 @@ export class PlayerSave {
     private quickPrayers: PrayerData[];
     private friends: string[];
     private ignores: string[];
+    private friendRanks: Record<string, number>;
+    private friendsChatChannelName: string;
+    private friendsChatLastOwner: string;
+    private friendsChatEntryRank: number;
+    private friendsChatTalkRank: number;
+    private friendsChatKickRank: number;
     private banks: Map<number, Item[]>;
     private presets: Presetable[];
     private questPoints: number;
@@ -444,6 +450,30 @@ export class PlayerSave {
         this.ignores = ignores;
     }
 
+    public getFriendRanks(): Record<string, number> {
+        return this.friendRanks ?? {};
+    }
+
+    public getFriendsChatChannelName(): string {
+        return String(this.friendsChatChannelName ?? "");
+    }
+
+    public getFriendsChatLastOwner(): string {
+        return String(this.friendsChatLastOwner ?? this.clanChat ?? "");
+    }
+
+    public getFriendsChatEntryRank(): number {
+        return PlayerSave.clamp(PlayerSave.toFiniteInt(this.friendsChatEntryRank, -1), -1, 7);
+    }
+
+    public getFriendsChatTalkRank(): number {
+        return PlayerSave.clamp(PlayerSave.toFiniteInt(this.friendsChatTalkRank, -1), -1, 7);
+    }
+
+    public getFriendsChatKickRank(): number {
+        return PlayerSave.clamp(PlayerSave.toFiniteInt(this.friendsChatKickRank, 2), 2, 7);
+    }
+
     public getBanks(): Map<number, Item[]> {
         return this.banks;
     }
@@ -705,6 +735,14 @@ export class PlayerSave {
                 PlayerSave.MAX_IGNORES
             )
         );
+        player.getRelations().loadFriendRanks(this.friendRanks);
+        player.getRelations().setFriendsChatChannelName(this.getFriendsChatChannelName());
+        player.getRelations().setFriendsChatLastOwner(this.getFriendsChatLastOwner());
+        player.getRelations().setFriendsChatRanks(
+            this.getFriendsChatEntryRank(),
+            this.getFriendsChatTalkRank(),
+            this.getFriendsChatKickRank()
+        );
 
         for (let i = 0; i < player.getBanks().length; i++) {
             if (i == Bank.BANK_SEARCH_TAB_INDEX) {
@@ -796,6 +834,12 @@ export class PlayerSave {
             player.getRelations().getIgnoreList(),
             PlayerSave.MAX_IGNORES
         );
+        playerSave.friendRanks = player.getRelations().getFriendRanks();
+        playerSave.friendsChatChannelName = player.getRelations().getFriendsChatChannelName();
+        playerSave.friendsChatLastOwner = player.getRelations().getFriendsChatLastOwner();
+        playerSave.friendsChatEntryRank = player.getRelations().getFriendsChatEntryRank();
+        playerSave.friendsChatTalkRank = player.getRelations().getFriendsChatTalkRank();
+        playerSave.friendsChatKickRank = player.getRelations().getFriendsChatKickRank();
 
         playerSave.presets = [...(player.getPresets() ?? [])];
 

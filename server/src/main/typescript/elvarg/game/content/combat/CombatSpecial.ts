@@ -1,7 +1,6 @@
 import { Mobile } from "../../entity/impl/Mobile";
 import type { Player } from "../../entity/impl/player/Player";
 import { CombatFactory } from "./CombatFactory";
-import { BonusManager } from "../../model/equipment/BonusManager";
 import { CombatMethod } from "./method/CombatMethod";
 import { CombatType } from "./CombatType";
 import { TaskManager } from "../../task/TaskManager";
@@ -476,9 +475,6 @@ export class CombatSpecial {
             }
         }
 
-        if (player.getInterfaceId() == BonusManager.INTERFACE_ID) {
-            BonusManager.update(player);
-        }
     }
 
     public getIdentifiers(): number[] {

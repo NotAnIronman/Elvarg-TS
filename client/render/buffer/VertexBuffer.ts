@@ -36,6 +36,7 @@ export class VertexBuffer extends DataBuffer {
         textureId: number,
         reuseVertex: boolean = true,
         priority: number = 0,
+        priorityIsPacked: boolean = false,
     ) {
         if (textureId >= 1024) {
             textureId = -1;
@@ -61,10 +62,13 @@ export class VertexBuffer extends DataBuffer {
 
         // Pack per-face priority (0-7, 3 bits) into bits [8:6] (previously unused)
         // Keep uPacked high bits at [4:0] and textureId bit at [5]
+        const packedPriority = priorityIsPacked
+            ? clamp(priority, 0, 7)
+            : VertexBuffer.compressPriority(priority);
         const v2 =
             (zPos << 17) |
             (alpha << 9) |
-            ((VertexBuffer.compressPriority(priority) & 0x7) << 6) |
+            ((packedPriority & 0x7) << 6) |
             (((textureId >> 9) & 0x1) << 5) |
             (uPacked >> 6);
 

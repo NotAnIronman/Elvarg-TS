@@ -94,7 +94,7 @@ function loadItemDefinitions() {
     def.equipmentType = hydrateEquipmentType(rawDef.equipmentType);
     def.weaponInterface = hydrateWeaponInterface(rawDef.weaponInterface);
     for (const property of [
-      "doubleHanded", "dropable", "sellable", "bloodMoneyValue", "highAlch",
+      "doubleHanded", "sellable", "bloodMoneyValue", "highAlch",
       "lowAlch", "dropValue", "blockAnim", "standAnim", "walkAnim", "runAnim",
       "standTurnAnim", "turn180Anim", "turn90CWAnim", "turn90CCWAnim", "bonuses",
       "requirements",

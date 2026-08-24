@@ -25,6 +25,7 @@ async function main() {
         [58, 26, TYPE_TEXT, "castlewars_status_overlay_saradomin:eject"],
         [59, 25, TYPE_TEXT, "castlewars_status_overlay_zamorak:eject"],
         // Client-written text, so only its presence matters.
+        [90, 49, TYPE_TEXT, "pvp_icons:combatrange"],
         [90, 50, TYPE_TEXT, "pvp_icons:wildernesslevel"],
         // Toggled by the server: the icon block outside the wilderness, and the safe badge
         // until safe zones exist.

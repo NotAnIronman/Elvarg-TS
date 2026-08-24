@@ -12,7 +12,7 @@ export class Equipment extends ItemContainer {
     }
 
     public static INVENTORY_INTERFACE_ID = 1688;
-    public static EQUIPMENT_SCREEN_INTERFACE_ID = 15106;
+    public static EQUIPMENT_SCREEN_INTERFACE_ID = 84;
     public static HEAD_SLOT = 0;
     public static CAPE_SLOT = 1;
     public static AMULET_SLOT = 2;

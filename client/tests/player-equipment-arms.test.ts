@@ -27,9 +27,49 @@ function composedKits(wearPos: number, wearPos2: number, wearPos3 = -1): number[
     return result.kits;
 }
 
+function composedEquipment(): { ids: number[]; layers: number[] } {
+    const items = new Map([
+        [100, { id: 100, wearPos: 2, wearPos2: -1, wearPos3: -1 }],
+        [101, { id: 101, wearPos: 3, wearPos2: -1, wearPos3: -1 }],
+        [102, { id: 102, wearPos: 4, wearPos2: -1, wearPos3: -1 }],
+        [103, { id: 103, wearPos: 1, wearPos2: -1, wearPos3: -1 }],
+        [104, { id: 104, wearPos: 0, wearPos2: -1, wearPos3: -1 }],
+    ]);
+    const loader = new PlayerModelLoader(
+        { getCount: () => 0 } as any,
+        { load: (id: number) => items.get(id) } as any,
+        {} as any,
+        {} as any,
+    );
+    let result = { ids: [] as number[], layers: [] as number[] };
+    (loader as any).buildStaticModel = (
+        _appearance: PlayerAppearance,
+        extras: any[],
+        layers: number[],
+    ) => {
+        result = { ids: extras.map((item) => item.id), layers };
+        return {};
+    };
+    const equip = new Array(14).fill(-1);
+    equip[EquipmentSlot.AMULET] = 100;
+    equip[EquipmentSlot.WEAPON] = 101;
+    equip[EquipmentSlot.BODY] = 102;
+    equip[EquipmentSlot.CAPE] = 103;
+    equip[EquipmentSlot.HEAD] = 104;
+    loader.buildStaticModelFromEquipment(
+        new PlayerAppearance(Gender.MALE, [0, 0, 0, 0, 0], new Array(7).fill(-1), equip),
+        equip,
+    );
+    return result;
+}
+
 assert.deepEqual(composedKits(4, -1).slice(2, 4), [-1, 13], "chainbody must retain arms");
 assert.deepEqual(composedKits(4, 6).slice(2, 4), [-1, -1], "platebody must hide arms");
 assert.deepEqual(composedKits(0, 8, 11).slice(0, 2), [-1, -1], "full helmets must hide hair and jaw");
 assert.deepEqual(composedKits(0, 11).slice(0, 2), [10, -1], "masks must retain the head kit");
+assert.deepEqual(composedEquipment(), {
+    ids: [104, 103, 102, 101, 100],
+    layers: [7, 7, 0, 7, 4],
+});
 
 console.log("Player equipment arm-slot regression test passed");
