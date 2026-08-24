@@ -15,9 +15,14 @@ const CRYSTAL_BOW_STAGE_ORDER: number[][] = [
 
 const CRYSTAL_BOW_ATTACK_BONUSES = [100, 100, 96, 92, 88, 84, 80, 76, 72, 68];
 const CRYSTAL_BOW_RANGED_STRENGTHS = [78, 78, 76, 74, 72, 70, 68, 66, 64, 62];
+const STATIC_CRYSTAL_BOW_IDS = new Set<number>([
+    ItemIdentifiers.CRYSTAL_BOW,
+    ItemIdentifiers.CRYSTAL_BOW_3,
+]);
 const EMPTY_CRYSTAL_BOW_IDS = new Set<number>([
     ItemIdentifiers.NEW_CRYSTAL_BOW,
     ItemIdentifiers.NEW_CRYSTAL_BOW_I_,
+    ItemIdentifiers.CRYSTAL_BOW_INACTIVE_,
 ]);
 
 const STAGE_INDEX_BY_ITEM_ID = new Map<number, number>();
@@ -28,20 +33,20 @@ for (let stageIndex = 0; stageIndex < CRYSTAL_BOW_STAGE_ORDER.length; stageIndex
 }
 
 export const CRYSTAL_BOW_ALL_WEAPON_IDS: number[] = [
-    ItemIdentifiers.NEW_CRYSTAL_BOW,
+    ...EMPTY_CRYSTAL_BOW_IDS,
     ...CRYSTAL_BOW_STAGE_ORDER.flat(),
-    ItemIdentifiers.NEW_CRYSTAL_BOW_I_,
+    ...STATIC_CRYSTAL_BOW_IDS,
 ];
 
 export const CRYSTAL_BOW_SHOTS_PER_STAGE = 250;
-export const CRYSTAL_BOW_PROJECTILE_ID = 249;
+export const CRYSTAL_BOW_PROJECTILE_ID = 249; // SP_ATTACK_GLOW_ARROW_TRAVEL
 
 export function isCrystalBow(itemId: number): boolean {
-    return STAGE_INDEX_BY_ITEM_ID.has(itemId) || EMPTY_CRYSTAL_BOW_IDS.has(itemId);
+    return STAGE_INDEX_BY_ITEM_ID.has(itemId) || STATIC_CRYSTAL_BOW_IDS.has(itemId) || EMPTY_CRYSTAL_BOW_IDS.has(itemId);
 }
 
 export function isChargedCrystalBow(itemId: number): boolean {
-    return STAGE_INDEX_BY_ITEM_ID.has(itemId);
+    return STAGE_INDEX_BY_ITEM_ID.has(itemId) || STATIC_CRYSTAL_BOW_IDS.has(itemId);
 }
 
 export function isEmptyCrystalBow(itemId: number): boolean {
