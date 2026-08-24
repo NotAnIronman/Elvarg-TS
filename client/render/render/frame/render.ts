@@ -533,6 +533,8 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
         host.app.viewport(0, 0, host.sceneRenderWidth | 0, host.sceneRenderHeight | 0);
 
         profiler.startPhase("tick");
+        // Advance projectiles before their position/rotation is packed into actor data.
+        host.projectileManager?.update(deltaTime);
         // Dynamic path always uses current appearance; no NPC fallback rebuild
         // Always keep dynamic player animation enabled; do not switch to pre-baked clips.
         // This removes the prebake path entirely for players, even with multiple players present.
@@ -687,9 +689,7 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
         const actorIndex = host.updateActorDataTexture();
         profiler.endPhase();
 
-        // Update projectiles
         profiler.startPhase("projectiles");
-        host.projectileManager?.update(deltaTime);
         host.gfxManager?.update();
         profiler.endPhase();
 

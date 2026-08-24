@@ -1,4 +1,4 @@
-import { getClientCycle } from "../../network/ServerConnection";
+import { getClientCycleFloat } from "../../network/ServerConnection";
 import type {
     ProjectileActorRef,
     ProjectileEndpoint,
@@ -120,8 +120,7 @@ export class ProjectileManager implements IProjectileManager {
     // =========================================================================
 
     private getCurrentCycleFloat(): number {
-        // projectile timing is driven by integer client cycles.
-        return getClientCycle();
+        return getClientCycleFloat();
     }
 
     private getCurrentTick(): number {

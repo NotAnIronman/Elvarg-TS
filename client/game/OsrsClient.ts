@@ -988,7 +988,18 @@ export class OsrsClient {
             globalState.osrsClient = this;
         } catch {}
         try {
-            setClientCycleProvider(() => this.playerEcs.getClientCycle());
+            setClientCycleProvider(() => {
+                const cycle = this.playerEcs.getClientCycle();
+                if (!this.clientTickLoopRunning || this.clientTickLastNowMs <= 0) return cycle;
+                const perf = (globalThis as any)?.performance;
+                const now =
+                    perf && typeof perf.now === "function"
+                        ? (perf.now.call(perf) as number)
+                        : Date.now();
+                const pendingMs =
+                    this.clientTickAccumulatedMs + Math.max(0, now - this.clientTickLastNowMs);
+                return cycle + Math.min(0.999, pendingMs / OsrsClient.CLIENT_TICK_MS);
+            });
         } catch {}
         try {
             registerAnimDebugProvider(() => {

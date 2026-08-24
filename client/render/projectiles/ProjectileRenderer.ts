@@ -1,5 +1,5 @@
 import { vec2 } from "gl-matrix";
-import PicoGL, { DrawCall, Texture } from "picogl";
+import { DrawCall, Texture } from "picogl";
 
 import type { WebGLMapSquare } from "../WebGLMapSquare";
 import type { WebGLOsrsRenderer } from "../WebGLOsrsRenderer";
@@ -192,6 +192,11 @@ export class ProjectileRenderer {
         if (projectiles.length === 0) return;
 
         const groups = this.collectProjectileGroups(projectiles);
+        const app = (this.renderer as any).app;
+
+        // Glow projectiles use nested translucent shells. Keep depth testing against
+        // the scene, but let every shell blend instead of the outer one hiding the rest.
+        if (transparent) app.depthMask(false);
 
         const mapWorldX = map.mapX << 13;
         const mapWorldY = map.mapY << 13;
@@ -216,8 +221,6 @@ export class ProjectileRenderer {
                 subOffset,
             );
 
-            (this.renderer as any).app.disable(PicoGL.CULL_FACE);
-
             for (const slot of group.slots) {
                 const proj = projectiles[slot];
                 const pos = proj.getPosition();
@@ -236,9 +239,8 @@ export class ProjectileRenderer {
             dc.uniform("u_drawIdOverride", -1);
             vec2.set(subOffset, 0, 0);
             dc.uniform("u_projectileSubOffset", subOffset);
-
-            if ((this.renderer as any).cullBackFace)
-                (this.renderer as any).app.enable(PicoGL.CULL_FACE);
         }
+
+        if (transparent) app.depthMask(true);
     }
 }

@@ -15,6 +15,10 @@ export function setClientCycleProvider(provider?: () => number): void {
 }
 
 export function getClientCycle(): number {
+    return Math.floor(getClientCycleFloat());
+}
+
+export function getClientCycleFloat(): number {
     if (state.clientCycleProvider) {
         try {
             const value = state.clientCycleProvider();
@@ -22,7 +26,7 @@ export function getClientCycle(): number {
                 // Never return 0. CS2 scripts use varcint vars that default to 0
                 // for dedup checks (e.g., rebuildchatbox checks `if (%varcint1112 = clientclock)`).
                 // If clientclock returns 0 and varcint1112 defaults to 0, the script returns early.
-                return Math.max(1, (value as number) | 0);
+                return Math.max(1, value as number);
             }
         } catch {
             // Provider errors should not break networking; fall back below.
@@ -40,7 +44,7 @@ export function getClientCycle(): number {
     }
     const elapsedMs = Math.max(0, now - state.clientCycleFallbackStartMs);
     // Never return 0 to avoid dedup collisions with default varcint values
-    return Math.max(1, state.clientCycleFallbackBaseCycle + Math.floor(elapsedMs / CLIENT_TICK_MS));
+    return Math.max(1, state.clientCycleFallbackBaseCycle + elapsedMs / CLIENT_TICK_MS);
 }
 
 export function getServerTickPhaseNow(): { tick: number; phase: number; tickMs: number } {
