@@ -25,7 +25,7 @@
  * 5030 CHAT_GETHISTORYEX_BYTYPEANDLINE: pop 2 ints, push 4 ints + 4 strings
  * 5031 CHAT_GETHISTORYEX_BYUID: pop 1 int, push 4 ints + 4 strings
  */
-import { sendChat } from "../../../network/ServerConnection";
+import { sendChat, sendChatFilter, sendPrivateMessage } from "../../../network/ServerConnection";
 import { chatHistory } from "../ChatHistory";
 import { Opcodes } from "../Opcodes";
 import type { HandlerMap } from "./HandlerTypes";
@@ -49,7 +49,7 @@ export function registerChatOps(handlers: HandlerMap): void {
         ctx.privateChatMode = privateMode;
         ctx.tradeChatMode = tradeMode;
 
-        // Notify server/handler if callback exists
+        sendChatFilter(publicMode, privateMode, tradeMode);
         ctx.setChatFilter?.(publicMode, privateMode, tradeMode);
     });
 
@@ -152,9 +152,9 @@ export function registerChatOps(handlers: HandlerMap): void {
     // Pops: recipient (string), message (string)
     handlers.set(Opcodes.CHAT_SENDPRIVATE, (ctx) => {
         ctx.stringStackSize -= 2;
-        const _recipient = ctx.stringStack[ctx.stringStackSize];
-        const _message = ctx.stringStack[ctx.stringStackSize + 1];
-        // Server would handle the private message packet
+        const recipient = ctx.stringStack[ctx.stringStackSize];
+        const message = ctx.stringStack[ctx.stringStackSize + 1];
+        sendPrivateMessage(recipient, message);
     });
 
     // CHAT_SENDCLAN (5010): Used by the modern Clan channels, which are separate

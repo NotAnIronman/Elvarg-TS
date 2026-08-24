@@ -86,6 +86,7 @@ export class Model extends Entity {
     changedLight: boolean = false;
 
     faceRenderPriorities!: Int8Array;
+    faceRenderLayers?: Uint8Array;
     faceAlphas!: Int8Array;
 
     textureCoords!: Int8Array;
@@ -548,6 +549,7 @@ export class Model extends Entity {
             model.faceColors3 = this.faceColors3;
             model.faceColors = this.faceColors;
             model.faceRenderPriorities = this.faceRenderPriorities;
+            model.faceRenderLayers = this.faceRenderLayers;
             model.faceAlphas = this.faceAlphas;
             model.textureCoords = this.textureCoords;
             model.faceTextures = this.faceTextures;

@@ -1,5 +1,6 @@
 import type { TradeActionClientPayload } from "./messages";
 import type { WidgetActionClientPayload } from "./widgets";
+import type { FriendsChatAction } from "../../../common/social/FriendsChat";
 
 type ClientToServer =
     | { type: "hello"; payload: { client: string; version?: string } }
@@ -88,6 +89,12 @@ type ClientToServer =
     | { type: "logout"; payload?: Record<string, never> }
     | { type: "login"; payload: { username: string; password: string; revision: number } }
     | { type: "chat"; payload: Record<string, unknown> }
+    | { type: "friends_chat_action"; payload: FriendsChatAction }
+    | { type: "private_message"; payload: { recipient: string; text: string } }
+    | {
+          type: "chat_filter";
+          payload: { publicMode: number; privateMode: number; tradeMode: number };
+      }
     | { type: "smithing_make"; payload: { recipeId: string; mode: string } }
     | { type: "smithing_mode"; payload: { mode: number; custom?: number } }
     | { type: "inventory_use_on"; payload: Record<string, unknown> }

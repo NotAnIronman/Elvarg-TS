@@ -1,12 +1,19 @@
 let pluginApi;
-const { PrayerHandler } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
+let PrayerHandler;
 const { SkullType } = require("../../src/main/typescript/elvarg/game/model/SkullType");
 
 // OpenRune cache names: component.wornitems:deathkeep and interface.deathkeep.
 const OPEN_ITEMS_KEPT_ON_DEATH_BUTTON = (387 << 16) | 5;
 const ITEMS_KEPT_ON_DEATH_INTERFACE_ID = 4;
+const MAIN_MODAL_TARGET_UID = (161 << 16) | 16;
 const ITEMS_KEPT_VALUE_COMPONENT = (ITEMS_KEPT_ON_DEATH_INTERFACE_ID << 16) | 18;
 const ITEMS_KEPT_SETTINGS_COMPONENT = (ITEMS_KEPT_ON_DEATH_INTERFACE_ID << 16) | 12;
+const DEATH_ITEMS_INVENTORY_ID = 584;
+const DEATH_ITEM_STATE_INVENTORY_ID = 468;
+const DEATH_INVENTORY_CAPACITY = 50;
+// Clientscript 974 uses these otherwise unrelated object IDs as item-state markers.
+const KEPT_ITEM_STATE = 323;
+const LOST_ITEM_STATE = 1991;
 const previewSettings = new WeakMap();
 
 function getSettings(player) {
@@ -24,7 +31,7 @@ function getSettings(player) {
 }
 
 function getAmountToKeep(player, settings) {
-  if (player.getSkullTimer() > 0 && player.getSkullType() === SkullType.RED_SKULL) {
+  if (settings.skullActive && player.getSkullType() === SkullType.RED_SKULL) {
     return 0;
   }
   return (settings.skullActive ? 0 : 3) + (settings.protectItemPrayer ? 1 : 0);
@@ -55,46 +62,89 @@ function getItemsToKeep(player, settings) {
   return items.slice(0, amountToKeep);
 }
 
-function open(player, settings = getSettings(player)) {
-  const toKeep = getItemsToKeep(player, settings);
+function getDeathItems(player, toKeep) {
+  const kept = new Set(toKeep);
+  const items = [];
+  const states = [];
   let risk = 0;
+
   for (const item of [
     ...player.getInventory().getItems(),
     ...player.getEquipment().getItems(),
   ]) {
-    if (
-      !item ||
-      item.getId() <= 0 ||
-      item.getAmount() <= 0 ||
-      !item.getDefinition().isTradeable() ||
-      toKeep.includes(item)
-    ) {
+    if (!item || item.getId() <= 0 || item.getAmount() <= 0 || kept.has(item)) {
       continue;
     }
-    risk += item.getDefinition().getValue() * item.getAmount();
+
+    const tradeable = item.getDefinition().isTradeable();
+    items.push({
+      slot: items.length,
+      itemId: item.getId(),
+      quantity: item.getAmount(),
+    });
+    states.push({
+      slot: states.length,
+      itemId: tradeable ? LOST_ITEM_STATE : KEPT_ITEM_STATE,
+      quantity: 1,
+    });
+
+    if (tradeable) {
+      const value = Math.max(0, Number(item.getDefinition().getValue()) || 0);
+      risk = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        risk + value * item.getAmount()
+      );
+    }
   }
+
+  return { items, states, risk };
+}
+
+function open(player, settings = getSettings(player)) {
+  const toKeep = getItemsToKeep(player, settings);
+  const deathItems = getDeathItems(player, toKeep);
   const keptItemIds = toKeep.map((item) => item.getId());
   while (keptItemIds.length < 4) keptItemIds.push(-1);
+  player.setInterfaceId(ITEMS_KEPT_ON_DEATH_INTERFACE_ID);
   player
     .getPacketSender()
-    .sendInterface(ITEMS_KEPT_ON_DEATH_INTERFACE_ID)
-    .sendInterfaceScript(972, [
-      settings.skullActive ? 1 : 0,
-      settings.protectItemPrayer ? 1 : 0,
-      settings.wildernessLevel,
-      settings.playerKill ? 1 : 0,
-      "",
-      toKeep.length,
-      ...keptItemIds,
-    ])
+    .sendSubInterface(MAIN_MODAL_TARGET_UID, ITEMS_KEPT_ON_DEATH_INTERFACE_ID, 0)
+    .sendInterfaceScript(
+      972,
+      [
+        settings.skullActive ? 1 : 0,
+        settings.protectItemPrayer ? 1 : 0,
+        settings.wildernessLevel,
+        settings.playerKill ? 1 : 0,
+        "",
+        toKeep.length,
+        ...keptItemIds,
+      ],
+      undefined,
+      undefined,
+      {
+        [DEATH_ITEMS_INVENTORY_ID]: {
+          capacity: DEATH_INVENTORY_CAPACITY,
+          slots: deathItems.items,
+        },
+        [DEATH_ITEM_STATE_INVENTORY_ID]: {
+          capacity: DEATH_INVENTORY_CAPACITY,
+          slots: deathItems.states,
+        },
+      },
+    )
     .sendInterfaceFlagsRange(ITEMS_KEPT_SETTINGS_COMPONENT, 0, 3, 1)
-    .sendString(`Guide risk value:<br><col=ffffff>${risk.toLocaleString()}</col>`, ITEMS_KEPT_VALUE_COMPONENT);
+    .sendString(
+      `Guide risk value:<br><col=ffffff>${deathItems.risk.toLocaleString()}</col>`,
+      ITEMS_KEPT_VALUE_COMPONENT,
+    );
 }
 
 module.exports = {
   name: "ItemsKeptOnDeath",
   register(api) {
     pluginApi = api;
+    PrayerHandler = api.getPrayerHandler();
     api.onInterfaceActionButton(OPEN_ITEMS_KEPT_ON_DEATH_BUTTON, ({ player }) => {
       if (player.busy?.()) {
         player.getPacketSender().sendInterfaceRemoval();

@@ -58,6 +58,7 @@ export class ItemDefinition {
         this.examine = cached.examine ?? this.examine;
         this.stackable = cached.stackability === ObjStackability.ALWAYS;
         this.tradeable = cached.isTradable;
+        this.dropable = cached.inventoryActions[4]?.toLowerCase() === "drop";
         this.noted = cached.noteTemplate !== -1;
         this.noteId = cached.note;
         this.value = cached.price;

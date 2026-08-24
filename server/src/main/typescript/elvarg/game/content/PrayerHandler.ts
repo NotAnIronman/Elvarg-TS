@@ -214,9 +214,6 @@ export class PrayerHandler {
                 player.getAppearance().setHeadHint(hintId);
             }
 
-            if (player.getInterfaceId() === BonusManager.INTERFACE_ID) {
-                BonusManager.update(player);
-            }
         } else if (character.isNpc()) {
             const npc = character.getAsNpc();
             if (pd.hint !== -1) {

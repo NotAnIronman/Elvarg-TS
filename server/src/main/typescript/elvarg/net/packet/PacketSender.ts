@@ -45,6 +45,7 @@ import {
   encodeWidgetSetPlayerHead,
   encodeWidgetSetRoot,
   encodeWidgetSetText,
+  type ScriptInventorySnapshot,
   MAIN_INVENTORY_GROUP_ID,
   MAIN_INVENTORY_SLOT_FLAGS,
   MAIN_INVENTORY_WIDGET_UID,
@@ -59,6 +60,7 @@ import {
 } from "../protocol/WorldMapProtocol";
 import { CacheDefinitions } from "../../game/cache/CacheDefinitions";
 const CHATBOX_MODAL_TARGET_UID = (162 << 16) | 567;
+const VARBIT_MULTICOMBAT_AREA = 4605;
 // Quest completion states consulted by spellbook CS2 scripts. Keep these client
 // flags separate from server-side spell casting so quests can be enforced later.
 // These are the state variables used by this cache's spell definitions. Values
@@ -490,10 +492,7 @@ export class PacketSender {
   }
 
   public sendMultiIcon(value: number): PacketSender {
-    const out = new PacketBuilder(61);
-    out.put(value);
-    this.player.getSession().write(out);
-    return this;
+    return this.sendVarbit(VARBIT_MULTICOMBAT_AREA, value === 0 ? 0 : 1);
   }
 
   public sendFriendStatus(status: number) {
@@ -1001,6 +1000,11 @@ export class PacketSender {
     type = 1,
     options: Parameters<typeof encodeWidgetOpenSub>[3] = {}
   ): this {
+    for (const [mountedGroupId, mounted] of this.subInterfaceTargets) {
+      if (mounted.targetUid === targetUid && mountedGroupId !== groupId) {
+        this.subInterfaceTargets.delete(mountedGroupId);
+      }
+    }
     this.subInterfaceTargets.set(groupId, { targetUid, type });
     this.player.getSession().sendClientPacket(encodeWidgetOpenSub(targetUid, groupId, type, options));
     if (groupId === MAIN_INVENTORY_GROUP_ID) {
@@ -1050,8 +1054,18 @@ export class PacketSender {
     return this;
   }
 
-  sendInterfaceScript(scriptId: number, args: (number | string)[] = [], varps?: Record<number, number>, varbits?: Record<number, number>): this {
-    this.player.getSession().sendClientPacket(encodeWidgetRunScript(scriptId, args, varps, varbits));
+  sendInterfaceScript(
+    scriptId: number,
+    args: (number | string)[] = [],
+    varps?: Record<number, number>,
+    varbits?: Record<number, number>,
+    inventories?: Record<number, ScriptInventorySnapshot>
+  ): this {
+    this.player
+      .getSession()
+      .sendClientPacket(
+        encodeWidgetRunScript(scriptId, args, varps, varbits, inventories)
+      );
     return this;
   }
 

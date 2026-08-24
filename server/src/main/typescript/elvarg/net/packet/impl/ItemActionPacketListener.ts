@@ -56,9 +56,6 @@ export class ItemActionPacketListener {
       return;
     }
 
-    // Match Java: clear modal/overlay interface context before item action.
-    player.getPacketSender().sendInterfaceRemoval();
-
     // Left-click inventory action for wieldables should behave like clicking "Wield/Wear".
     const Inventory = getInventoryCtor();
     if (interfaceId === Inventory.INTERFACE_ID) {
@@ -72,6 +69,10 @@ export class ItemActionPacketListener {
         return;
       }
     }
+
+    // Non-equipment item actions interrupt the current modal. Equipping has its own
+    // interface guard so the equipment-stats screen can remain open like OSRS.
+    player.getPacketSender().sendInterfaceRemoval();
 
     switch (itemId) {
       case 9520:

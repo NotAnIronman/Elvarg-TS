@@ -1,8 +1,35 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 
 import type { DrawRange } from "../render/DrawRange";
+import { VertexBuffer } from "../render/buffer/VertexBuffer";
 
 async function main(): Promise<void> {
+    const playerShader = fs.readFileSync(
+        path.resolve(__dirname, "../render/shaders/player.vert.glsl"),
+        "utf8",
+    );
+    const priorityBias = playerShader.indexOf(
+        "applyPriorityDepthBias(depthLayerPos, vertex.priority)",
+    );
+    const transparentGuard = playerShader.lastIndexOf("#ifdef DISCARD_ALPHA", priorityBias);
+    assert.ok(priorityBias > 0);
+    assert.ok(
+        transparentGuard === -1 || playerShader.indexOf("#endif", transparentGuard) < priorityBias,
+    );
+    assert.ok(playerShader.includes("gl_Position = u_projectionMatrix * viewPos"));
+    assert.ok(
+        playerShader.includes(
+            "gl_Position.z = depthLayerClipPos.z * gl_Position.w / depthLayerClipPos.w",
+        ),
+    );
+
+    const vertexBuffer = new VertexBuffer(1);
+    vertexBuffer.addVertex(0, 0, 0, 0, 0xff, 0, 0, -1, false, 7, true);
+    const packedVertex = new DataView(vertexBuffer.byteArray().buffer);
+    assert.equal((packedVertex.getUint32(8, true) >> 6) & 0x7, 7);
+
     (globalThis as any).self = globalThis;
     const { drawPlayerSlots, PlayerRenderer, shouldUseUnanimatedIdlePlayer } = await import(
         "../render/player/PlayerRenderer"

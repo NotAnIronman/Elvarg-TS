@@ -169,6 +169,7 @@ export interface Cs2Context {
     widgetManager: WidgetManager;
     varManager: VarManager;
     loadScript: (id: number) => Script | null;
+    onScriptFinished?: (scriptId: number) => void;
 
     /**
      * PARITY: OSRS Protocol Revision (e.g., 179, 220).
@@ -1496,6 +1497,7 @@ export class Cs2Vm {
                 return false;
             }
 
+            this.context.onScriptFinished?.(currentScript.id);
             this.returnLocalArraysToPool(localInts, localStrings);
             const caller = this.callStack[--this.callStackDepth];
 
@@ -1517,6 +1519,7 @@ export class Cs2Vm {
         };
 
         const finalizeSuccessfulTopLevel = (): void => {
+            this.context.onScriptFinished?.(rootScript.id);
             this.flushDeferredActionsIfTopLevel();
             if (
                 this.callStackDepth === 0 &&

@@ -52,6 +52,7 @@ flat out uint v_priority;
 
 #include "./includes/material.glsl";
 #include "./includes/height-map.glsl";
+#include "./includes/priority-depth.glsl";
 
 #include "./includes/vertex.glsl";
 
@@ -140,16 +141,14 @@ void main() {
     // Transform to view space
     vec4 viewPos = u_worldEntityTransform * (u_viewMatrix * localPos);
 
-    // Apply a small view-space depth offset for non-zero priorities.
-    // Higher priority = slightly closer to the camera.
-    if (vertex.priority > 0u) {
-        const float PRIORITY_LAYER_EPSILON = 0.01; // tune relative to near/far and scale
-        float layer = float(vertex.priority & 0x7u);
-        // Camera looks down -Z in view space; decreasing z moves closer to camera
-        viewPos.z += layer * PRIORITY_LAYER_EPSILON;
-    }
-
+    // Player vertices carry an explicit equipment layer rather than the cache's
+    // software face priority. Bias only projected depth so equipment keeps its
+    // original screen position and perspective.
+    vec4 depthLayerPos = viewPos;
+    applyPriorityDepthBias(depthLayerPos, vertex.priority);
+    vec4 depthLayerClipPos = u_projectionMatrix * depthLayerPos;
     gl_Position = u_projectionMatrix * viewPos;
+    gl_Position.z = depthLayerClipPos.z * gl_Position.w / depthLayerClipPos.w;
     v_plane = float(playerInfo.plane);
     v_priority = vertex.priority;
 }

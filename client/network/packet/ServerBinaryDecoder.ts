@@ -922,6 +922,29 @@ export function decodeServerPacket(data: Uint8Array | ArrayBuffer): DecodedServe
             };
             const varps = readVars();
             const varbits = readVars();
+            const inventories: Record<
+                number,
+                { capacity: number; slots: any[] }
+            > = {};
+            if (reader.remaining > 0) {
+                const inventoryCount = reader.readByte();
+                for (let i = 0; i < inventoryCount; i++) {
+                    const inventoryId = reader.readShort();
+                    const capacity = reader.readShort();
+                    const slotCount = reader.readShort();
+                    const slots: any[] = [];
+                    for (let slotIndex = 0; slotIndex < slotCount; slotIndex++) {
+                        const slot = reader.readShort();
+                        const itemId = reader.readShort() - 1;
+                        let quantity = reader.readByte();
+                        if (quantity === 255) {
+                            quantity = reader.readInt();
+                        }
+                        slots.push({ slot, itemId, quantity });
+                    }
+                    inventories[inventoryId] = { capacity, slots };
+                }
+            }
             return {
                 type: "widget",
                 payload: {
@@ -930,6 +953,7 @@ export function decodeServerPacket(data: Uint8Array | ArrayBuffer): DecodedServe
                     args,
                     varps,
                     varbits,
+                    inventories,
                 },
             };
         }
@@ -998,16 +1022,18 @@ export function decodeServerPacket(data: Uint8Array | ArrayBuffer): DecodedServe
         }
 
         case ServerPacketId.CHAT_MESSAGE: {
-            const messageTypes = [
-                "game",
-                "public",
-                "private_in",
-                "private_out",
-                "channel",
-                "clan",
-                "trade",
-                "server",
-            ];
+            const messageTypes: Record<number, string> = {
+                0: "game",
+                1: "public",
+                2: "public",
+                3: "private_in",
+                4: "trade",
+                6: "private_out",
+                7: "clan",
+                9: "channel",
+                11: "game",
+                101: "trade",
+            };
             const text = reader.readString();
             const chatType = reader.readByte();
             const messageType = messageTypes[chatType] || "game";

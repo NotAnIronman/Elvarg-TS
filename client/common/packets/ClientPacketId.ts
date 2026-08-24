@@ -71,6 +71,8 @@ export const enum ClientPacketId {
     RESUME_STRINGDIALOG = 194,
     MAP_EDIT = 195,
     FRIENDS_CHAT_ACTION = 196,
+    PRIVATE_MESSAGE = 197,
+    CHAT_FILTER = 198,
 }
 
 /**
@@ -119,6 +121,8 @@ export const CLIENT_PACKET_LENGTHS: Record<ClientPacketId, number> = {
     [ClientPacketId.RESUME_STRINGDIALOG]: -1, // value(string)
     [ClientPacketId.MAP_EDIT]: -1, // action(1) + tile(4) + level/type/rotation/id(var)
     [ClientPacketId.FRIENDS_CHAT_ACTION]: -1,
+    [ClientPacketId.PRIVATE_MESSAGE]: -1,
+    [ClientPacketId.CHAT_FILTER]: 3,
 
     [ClientPacketId.DEBUG]: -2,
 };

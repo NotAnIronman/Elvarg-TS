@@ -396,8 +396,10 @@ export class PlayerSession {
     const interaction = actor.getInteractingMobile();
     const animation = actor.getAnimation();
     const graphic = actor.getGraphic();
+    const canReceiveChat = !actor.isPlayer?.() || actor === this.player ||
+      this.player?.getRelations().canReceivePublicChatFrom(actor);
     return {
-      forcedChat: flags.flagged(Flag.FORCED_CHAT) && actor.getForcedChat() != null
+      forcedChat: canReceiveChat && flags.flagged(Flag.FORCED_CHAT) && actor.getForcedChat() != null
         ? actor.getForcedChat()
         : undefined,
       interactionIndex: flags.flagged(Flag.ENTITY_INTERACTION)
