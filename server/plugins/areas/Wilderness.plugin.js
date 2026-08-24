@@ -7,9 +7,9 @@ const { Location } = require("../../src/main/typescript/elvarg/game/model/Locati
 // pvp_icons overlay (OSRS interface 90)
 // ---------------------------------------------------------------------------
 
-// Mounted permanently like every other gameframe overlay. The wilderness level text
-// (90:50) is written by the cache's own script 388, which derives the level from the
-// player's coordinates - the server sends no text for it.
+// Mounted permanently like every other gameframe overlay. Cache script 386 lays out and
+// colours the skull, level, range and multi-combat icon; script 388 fills the Wilderness
+// level and combat range from the player's coordinates and combat-level varbit.
 const PVP_ICONS_TARGET_UID = (161 << 16) | 3; // component.toplevel_osrs_stretch:pvp_icons
 const PVP_ICONS_INTERFACE = 90;
 // pvp_icons:icons_dodger, the block's outermost container. Deliberately not its child
@@ -18,6 +18,12 @@ const PVP_ICONS_INTERFACE = 90;
 // client skips a subtree whose ancestor is hidden.
 const PVP_ICONS_UID = (90 << 16) | 43;
 const PVPW_SAFE_UID = (90 << 16) | 47;
+const PVP_LEVEL_UID = (90 << 16) | 50;
+const VARP_MAP_FLAGS_CACHED = 3717;
+const MAP_FLAGS_REGULAR_WILDERNESS = 0;
+const VARBIT_IN_WILDERNESS = 5963;
+const PVP_LAYOUT_SCRIPT = 386;
+const PVP_LEVEL_SCRIPT = 388;
 // ponytail: the client has no "gameframe ready" packet, so the login mount is simply
 // retried a few ticks later; raise this if it still loses the race on slow clients.
 const MOUNT_RETRY_TICKS = 3;
@@ -182,12 +188,17 @@ function isInWilderness(state, player) {
 // ---------------------------------------------------------------------------
 
 const lastIconsVisible = new WeakMap();
+const lastWildernessState = new WeakMap();
+const lastPvpLayoutState = new WeakMap();
 
 function mountPvpIcons(player) {
   if (!player || player?.isPlayerBot?.() === true) {
     return;
   }
   const sender = player.getPacketSender();
+  // Bit 2 marks a PvP world, where script 387 adds 15 to the attack range. Keep it clear
+  // so a normal world uses combat level +/- Wilderness level.
+  sender.sendConfig(VARP_MAP_FLAGS_CACHED, MAP_FLAGS_REGULAR_WILDERNESS);
   sender.sendSubInterface(PVP_ICONS_TARGET_UID, PVP_ICONS_INTERFACE, 1);
   // Cache script 386 leaves the "safe area" badge opaque everywhere outside the Clan Wars
   // arena, so keep it hidden until safe zones are actually configured.
@@ -195,6 +206,11 @@ function mountPvpIcons(player) {
   // A fresh mount resets the group's widgets to their cache defaults.
   lastIconsVisible.delete(player);
   syncPvpIcons(player);
+
+  const tile = readPlayerTile(player);
+  if (tile && Wilderness.isInLocation(tile.location)) {
+    syncPvpLayout(player, tile, true);
+  }
 }
 
 // Nothing outside the wilderness is wired up yet (skull timer, attack style, PvP worlds),
@@ -213,12 +229,39 @@ function syncPvpIcons(player) {
   player.getPacketSender().sendInterfaceDisplayState(PVP_ICONS_UID, !visible);
 }
 
+function syncWildernessState(player, inWilderness) {
+  const value = inWilderness ? 1 : 0;
+  if (lastWildernessState.get(player) === value) {
+    return;
+  }
+  lastWildernessState.set(player, value);
+  player.getPacketSender().sendVarbit(VARBIT_IN_WILDERNESS, value);
+}
+
+function syncPvpLayout(player, tile, force = false) {
+  const wildernessLevel = Wilderness.levelForY(tile.y);
+  const combatLevel = combatLevelOf(player);
+  const multiIcon = Wilderness.isMulti(tile.x, tile.y) ? 1 : 0;
+  const state = `${wildernessLevel}:${combatLevel}:${multiIcon}`;
+  if (!force && lastPvpLayoutState.get(player) === state) {
+    return;
+  }
+  lastPvpLayoutState.set(player, state);
+
+  // The webclient supplies the missing enhanced-client range row after script 386 runs.
+  // Script 388 then fills both rows using normal-world Wilderness range rules.
+  const sender = player.getPacketSender();
+  sender.sendClientScript(PVP_LAYOUT_SCRIPT);
+  sender.sendClientScript(PVP_LEVEL_SCRIPT, PVP_LEVEL_UID);
+}
+
 function refreshWildernessUi(player, tile, inWilderness) {
   if (!player || player?.isPlayerBot?.() === true || !tile) {
     return;
   }
 
   if (inWilderness) {
+    syncWildernessState(player, true);
     player.getPacketSender().sendInteractionOption("Attack", 2, true);
 
     const level = Wilderness.levelForY(tile.y);
@@ -230,9 +273,12 @@ function refreshWildernessUi(player, tile, inWilderness) {
     if (player.getMultiIcon() !== multiIcon) {
       player.setMultiIcon(multiIcon);
     }
+    syncPvpLayout(player, tile);
     return;
   }
 
+  syncWildernessState(player, false);
+  lastPvpLayoutState.delete(player);
   player.getPacketSender().sendInteractionOption("null", 2, true);
 
   if (player.getWildernessLevel() !== 0) {
@@ -259,6 +305,9 @@ function onPlayerProcess(state, player) {
   }
   const previous = state.tiles.get(player);
   if (Location.isSameTile(previous, tile) && typeof previous.inWilderness === "boolean") {
+    if (previous.inWilderness) {
+      syncPvpLayout(player, tile);
+    }
     return;
   }
 
@@ -302,6 +351,8 @@ function leaveWilderness(player, tile, wasInWilderness) {
   if (player.getMultiIcon() !== 0) {
     player.setMultiIcon(0);
   }
+  syncWildernessState(player, false);
+  lastPvpLayoutState.delete(player);
 }
 
 function retryPendingMount(state, player) {
@@ -338,6 +389,9 @@ function onPlayerLogin(state, player) {
 function onPlayerDisconnect(state, player) {
   state.tiles.delete(player);
   state.pendingMount.delete(player);
+  lastIconsVisible.delete(player);
+  lastWildernessState.delete(player);
+  lastPvpLayoutState.delete(player);
 }
 
 function onCanAttack(state, event) {

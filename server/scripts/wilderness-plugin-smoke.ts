@@ -4,15 +4,21 @@
 // Usage: TS_NODE_COMPILER_OPTIONS='{"target":"es2020"}' yarn ts-node ./scripts/wilderness-plugin-smoke.ts
 import { strict as assert } from "assert";
 import { Location } from "../src/main/typescript/elvarg/game/model/Location";
+import { PacketSender } from "../src/main/typescript/elvarg/net/packet/PacketSender";
 
 const Wilderness = require("../plugins/areas/Wilderness.plugin");
 const { isVisibleRealPlayer } = require("../plugins/bots/behaviours/pvp/PvpTargetFilters");
 
 const PVP_ICONS_TARGET_UID = (161 << 16) | 3;
 const PVP_ICONS_UID = (90 << 16) | 43;
+const PVP_LEVEL_UID = (90 << 16) | 50;
+const VARP_MAP_FLAGS_CACHED = 3717;
+const VARBIT_IN_WILDERNESS = 5963;
+const VARBIT_MULTICOMBAT_AREA = 4605;
 
 const IN_WILDERNESS = new Location(3100, 3600, 0);
 const AT_THE_DITCH = new Location(3100, 3525, 0); // level 1 Wilderness
+const MULTI_AT_THE_DITCH = new Location(3200, 3525, 0);
 const OUTSIDE = new Location(3100, 3500, 0);
 
 let process: ((event: any) => void) | undefined;
@@ -41,6 +47,9 @@ function overlayFollowsTheDitch() {
     const sender = new Proxy<any>({
         sendSubInterface: (...args: any[]) => sent.push({ call: "sendSubInterface", args }),
         sendInterfaceDisplayState: (...args: any[]) => sent.push({ call: "sendInterfaceDisplayState", args }),
+        sendConfig: (...args: any[]) => sent.push({ call: "sendConfig", args }),
+        sendClientScript: (...args: any[]) => sent.push({ call: "sendClientScript", args }),
+        sendVarbit: (...args: any[]) => sent.push({ call: "sendVarbit", args }),
     }, {
         get: (target, property) => target[property] ?? (() => sender),
     });
@@ -51,6 +60,7 @@ function overlayFollowsTheDitch() {
         setWildernessLevel: (level: number) => { wildernessLevel = level; },
         getMultiIcon: () => multiIcon,
         setMultiIcon: (icon: number) => { multiIcon = icon; },
+        getSkillManager: () => ({ getCombatLevel: () => 73 }),
     };
 
     // Only the resulting state matters; the entry re-mount re-sends the same value.
@@ -67,6 +77,11 @@ function overlayFollowsTheDitch() {
     login!({ player });
     assert.equal(mounts(), 1, "login must mount the pvp_icons overlay");
     assert.equal(hidden(), true, "login outside the wilderness must hide the icon block");
+    assert.ok(sent.some((s) => s.call === "sendConfig"
+        && s.args[0] === VARP_MAP_FLAGS_CACHED && s.args[1] === 0),
+    "the cache must use normal Wilderness combat ranges");
+    assert.ok(sent.some((s) => s.call === "sendVarbit"
+        && s.args[0] === VARBIT_IN_WILDERNESS && s.args[1] === 0));
 
     // The login mount is retried a few ticks later; keep ticking until it lands.
     sent.length = 0;
@@ -77,11 +92,22 @@ function overlayFollowsTheDitch() {
     // Step into the wilderness. Visibility reconverges from the wilderness level, so the
     // tick that sets the level is followed by the tick that sends the state.
     sent.length = 0;
-    location = IN_WILDERNESS;
+    location = AT_THE_DITCH;
     process!({ player });
     process!({ player });
     assert.equal(hidden(), false, "entering the wilderness must show the icon block");
-    assert.ok(wildernessLevel > 0, "entering the wilderness must set a wilderness level");
+    assert.equal(wildernessLevel, 1, "the ditch must be level 1 Wilderness");
+    assert.ok(sent.some((s) => s.call === "sendClientScript" && s.args[0] === 386),
+        "OSRS script 386 must position and colour the Wilderness HUD");
+    assert.ok(sent.some((s) => s.call === "sendClientScript"
+        && s.args[0] === 388 && s.args[1] === PVP_LEVEL_UID),
+    "OSRS script 388 must populate the level and combat range");
+    assert.ok(sent.some((s) => s.call === "sendVarbit"
+        && s.args[0] === VARBIT_IN_WILDERNESS && s.args[1] === 1));
+
+    location = MULTI_AT_THE_DITCH;
+    process!({ player });
+    assert.equal(multiIcon, 1, "entering a multi-combat tile must enable the icon");
 
     // Step back out.
     sent.length = 0;
@@ -90,8 +116,29 @@ function overlayFollowsTheDitch() {
     process!({ player });
     assert.equal(hidden(), true, "leaving the wilderness must hide the icon block");
     assert.equal(wildernessLevel, 0, "leaving the wilderness must clear the wilderness level");
+    assert.equal(multiIcon, 0, "leaving the wilderness must clear the multi-combat icon");
 
     console.log("  overlay: mounted once, hidden outside the wilderness");
+}
+
+function multiIconUsesTheWebclientVarbit() {
+    const packets: Buffer[] = [];
+    const sender = new PacketSender({
+        getSession: () => ({
+            sendClientPacket: (packet: Buffer) => {
+                packets.push(packet);
+                return true;
+            },
+        }),
+    });
+
+    sender.sendMultiIcon(1);
+    assert.equal(packets.length, 1);
+    assert.equal(packets[0][0], 42, "multi icon must use the webclient VARBIT packet");
+    assert.equal(packets[0].readUInt16BE(1), VARBIT_MULTICOMBAT_AREA);
+    assert.equal(packets[0].readInt32BE(3), 1);
+
+    console.log("  multi: OSRS multi-combat varbit sent");
 }
 
 /**
@@ -182,6 +229,7 @@ function botsSkipUnattackableTargets() {
 
 register();
 overlayFollowsTheDitch();
+multiIconUsesTheWebclientVarbit();
 levelRangeIsEnforced();
 botsSkipUnattackableTargets();
 console.log("wilderness plugin ok");

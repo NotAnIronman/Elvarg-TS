@@ -297,6 +297,7 @@ import { VarcPersistence } from "./vars/VarcPersistence";
 import { NotificationDisplay } from "./widgets/NotificationDisplay";
 import { PlayerDesignController } from "./widgets/PlayerDesignController";
 import { SpellSelectionController } from "./widgets/SpellSelectionController";
+import { applyWildernessHudLayout } from "./widgets/WildernessHud";
 import {
     type SelectedSpellInfo,
     type SpellSelectionState,
@@ -1462,6 +1463,9 @@ export class OsrsClient {
             },
             loadScript: (id: number) => {
                 return self.clientScripts.load(id);
+            },
+            onScriptFinished: (scriptId: number) => {
+                applyWildernessHudLayout(self.widgetManager, self.varManager, scriptId);
             },
             clientRevision: 235,
             // Canvas dimensions as defined by the renderer's current UI layout space.

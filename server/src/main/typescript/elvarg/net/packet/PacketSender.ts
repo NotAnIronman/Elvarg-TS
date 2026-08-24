@@ -60,6 +60,7 @@ import {
 } from "../protocol/WorldMapProtocol";
 import { CacheDefinitions } from "../../game/cache/CacheDefinitions";
 const CHATBOX_MODAL_TARGET_UID = (162 << 16) | 567;
+const VARBIT_MULTICOMBAT_AREA = 4605;
 // Quest completion states consulted by spellbook CS2 scripts. Keep these client
 // flags separate from server-side spell casting so quests can be enforced later.
 // These are the state variables used by this cache's spell definitions. Values
@@ -491,10 +492,7 @@ export class PacketSender {
   }
 
   public sendMultiIcon(value: number): PacketSender {
-    const out = new PacketBuilder(61);
-    out.put(value);
-    this.player.getSession().write(out);
-    return this;
+    return this.sendVarbit(VARBIT_MULTICOMBAT_AREA, value === 0 ? 0 : 1);
   }
 
   public sendFriendStatus(status: number) {
