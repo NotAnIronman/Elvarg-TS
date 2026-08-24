@@ -85,6 +85,7 @@ export class PlayerSave {
     private recentKills: string[];
     private deaths: number;
     private points: number;
+    private pcPoints: number;
     private pouches;
     private inventory: Item[];
     private equipment: Item[];
@@ -666,6 +667,7 @@ export class PlayerSave {
         player.setHighestKillstreak(this.highestKillstreak);
         player.setDeaths(this.deaths);
         player.setPoints(this.points);
+        player.pcPoints = Math.max(0, Math.min(4000, Number.isFinite(this.pcPoints) ? Math.trunc(this.pcPoints) : 0));
         player.setPoisonDamage(this.poisonDamage);
         player.setCrystalBowShotsInStage(this.crystalBowShotsInStage);
         player.setCrystalBowTrackedStageItemId(this.crystalBowTrackedStageItemId);
@@ -763,6 +765,7 @@ export class PlayerSave {
         playerSave.recentKills = [...(player.getRecentKills() ?? [])];
         playerSave.deaths = player.getDeaths();
         playerSave.points = player.getPoints();
+        playerSave.pcPoints = Math.max(0, Math.min(4000, Number.isFinite(player.pcPoints) ? Math.trunc(player.pcPoints) : 0));
         playerSave.poisonDamage = player.getPoisonDamage();
         playerSave.crystalBowShotsInStage = player.getCrystalBowShotsInStage();
         playerSave.crystalBowTrackedStageItemId = player.getCrystalBowTrackedStageItemId();

@@ -73,9 +73,11 @@ export class NPCDeathTask extends Task {
         (this.npc as any).__skipDefaultRespawn = false;
 
         if (this.npc.getArea() !== null) {
-            this.npc.getArea().leave(this.npc, false);
-            this.npc.getArea().postLeave(this.npc, false);
-            this.npc.setArea(null);
+            const area = this.npc.getArea();
+            area.leave(this.npc, false);
+            if (this.npc.getArea() === area) {
+                this.npc.setArea(null);
+            }
         }
         this.npc.setDying(false);
         this.npc.setNpcTransformationId(-1);
