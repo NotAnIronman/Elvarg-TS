@@ -371,8 +371,6 @@ class ClientConnection {
               this.player.getPacketSender().closeWorldMap();
             } else if (equipmentSlot >= 0) {
               EquipPacketListener.unequip(this.player, equipmentSlot);
-            } else if (actionPacket.groupId === 387 && actionPacket.childId === 1) {
-              BonusManager.open(this.player);
             } else if (Bank.handleWidgetAction(this.player, actionPacket)) {
               // Bank owns its cache-native widgets while the bank modal is open.
             } else if (ShopManager.handleWidgetAction(this.player, actionPacket)) {
