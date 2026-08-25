@@ -35,10 +35,7 @@ interface SpriteTexture {
     h: number;
 }
 
-/**
- * Renders overhead prayer icons above players/NPCs in screen space.
- * Uses the same billboard shader approach as HealthBarOverlay.
- */
+/** Renders PK skull and prayer icons above players in OSRS stacking order. */
 export class OverheadPrayerOverlay implements Overlay {
     constructor(
         private readonly program: Program,
@@ -54,9 +51,15 @@ export class OverheadPrayerOverlay implements Overlay {
     private drawCall?: DrawCall;
 
     private spriteIndex?: CacheIndex;
-    private prayerSprites: Map<number, SpriteTexture> = new Map();
-    private failedSpriteIndices: Set<number> = new Set();
-    private headIconsPrayerArchiveId: number = -1;
+    private iconSprites = {
+        pk: new Map<number, SpriteTexture>(),
+        prayer: new Map<number, SpriteTexture>(),
+    };
+    private failedSpriteIndices = {
+        pk: new Set<number>(),
+        prayer: new Set<number>(),
+    };
+    private archiveIds = { pk: -1, prayer: -1 };
 
     private screenSize: Float32Array = new Float32Array(2);
     private tint: Float32Array = new Float32Array([1, 1, 1, 1]);
@@ -92,13 +95,15 @@ export class OverheadPrayerOverlay implements Overlay {
     }
 
     private destroyTextures(): void {
-        for (const sprite of this.prayerSprites.values()) {
-            try {
-                sprite.tex.delete?.();
-            } catch {}
+        for (const kind of ["pk", "prayer"] as const) {
+            for (const sprite of this.iconSprites[kind].values()) {
+                try {
+                    sprite.tex.delete?.();
+                } catch {}
+            }
+            this.iconSprites[kind].clear();
+            this.failedSpriteIndices[kind].clear();
         }
-        this.prayerSprites.clear();
-        this.failedSpriteIndices.clear();
     }
 
     dispose(): void {
@@ -120,65 +125,69 @@ export class OverheadPrayerOverlay implements Overlay {
             if (!cacheSystem) return; // Cache not loaded yet
             this.spriteIndex = cacheSystem.getIndex(IndexType.DAT2.sprites);
 
-            // Load graphics defaults to get the headicons_prayer archive ID
+            // Load the same head-icon archives used by the official client.
             const cacheInfo = this.ctx.getLoadedCacheInfo?.();
             if (cacheInfo) {
                 const defaults = GraphicsDefaults.load(cacheInfo, cacheSystem);
-                this.headIconsPrayerArchiveId = defaults.headIconsPrayer;
+                this.archiveIds.pk = defaults.headIconsPk;
+                this.archiveIds.prayer = defaults.headIconsPrayer;
             }
 
-            // Fallback: try by name
-            if (this.headIconsPrayerArchiveId < 0 && this.spriteIndex) {
-                try {
-                    this.headIconsPrayerArchiveId =
-                        this.spriteIndex.getArchiveId("headicons_prayer");
-                } catch {}
+            // Fallback for cache variants without populated graphics defaults.
+            if (this.spriteIndex) {
+                for (const kind of ["pk", "prayer"] as const) {
+                    if (this.archiveIds[kind] >= 0) continue;
+                    try {
+                        this.archiveIds[kind] = this.spriteIndex.getArchiveId(
+                            kind === "pk" ? "headicons_pk" : "headicons_prayer",
+                        );
+                    } catch {}
+                }
             }
         } catch (err) {
             console.warn("[OverheadPrayerOverlay] initAssetsFromCache error", err);
         }
     }
 
-    private getPrayerSprite(index: number): SpriteTexture | undefined {
+    private getSprite(kind: "pk" | "prayer", index: number): SpriteTexture | undefined {
         if (index < 0) return undefined;
-        const cached = this.prayerSprites.get(index);
+        const cached = this.iconSprites[kind].get(index);
         if (cached) return cached;
 
-        if (!this.spriteIndex || this.headIconsPrayerArchiveId < 0) {
+        if (!this.spriteIndex || this.archiveIds[kind] < 0) {
             // The overlay can be constructed before cache loading finishes.
             // Re-resolve here rather than permanently hiding every icon.
             this.initAssetsFromCache();
         }
-        if (!this.spriteIndex || this.headIconsPrayerArchiveId < 0) {
+        if (!this.spriteIndex || this.archiveIds[kind] < 0) {
             return undefined;
         }
 
         // Don't repeatedly parse a confirmed missing sprite frame.
-        if (this.failedSpriteIndices.has(index)) return undefined;
+        if (this.failedSpriteIndices[kind].has(index)) return undefined;
 
         try {
-            // Load all sprites from the headicons_prayer archive
             const sprites = SpriteLoader.loadIntoIndexedSprites(
                 this.spriteIndex,
-                this.headIconsPrayerArchiveId,
+                this.archiveIds[kind],
             );
             if (!sprites || index >= sprites.length) {
-                this.failedSpriteIndices.add(index);
+                this.failedSpriteIndices[kind].add(index);
                 return undefined;
             }
 
             const indexed = sprites[index];
             if (!indexed) {
-                this.failedSpriteIndices.add(index);
+                this.failedSpriteIndices[kind].add(index);
                 return undefined;
             }
 
             const sprite = this.createTextureFromIndexedSprite(indexed);
-            this.prayerSprites.set(index, sprite);
+            this.iconSprites[kind].set(index, sprite);
             return sprite;
         } catch (err) {
-            console.warn("[OverheadPrayerOverlay] failed to load prayer sprite", index, err);
-            this.failedSpriteIndices.add(index);
+            console.warn(`[OverheadPrayerOverlay] failed to load ${kind} sprite`, index, err);
+            this.failedSpriteIndices[kind].add(index);
             return undefined;
         }
     }
@@ -247,11 +256,11 @@ export class OverheadPrayerOverlay implements Overlay {
         const stacks = this.actorStacks;
 
         for (const entry of entries) {
-            const iconIndex = entry.headIconPrayer | 0;
-            if (iconIndex < 0) continue;
-
-            const sprite = this.getPrayerSprite(iconIndex);
-            if (!sprite) continue;
+            const sprites = [
+                this.getSprite("pk", entry.headIconPk | 0),
+                this.getSprite("prayer", entry.headIconPrayer | 0),
+            ].filter((sprite): sprite is SpriteTexture => sprite !== undefined);
+            if (sprites.length === 0) continue;
 
             const plane = entry.plane | 0;
             const height = helpers.getMinTileHeightInRadius(
@@ -268,40 +277,40 @@ export class OverheadPrayerOverlay implements Overlay {
 
             const scale =
                 Number.isFinite(this.scale) && this.scale > 0 ? this.scale : 1.0;
-            const spriteW = Math.max(1, Math.round(sprite.w * scale));
-            const spriteH = Math.max(1, Math.round(sprite.h * scale));
-
             // Continue the per-actor element offset above any text/health bars;
-            // an untouched offset advances by 7 before icons are placed.
+            // an untouched offset advances by 7 before icons are placed. OSRS
+            // draws the skull first and then stacks the prayer icon above it.
             const groupKey = typeof entry.groupKey === "number" ? entry.groupKey | 0 : undefined;
             const stackOffset = groupKey !== undefined ? stacks?.get(groupKey) : undefined;
             let var18 = stackOffset ?? -2 * scale;
             if (stackOffset === undefined) {
                 var18 += 7 * scale;
             }
-            var18 += 25 * scale;
-            const x = -12 * scale;
-            const y = -var18;
-            if (groupKey !== undefined) {
-                stacks?.set(groupKey, var18);
+            for (const sprite of sprites) {
+                var18 += 25 * scale;
+                this.writeQuad(
+                    -12 * scale,
+                    -var18,
+                    Math.max(1, Math.round(sprite.w * scale)),
+                    Math.max(1, Math.round(sprite.h * scale)),
+                );
+                this.resetFullUvs();
+
+                this.tint[0] = 1.0;
+                this.tint[1] = 1.0;
+                this.tint[2] = 1.0;
+                this.tint[3] = 1.0;
+
+                this.positions.data(this.quadVerts);
+                this.uvs.data(this.quadUvs);
+                this.drawCall
+                    .uniform("u_screenSize", this.screenSize)
+                    .uniform("u_centerWorld", center)
+                    .uniform("u_tint", this.tint)
+                    .texture("u_sprite", sprite.tex)
+                    .draw();
             }
-
-            this.writeQuad(x, y, spriteW, spriteH);
-            this.resetFullUvs();
-
-            this.tint[0] = 1.0;
-            this.tint[1] = 1.0;
-            this.tint[2] = 1.0;
-            this.tint[3] = 1.0;
-
-            this.positions.data(this.quadVerts);
-            this.uvs.data(this.quadUvs);
-            this.drawCall
-                .uniform("u_screenSize", this.screenSize)
-                .uniform("u_centerWorld", center)
-                .uniform("u_tint", this.tint)
-                .texture("u_sprite", sprite.tex)
-                .draw();
+            if (groupKey !== undefined) stacks?.set(groupKey, var18);
         }
     }
 

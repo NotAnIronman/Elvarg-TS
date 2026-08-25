@@ -225,6 +225,7 @@ export function acquireOverheadPrayerEntry(host: WebGLOsrsRendererHost, ): Overh
                 worldZ: 0,
                 plane: 0,
                 heightOffsetTiles: 0.9,
+                headIconPk: -1,
                 headIconPrayer: -1,
             }
         );
@@ -268,6 +269,7 @@ export function resetOverheadPrayerOutput(host: WebGLOsrsRendererHost, ): void {
 
         if (host.overheadPrayerOutput.length === 0) return;
         for (const entry of host.overheadPrayerOutput) {
+            entry.headIconPk = -1;
             entry.headIconPrayer = -1;
             entry.heightOffsetTiles = 0.9;
             host.overheadPrayerPool.push(entry);

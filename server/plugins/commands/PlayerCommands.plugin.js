@@ -63,6 +63,32 @@ function yellDelaySeconds(player) {
   return DonatorRights.getYellDelay(player.getDonatorRights?.());
 }
 
+function canChangeSkull(player) {
+  if (!CombatFactory.inCombat(player)) {
+    return true;
+  }
+  player.getPacketSender().sendMessage("You cannot change that during combat!");
+  return false;
+}
+
+function confirmSkull(api, player, type, duration, warning) {
+  if (!canChangeSkull(player)) {
+    return;
+  }
+  api.sendMultiChatboxPrompt(
+    player,
+    warning,
+    "Yes",
+    () => {
+      if (canChangeSkull(player)) {
+        CombatFactory.skull(player, type, duration);
+      }
+    },
+    "No",
+    () => {}
+  );
+}
+
 let World;
 let ItemOnGroundManager;
 let CombatFactory;
@@ -237,20 +263,24 @@ module.exports = {
     });
 
     api.registerCommand("skull", ({ player }) => {
-      if (CombatFactory.inCombat(player)) {
-        player.getPacketSender().sendMessage("You cannot change that during combat!");
-        return true;
-      }
-      CombatFactory.skull(player, SkullType.WHITE_SKULL, 300);
+      confirmSkull(
+        api,
+        player,
+        SkullType.WHITE_SKULL,
+        300,
+        "Skulling yourself can make you lose every carried item. Are you sure?"
+      );
       return true;
     });
 
     api.registerCommand("redskull", ({ player }) => {
-      if (CombatFactory.inCombat(player)) {
-        player.getPacketSender().sendMessage("You cannot change that during combat!");
-        return true;
-      }
-      CombatFactory.skull(player, SkullType.RED_SKULL, 60 * 30);
+      confirmSkull(
+        api,
+        player,
+        SkullType.RED_SKULL,
+        60 * 30,
+        "A red skull makes you lose every carried item and disables Protect Item. Continue?"
+      );
       return true;
     });
 

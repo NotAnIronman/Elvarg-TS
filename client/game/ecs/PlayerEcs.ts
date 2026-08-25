@@ -1108,11 +1108,21 @@ export class PlayerEcs {
     }
 
     getHeadIconPk(index: number): number {
+        const appearance = this.appearances[index];
+        if (appearance?.headIcons?.skull !== undefined) {
+            return appearance.headIcons.skull | 0;
+        }
         return (this.headIconPk?.[index] ?? -1) | 0;
     }
 
     setHeadIconPk(index: number, iconId: number): void {
-        if (this.headIconPk) this.headIconPk[index] = (iconId | 0) & 0x7f;
+        const normalized = iconId < 0 ? -1 : (iconId | 0) & 0x7f;
+        if (this.headIconPk) this.headIconPk[index] = normalized;
+        const appearance = this.appearances[index];
+        if (appearance) {
+            appearance.headIcons ??= {};
+            appearance.headIcons.skull = normalized;
+        }
     }
 
     /**

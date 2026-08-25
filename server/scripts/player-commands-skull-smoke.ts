@@ -1,0 +1,118 @@
+import * as assert from "node:assert/strict";
+import { MultiChatboxPrompt } from "../src/main/typescript/elvarg/game/model/menu/MultiChatboxPrompt";
+import { SkullType } from "../src/main/typescript/elvarg/game/model/SkullType";
+
+const plugin = require("../plugins/commands/PlayerCommands.plugin.js");
+
+const commands = new Map<string, (event: any) => boolean>();
+let inCombat = false;
+const skulls: Array<{ player: any; type: SkullType; duration: number }> = [];
+const sent = {
+  chatboxes: [] as number[],
+  scripts: [] as any[][],
+  messages: [] as string[],
+  removals: 0,
+};
+const sender: any = {
+  sendInterfaceScript: () => sender,
+  sendVarbit: () => sender,
+  sendChatboxInterface: (id: number) => {
+    sent.chatboxes.push(id);
+    return sender;
+  },
+  sendClientScript: (...args: any[]) => {
+    sent.scripts.push(args);
+    return sender;
+  },
+  sendInterfaceFlagsRange: () => sender,
+  sendInterfaceRemoval: () => {
+    sent.removals++;
+    return sender;
+  },
+  sendMessage: (message: string) => {
+    sent.messages.push(message);
+    return sender;
+  },
+};
+const player = { getPacketSender: () => sender };
+const combatFactory = {
+  inCombat: () => inCombat,
+  skull: (target: any, type: SkullType, duration: number) => {
+    skulls.push({ player: target, type, duration });
+  },
+};
+
+plugin.register({
+  getWorld: () => ({}),
+  getItemOnGroundManager: () => ({}),
+  getCombatFactory: () => combatFactory,
+  getPlayerPunishment: () => ({}),
+  registerCommand: (name: string, handler: (event: any) => boolean) => {
+    commands.set(name, handler);
+  },
+  sendMultiChatboxPrompt: (target: any, title: string, ...pairs: any[]) =>
+    MultiChatboxPrompt.showPrompt("PlayerCommands", target, title, pairs),
+});
+
+const choose = (option: number, useWidgetAction = false) => MultiChatboxPrompt.handleInterfaceActionClick({
+  player,
+  buttonId: (219 << 16) | 1,
+  action: useWidgetAction ? 0 : option,
+  groupId: 219,
+  childId: 1,
+  slot: useWidgetAction ? option : undefined,
+  handled: false,
+});
+
+const skullCommand = commands.get("skull");
+const redSkullCommand = commands.get("redskull");
+assert.ok(skullCommand);
+assert.ok(redSkullCommand);
+
+skullCommand({ player });
+assert.strictEqual(skulls.length, 0, "::skull must not apply a skull before confirmation");
+assert.strictEqual(sent.chatboxes[sent.chatboxes.length - 1], 219, "::skull must open the native option chatbox");
+assert.deepStrictEqual(
+  sent.scripts[sent.scripts.length - 1],
+  [58, "Skulling yourself can make you lose every carried item. Are you sure?", "Yes|No"]
+);
+assert.strictEqual(choose(2, true), true);
+assert.strictEqual(skulls.length, 0, "choosing No must leave the player unskulled");
+
+skullCommand({ player });
+assert.strictEqual(choose(1, true), true);
+assert.deepStrictEqual(skulls[skulls.length - 1], {
+  player,
+  type: SkullType.WHITE_SKULL,
+  duration: 300,
+});
+
+skullCommand({ player });
+inCombat = true;
+assert.strictEqual(choose(1), true);
+assert.strictEqual(skulls.length, 1, "combat must be checked again when Yes is selected");
+assert.strictEqual(sent.messages[sent.messages.length - 1], "You cannot change that during combat!");
+
+const promptsBeforeCombatCommand = sent.chatboxes.length;
+skullCommand({ player });
+assert.strictEqual(
+  sent.chatboxes.length,
+  promptsBeforeCombatCommand,
+  "a player already in combat must not receive the prompt"
+);
+
+inCombat = false;
+redSkullCommand({ player });
+assert.deepStrictEqual(
+  sent.scripts[sent.scripts.length - 1],
+  [58, "A red skull makes you lose every carried item and disables Protect Item. Continue?", "Yes|No"]
+);
+assert.strictEqual(choose(1), true);
+assert.deepStrictEqual(skulls[skulls.length - 1], {
+  player,
+  type: SkullType.RED_SKULL,
+  duration: 60 * 30,
+});
+assert.strictEqual(sent.removals, 4, "every answer must close its option chatbox");
+
+console.log("player command skull confirmation smoke passed");

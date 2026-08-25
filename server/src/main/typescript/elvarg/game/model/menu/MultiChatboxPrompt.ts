@@ -105,11 +105,17 @@ export class MultiChatboxPrompt {
       MultiChatboxPrompt.pendingPrompts.delete(event.player);
       return false;
     }
-    if (event.buttonId !== MultiChatboxPrompt.OPTIONS_WIDGET_ID) {
+    if (
+      event.buttonId !== MultiChatboxPrompt.OPTIONS_WIDGET_ID &&
+      event.groupId !== MultiChatboxPrompt.INTERFACE_ID
+    ) {
       return false;
     }
 
-    return MultiChatboxPrompt.selectOption(event.player, event.action - 1);
+    const optionNumber = typeof event.slot === "number" && Number.isInteger(event.slot)
+      ? event.slot
+      : event.action;
+    return MultiChatboxPrompt.selectOption(event.player, optionNumber - 1);
   }
 
   private static selectOption(player: any, optionIndex: number): boolean {
@@ -130,9 +136,15 @@ export class MultiChatboxPrompt {
     }
 
     MultiChatboxPrompt.pendingPrompts.delete(player);
-    player?.getPacketSender?.()?.sendInterfaceRemoval?.();
-
     const selected = pending.options[optionIndex];
+    try {
+      player?.getPacketSender?.()?.sendInterfaceRemoval?.();
+    } catch (err) {
+      console.error(
+        `[plugins] multi_chatbox_prompt close failed (${pending.pluginName})`,
+        err
+      );
+    }
     try {
       selected.callback(player, optionIndex, selected.text);
     } catch (err) {

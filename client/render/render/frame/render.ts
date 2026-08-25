@@ -981,7 +981,7 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
                 }
             } catch {}
 
-            // Render overhead prayer icons for all players
+            // Render overhead skull and prayer icons for all players.
             try {
                 const pe = host.osrsClient.playerEcs;
                 const count = pe.size?.() ?? (pe as any).size?.() ?? 0;
@@ -989,8 +989,9 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
                     for (let i = 0; i < count; i++) {
                         if (overheadPrayers.length >= overheadPrayerMaxEntries) break;
                         if (!host.shouldRenderPlayerIndex(i)) continue;
+                        const headIconPk = pe.getHeadIconPk(i);
                         const headIconPrayer = pe.getHeadIconPrayer(i);
-                        if (headIconPrayer < 0) continue;
+                        if (headIconPk < 0 && headIconPrayer < 0) continue;
 
                         const px = pe.getX(i) | 0;
                         const py = pe.getY(i) | 0;
@@ -1007,6 +1008,7 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
                             false,
                             pe.getServerIdForIndex?.(i) ?? 0,
                         );
+                        entry.headIconPk = headIconPk;
                         entry.headIconPrayer = headIconPrayer;
                         // Position above the player head, above any health bars/hitsplats
                         entry.heightOffsetTiles = host.resolvePlayerHeadIconOffset(
