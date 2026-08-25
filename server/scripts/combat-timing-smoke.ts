@@ -516,6 +516,7 @@ try {
 
     (CombatFactory as any).handleRetaliation = originalHandleRetaliation;
     let retaliationDelay = -1;
+    let retaliationDisabled = false;
     const attacker: any = { getHitpoints: () => 10, isRegistered: () => true };
     const retaliationCombat = {
         getTarget: () => null,
@@ -529,12 +530,17 @@ try {
         getAsNpc: () => ({
             getMovementCoordinator: () => ({ getCoordinateState: () => CoordinateState.HOME }),
         }),
+        hasFlag: () => retaliationDisabled,
         getMovementQueue: () => ({ reset: () => undefined }),
     };
     (CombatFactory as any).getMethod = () => ({ attackSpeed: () => 4 });
     (TaskManager as any).submit = () => undefined;
     (CombatFactory as any).handleRetaliation(attacker, retaliatingNpc);
     assert.equal(retaliationDelay, 2);
+    retaliationDelay = -1;
+    retaliationDisabled = true;
+    (CombatFactory as any).handleRetaliation(attacker, retaliatingNpc);
+    assert.equal(retaliationDelay, -1);
 
     let botTarget: any = null;
     let botAttacks = 0;

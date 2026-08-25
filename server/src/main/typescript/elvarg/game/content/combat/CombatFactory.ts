@@ -992,7 +992,8 @@ export class CombatFactory {
                     target.getAsPlayer().autoRetaliateReturn() &&
                     !target.getMovementQueue().isMovings();
             } else if (target.isNpc()) {
-                auto_ret = target.getAsNpc().getMovementCoordinator().getCoordinateState() == CoordinateState.HOME;
+                auto_ret = target.hasFlag?.("combat:no-retaliate") !== true
+                    && target.getAsNpc().getMovementCoordinator().getCoordinateState() == CoordinateState.HOME;
             }
 
             if (!auto_ret) {

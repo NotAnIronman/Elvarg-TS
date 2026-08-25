@@ -84,6 +84,10 @@ export class HitQueue {
         return this.pendingHits.length > 0 || this.pendingDamage.length > 0;
     }
 
+    hasPendingHitFrom(attacker: Mobile): boolean {
+        return this.pendingHits.some(({ hit }) => hit.getAttacker() === attacker);
+    }
+
     getQueuedDamage(): number {
         return this.pendingDamage.reduce((total, hit) => total + hit.getDamage(), 0);
     }

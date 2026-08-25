@@ -113,17 +113,25 @@ export class CombatRange {
             const fromX = a.maxX + 1 === b.minX ? a.maxX : a.minX;
             const toX = a.maxX + 1 === b.minX ? b.minX : b.maxX;
             for (let y = Math.max(a.minY, b.minY); y <= Math.min(a.maxY, b.maxY); y++) {
-                if (RegionManager.canMove(fromX, y, toX, y, z, 1, 1, area)) return true;
+                if (this.hasOpenCardinalEdge(fromX, y, toX, y, z, area)) return true;
             }
         }
         if (a.maxY + 1 === b.minY || b.maxY + 1 === a.minY) {
             const fromY = a.maxY + 1 === b.minY ? a.maxY : a.minY;
             const toY = a.maxY + 1 === b.minY ? b.minY : b.maxY;
             for (let x = Math.max(a.minX, b.minX); x <= Math.min(a.maxX, b.maxX); x++) {
-                if (RegionManager.canMove(x, fromY, x, toY, z, 1, 1, area)) return true;
+                if (this.hasOpenCardinalEdge(x, fromY, x, toY, z, area)) return true;
             }
         }
         return false;
+    }
+
+    private static hasOpenCardinalEdge(fromX: number, fromY: number, toX: number, toY: number, z: number, area: any): boolean {
+        const fromMask = toX > fromX ? 0x8 : toX < fromX ? 0x80 : toY > fromY ? 0x20 : 0x2;
+        const toMask = toX > fromX ? 0x80 : toX < fromX ? 0x8 : toY > fromY ? 0x2 : 0x20;
+        const invalid = RegionManager.UNKNOWN | RegionManager.UNLOADED_TILE;
+        return (RegionManager.getClipping(fromX, fromY, z, area) & (fromMask | invalid)) === 0
+            && (RegionManager.getClipping(toX, toY, z, area) & (toMask | invalid)) === 0;
     }
 
     private static hasMeleeLine(a: Bounds, b: Bounds, z: number, area: any): boolean {

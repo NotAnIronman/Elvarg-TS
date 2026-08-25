@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { MapManager } from "../game/MapManager";
 import { decodeServerPacket } from "../network/packet/ServerBinaryDecoder";
 import { onLocAddChange } from "../render/render/locs";
+import { onLocDel } from "../render/render/locs2";
 import { MapFileLoader } from "../rs/map/MapFileLoader";
 
 function mapLoadBackoff(): void {
@@ -53,6 +54,29 @@ function duplicateLocReplayIsIgnored(): void {
     assert.equal(refreshes, 3);
 }
 
+function crossShapeReplacementKeepsBaseWallHidden(): void {
+    const tile = { x: 2643, y: 2592 };
+    const host = {
+        addedLocs: new Map(),
+        locOverrides: new Map(),
+        instanceActive: false,
+        osrsClient: { locTypeLoader: { load: () => undefined } },
+        getLocIdsAtTileAllLevels: () => [],
+        scheduleLocGeometryUpdate: () => undefined,
+    } as any;
+
+    onLocDel(host, tile, 0, 0, 0);
+    onLocAddChange(host, 14245, tile, 0, 22, 0);
+    assert.equal(host.locOverrides.get("2643,2592,0,-1").matchType, 0);
+    assert.equal(host.addedLocs.get("2643,2592,0,22").locId, 14245);
+
+    onLocDel(host, tile, 0, 22, 0);
+    onLocAddChange(host, 14233, tile, 0, 0, 0);
+    assert.equal(host.locOverrides.get("2643,2592,0,-1").matchType, 0);
+    assert.equal(host.addedLocs.has("2643,2592,0,22"), false);
+    assert.equal(host.addedLocs.get("2643,2592,0,0").locId, 14233);
+}
+
 function regionReplacementUsesNativeMapData(): void {
     const payload = Uint8Array.from([48, 55, 1, 0, 3, 0, 2, 1, 2, 3, 4, 5]);
     const frame = Uint8Array.from([144, 0, payload.length, ...payload]);
@@ -74,5 +98,6 @@ function regionReplacementUsesNativeMapData(): void {
 
 mapLoadBackoff();
 duplicateLocReplayIsIgnored();
+crossShapeReplacementKeepsBaseWallHidden();
 regionReplacementUsesNativeMapData();
 console.log("Map loading regression tests passed");

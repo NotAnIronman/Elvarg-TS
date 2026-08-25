@@ -2,13 +2,9 @@ const { Area } = require("../../src/main/typescript/elvarg/game/model/areas/Area
 const { PrivateArea } = require("../../src/main/typescript/elvarg/game/model/areas/impl/PrivateArea");
 const { Boundary } = require("../../src/main/typescript/elvarg/game/model/Boundary");
 const { Location } = require("../../src/main/typescript/elvarg/game/model/Location");
-const { Item } = require("../../src/main/typescript/elvarg/game/model/Item");
 const { Animation } = require("../../src/main/typescript/elvarg/game/model/Animation");
-const { Flag } = require("../../src/main/typescript/elvarg/game/model/Flag");
 const { Graphic } = require("../../src/main/typescript/elvarg/game/model/Graphic");
 const { Projectile } = require("../../src/main/typescript/elvarg/game/model/Projectile");
-const { Equipment } = require("../../src/main/typescript/elvarg/game/model/container/impl/Equipment");
-const { WeaponInterfaces } = require("../../src/main/typescript/elvarg/game/content/combat/WeaponInterfaces");
 const { GameObject } = require("../../src/main/typescript/elvarg/game/entity/impl/object/GameObject");
 const { MapObjects } = require("../../src/main/typescript/elvarg/game/entity/impl/object/MapObjects");
 const { NPC } = require("../../src/main/typescript/elvarg/game/entity/impl/npc/NPC");
@@ -17,12 +13,16 @@ const { CombatType } = require("../../src/main/typescript/elvarg/game/content/co
 const { PendingHit } = require("../../src/main/typescript/elvarg/game/content/combat/hit/PendingHit");
 const { HitDamage } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitDamage");
 const { HitMask } = require("../../src/main/typescript/elvarg/game/content/combat/hit/HitMask");
+const { LocModelType } = require("../../src/main/typescript/elvarg/game/cache/codec/rs/config/loctype/LocModelType");
 const { PathFinder } = require("../../src/main/typescript/elvarg/game/model/movement/path/PathFinder");
+const { ActionNode, BotController, SelectorNode } = require("../../src/main/typescript/elvarg/game/bot/BehaviorTree");
 const { Skill } = require("../../src/main/typescript/elvarg/game/model/Skill");
 const { ItemIdentifiers } = require("../../src/main/typescript/elvarg/util/ItemIdentifiers");
 const { NpcIdentifiers } = require("../../src/main/typescript/elvarg/util/NpcIdentifiers");
 const { ObjectIdentifiers } = require("../../src/main/typescript/elvarg/util/ObjectIdentifiers");
 const { createBotPlayer } = require("../bots/behaviours/spawn/BotPlayerFactory");
+const { buildRoamingPvpMetadata } = require("../bots/behaviours/pvp/PvpAssignment");
+const { applyGeneratedPvpLoadout } = require("../bots/behaviours/policies/PvpLoadoutPolicy");
 const { ATTR_SKIP_PERSISTENCE } = require("../bots/runtime/BotPersistenceConstants");
 
 const OVERLAY_HUD_UID = (161 << 16) | 8;
@@ -46,16 +46,11 @@ const MAX_PESTS = 100;
 const MIN_REWARD_ACTIVITY = 50;
 const MAX_ACTIVITY = 100;
 const MAX_COMMENDATIONS = 4000;
-const BOT_EQUIPMENT = [
-  [Equipment.HEAD_SLOT, ItemIdentifiers.RUNE_FULL_HELM],
-  [Equipment.CAPE_SLOT, ItemIdentifiers.FIRE_CAPE],
-  [Equipment.AMULET_SLOT, ItemIdentifiers.AMULET_OF_GLORY],
-  [Equipment.WEAPON_SLOT, ItemIdentifiers.DRAGON_SCIMITAR],
-  [Equipment.BODY_SLOT, ItemIdentifiers.RUNE_PLATEBODY],
-  [Equipment.SHIELD_SLOT, ItemIdentifiers.RUNE_KITESHIELD],
-  [Equipment.LEG_SLOT, ItemIdentifiers.RUNE_PLATELEGS],
-  [Equipment.HANDS_SLOT, ItemIdentifiers.BARROWS_GLOVES],
-  [Equipment.FEET_SLOT, ItemIdentifiers.RUNE_BOOTS],
+const ATTR_WAITING_BOAT = "pest-control:waiting-boat";
+const BOT_DEFEND_OFFSETS = [
+  [-2, 1], [-1, 1], [0, 1], [1, 1], [2, 1],
+  [-2, 0], [-1, 0], [1, 0], [2, 0],
+  [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
 ];
 
 const BOATS = [
@@ -216,7 +211,7 @@ function clampActivity(value) {
 
 class DefilerCombatMethod extends CombatMethod {
   type() { return CombatType.RANGED; }
-  attackDistance() { return 20; }
+  attackDistance() { return 6; }
   hits(character, target) { return [new PendingHit(character, target, this, 1)]; }
   start(character, target) {
     const animation = character.getAttackAnim?.();
@@ -227,7 +222,7 @@ class DefilerCombatMethod extends CombatMethod {
 
 class TorcherCombatMethod extends CombatMethod {
   type() { return CombatType.MAGIC; }
-  attackDistance() { return 20; }
+  attackDistance() { return 10; }
   hits(character, target) { return [new PendingHit(character, target, this, 1)]; }
   start(character, target) {
     const animation = character.getAttackAnim?.();
@@ -266,13 +261,81 @@ function restorePlayer(player) {
 }
 
 function botsNeeded(queueLength) {
-  return Math.max(0, MIN_PLAYERS - queueLength);
+  return Math.max(0, MAX_PLAYERS - queueLength);
+}
+
+function adoptPendingBots(state, players) {
+  for (const bot of players) {
+    if (bot.isPlayerBot?.() !== true
+      || bot.getAttribute?.(ATTR_WAITING_BOAT) !== state.boat.key
+      || bot.getArea?.() === state.area) continue;
+    moveBetweenAreas(bot, state.area, state.boat.waitingLocation.clone());
+  }
+}
+
+function chooseDefenceTarget(knight, npcs, random = Math.random) {
+  const combat = knight.getCombat();
+  const attacker = combat.getAttacker?.();
+  const hitQueue = combat.getHitQueue();
+  const engaged = [];
+  for (const npc of npcs) {
+    if (!npc.__pcType
+      || npc.getHitpoints() <= 0
+      || npc.isRegistered?.() === false
+      || npc.getPrivateArea?.() !== knight.getPrivateArea?.()
+      || npc.getCombat?.().getTarget?.() !== knight
+      || (npc !== attacker && !hitQueue.hasPendingHitFrom(npc))) continue;
+    engaged.push(npc);
+  }
+  return engaged[Math.floor(random() * engaged.length)] ?? null;
+}
+
+function createDefenderTree(match) {
+  return new SelectorNode([
+    new ActionNode(({ player }) => match.defendKnight(player)),
+    new ActionNode((context) => match.holdDefencePosition(context)),
+  ]);
+}
+
+function gateGroupKey(location) {
+  if (location.getX() === 2643) return "west";
+  if (location.getX() === 2670) return "east";
+  if (location.getY() === 2585) return "south";
+  return null;
 }
 
 function logoutBot(player) {
   player.setAttribute(ATTR_SKIP_PERSISTENCE, true);
   player.getForcedLogoutTimer().start(0);
   player.requestLogout();
+}
+
+function releaseMatchPlayer(player, area) {
+  if (player.isPlayerBot?.() === true) return logoutBot(player);
+  area.leave(player, false);
+  player.moveTo(OUTPOST_RETURN.clone());
+}
+
+function cleanupMatchNpcs(npcs, world) {
+  const addQueue = world.getAddNPCQueue();
+  const removeQueue = world.getRemoveNPCQueue();
+  for (const npc of npcs) {
+    npc.getCombat?.().reset?.();
+    npc.getMovementQueue?.().reset?.();
+    npc.setVisible?.(false);
+    for (let index = addQueue.indexOf(npc); index !== -1; index = addQueue.indexOf(npc)) addQueue.splice(index, 1);
+    if (npc.isRegistered?.() && !removeQueue.includes(npc)) removeQueue.push(npc);
+  }
+  npcs.clear();
+}
+
+function resetStructures(structures, replace) {
+  for (const state of structures.values()) {
+    if (state.damage === 0 && !state.open) continue;
+    state.damage = 0;
+    state.open = false;
+    replace(state);
+  }
 }
 
 class PestControlMatchArea extends PrivateArea {
@@ -300,10 +363,14 @@ class PestControlMatchArea extends PrivateArea {
     this.match.processOnce();
     if (mobile.isNpc?.()) {
       const npc = mobile.getAsNpc();
-      npc.getCombat().getLastAttack().reset();
+      if (npc !== this.match.knight) npc.getCombat().getLastAttack().reset();
       this.match.processPest(npc);
     }
-    if (mobile.isPlayer?.()) this.match.updatePlayerOverlay(mobile.getAsPlayer());
+    if (mobile.isPlayer?.()) {
+      const player = mobile.getAsPlayer();
+      if (player.isPlayerBot?.() === true) this.match.processBot(player);
+      this.match.updatePlayerOverlay(player);
+    }
   }
 }
 
@@ -317,6 +384,7 @@ class PestControlMatch {
     this.portalByNpc = new Map();
     this.portals = new Map();
     this.structures = new Map();
+    this.botControllers = new Map();
     this.elapsedTicks = 0;
     this.lastCycle = -1;
     this.ended = false;
@@ -331,6 +399,7 @@ class PestControlMatch {
       NpcIdentifiers.VOID_KNIGHT_8,
     ]), KNIGHT_LOCATION);
     this.knight.__pcKind = "knight";
+    this.knight.getMovementQueue().setBlockMovement(true).reset();
     this.squire = this.spawnNpc(NpcIdentifiers.SQUIRE_12, GAME_SQUIRE_LOCATION);
     this.squire.__pcKind = "squire";
 
@@ -338,21 +407,61 @@ class PestControlMatch {
       const npc = this.spawnNpc(boat.shieldedIds[index], new Location(data.x, data.y, 0));
       npc.setHitpoints(boat.portalHp);
       npc.__pcKind = "portal";
+      npc.setFlag("combat:no-retaliate");
       const state = { ...data, index, npc, shielded: true, dead: false, hp: boat.portalHp };
       this.portals.set(data.key, state);
       this.portalByNpc.set(npc, state);
     });
 
+    let defenderIndex = 0;
     for (const player of players) {
       this.players.set(player, { activity: 0, damage: 0, sent: new Map() });
+      if (player.isPlayerBot?.() === true) {
+        const [offsetX, offsetY] = BOT_DEFEND_OFFSETS[defenderIndex++ % BOT_DEFEND_OFFSETS.length];
+        const defendAt = KNIGHT_LOCATION.clone().add(offsetX, offsetY);
+        this.botControllers.set(player, new BotController(
+          player,
+          defendAt.getX(),
+          defendAt.getY(),
+          defendAt.getZ(),
+          createDefenderTree(this)
+        ));
+      }
       moveBetweenAreas(player, this.area, GAME_START.clone());
     }
+  }
+
+  defendKnight(player) {
+    const combat = player.getCombat();
+    const current = combat.getTarget?.();
+    const target = chooseDefenceTarget(this.knight, current ? [current] : [])
+      ?? chooseDefenceTarget(this.knight, this.npcs);
+    if (!target) {
+      if (current?.__pcType) combat.reset();
+      return "failure";
+    }
+    if (current !== target) combat.attack(target);
+    return "running";
+  }
+
+  holdDefencePosition({ player, spawnX, spawnY, spawnZ }) {
+    if (player.getHitpoints() <= 0 || player.getPrivateArea?.() !== this.area) return "failure";
+    const destination = new Location(spawnX, spawnY, spawnZ);
+    if (player.getLocation().getDistance(destination) <= 1) return "running";
+    if (player.getMovementQueue().size() === 0) {
+      PathFinder.calculateWalkRoute(player, spawnX, spawnY);
+    }
+    return "running";
+  }
+
+  processBot(player) {
+    this.botControllers.get(player)?.tick(Date.now());
   }
 
   spawnNpc(id, location) {
     const npc = NPC.create(id, location.clone());
     npc.__skipDefaultRespawn = true;
-    this.area.add(npc);
+    this.area.enter(npc);
     this.npcs.add(npc);
     World.getAddNPCQueue().push(npc);
     return npc;
@@ -370,13 +479,13 @@ class PestControlMatch {
           this.addStructure("barricade", ObjectIdentifiers.BARRICADE_6 + shape, base);
         } else if (id >= ObjectIdentifiers.GATE_120 && id <= ObjectIdentifiers.GATE_123) {
           const closedId = id % 2 === 0 ? id - 1 : id;
-          this.addStructure("gate", closedId, base);
+          this.addStructure("gate", closedId, base, gateGroupKey(location));
         }
       }
     }
   }
 
-  addStructure(kind, fullId, base) {
+  addStructure(kind, fullId, base, group = null) {
     const object = new GameObject(fullId, base.getLocation().clone(), base.getType(), base.getFace(), this.area);
     ObjectManager.register(object, false);
     this.structures.set(this.structureKey(object), {
@@ -387,7 +496,9 @@ class PestControlMatch {
       maxDamage: kind === "gate" ? 3 : 2,
       open: false,
       baseFace: base.getFace(),
+      baseType: base.getType(),
       baseLocation: base.getLocation().clone(),
+      group,
     });
   }
 
@@ -412,14 +523,18 @@ class PestControlMatch {
     const replacement = new GameObject(
       state.fullId + damageOffset + openOffset,
       location,
-      old.getType(),
+      state.damage >= state.maxDamage ? LocModelType.FLOOR_DECORATION : state.baseType,
       face,
       this.area
     );
     ObjectManager.deregister(old, true);
-    this.area.remove(old);
+    this.area.detach(old);
     state.object = replacement;
     ObjectManager.register(replacement, true);
+  }
+
+  resetStructures() {
+    resetStructures(this.structures, (state) => this.replaceStructure(state));
   }
 
   onPlayerEnter(player) {
@@ -668,8 +783,12 @@ class PestControlMatch {
     if (!state) return false;
 
     if (state.kind === "gate" && clickType === 1) {
-      state.open = !state.open;
-      this.replaceStructure(state);
+      const open = !state.open;
+      for (const part of this.structures.values()) {
+        if (part.kind !== "gate" || part.group !== state.group) continue;
+        part.open = open;
+        this.replaceStructure(part);
+      }
       return true;
     }
     if (clickType === 3 && state.damage > 0) {
@@ -717,6 +836,7 @@ class PestControlMatch {
   finish(won, reason) {
     if (this.ended) return;
     this.ended = true;
+    this.resetStructures();
     const players = [...this.players.keys()];
     for (const player of players) {
       const state = this.players.get(player);
@@ -737,23 +857,15 @@ class PestControlMatch {
       closeOverlay(player);
       player.setAttribute("pest-control:match", null);
       this.players.delete(player);
-      this.area.leave(player, false);
-      player.moveTo(OUTPOST_RETURN.clone());
-      if (player.isPlayerBot?.() === true) logoutBot(player);
+      releaseMatchPlayer(player, this.area);
     }
-    this.cleanupNpcs();
     this.area.destroy();
+    this.cleanupNpcs();
     this.onFinished(this);
   }
 
   cleanupNpcs() {
-    const addQueue = World.getAddNPCQueue();
-    const removeQueue = World.getRemoveNPCQueue();
-    for (const npc of this.npcs) {
-      for (let index = addQueue.indexOf(npc); index !== -1; index = addQueue.indexOf(npc)) addQueue.splice(index, 1);
-      if (npc.isRegistered?.() && !removeQueue.includes(npc)) removeQueue.push(npc);
-    }
-    this.npcs.clear();
+    cleanupMatchNpcs(this.npcs, World);
   }
 }
 
@@ -815,7 +927,6 @@ class PestControlOutpostArea extends Area {
 function createPestControl(api) {
   const matches = new Set();
   const stateByBoat = new Map();
-  const BonusManager = api.getBonusManager();
   let botSerial = 0;
   const boatByGangplank = new Map(BOATS.map((boat) => [boat.gangplankId, boat]));
   const boatByExit = new Map(BOATS.map((boat) => [boat.exitId, boat]));
@@ -830,6 +941,7 @@ function createPestControl(api) {
         const cycle = World.getProcessCycle();
         if (cycle === this.lastCycle) return;
         this.lastCycle = cycle;
+        adoptPendingBots(this, World.getPlayers());
         this.queue = this.queue.filter((player) => player?.isRegistered?.() !== false && player.getArea?.() === this.area);
         if (this.queue.length >= MAX_PLAYERS) return this.launch();
         if (this.queue.length < MIN_PLAYERS) return;
@@ -838,6 +950,7 @@ function createPestControl(api) {
       launch() {
         if (this.queue.length < MIN_PLAYERS) return;
         const players = this.queue.splice(0, MAX_PLAYERS);
+        for (const player of players) player.setAttribute(ATTR_WAITING_BOAT, null);
         this.countdown = LANDER_WAIT_TICKS;
         const match = new PestControlMatch(boat, players, (finished) => matches.delete(finished));
         matches.add(match);
@@ -859,18 +972,15 @@ function createPestControl(api) {
     });
     if (!bot) return;
     bot.setPlayerBot(true);
+    bot.setRunning(true);
     bot.setAttribute(ATTR_SKIP_PERSISTENCE, true);
+    bot.setAttribute(ATTR_WAITING_BOAT, state.boat.key);
+    applyGeneratedPvpLoadout(
+      bot,
+      { pvp: buildRoamingPvpMetadata({ excludeF2p: true }) },
+      { api }
+    );
     api.emitPlayerLogin({ player: bot, username });
-    for (const skill of [Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.HITPOINTS]) {
-      bot.getSkillManager().setCurrentLevel(skill, 99, false).setMaxLevels(skill, 99, false);
-    }
-    bot.getSkillManager().setCurrentLevel(Skill.PRAYER, 70, false).setMaxLevels(Skill.PRAYER, 70, false);
-    for (const [slot, itemId] of BOT_EQUIPMENT) bot.getEquipment().setItem(slot, new Item(itemId, 1));
-    bot.getInventory().adds(ItemIdentifiers.SHARK, 20);
-    WeaponInterfaces.assign(bot);
-    BonusManager.update(bot);
-    bot.getEquipment().refreshItems();
-    bot.getUpdateFlag().flag(Flag.APPEARANCE);
   }
 
   function joinBoat(player, boat) {
@@ -1001,8 +1111,19 @@ module.exports = {
     choosePortalOrder,
     clampActivity,
     botsNeeded,
-    BOT_EQUIPMENT,
     moveBetweenAreas,
-    constants: { LANDER_OVERLAY, GAME_OVERLAY, ACTIVITY_VARBIT, MIN_PLAYERS, MAX_PLAYERS },
+    adoptPendingBots,
+    chooseDefenceTarget,
+    gateGroupKey,
+    releaseMatchPlayer,
+    cleanupMatchNpcs,
+    resetStructures,
+    constants: {
+      LANDER_OVERLAY,
+      GAME_OVERLAY,
+      ACTIVITY_VARBIT,
+      MIN_PLAYERS,
+      MAX_PLAYERS,
+    },
   },
 };

@@ -122,13 +122,15 @@ export class MapObjects {
     }
 
     static remove(object: GameObject) {
-        const hash = this.getHash(object.getLocation().getX(), object.getLocation().getY(), object.getLocation().getZ());
+        if (!object.getPrivateArea()) {
+            const hash = this.getHash(object.getLocation().getX(), object.getLocation().getY(), object.getLocation().getZ());
 
-        if (this.mapObjects.has(hash)) {
-            const list = this.mapObjects.get(hash);
-            for (let i = 0; i < list.length; i++) {
-                if (list[i].getId() === object.getId() && list[i].getLocation().equals(object.getLocation())) {
-                    list.splice(i, 1);
+            if (this.mapObjects.has(hash)) {
+                const list = this.mapObjects.get(hash);
+                for (let i = 0; i < list.length; i++) {
+                    if (list[i].getId() === object.getId() && list[i].getLocation().equals(object.getLocation())) {
+                        list.splice(i, 1);
+                    }
                 }
             }
         }

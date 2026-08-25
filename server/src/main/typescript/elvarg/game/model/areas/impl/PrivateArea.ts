@@ -33,8 +33,12 @@ export abstract class PrivateArea extends Area {
     }
 
     remove(entity: Entity) {
-        this.entities = this.entities.filter((e) => e !== entity);
+        this.detach(entity);
         entity.setArea(null);
+    }
+
+    detach(entity: Entity) {
+        this.entities = this.entities.filter((e) => e !== entity);
     }
 
     add(entity: Entity) {
@@ -55,6 +59,10 @@ export abstract class PrivateArea extends Area {
         }
         for (let object of this.getObjects()) {
             ObjectManager.deregister(object, false);
+        }
+        const removedObjects = World.getRemovedObjects();
+        for (let index = removedObjects.length - 1; index >= 0; index--) {
+            if (removedObjects[index].getPrivateArea() === this) removedObjects.splice(index, 1);
         }
         for (let item of World.getItems()) {
             if (item.getPrivateArea() === this) {

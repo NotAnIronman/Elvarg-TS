@@ -283,12 +283,16 @@ try {
     ), true, "directional projectile flags must remain asymmetric");
     (RegionManager as any).getClipping = originalGetClipping;
 
-    (RegionManager as any).canMove = () => true;
+    (RegionManager as any).getClipping = () => 0;
     assert.equal(CombatRange.canReach(entity(0, 0, 1, true), melee, entity(1, 0, 1, false)), true);
     assert.equal(CombatRange.canReach(entity(0, 0, 1, true), melee, entity(1, 1, 1, false)), false);
     assert.equal(CombatRange.canReach(entity(0, 0, 2, false), melee, entity(1, 1, 1, true)), false);
-    (RegionManager as any).canMove = () => false;
+    (RegionManager as any).getClipping = (x: number) => x === 1 ? RegionManager.BLOCKED_TILE : 0;
+    assert.equal(CombatRange.canReach(entity(0, 0, 1, true), melee, entity(1, 0, 1, false)), true,
+        "an occupied target on a blocked floor tile must remain attackable across an open edge");
+    (RegionManager as any).getClipping = (x: number) => x === 1 ? 0x80 : 0;
     assert.equal(CombatRange.canReach(entity(0, 0, 1, true), melee, entity(1, 0, 1, false)), false);
+    (RegionManager as any).getClipping = originalGetClipping;
 
     const first = { id: "first" };
     const second = { id: "second" };

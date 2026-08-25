@@ -17,6 +17,16 @@ export class ObjectManager {
             && a.getLocation().equals(b.getLocation());
     }
 
+    private static matchesBaseMapObject(object: GameObject): boolean {
+        if (!object.getPrivateArea()) {
+            return false;
+        }
+        const base = MapObjects.get(object.getId(), object.getLocation().clone(), null);
+        return base != null
+            && base.getType() === object.getType()
+            && base.getFace() === object.getFace();
+    }
+
     public static onRegionChange(player: Player, baseX: number, baseY: number, level: number) {
         // Region sync should only target the requesting player.
         // Broadcasting every object spawn globally here causes redundant updates.
@@ -25,6 +35,9 @@ export class ObjectManager {
                 continue;
             }
             if (player.getPrivateArea() !== object.getPrivateArea()) {
+                continue;
+            }
+            if (this.matchesBaseMapObject(object)) {
                 continue;
             }
             const location = object.getLocation();
@@ -139,7 +152,7 @@ export class ObjectManager {
                         return;
                     }
                     const location = object.getLocation();
-                    if (!player.getSession().isTileInScene(
+                    if (!object.getPrivateArea() && !player.getSession().isTileInScene(
                         location.getX(), location.getY(), location.getZ()
                     )) {
                         return;

@@ -452,6 +452,10 @@ export function onLocAddChange(host: WebGLOsrsRendererHost,
             const overrideKey = `${tile.x | 0},${tile.y | 0},${level | 0},-1`;
             const existing = host.addedLocs.get(key);
             const existingOverride = host.locOverrides.get(overrideKey);
+            const preservesOtherShapeRemoval =
+                existingOverride?.newId === 0 &&
+                typeof existingOverride.matchType === "number" &&
+                existingOverride.matchType !== shape;
             if (
                 existing?.locId === locId &&
                 existing.x === tile.x &&
@@ -460,7 +464,7 @@ export function onLocAddChange(host: WebGLOsrsRendererHost,
                 existing.shape === shape &&
                 existing.rotation === rotation &&
                 existingOverride?.newId === 0 &&
-                existingOverride.matchType === shape
+                (existingOverride.matchType === shape || preservesOtherShapeRemoval)
             ) {
                 return;
             }
@@ -469,10 +473,12 @@ export function onLocAddChange(host: WebGLOsrsRendererHost,
             // Suppress the base cache-baked loc at this tile so it doesn't
             // keep rendering alongside (or instead of) the new one - buildScene
             // has no other way to know a cache loc was replaced/removed.
-            host.locOverrides.set(overrideKey, {
-                newId: 0,
-                matchType: shape as LocModelType,
-            });
+            if (!preservesOtherShapeRemoval) {
+                host.locOverrides.set(overrideKey, {
+                    newId: 0,
+                    matchType: shape as LocModelType,
+                });
+            }
 
             const mapX = Math.floor(tile.x / 64);
             const mapY = Math.floor(tile.y / 64);

@@ -49,7 +49,14 @@ export class AreaManager {
 
         // Handle processing..
         if (area != null) {
+            const processedArea = area;
             area.process(c);
+            if (c.getArea() !== processedArea) {
+                area = c.getArea();
+                boundaryIndex = area == null
+                    ? -1
+                    : AreaManager.findBoundaryIndex(c.getLocation(), area);
+            }
         }
 
         // Handle multiicon update..
@@ -64,12 +71,13 @@ export class AreaManager {
 
         // Update area..
         c.setArea(area);
+        const currentPosition = c.getLocation();
         AreaManager.areaHints.set(c, {
             area,
             boundaryIndex,
-            x: position.getX(),
-            y: position.getY(),
-            z: position.getZ(),
+            x: currentPosition.getX(),
+            y: currentPosition.getY(),
+            z: currentPosition.getZ(),
         });
 
     }
