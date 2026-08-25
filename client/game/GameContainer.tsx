@@ -12,6 +12,7 @@ import { DebugControls } from "./DebugControls";
 import "./GameContainer.css";
 import { GameRenderer } from "./GameRenderer";
 import { OsrsClient } from "./OsrsClient";
+import { VengeanceTimerOverlay } from "./plugins/vengeancetimer/VengeanceTimerOverlay";
 import { SidebarShell } from "./sidebar/SidebarShell";
 
 interface OsrsContainerProps {
@@ -363,6 +364,8 @@ export function GameContainer({ osrsClient }: OsrsContainerProps): JSX.Element {
                 <div className="game-canvas-shell">
                     <div className="game-canvas-stage">
                         {loadingBarOverlay}
+
+                        {!hideUi && <VengeanceTimerOverlay osrsClient={osrsClient} />}
 
                         <div className="hud right-top">
                             <div className="fps-counter content-text">{fps}</div>

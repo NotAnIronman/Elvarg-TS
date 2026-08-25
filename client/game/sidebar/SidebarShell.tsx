@@ -649,6 +649,21 @@ function PluginHubPanel({ osrsClient }: { osrsClient: OsrsClient }): JSX.Element
         tileMarkersGetSnapshot,
     );
 
+    const vengeanceTimerPlugin = osrsClient.vengeanceTimerPlugin;
+    const vengeanceTimerSubscribe = useCallback(
+        (listener: () => void) => vengeanceTimerPlugin.subscribe(listener),
+        [vengeanceTimerPlugin],
+    );
+    const vengeanceTimerGetSnapshot = useCallback(
+        () => vengeanceTimerPlugin.getState(),
+        [vengeanceTimerPlugin],
+    );
+    const vengeanceTimerState = useSyncExternalStore(
+        vengeanceTimerSubscribe,
+        vengeanceTimerGetSnapshot,
+        vengeanceTimerGetSnapshot,
+    );
+
     const pluginToggles = useMemo<PluginHubToggle[]>(
         () => [
             {
@@ -696,6 +711,15 @@ function PluginHubPanel({ osrsClient }: { osrsClient: OsrsClient }): JSX.Element
                     osrsClient.setRememberLoginEnabled(enabled);
                 },
             },
+            {
+                id: "vengeance_timer",
+                name: "Vengeance Timer",
+                description: "Shows the 30-second Vengeance cooldown.",
+                enabled: vengeanceTimerState.config.enabled,
+                setEnabled: (enabled: boolean) => {
+                    vengeanceTimerPlugin.setConfig({ enabled });
+                },
+            },
         ],
         [
             groundItemsPlugin,
@@ -708,6 +732,8 @@ function PluginHubPanel({ osrsClient }: { osrsClient: OsrsClient }): JSX.Element
             rememberLoginState.config.enabled,
             tileMarkersPlugin,
             tileMarkersState.config.enabled,
+            vengeanceTimerPlugin,
+            vengeanceTimerState.config.enabled,
         ],
     );
 

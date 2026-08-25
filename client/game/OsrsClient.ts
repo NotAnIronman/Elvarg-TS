@@ -266,6 +266,8 @@ import { createBrowserRememberLoginPluginPersistence } from "./plugins/rememberl
 import { RememberLoginPlugin } from "./plugins/rememberlogin/RememberLoginPlugin";
 import { createBrowserTileMarkersPluginPersistence } from "./plugins/tilemarkers/BrowserTileMarkersPluginPersistence";
 import { TileMarkersPlugin } from "./plugins/tilemarkers/TileMarkersPlugin";
+import { createBrowserVengeanceTimerPluginPersistence } from "./plugins/vengeancetimer/BrowserVengeanceTimerPluginPersistence";
+import { VengeanceTimerPlugin } from "./plugins/vengeancetimer/VengeanceTimerPlugin";
 import { ResolveTilePlaneFn } from "./scene/PlaneResolver";
 import {
     createSelectedSpellOnGroundItemPacket,
@@ -498,6 +500,7 @@ export class OsrsClient {
     readonly notesPlugin: NotesPlugin;
     readonly rememberLoginPlugin: RememberLoginPlugin;
     readonly tileMarkersPlugin: TileMarkersPlugin;
+    readonly vengeanceTimerPlugin: VengeanceTimerPlugin;
     readonly tileHighlightManager: TileHighlightManager = new TileHighlightManager();
     private sidebarPluginVisibility: Required<SidebarPluginVisibilityOptions> = {
         groundItemsEnabled: true,
@@ -1035,6 +1038,9 @@ export class OsrsClient {
         );
         this.tileMarkersPlugin = new TileMarkersPlugin(
             createBrowserTileMarkersPluginPersistence("osrs.plugin.tile_markers.v1"),
+        );
+        this.vengeanceTimerPlugin = new VengeanceTimerPlugin(
+            createBrowserVengeanceTimerPluginPersistence("osrs.plugin.vengeance_timer.v1"),
         );
         this.syncSidebarPlugins(true);
         this.groundItemsPlugin.subscribe(() => {
