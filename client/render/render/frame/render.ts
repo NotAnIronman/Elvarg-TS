@@ -505,6 +505,9 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
         }
 
         const camera = host.osrsClient.camera;
+        // The terrain clamp is a render-only pitch. Clear the previous frame's value
+        // before input so camera controls continue to operate on the player's pitch.
+        camera.setScenePitchOverride(undefined);
 
         profiler.startPhase("input");
         host.handleInput(deltaTime);
@@ -543,16 +546,16 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
         host.tickPass(timeSec, ticksElapsed, clientTicksElapsed, clientCycle);
         profiler.endPhase();
 
+        camera.applySmoothing(deltaTime);
         // Now update follow camera and matrices using up-to-date player position
         if (host.osrsClient.followPlayerCamera && host.osrsClient.playerEcs.size() > 0) {
             host.updateCameraFollow(deltaTime, timeSec);
         }
-        camera.applySmoothing(deltaTime);
         let cameraShakeApplied = false;
         let restoreCameraX = 0;
         let restoreCameraY = 0;
         let restoreCameraZ = 0;
-        let restoreCameraPitch = 0;
+        let restoreCameraPitchOverride: number | undefined;
         let restoreCameraYaw = 0;
         // Ensure camera uses valid dimensions
         const camWidth = Math.max(1, host.app.width || host.canvas.width || 1);
@@ -584,14 +587,15 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
                 restoreCameraX = camera.getPosX();
                 restoreCameraY = camera.getPosY();
                 restoreCameraZ = camera.getPosZ();
-                restoreCameraPitch = camera.pitch | 0;
+                restoreCameraPitchOverride = camera.getScenePitchOverride();
                 restoreCameraYaw = camera.yaw | 0;
 
-                let shakenPitch = restoreCameraPitch;
+                let shakenPitch = camera.getScenePitchAngle();
                 if ((shake.pitch | 0) !== 0) {
-                    let camAngleX = 128 + Math.floor((clamp(shakenPitch, 0, 512) * 255) / 512);
-                    camAngleX = Math.max(128, Math.min(383, camAngleX + (shake.pitch | 0)));
-                    shakenPitch = clamp(Math.floor(((camAngleX - 128) * 512) / 255), 0, 512);
+                    shakenPitch = Math.max(
+                        128,
+                        Math.min(383, shakenPitch + (shake.pitch | 0)),
+                    );
                 }
                 const shakenYaw = (restoreCameraYaw + (shake.yaw | 0)) & 2047;
 
@@ -600,7 +604,7 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
                     restoreCameraY + shake.y / 128,
                     restoreCameraZ + shake.z / 128,
                 );
-                camera.snapToPitch(shakenPitch);
+                camera.setScenePitchOverride(shakenPitch);
                 camera.snapToYaw(shakenYaw);
                 camera.update(
                     camWidth,
@@ -787,7 +791,7 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
         // Restore baseline camera before actor2d-style overlays (OSRS drawEntities restore semantics).
         if (cameraShakeApplied) {
             camera.snapToPosition(restoreCameraX, restoreCameraY, restoreCameraZ);
-            camera.snapToPitch(restoreCameraPitch);
+            camera.setScenePitchOverride(restoreCameraPitchOverride);
             camera.snapToYaw(restoreCameraYaw);
             camera.update(
                 camWidth,

@@ -293,7 +293,7 @@ export function updateCameraFollow(host: WebGLOsrsRendererHost, deltaTime?: numb
         const zoom =
             (host.osrsClient.zoomWidth - host.osrsClient.zoomHeight) * (v / 100) +
             host.osrsClient.zoomHeight;
-        let camAngleX = camera.getScenePitchAngle();
+        let camAngleX = camera.getControlPitchAngle();
         const terrainMinCamAngleX = (host.cameraTerrainPitchPressure | 0) >> 8;
         if (terrainMinCamAngleX > camAngleX) {
             camAngleX = terrainMinCamAngleX;
@@ -305,6 +305,10 @@ export function updateCameraFollow(host: WebGLOsrsRendererHost, deltaTime?: numb
                 camAngleX = shakeMinCamAngleX;
             }
         }
+        // OSRS keeps the user-controlled pitch separate from cameraFpPitch. Terrain
+        // pressure changes the rendered pitch as well as the orbit calculation so the
+        // focal point remains fixed instead of sliding vertically beside hills.
+        camera.setScenePitchOverride(camAngleX);
 
         const yawRad = (camera.yaw - 1024) * RS_TO_RADIANS;
         const pitchRad = -camAngleX * RS_TO_RADIANS;

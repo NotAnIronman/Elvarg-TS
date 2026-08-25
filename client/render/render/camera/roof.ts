@@ -99,7 +99,6 @@ import {
     isTouchDevice,
     isWebGL2Supported,
 } from "../../../common/utils/DeviceUtil";
-import { clamp } from "../../../common/utils/MathUtil";
 import { ClientState } from "../../../game/ClientState";
 import { GameRenderer } from "../../../game/GameRenderer";
 import type { HitsplatEventPayload } from "../../../game/GameRenderer";
@@ -305,8 +304,7 @@ export function getRoofTargetTile(host: WebGLOsrsRendererHost,
 
 export function getCameraPitchRs(host: WebGLOsrsRendererHost, ): number {
 
-        const pitch = clamp(host.osrsClient.camera.pitch | 0, 0, 512);
-        return 128 + Math.floor((pitch * 255) / 512);
+        return host.osrsClient.camera.getScenePitchAngle();
     
 }
 

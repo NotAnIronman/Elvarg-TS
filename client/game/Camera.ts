@@ -30,6 +30,7 @@ export class Camera {
     private targetPos: vec3;
     private targetPitch: number;
     private targetYaw: number;
+    private scenePitchOverride: number | undefined;
 
     private readonly positionMaxSpeedPerSec = 12; // tiles per second toward target
     private readonly positionSpringPerSec = 6; // proportional easing factor
@@ -138,8 +139,22 @@ export class Camera {
         return normalized;
     }
 
-    getScenePitchAngle(): number {
+    getControlPitchAngle(): number {
         return Camera.rawPitchToScenePitchAngle(this.pitch);
+    }
+
+    getScenePitchAngle(): number {
+        return this.scenePitchOverride ?? this.getControlPitchAngle();
+    }
+
+    getScenePitchOverride(): number | undefined {
+        return this.scenePitchOverride;
+    }
+
+    setScenePitchOverride(pitch: number | undefined): void {
+        this.scenePitchOverride =
+            pitch === undefined ? undefined : clamp(Math.trunc(pitch), 0, 512);
+        this.updated = true;
     }
 
     getScenePitchRadians(): number {
