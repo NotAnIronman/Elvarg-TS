@@ -1524,7 +1524,8 @@ export function encodeHandshake(
   id: number,
   name: string,
   isAdmin: boolean,
-  appearance?: PlayerAppearance
+  appearance?: PlayerAppearance,
+  chatIcons: readonly number[] = []
 ): Buffer {
   const idBuffer = Buffer.alloc(4);
   idBuffer.writeInt32BE(id, 0);
@@ -1542,13 +1543,16 @@ export function encodeHandshake(
       }
     }
   }
+  const icons = chatIcons
+    .filter((icon) => Number.isInteger(icon) && icon >= 0 && icon <= 255)
+    .slice(0, 255);
   return packet(
     ServerPacket.HANDSHAKE,
     Buffer.concat([
       idBuffer,
       string(name),
       ...appearanceParts,
-      Buffer.from([0]),
+      Buffer.from([icons.length, ...icons]),
       string(""),
       Buffer.from([isAdmin ? 1 : 0]),
     ])

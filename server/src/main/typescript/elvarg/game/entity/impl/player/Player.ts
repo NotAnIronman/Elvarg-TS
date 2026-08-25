@@ -218,6 +218,7 @@ export class Player extends Mobile {
 
     // Rights
     public rights = PlayerRights.NONE;
+    private chatIcons: number[] = [];
     public donatorRights = DonatorRights.NONE;
     /**
      * The cached player update block for updating.
@@ -774,6 +775,17 @@ export class Player extends Mobile {
 
     public setRights(rights: PlayerRights): this {
         this.rights = rights;
+        return this;
+    }
+
+    public getChatIcons(): readonly number[] {
+        return this.chatIcons;
+    }
+
+    public setChatIcons(chatIcons: readonly number[]): this {
+        this.chatIcons = chatIcons
+            .filter((icon) => Number.isInteger(icon) && icon >= 0 && icon <= 255)
+            .slice(0, 255);
         return this;
     }
 

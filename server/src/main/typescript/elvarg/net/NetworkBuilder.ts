@@ -683,7 +683,8 @@ class ClientConnection {
         player.getIndex(),
         player.getUsername(),
         PlayerRights.hasAdminRights(player),
-        this.getPlayerAppearance(player)
+        this.getPlayerAppearance(player),
+        player.getChatIcons()
       )
     );
     this.send(encodeDefaultAnimations());
