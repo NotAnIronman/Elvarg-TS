@@ -106,6 +106,7 @@
     "test:wilderness": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/wilderness-plugin-smoke.ts",
     "test:welcome-screen": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/welcome-screen-plugin-smoke.ts",
     "test:staff-crowns": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/staff-crowns-plugin-smoke.ts",
+    "test:emotes": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/emotes-plugin-smoke.ts",
     "test:content-api": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/content-api-smoke.ts",
     "test:presets": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/presets-interface-smoke.ts",
     "test:hud-interfaces": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/hud-interface-smoke.ts",
