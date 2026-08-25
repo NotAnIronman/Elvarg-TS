@@ -104,6 +104,7 @@
     "test:stress-bot-bounds": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2022\"}' ts-node ./scripts/stress-bot-bounds-smoke.ts",
     "test:region-loading": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2022\"}' ts-node ./scripts/region-loading-smoke.ts",
     "test:wilderness": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/wilderness-plugin-smoke.ts",
+    "test:welcome-screen": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/welcome-screen-plugin-smoke.ts",
     "test:content-api": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/content-api-smoke.ts",
     "test:presets": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/presets-interface-smoke.ts",
     "test:hud-interfaces": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/hud-interface-smoke.ts",

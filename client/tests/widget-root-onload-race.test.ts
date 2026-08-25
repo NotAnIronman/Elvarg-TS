@@ -69,4 +69,13 @@ assert.equal(subChanges, 2);
 manager.resize(801, 600);
 assert.equal(rootLoads, 1);
 
+const closedGroups: number[] = [];
+manager.onInterfaceClose = (groupId) => closedGroups.push(groupId);
+manager.setRootInterface(900);
+assert.deepEqual(closedGroups.sort((a, b) => a - b), [900, 901]);
+
+closedGroups.length = 0;
+manager.clear();
+assert.deepEqual(closedGroups.sort((a, b) => a - b), [900, 901]);
+
 console.log("Widget root onLoad race test passed");

@@ -132,6 +132,24 @@ export class WidgetManager {
     canvasHeight: number = 0;
     private pendingRootOnLoad: number = -1;
 
+    private notifyInterfacesClosed(includeLoadedGroups = false): void {
+        const groupIds = new Set<number>();
+        if (includeLoadedGroups) {
+            for (const groupId of this.groups.keys()) {
+                groupIds.add(groupId);
+            }
+        }
+        if (this.rootInterface !== -1) {
+            groupIds.add(this.rootInterface);
+        }
+        for (const parent of this.interfaceParents.values()) {
+            groupIds.add(parent.group);
+        }
+        for (const groupId of groupIds) {
+            this.onInterfaceClose?.(groupId);
+        }
+    }
+
     /** Reference to the main client */
     osrsClient: any = null;
 
@@ -1130,6 +1148,8 @@ export class WidgetManager {
      * Only use this for complete client reset (e.g., logout, reconnect).
      */
     clear(): void {
+        this.notifyInterfacesClosed(true);
+
         // Clear all widget group data
         this.groups.clear();
         this.widgetByUid.clear();
@@ -1451,6 +1471,8 @@ export class WidgetManager {
      * Does NOT clear widget caches - loaded groups persist in memory
      */
     setRootInterface(groupId: number): WidgetGroupInstance | undefined {
+        this.notifyInterfacesClosed();
+
         // Do NOT clear all caches here. Widgets stay loaded in memory.
         // Only clear special widget references and interface parents for the new root.
 

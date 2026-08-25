@@ -190,6 +190,8 @@ import { KNOWN_WATER_TEXTURE_IDS } from "../../water/WaterTextureIds";
 import type { WebGLOsrsRendererHost } from "../hostInterface";
 import { RENDER_CONSTANTS } from "../constants";
 
+const WELCOME_SCREEN_GROUP_ID = 378;
+
 export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: number, resized: boolean): void {
 
         profiler.startFrame();
@@ -1551,6 +1553,13 @@ export function render(host: WebGLOsrsRendererHost, time: number, deltaTime: num
             }
         } catch {}
         profiler.endPhase();
+
+        if ((host.osrsClient.widgetManager?.rootInterface ?? -1) === WELCOME_SCREEN_GROUP_ID) {
+            // Keep the loaded scene hot, but hide its final image behind the Welcome Screen.
+            host.app.disable(PicoGL.SCISSOR_TEST);
+            host.app.clearColor(0, 0, 0, 1);
+            host.app.defaultDrawFramebuffer().clear();
+        }
 
         host.ensureWorldEntityOverlaysLoaded(time);
 
