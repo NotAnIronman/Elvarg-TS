@@ -15,11 +15,11 @@ export class OptionDialogue extends Dialogue {
         this.options = options;
     }
 
-    public execute(option: DialogueOption): void {
+    public execute(option: DialogueOption, player?: Player): void {
         if (this.action == null) {
             return;
         }
-        this.action.executeOption(option);
+        this.action.executeOption(option, player);
     }
 
     public send(player: Player): void {

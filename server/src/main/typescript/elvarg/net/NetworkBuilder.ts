@@ -69,6 +69,7 @@ import { EffectSpells } from "../game/content/combat/magic/EffectSpells";
 import { CombatSpells } from "../game/content/combat/magic/CombatSpells";
 import { TeleportHandler } from "../game/model/teleportation/TeleportHandler";
 import { ArceuusSpells } from "../game/content/combat/magic/ArceuusSpells";
+import { QuestHandler } from "../game/content/quests/QuestHandler";
 
 const OBJECT_ACTIONS = new ObjectActionPacketListener();
 const NPC_ACTIONS = new NPCOptionPacketListener();
@@ -527,6 +528,14 @@ class ClientConnection {
           continue;
         case "examine_npc":
           if (this.player) {
+            const examine = {
+              player: this.player,
+              npcId: packet.id,
+              handled: false,
+            };
+            if (PluginManager.emitNpcExamine(examine)) {
+              continue;
+            }
             const definition = NpcDefinition.forId(packet.id);
             this.player.getPacketSender().sendMessage(definition.getExamine() || definition.getName());
           }
@@ -732,6 +741,7 @@ class ClientConnection {
       .sendItemContainer(player.getInventory(), 3214)
       .sendSkillsSnapshot()
       .sendRunEnergy();
+    QuestHandler.updateQuestTab(player);
   }
 
   private walk(x: number, y: number, modifierFlags: number): void {

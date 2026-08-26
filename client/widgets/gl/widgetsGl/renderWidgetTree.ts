@@ -55,6 +55,14 @@ import type { WorldMapLabelDraw, WorldMapLabelMetrics } from "./worldMapLabels";
 export type { WidgetNode };
 type Widget = WidgetNode;
 
+// Dialogue portraits are deliberate camera shots, not ordinary widget models.
+// The cache angles describe the placeholder model that exists before
+// CC_SETNPCHEAD/CC_SETPLAYERHEAD replaces it, which leaves dialogue heads
+// facing edge-on in this renderer.
+const DIALOGUE_CHATHEAD_ZOOM = 860;
+const NPC_DIALOGUE_CHATHEAD_YAW = -96;
+const PLAYER_DIALOGUE_CHATHEAD_YAW = 96;
+
 export function renderWidgetTreeGL(glr: GLRenderer, root: Widget, opts: GLRenderOpts) {
     // PERF: Reset widget count for this render pass
     ps._widgetRenderCount = 0;
@@ -3163,6 +3171,19 @@ export function renderWidgetTreeGL(glr: GLRenderer, root: Widget, opts: GLRender
             let offX = (w.modelOffsetX ?? 0) | 0;
             let offY = (w.modelOffsetY ?? 0) | 0;
             const ortho = !!w.modelOrthog;
+
+            const isDialogueChathead =
+                (w as any).isNpcChathead === true || (w as any).isPlayerChathead === true;
+            if (isDialogueChathead) {
+                rx = 0;
+                ry = (w as any).isNpcChathead
+                    ? NPC_DIALOGUE_CHATHEAD_YAW
+                    : PLAYER_DIALOGUE_CHATHEAD_YAW;
+                rz = 0;
+                zoom = DIALOGUE_CHATHEAD_ZOOM;
+                offX = 0;
+                offY = 0;
+            }
 
             // No client-side bob if no sequence; rely on server/script-provided sequence/animationId.
 

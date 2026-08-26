@@ -47,7 +47,7 @@ export class CooksAssistant implements Quest {
         player.getPacketSender().sendString("", 8145);
 
         switch (currentStatus) {
-            case 'NOT_STARTED':
+            case 0:
                 player.getPacketSender().sendString("Cook's Assistant", 8144);
                 player.getPacketSender().sendString("I can start this quest by speaking to the Cook in the", 8147);
                 player.getPacketSender().sendString("Lumbridge Castle kitchen.", 8148);
@@ -100,7 +100,7 @@ export class CooksAssistant implements Quest {
             return false;
         }
 
-        switch (Quests.getProgress(player)) {
+        switch (Quests.COOKS_ASSISTANT.getProgress(player)) {
             case 0:
                 player.getDialogueManager().startDialog(this.dialogueBuilder, 0);
                 break;
@@ -122,12 +122,21 @@ export class CooksAssistant implements Quest {
         this.dialogueBuilder = new DialogueChainBuilder();
         this.dialogueBuilder.add(
             new NpcDialogue(0, CooksAssistant.NPC_COOK, "What am I to do?", DialogueExpression.SAD),
-            new OptionDialogue(1, new CooksDialogueAction(() => ([
-                ["What's wrong?", (player: any) => player.getDialogueManager().start(2)],
-                ["Can you cook me a cake?", (player: any) => player.getDialogueManager().start(14)],
-                ["You don't look very happy.", (player: any) => player.getDialogueManager().start(2)],
-                ["Nice hat.", (player: any) => player.getDialogueManager().start(17)]
-                ]))),
+            new OptionDialogue(1, new CooksDialogueAction((option, player) => {
+                if (!player) return;
+                switch (option) {
+                    case DialogueOption.FIRST_OPTION:
+                    case DialogueOption.THIRD_OPTION:
+                        player.getDialogueManager().startDialog(this.dialogueBuilder, 2);
+                        break;
+                    case DialogueOption.SECOND_OPTION:
+                        player.getDialogueManager().startDialog(this.dialogueBuilder, 14);
+                        break;
+                    case DialogueOption.FOURTH_OPTION:
+                        player.getDialogueManager().startDialog(this.dialogueBuilder, 17);
+                        break;
+                }
+            }), "What's wrong?", "Can you cook me a cake?", "You don't look very happy.", "Nice hat."),
             new PlayerDialogue(2, "What's wrong?"),
             new NpcDialogue(3, CooksAssistant.NPC_COOK,
                 "Oh dear, oh dear, oh dear, I'm in a terrible terrible" +
@@ -138,13 +147,18 @@ export class CooksAssistant implements Quest {
                 "them in time now. He'll sack me! What will I do? I have" +
                 "four children and a goat to look after. Would you help" +
                 "me? Please?", DialogueExpression.SAD),
-            new OptionDialogue(5, new CooksDialogueAction((player) =>([
-                ["I'm always happy to help a cook in distress.", (player) => {
-                    Quests.COOKS_ASSISTANT.setProgress(player, 1);
-                    player.getDialogueManager().start(6);
-                }],
-                ["I can't right now, Maybe later.", (player) => player.getDialogueManager().start(11)]
-            ]))),
+            new OptionDialogue(5, new CooksDialogueAction((option, player) => {
+                if (!player) return;
+                switch (option) {
+                    case DialogueOption.FIRST_OPTION:
+                        Quests.COOKS_ASSISTANT.setProgress(player, 1);
+                        player.getDialogueManager().startDialog(this.dialogueBuilder, 6);
+                        break;
+                    case DialogueOption.SECOND_OPTION:
+                        player.getDialogueManager().startDialog(this.dialogueBuilder, 11);
+                        break;
+                }
+            }), "I'm always happy to help a cook in distress.", "I can't right now, Maybe later."),
 
             new PlayerDialogue(6, "Yes, I'll help you.", DialogueExpression.HAPPY),
             new NpcDialogue(7, CooksAssistant.NPC_COOK, "Oh thank you, thank you. I need milk, an egg, and " +
@@ -172,7 +186,7 @@ export class CooksAssistant implements Quest {
                     && player.getInventory().contains(CooksAssistant.FLOUR)) {
                     player.getDialogueManager().start(this.dialogueBuilder, 21);
                 } else {
-                    player.getDialogueManager().start(this.dialogueBuilder, 24);
+                    player.getDialogueManager().start(this.dialogueBuilder, 28);
                 }
             })),
 
@@ -190,6 +204,7 @@ export class CooksAssistant implements Quest {
             new PlayerDialogue(26, "Well, maybe one day I'll be important enough to sit on" +
                 "the Duke's table"),
             new NpcDialogue(27, CooksAssistant.NPC_COOK, "Maybe, but I won't be holding my breath.",DialogueExpression.LAUGHING, new CooksAction((player) => {
+                Quests.COOKS_ASSISTANT.setProgress(player, 3);
                 Quests.COOKS_ASSISTANT.showRewardInterface(player, ["1 Quest Point", "500 Coins", "300 Cooking XP"], 326);
                 player.getInventory().add(995, 500);
                 player.getSkillManager().addExperience(Skill.COOKING, 300);
@@ -197,29 +212,33 @@ export class CooksAssistant implements Quest {
                 //client.getActionSender().sendQuickSong(93, 0);
             })),
 
-            new PlayerDialogue(24, "I don't have all the ingredients yet!", DialogueExpression.SAD),
-            new EndDialogue(25)
+            // Keep the incomplete-items response on its own branch. Index 24
+            // is the post-turn-in conversation used when the quest is ready
+            // to be completed; reusing it made the dialogue map overwrite the
+            // reward branch and let players complete the quest without items.
+            new PlayerDialogue(28, "I don't have all the ingredients yet!", DialogueExpression.SAD),
+            new EndDialogue(29)
         );
     }
 }
 
 
 class CooksDialogueAction implements DialogueOptionAction{
-    constructor(private readonly execFunc: Function){
+    constructor(private readonly execFunc: (option: DialogueOption, player?: Player) => void){
 
     }
-    executeOption(option: DialogueOption): void {
-        this.execFunc();
+    executeOption(option: DialogueOption, player?: Player): void {
+        this.execFunc(option, player);
     }
 
 }
 
 class CooksAction implements DialogueAction{
-    constructor(private readonly execFunc: Function){
+    constructor(private readonly execFunc: (player: Player) => void){
 
     }
     execute(player: Player): void {
-        this.execFunc();
+        this.execFunc(player);
     }
     
 }

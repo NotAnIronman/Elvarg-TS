@@ -10,18 +10,69 @@ export class QuestHandler {
     public static NOT_STARTED = 0;
 
     public static updateQuestTab(player: Player) {
-        player.getPacketSender().sendString("QP: " + player + " ", 3985);
+        player.getPacketSender().sendString("QP: " + player.getQuestPoints() + " ", 3985);
 
-        for (const questRecord of Object.values(Quests)) {
-            const quest = questRecord.get();
+        const questRecords = Object.values(Quests)
+            .filter((record): record is Quests => record instanceof Quests);
+        const questRows = [];
+        let slot = 0;
 
-            player.getPacketSender().sendString(quest.questTabStringId(), questRecord.getProgressColor(player) + questRecord.getName());
+        // The client creates a heading row before the quest rows. Keep the
+        // server slot numbers aligned with those dynamic children so clicks
+        // can be resolved back to the same quest.
+        if (questRecords.length > 0) {
+            slot++;
         }
+
+        for (const questRecord of questRecords) {
+            const quest = questRecord.get();
+            const progress = questRecord.getProgress(player);
+            const status = progress === QuestHandler.NOT_STARTED
+                ? 1 // side-journal client: not started
+                : progress >= quest.completeStatus()
+                    ? 2 // side-journal client: complete
+                    : 0; // side-journal client: in progress
+
+            player.getPacketSender().sendString(
+                questRecord.getProgressColor(player) + questRecord.getName(),
+                quest.questTabStringId(),
+            );
+            questRows.push({
+                slot: slot++,
+                status,
+                key: `quest-${quest.questTabButtonId()}`,
+                displayName: questRecord.getName(),
+            });
+        }
+
+        player.getPacketSender().sendQuestList([{
+            title: "Free Quests",
+            quests: questRows,
+        }]);
+    }
+
+    public static handleQuestListClick(player: Player, slot: number, action: number): boolean {
+        if (!player || !Number.isInteger(slot) || slot < 0 || action !== 2) {
+            return false;
+        }
+
+        const questRecords = Object.values(Quests)
+            .filter((record): record is Quests => record instanceof Quests);
+        let currentSlot = questRecords.length > 0 ? 1 : 0;
+        for (const questRecord of questRecords) {
+            if (currentSlot === slot) {
+                questRecord.get().showQuestLog(player, questRecord.getProgress(player));
+                return true;
+            }
+            currentSlot++;
+        }
+        return false;
     }
 
     public static firstClickNpc(player: Player, npc: NPC) {
-        for (const questRecord of Object.values(Quests)) {
-            if (questRecord.quest.firstClickNpc(player, npc)) {
+        for (const questRecord of Object.values(Quests)
+            .filter((record): record is Quests => record instanceof Quests)) {
+            if (questRecord.get().firstClickNpc(player, npc)) {
                 return true;
             }
         }
@@ -37,11 +88,13 @@ export class Quests {
 
     public readonly name: string;
 	public readonly quest: Quest;
+    private readonly progressKey: number;
 
 
     constructor(name: string, quest: Quest) {
         this.name = name;
         this.quest = quest;
+        this.progressKey = quest.questTabButtonId();
     }
 
     public getName(): string {
@@ -57,11 +110,11 @@ export class Quests {
     }
 
     public static getProgress(player: Player) {
-        if (!player.getQuestProgress().has(Quests[this.toString()])) {
-            return 0;
-        }
+        return Quests.COOKS_ASSISTANT.getProgress(player);
+    }
 
-        return player.getQuestProgress().get(Quests[this.toString()]);
+    public getProgress(player: Player): number {
+        return player.getQuestProgress().get(this.progressKey) ?? QuestHandler.NOT_STARTED;
     }
 
     public getQuestProgress(player: Player, questIndex: number): number {
@@ -72,7 +125,7 @@ export class Quests {
     }
 
     public setProgress(player: Player, progress: number) {
-        player.getQuestProgress().set(Quests[this.toString()], progress);
+        player.getQuestProgress().set(this.progressKey, progress);
         QuestHandler.updateQuestTab(player);
     }
 
@@ -90,7 +143,7 @@ export class Quests {
     @return progressColor The status colour prefix, e.g. "@red@"
     */
     public getProgressColor(player: Player): string {
-        const questProgress = Quests.getProgress(player);
+        const questProgress = this.getProgress(player);
         if (questProgress == 0) {
             return "@red@";
         }
@@ -113,9 +166,12 @@ export class Quests {
     }
 
     public static getOrdinal(quest: Quest): number {
-        for (const q of Object.values(Quests)) {
+        const questRecords = Object.values(Quests)
+            .filter((record): record is Quests => record instanceof Quests);
+        for (let ordinal = 0; ordinal < questRecords.length; ordinal++) {
+            const q = questRecords[ordinal];
             if (q.get() === quest) {
-                return q.ordinal();
+                return ordinal;
             }
         }
         return -1;
@@ -149,7 +205,7 @@ export class Quests {
             return false;
         }
 
-        const status: number = player.getQuestProgress().get(quest.getQuestProgress(player, buttonId));
+        const status: number = quest.getProgress(player);
         quest.get().showQuestLog(player, status);
         return true;
     }

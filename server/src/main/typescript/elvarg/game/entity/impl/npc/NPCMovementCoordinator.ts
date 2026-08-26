@@ -21,6 +21,12 @@ export class NPCMovementCoordinator {
     }
 
     public process() {
+        // A stationary NPC can still be displaced by a player. This must run
+        // before the radius==0 early return below.
+        if (NPCMovementCoordinator.tryEscapeOverlappingPlayer(this.npc)) {
+            return;
+        }
+
         if (this.radius == 0) {
             if (this.coordinateState == CoordinateState.HOME) {
                 return;
@@ -55,6 +61,55 @@ export class NPCMovementCoordinator {
                 this.processRetreatingMovement();
                 break;
         }
+    }
+
+    /**
+     * Queue one clipped step when a non-pet NPC is standing on a player.
+     * Combat pursuit and follower movement have their own routing, so they are
+     * deliberately left untouched here.
+     */
+    public static tryEscapeOverlappingPlayer(npc: NPC): boolean {
+        if (
+            npc.getSize() !== 1
+            || npc.isPet()
+            || npc.isDyingFunction()
+            || CombatFactory.inCombat(npc)
+        ) {
+            return false;
+        }
+
+        const movement = npc.getMovementQueue();
+        if (movement.hasPendingWork() || !movement.getMobility().canMove()) {
+            return false;
+        }
+
+        const location = npc.getLocation();
+        const overlappingPlayer = npc
+            .getPlayersWithinDistance(0)
+            .some((player) => Location.isSameTile(player.getLocation(), location));
+        if (!overlappingPlayer) {
+            return false;
+        }
+
+        const candidates = [
+            [1, 0],   // east
+            [0, 1],   // north
+            [-1, 0],  // west
+            [0, -1],  // south
+            [1, 1],   // north-east
+            [-1, 1],  // north-west
+            [-1, -1], // south-west
+            [1, -1],  // south-east
+        ];
+        for (const [deltaX, deltaY] of candidates) {
+            if (!movement.canWalkTo(location.transform(deltaX, deltaY))) {
+                continue;
+            }
+            movement.walkStep(deltaX, deltaY);
+            return true;
+        }
+
+        return false;
     }
 
     private processRetreatingMovement(): void {

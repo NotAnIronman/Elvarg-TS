@@ -96,6 +96,12 @@ export interface PluginNpcInteractionEvent {
   handled: boolean;
 }
 
+export interface PluginNpcExamineEvent {
+  player: any;
+  npcId: number;
+  handled: boolean;
+}
+
 export interface PluginNpcInteractionTeleportLocation {
   x: number;
   y: number;
@@ -482,6 +488,7 @@ export interface PluginApi {
   onObjectRoute(handler: (event: PluginObjectRouteEvent) => void): void;
   onObjectInteraction(handler: (event: PluginObjectInteractionEvent) => void): void;
   onNpcInteraction(handler: (event: PluginNpcInteractionEvent) => void): void;
+  onNpcExamine(handler: (event: PluginNpcExamineEvent) => void): void;
   registerNpcInteraction(
     npcIds: number | number[],
     definition: PluginNpcInteractionDefinition

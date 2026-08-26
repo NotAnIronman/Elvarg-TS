@@ -153,7 +153,7 @@ const PETS = [
     enumName: "TANGLEROOT",
     petId: 7335,
     morphId: 0,
-    itemId: 0,
+    itemId: 20661,
     dialogue: -1,
     skill: Skill.FARMING,
     chance: 5000,
@@ -162,7 +162,7 @@ const PETS = [
     enumName: "ROCKY",
     petId: 7336,
     morphId: 0,
-    itemId: 0,
+    itemId: 20663,
     dialogue: -1,
     skill: Skill.THIEVING,
     chance: 5000,
@@ -299,6 +299,7 @@ const PETS = [
 const PET_BY_ID = new Map();
 const PET_BY_ITEM_ID = new Map();
 const PET_BY_NAME = new Map();
+const PET_ITEM_ID_ATTRIBUTE = "pets.itemId";
 
 for (const pet of PETS) {
   PET_BY_ID.set(pet.petId, pet);
@@ -306,6 +307,77 @@ for (const pet of PETS) {
   if (Number.isInteger(pet.itemId) && !PET_BY_ITEM_ID.has(pet.itemId)) {
     PET_BY_ITEM_ID.set(pet.itemId, pet);
   }
+}
+
+// August has explicit item -> follower mappings for the newer cache variants.
+// Keep these as aliases instead of replacing Elvarg's existing entries: several
+// of Elvarg's legacy NPC ids are intentionally chosen for this client's cache.
+const AUGUST_SUPPORTED_PET_ITEM_ALIASES = [
+  [6637, [12647]],
+  [6639, [22663]],
+  [2130, [12939, 12940]],
+  [4001, [13071]],
+  [5536, [13180]],
+  [6718, [13326]],
+  [6296, [19730]],
+  [3077, [20693, 24483, 24484, 24485, 24486]],
+  [7674, [21291]],
+  [7759, [21509, 21510]],
+  [7891, [21748, 21749]],
+  [7890, [21750, 21751]],
+  [8025, [21992, 21993]],
+  [8008, [22318]],
+  [8009, [22319]],
+  [8196, [22376, 22377]],
+  [8197, [22378, 22379]],
+  [8198, [22380, 22381]],
+  [8199, [22382, 22383]],
+  [8200, [22384, 22385]],
+  [8336, [22473, 22474]],
+  [8492, [22746, 22747, 22748, 22749, 22750, 22751, 22752, 22753]],
+  [2143, [23495, 23496, 25842, 25843]],
+  [8729, [23757, 23758]],
+  [8730, [23759]],
+  [8731, [23760, 23761]],
+  [9398, [24491, 24492]],
+  [9511, [24656, 24657]],
+  [9512, [24658, 24659]],
+  [9637, [24701]],
+  [9850, [24847, 24848]],
+  [9851, [24849, 24850]],
+  [10620, [25519, 25520]],
+  [6817, [25600, 25601]],
+  [10562, [25602, 25603]],
+  [10650, [25613, 25614]],
+  [10761, [25748]],
+  [10762, [25749]],
+  [10763, [25750]],
+  [10764, [25751]],
+  [10765, [25752]],
+  [8183, [25836]],
+  [11276, [26348, 26349]],
+].flatMap(([petId, itemIds]) => itemIds.map((itemId) => ({ petId, itemId })));
+
+for (const alias of AUGUST_SUPPORTED_PET_ITEM_ALIASES) {
+  if (PET_BY_ITEM_ID.has(alias.itemId)) {
+    continue;
+  }
+
+  let pet = PET_BY_ID.get(alias.petId);
+  if (!pet) {
+    pet = {
+      enumName: `CACHE_PET_${alias.petId}`,
+      petId: alias.petId,
+      morphId: 0,
+      itemId: alias.itemId,
+      dialogue: -1,
+    };
+    PET_BY_ID.set(alias.petId, pet);
+  }
+
+  // Each item variant needs its own itemId so dropping/picking up a coloured
+  // pet does not silently convert it into the first item in its NPC family.
+  PET_BY_ITEM_ID.set(alias.itemId, { ...pet, itemId: alias.itemId });
 }
 
 const SKILLING_PETS = [
@@ -547,6 +619,7 @@ function drop(player, itemId, reward) {
     const location = chooseSpawnLocation(player);
     const npc = NPC.create(pet.petId, location);
     npc.setPet(true);
+    npc.setAttribute(PET_ITEM_ID_ATTRIBUTE, pet.itemId);
     npc.setOwner(player);
     npc.setFollowing(player);
     npc.setMobileInteraction(player);
@@ -618,7 +691,8 @@ function pickup(player, npc) {
     return false;
   }
 
-  const pet = getPetByNpcId(npc.getId());
+  const petItemId = npc.getAttribute?.(PET_ITEM_ID_ATTRIBUTE);
+  const pet = getPetForItemId(petItemId) ?? getPetByNpcId(npc.getId());
   if (!pet) {
     return false;
   }

@@ -77,8 +77,11 @@ export class DialogueManager {
         let continueAction = current.getContinueAction();
         if (continueAction != null) {
             // This dialogue has a custom continue action
-            continueAction.execute(this.player);
+            // Clear the old entry before executing it. Actions are allowed to
+            // start a new dialogue; resetting afterwards would erase that new
+            // dialogue immediately.
             this.reset();
+            continueAction.execute(this.player);
             return;
         }
 
@@ -141,7 +144,7 @@ export class DialogueManager {
             this.player.getPacketSender().sendInterfaceRemoval();
             return;
         }
-        (dialogue as OptionDialogue).execute(option);
+        (dialogue as OptionDialogue).execute(option, this.player);
     }
 
 }

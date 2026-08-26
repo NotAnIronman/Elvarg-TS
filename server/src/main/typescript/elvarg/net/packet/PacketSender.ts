@@ -43,8 +43,10 @@ import {
   encodeWidgetSetItem,
   encodeWidgetSetNpcHead,
   encodeWidgetSetPlayerHead,
+  encodeWidgetSetQuestList,
   encodeWidgetSetRoot,
   encodeWidgetSetText,
+  type QuestListPacketGroup,
   type ScriptInventorySnapshot,
   MAIN_INVENTORY_GROUP_ID,
   MAIN_INVENTORY_SLOT_FLAGS,
@@ -1074,14 +1076,15 @@ export class PacketSender {
     return this;
   }
 
-  sendExpDrop(skill: any, exp: number): this {
-    if (!skill || typeof skill.getIndex !== "function") {
-      return this;
-    }
-    const out = new PacketBuilder(116);
-    out.put(skill.getIndex());
-    out.putInt(exp);
-    this.player.getSession().write(out);
+  sendQuestList(groups: readonly QuestListPacketGroup[]): this {
+    this.player.getSession().sendClientPacket(encodeWidgetSetQuestList(groups));
+    return this;
+  }
+
+  sendExpDrop(_skill: any, _exp: number): this {
+    // Opcode 116 is the quest-list packet in this client protocol. Elvarg
+    // has no client-side experience-drop consumer, so emitting it here would
+    // make normal skill actions corrupt the quest-list decoder.
     return this;
   }
 }

@@ -1330,6 +1330,45 @@ export function encodeWidgetSetAnimation(uid: number, animationId: number): Buff
   return encodeServerPacket(ServerPacketId.WIDGET_SET_ANIMATION, payload);
 }
 
+export type QuestListPacketGroup = {
+  title: string;
+  quests: Array<{
+    slot: number;
+    status: number;
+    key: string;
+    displayName: string;
+  }>;
+};
+
+/** Encodes the server-owned quest rows consumed by the side-journal client widget. */
+export function encodeWidgetSetQuestList(groups: readonly QuestListPacketGroup[]): Buffer {
+  const parts: Buffer[] = [];
+  const safeGroups = groups.slice(0, 0xffff);
+  const groupCount = Buffer.alloc(2);
+  groupCount.writeUInt16BE(safeGroups.length);
+  parts.push(groupCount);
+
+  for (const group of safeGroups) {
+    const quests = Array.isArray(group.quests) ? group.quests.slice(0, 0xffff) : [];
+    const questCount = Buffer.alloc(2);
+    questCount.writeUInt16BE(quests.length);
+    parts.push(string(group.title ?? ""), questCount);
+
+    for (const quest of quests) {
+      const header = Buffer.alloc(3);
+      header.writeUInt16BE(quest.slot & 0xffff);
+      header[2] = quest.status & 0xff;
+      parts.push(
+        header,
+        string(quest.key ?? ""),
+        string(quest.displayName ?? ""),
+      );
+    }
+  }
+
+  return encodeServerPacket(ServerPacketId.WIDGET_SET_QUEST_LIST, Buffer.concat(parts));
+}
+
 export type ScriptInventorySnapshot = {
   capacity: number;
   slots: Array<{ slot: number; itemId: number; quantity: number }>;

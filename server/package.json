@@ -112,6 +112,7 @@
     "test:welcome-screen": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/welcome-screen-plugin-smoke.ts",
     "test:staff-crowns": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/staff-crowns-plugin-smoke.ts",
     "test:emotes": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/emotes-plugin-smoke.ts",
+    "test:pets": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/pets-plugin-smoke.ts",
     "test:skull-command": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/player-commands-skull-smoke.ts",
     "test:vengeance-timer": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2022\"}' ts-node ./scripts/vengeance-timer-plugin-smoke.ts",
     "test:content-api": "TS_NODE_COMPILER_OPTIONS='{\"target\":\"es2020\"}' ts-node ./scripts/content-api-smoke.ts",

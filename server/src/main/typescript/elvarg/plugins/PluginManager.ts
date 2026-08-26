@@ -30,6 +30,7 @@ import {
   PluginNpcDeathEvent,
   PluginNpcAggressionToleranceEvent,
   PluginNpcInteractionEvent,
+  PluginNpcExamineEvent,
   PluginNpcInteractionDefinition,
   PluginObjectRouteEvent,
   PluginObjectInteractionEvent,
@@ -124,6 +125,7 @@ export class PluginManager {
   private static objectRouteHooks: PluginHook<PluginObjectRouteEvent>[] = [];
   private static objectInteractionHooks: PluginHook<PluginObjectInteractionEvent>[] = [];
   private static npcInteractionHooks: PluginHook<PluginNpcInteractionEvent>[] = [];
+  private static npcExamineHooks: PluginHook<PluginNpcExamineEvent>[] = [];
   private static npcDeathHooks: PluginHook<PluginNpcDeathEvent>[] = [];
   private static canAttackHooks: PluginHook<PluginCanAttackEvent>[] = [];
   private static canTeleportHooks: PluginHook<PluginCanTeleportEvent>[] = [];
@@ -608,6 +610,20 @@ export class PluginManager {
         break;
       }
       PluginManager.executeHook(hook, event, "npc_interaction", "npc_interaction");
+    }
+    return event.handled === true;
+  }
+
+  public static emitNpcExamine(event: PluginNpcExamineEvent): boolean {
+    if (!event || !event.player || !Number.isInteger(event.npcId)) {
+      return false;
+    }
+
+    for (const hook of PluginManager.npcExamineHooks) {
+      if (event.handled) {
+        break;
+      }
+      PluginManager.executeHook(hook, event, "npc_examine", "npc_examine");
     }
     return event.handled === true;
   }
@@ -1887,6 +1903,20 @@ export class PluginManager {
           pluginName,
           handler: (event) => {
             if (!event || event.handled || !event.player || !event.npc) {
+              return;
+            }
+            handler(event);
+          },
+        });
+      },
+      onNpcExamine: (handler) => {
+        if (typeof handler !== "function") {
+          return;
+        }
+        PluginManager.npcExamineHooks.push({
+          pluginName,
+          handler: (event) => {
+            if (!event || event.handled || !event.player || !Number.isInteger(event.npcId)) {
               return;
             }
             handler(event);
