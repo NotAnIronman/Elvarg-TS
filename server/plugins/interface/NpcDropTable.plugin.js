@@ -221,8 +221,8 @@ function rowsFor(npcId) {
       rows.push({
         itemId,
         name: itemName(itemId),
-        quantity: quantityText(drop),
-        rate: `${category}: ${rateText(drop, category)}`,
+                quantity: quantityText(drop),
+                rate: `${category}: ${rateText(drop, category)}`,
       });
     }
   }
@@ -267,8 +267,14 @@ function openDropTable(player, npcId) {
 
   player.setInterfaceId(GROUP_ID);
   const sender = player.getPacketSender();
-  sender.sendSubInterface(MAIN_MODAL_UID, GROUP_ID, 0);
-  sender.sendClientScript(227, uid(FRAME_COMPONENT), `${npcName(npcId)} drops`);
+  // Script 227 must run as a postScript bundled into the same open_sub
+  // packet (matching Presets.plugin.js's working pattern) - calling it as a
+  // separate sendClientScript afterward crashes client-side with a
+  // Cs2Error RuntimeException, since it expects to run in the context of
+  // the interface being opened, not as an independent later invocation.
+  sender.sendSubInterface(MAIN_MODAL_UID, GROUP_ID, 0, {
+    postScripts: [{ scriptId: 227, args: [uid(FRAME_COMPONENT), `${npcName(npcId)} drops`] }],
+  });
   renderRows(player, rows);
   return true;
 }
@@ -288,8 +294,8 @@ module.exports = {
         return "Usage: ::drops <NpcID>";
       }
       return openDropTable(player, npcId)
-        ? undefined
-        : `No drop table is available for NPC ${npcId}.`;
+      ? undefined
+      : `No drop table is available for NPC ${npcId}.`;
     });
     api.onInterfaceActionButton(uid(CLOSE_COMPONENT), ({ player }) => {
       player.getPacketSender().closeInterface(GROUP_ID);

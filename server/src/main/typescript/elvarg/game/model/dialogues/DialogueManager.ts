@@ -17,13 +17,20 @@ interface StaticDialogueDefinition {
     startIndex: number;
 }
 
+/** A single dialogue, or a pool of variants to pick from at random - for
+ * generic NPCs (villagers etc.) that say one of several different lines
+ * rather than always the same fixed conversation. */
+type StaticDialogueEntry = StaticDialogueDefinition | StaticDialogueDefinition[];
+
 export class DialogueManager {
-    public static readonly STATIC_DIALOGUES: Map<number, StaticDialogueDefinition> = new Map([
+    public static readonly STATIC_DIALOGUES: Map<number, StaticDialogueEntry> = new Map([
         [DialogueIdentifiers.TEST, { create: () => new TestStaticDialogue(), startIndex: 0 }],
         [DialogueIdentifiers.BANKER, { create: () => new BankerDialogue(), startIndex: 0 }],
         [DialogueIdentifiers.PERDU, { create: () => new ParduDialogue(), startIndex: 0 }],
         [DialogueIdentifiers.NIEVE, { create: () => new NieveDialogue(), startIndex: 0 }],
-        [DialogueIdentifiers.NIEVE_ASSIGNMENT, { create: () => new NieveDialogue(), startIndex: 2 }]
+        [DialogueIdentifiers.NIEVE_ASSIGNMENT, { create: () => new NieveDialogue(), startIndex: 2 }],
+        [2814, { create: () => new LumbridgeShopAssistant(), startIndex: 0}],
+        [2813, { create: () => new LumbridgeShopKeeper(), startIndex: 0}],
     ]);
 
     private readonly player: Player;
@@ -94,10 +101,13 @@ export class DialogueManager {
     }
 
     public startStaticDialogue(id: number): boolean {
-        const definition = DialogueManager.STATIC_DIALOGUES.get(id);
-        if (!definition) {
+        const entry = DialogueManager.STATIC_DIALOGUES.get(id);
+        if (!entry) {
             return false;
         }
+        const definition = Array.isArray(entry)
+        ? entry[Math.floor(Math.random() * entry.length)]
+        : entry;
         this.startDialog(definition.create(), definition.startIndex);
         return true;
     }
@@ -147,4 +157,4 @@ export class DialogueManager {
         (dialogue as OptionDialogue).execute(option, this.player);
     }
 
-}
+    }

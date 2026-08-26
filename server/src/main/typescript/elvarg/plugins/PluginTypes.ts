@@ -109,14 +109,14 @@ export interface PluginNpcInteractionTeleportLocation {
 }
 
 export type PluginNpcInteractionActionDefinition =
-  | {
-      shopId: number;
-      teleportLocation?: never;
-    }
-  | {
-      shopId?: never;
-      teleportLocation: PluginNpcInteractionTeleportLocation;
-    };
+| {
+  shopId: number;
+  teleportLocation?: never;
+}
+| {
+  shopId?: never;
+  teleportLocation: PluginNpcInteractionTeleportLocation;
+};
 
 export interface PluginNpcInteractionDefinition {
   firstClick?: PluginNpcInteractionActionDefinition;
@@ -535,6 +535,21 @@ export interface PluginApi {
     clickType: number,
     handler: (event: PluginNpcInteractionEvent) => void | boolean
   ): void;
+  /**
+   * Registers by the NPC's real menu option label (e.g. "Pickpocket",
+   * "Talk-to", "Attack") instead of a hardcoded op number. Real OSRS NPCs
+   * are not consistent about which op a given label sits at, so each
+   * npcId is resolved independently against its own cache-derived option
+   * order (see getNpcActions) rather than assuming a fixed op number
+   * applies to every NPC in the list.
+   */
+  onNpcAction(
+    npcIds: number | number[],
+    label: string,
+    handler: (event: PluginNpcInteractionEvent) => void | boolean
+  ): void;
+  /** Returns an NPC's real cache-defined menu option order, e.g. ["Talk-to", "Pickpocket", null, null, "Examine"]. */
+  getNpcActions(npcId: number): (string | null)[];
   onNpcFirstClick(
     npcIds: number | number[],
     handler: (event: PluginNpcInteractionEvent) => void | boolean
@@ -576,7 +591,7 @@ export interface PluginApi {
     player: any,
     title: string,
     ...optionCallbackPairs: Array<
-      string | ((player: any, optionIndex: number, optionText: string) => void)
+    string | ((player: any, optionIndex: number, optionText: string) => void)
     >
   ): boolean;
   onButton(
@@ -728,7 +743,7 @@ export interface PluginApi {
   registerNpcCombatMethodProvider(
     npcIds: number | number[],
     methodCtor: new () => any,
-    options?: { singleton?: boolean }
+                                  options?: { singleton?: boolean }
   ): void;
 }
 

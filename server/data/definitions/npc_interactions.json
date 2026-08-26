@@ -57,6 +57,16 @@
       "args": { "shopId": 3 }
     }
   },
+  "2814": {
+    "first_click": {
+      "method": "core.dialogues.start",
+      "args": { "dialogueId": 3 }
+    },
+    "second_click": {
+      "method": "core.shops.open",
+      "args": { "shopId": 0 }
+    }
+  },
   "3309": {
     "first_click": {
       "method": "core.shops.open",

@@ -67,60 +67,60 @@ const PICKPOCKETS = [
       NpcIds.WOMAN_14,
     ],
   },
-  {
-    name: "farmer",
-    level: 10,
-    xp: 14.5,
-    stunTime: 8,
-    stunDamage: 1,
-    rewards: [[ItemIds.COINS, 9], [ItemIds.POTATO_SEED, 1]],
-    npcIds: [NpcIds.FARMER, NpcIds.FARMER_2, NpcIds.FARMER_3, NpcIds.FARMER_4, NpcIds.FARMER_5, NpcIds.FARMER_6],
-  },
-  {
-    name: "rogue",
-    level: 32,
-    xp: 36.5,
-    stunTime: 9,
-    stunDamage: 2,
-    rewards: [[ItemIds.COINS, 34], [ItemIds.LOCKPICK, 1], [ItemIds.JUG_OF_WINE, 1]],
-    npcIds: [NpcIds.ROGUE],
-  },
-  {
-    name: "master farmer",
-    level: 38,
-    xp: 43,
-    stunTime: 9,
-    stunDamage: 3,
-    rewards: [[ItemIds.POTATO_SEED, 1], [ItemIds.ONION_SEED, 1], [ItemIds.MARRENTILL_SEED, 1], [ItemIds.RANARR_SEED, 1]],
-    npcIds: [NpcIds.MASTER_FARMER, NpcIds.MASTER_FARMER_2],
-  },
-  {
-    name: "guard",
-    level: 40,
-    xp: 47,
-    stunTime: 9,
-    stunDamage: 2,
-    rewards: [[ItemIds.COINS, 30]],
-    npcIds: [NpcIds.GUARD, NpcIds.GUARD_2, NpcIds.GUARD_3, NpcIds.GUARD_4, NpcIds.GUARD_5, NpcIds.GUARD_6],
-  },
-  {
-    name: "paladin",
-    level: 70,
-    xp: 152,
-    stunTime: 10,
-    stunDamage: 3,
-    rewards: [[ItemIds.COINS, 80], [ItemIds.CHAOS_RUNE, 2]],
-    npcIds: [NpcIds.PALADIN, NpcIds.PALADIN_2, NpcIds.PALADIN_3],
-  },
-  {
-    name: "gnome",
-    level: 75,
-    xp: 199,
-    stunTime: 10,
-    stunDamage: 1,
-    rewards: [[ItemIds.COINS, 300], [ItemIds.GOLD_ORE, 1], [ItemIds.EARTH_RUNE, 1]],
-    npcIds: [NpcIds.GNOME],
-  },
+{
+  name: "farmer",
+  level: 10,
+  xp: 14.5,
+  stunTime: 8,
+  stunDamage: 1,
+  rewards: [[ItemIds.COINS, 9], [ItemIds.POTATO_SEED, 1]],
+  npcIds: [NpcIds.FARMER, NpcIds.FARMER_2, NpcIds.FARMER_3, NpcIds.FARMER_4, NpcIds.FARMER_5, NpcIds.FARMER_6],
+},
+{
+  name: "rogue",
+  level: 32,
+  xp: 36.5,
+  stunTime: 9,
+  stunDamage: 2,
+  rewards: [[ItemIds.COINS, 34], [ItemIds.LOCKPICK, 1], [ItemIds.JUG_OF_WINE, 1]],
+  npcIds: [NpcIds.ROGUE],
+},
+{
+  name: "master farmer",
+  level: 38,
+  xp: 43,
+  stunTime: 9,
+  stunDamage: 3,
+  rewards: [[ItemIds.POTATO_SEED, 1], [ItemIds.ONION_SEED, 1], [ItemIds.MARRENTILL_SEED, 1], [ItemIds.RANARR_SEED, 1]],
+  npcIds: [NpcIds.MASTER_FARMER, NpcIds.MASTER_FARMER_2],
+},
+{
+  name: "guard",
+  level: 40,
+  xp: 47,
+  stunTime: 9,
+  stunDamage: 2,
+  rewards: [[ItemIds.COINS, 30]],
+  npcIds: [NpcIds.GUARD, NpcIds.GUARD_2, NpcIds.GUARD_3, NpcIds.GUARD_4, NpcIds.GUARD_5, NpcIds.GUARD_6],
+},
+{
+  name: "paladin",
+  level: 70,
+  xp: 152,
+  stunTime: 10,
+  stunDamage: 3,
+  rewards: [[ItemIds.COINS, 80], [ItemIds.CHAOS_RUNE, 2]],
+  npcIds: [NpcIds.PALADIN, NpcIds.PALADIN_2, NpcIds.PALADIN_3],
+},
+{
+  name: "gnome",
+  level: 75,
+  xp: 199,
+  stunTime: 10,
+  stunDamage: 1,
+  rewards: [[ItemIds.COINS, 300], [ItemIds.GOLD_ORE, 1], [ItemIds.EARTH_RUNE, 1]],
+  npcIds: [NpcIds.GNOME],
+},
 ];
 
 const PICKPOCKET_BY_NPC_ID = new Map();
@@ -160,7 +160,11 @@ module.exports = {
   register(api) {
     TaskManager = api.getTaskManager();
     CombatFactory = api.getCombatFactory();
-    api.onNpcFirstClick(Array.from(PICKPOCKET_BY_NPC_ID.keys()), function pickpocket(event) {
+    // Resolved per-NPC against real cache data (NpcDefinition.getActions()),
+    // not a hardcoded op number - some NPCs put Pickpocket at a different
+    // op than others, so a single "onNpcFirstClick"/"onNpcSecondClick" call
+    // is never reliably correct across a whole NPC ID list.
+    api.onNpcAction(Array.from(PICKPOCKET_BY_NPC_ID.keys()), "Pickpocket", function pickpocket(event) {
       const { player, npc, npcId } = event;
       const def = PICKPOCKET_BY_NPC_ID.get(npcId);
       if (!def) {
@@ -173,8 +177,8 @@ module.exports = {
       }
       if (player.getSkillManager().getCurrentLevel(Skill.THIEVING) < def.level) {
         player
-          .getPacketSender()
-          .sendMessage(`You need a Thieving level of at least ${def.level} to do this.`);
+        .getPacketSender()
+        .sendMessage(`You need a Thieving level of at least ${def.level} to do this.`);
         event.handled = true;
         return;
       }
@@ -184,15 +188,15 @@ module.exports = {
       }
       if (CombatFactory.inCombat(player)) {
         player
-          .getPacketSender()
-          .sendMessage("You must wait a few seconds after being in combat to do this.");
+        .getPacketSender()
+        .sendMessage("You must wait a few seconds after being in combat to do this.");
         event.handled = true;
         return;
       }
       if (CombatFactory.inCombat(npc)) {
         player
-          .getPacketSender()
-          .sendMessage("That npc is currently in combat and cannot be pickpocketed.");
+        .getPacketSender()
+        .sendMessage("That npc is currently in combat and cannot be pickpocketed.");
         event.handled = true;
         return;
       }
@@ -221,8 +225,8 @@ module.exports = {
               player.getInventory().addItem(loot);
             }
             player
-              .getPacketSender()
-              .sendMessage(`You steal ${loot.getAmount()} x ${loot.getDefinition().getName()}.`);
+            .getPacketSender()
+            .sendMessage(`You steal ${loot.getAmount()} x ${loot.getDefinition().getName()}.`);
             player.getSkillManager().addExperiences(Skill.THIEVING, def.xp);
             Pets.onSkill(player, Skill.THIEVING);
             return;
@@ -240,9 +244,9 @@ module.exports = {
           Sounds.sendSound(player, Sound.THIEVING_STUNNED);
           CombatFactory.stun(player, def.stunTime, true);
           player
-            .getCombat()
-            .getHitQueue()
-            .addPendingDamage([new HitDamage(def.stunDamage, HitMask.RED)]);
+          .getCombat()
+          .getHitQueue()
+          .addPendingDamage([new HitDamage(def.stunDamage, HitMask.RED)]);
           player.getMovementQueue().reset();
         })
       );
@@ -259,8 +263,8 @@ module.exports = {
       const player = event.player;
       if (player.getSkillManager().getCurrentLevel(Skill.THIEVING) < stall.level) {
         player
-          .getPacketSender()
-          .sendMessage(`You need a Thieving level of at least ${stall.level} to do this.`);
+        .getPacketSender()
+        .sendMessage(`You need a Thieving level of at least ${stall.level} to do this.`);
         event.handled = true;
         return;
       }
@@ -281,8 +285,8 @@ module.exports = {
       player.getInventory().addItem(reward);
       player.getSkillManager().addExperiences(Skill.THIEVING, stall.xp);
       player
-        .getPacketSender()
-        .sendMessage(`You steal ${reward.getAmount()} x ${reward.getDefinition().getName()}.`);
+      .getPacketSender()
+      .sendMessage(`You steal ${reward.getAmount()} x ${reward.getDefinition().getName()}.`);
       Pets.onSkill(player, Skill.THIEVING);
       event.handled = true;
     });
