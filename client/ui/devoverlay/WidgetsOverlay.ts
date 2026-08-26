@@ -3,9 +3,10 @@ import { App as PicoApp, Program } from "picogl";
 import { CacheIndex } from "../../rs/cache/CacheIndex";
 import { CacheSystem } from "../../rs/cache/CacheSystem";
 import { BitmapFont } from "../../rs/font/BitmapFont";
+import { ClientState } from "../../game/ClientState";
 import { isTouchDevice } from "../../common/utils/DeviceUtil";
 import { getUiScale } from "../UiScale";
-import { FONT_VERDANA_13 } from "../fonts";
+import { FONT_BOLD_12, FONT_VERDANA_13 } from "../fonts";
 import { getChooseOptionMenuRect } from "../../widgets/gl/choose-option";
 import { GLRenderer } from "../../widgets/gl/renderer";
 import {
@@ -55,6 +56,14 @@ type DirtyRect = {
     h: number;
 };
 
+type MouseOverTextVisualState = {
+    signature: string;
+    text?: string;
+    rect?: DirtyRect;
+    x?: number;
+    y?: number;
+};
+
 export class WidgetsOverlay implements Overlay {
     private app!: PicoApp;
     private glRenderer?: GLRenderer;
@@ -80,6 +89,8 @@ export class WidgetsOverlay implements Overlay {
     private lastMenuVisualSignature: string = "";
     private lastMenuVisualRect?: DirtyRect;
     private lastTradeAmountOverlaySignature: string = "";
+    private lastMouseOverTextSignature: string = "";
+    private lastMouseOverTextRect?: DirtyRect;
 
     // Public property to enable/disable the overlay
     public enabled: boolean = true;
@@ -119,6 +130,8 @@ export class WidgetsOverlay implements Overlay {
         this.lastMenuVisualSignature = "";
         this.lastMenuVisualRect = undefined;
         this.lastTradeAmountOverlaySignature = "";
+        this.lastMouseOverTextSignature = "";
+        this.lastMouseOverTextRect = undefined;
     }
 
     clearAndHide(): void {
@@ -560,6 +573,71 @@ export class WidgetsOverlay implements Overlay {
         return { signature, rect };
     }
 
+    /**
+     * Builds the OSRS mouseover label from the active world menu. The client stores menu
+     * entries in display order, so the first actionable entry is the default option.
+     */
+    private getMouseOverTextVisualState(menuOpen: boolean): MouseOverTextVisualState {
+        const client = this.ctx.getGameContext?.()?.osrsClient;
+        if (!client?.showMouseOverText || menuOpen || client.menuOpen) {
+            return { signature: "hidden" };
+        }
+
+        const entries = Array.isArray(client.menuActiveSimpleEntries)
+            ? client.menuActiveSimpleEntries
+            : [];
+        let topEntry: any;
+        let optionCount = 0;
+        for (const entry of entries) {
+            const option = typeof entry?.option === "string" ? entry.option.trim() : "";
+            if (!option || option.toLowerCase() === "cancel") continue;
+            optionCount++;
+            if (!topEntry) topEntry = entry;
+        }
+
+        let text = "";
+        if (topEntry) {
+            const option = String(topEntry.option || "").trim();
+            const target = String(topEntry.target || "").trim();
+            text = target ? `${option} ${target}` : option;
+            if (optionCount > 1) {
+                text += `<col=ffffff> / ${optionCount - 1} more options`;
+            }
+        } else if (ClientState.isItemSelected === 1) {
+            const itemName = String(ClientState.selectedSpellName || "").trim();
+            text = `Use${itemName ? ` ${itemName}` : ""} ->`;
+        } else if (ClientState.isSpellSelected) {
+            const action = String(ClientState.selectedSpellActionName || "Cast").trim() || "Cast";
+            const spellName = String(ClientState.selectedSpellName || "").trim();
+            text = `${action}${spellName ? ` ${spellName}` : ""} ->`;
+        }
+
+        if (!text || !this.glRenderer) return { signature: "hidden" };
+
+        const viewport = client.renderer?.getSceneViewportWidgetRect?.();
+        const viewportX = Math.max(0, viewport?.x | 0);
+        const viewportY = Math.max(0, viewport?.y | 0);
+        const viewportWidth = Math.max(1, viewport?.width | 0 || this.app.width);
+        const rectX = Math.round(viewportX * this.overlayScaleX);
+        const rectY = Math.round(viewportY * this.overlayScaleY);
+        const rectWidth = Math.max(
+            1,
+            Math.min(this.glRenderer.width - rectX, Math.round(viewportWidth * this.overlayScaleX)),
+        );
+        const rectHeight = Math.max(1, Math.min(this.glRenderer.height - rectY, 20 * this.overlayScaleY));
+        if (rectX >= this.glRenderer.width || rectY >= this.glRenderer.height) {
+            return { signature: "hidden" };
+        }
+
+        return {
+            signature: `visible:${text}:${rectX}:${rectY}:${this.overlayScaleX}:${this.overlayScaleY}`,
+            text,
+            rect: { x: rectX, y: rectY, w: rectWidth, h: rectHeight },
+            x: rectX + Math.round(4 * this.overlayScaleX),
+            y: rectY + Math.round(3 * this.overlayScaleY),
+        };
+    }
+
     draw(phase: RenderPhase): void {
         // Only draw in PostPresent phase
         if (phase !== RenderPhase.PostPresent) {
@@ -628,6 +706,9 @@ export class WidgetsOverlay implements Overlay {
             const menuVisualDirty = menuVisualState.signature !== this.lastMenuVisualSignature;
             const tradeOverlaySignature = this.getTradeAmountOverlaySignature(widgetManager);
             const tradeOverlayDirty = tradeOverlaySignature !== this.lastTradeAmountOverlaySignature;
+            const mouseOverTextState = this.getMouseOverTextVisualState(menuOpen);
+            const mouseOverTextDirty =
+                mouseOverTextState.signature !== this.lastMouseOverTextSignature;
 
             // Force a full redraw only for root set changes.
             // The Choose Option menu is drawn as part of the shared widget overlay. When it is
@@ -637,7 +718,11 @@ export class WidgetsOverlay implements Overlay {
                 !this.hasPresentedFrame || this.rootSetChanged || menuOpen || tradeOverlayDirty;
             const preciseDirtyCount = preciseDirtyWidgets.length | 0;
             const shouldRedraw =
-                anyDirty || preciseDirtyCount > 0 || forceFullRedraw || menuVisualDirty;
+                anyDirty ||
+                preciseDirtyCount > 0 ||
+                forceFullRedraw ||
+                menuVisualDirty ||
+                mouseOverTextDirty;
 
             const consumedRootIndices: number[] = [];
 
@@ -669,6 +754,10 @@ export class WidgetsOverlay implements Overlay {
                 if (menuVisualDirty) {
                     if (this.lastMenuVisualRect) dirtyRects.push(this.lastMenuVisualRect);
                     if (menuVisualState.rect) dirtyRects.push(menuVisualState.rect);
+                }
+                if (mouseOverTextDirty) {
+                    if (this.lastMouseOverTextRect) dirtyRects.push(this.lastMouseOverTextRect);
+                    if (mouseOverTextState.rect) dirtyRects.push(mouseOverTextState.rect);
                 }
                 if (!renderFull) {
                     if (dirtyRects.length === 0) {
@@ -705,6 +794,7 @@ export class WidgetsOverlay implements Overlay {
                         renderWidgetTreeGL(this.glRenderer, entry.root, entry.renderOpts);
                     }
                     this.drawTradeAmountOverlay(widgetManager);
+                    this.drawMouseOverText(mouseOverTextState);
                     this.rootSetChanged = false;
                 } else if (widgetManager) {
                     // Partial pass: keep existing click targets and redraw only dirty root regions.
@@ -737,12 +827,24 @@ export class WidgetsOverlay implements Overlay {
                         }
                     }
                     this.drawTradeAmountOverlay(widgetManager);
+                    const mouseOverTextRect = mouseOverTextState.rect;
+                    if (
+                        mouseOverTextDirty ||
+                        (mouseOverTextRect &&
+                            dirtyRects.some((rect) =>
+                                this.rectsIntersect(rect, mouseOverTextRect),
+                            ))
+                    ) {
+                        this.drawMouseOverText(mouseOverTextState);
+                    }
                 }
                 this.presentOverlayCanvas(renderFull, dirtyRects);
 
                 this.lastMenuVisualSignature = menuVisualState.signature;
                 this.lastMenuVisualRect = menuVisualState.rect;
                 this.lastTradeAmountOverlaySignature = tradeOverlaySignature;
+                this.lastMouseOverTextSignature = mouseOverTextState.signature;
+                this.lastMouseOverTextRect = mouseOverTextState.rect;
             }
 
             // Process input against the current click target registry.
@@ -766,6 +868,30 @@ export class WidgetsOverlay implements Overlay {
             .map((root: any) => `${root?._absX ?? root?.x ?? 0},${root?._absY ?? root?.y ?? 0}`)
             .join(";");
         return `visible:${value}:${bounds}`;
+    }
+
+    private drawMouseOverText(state: MouseOverTextVisualState): void {
+        if (!state.text || !state.rect || !this.glRenderer) return;
+
+        drawTextGL(
+            this.glRenderer,
+            this.ctx.getFontLoader?.() || (() => undefined),
+            state.text,
+            state.x ?? state.rect.x,
+            state.y ?? state.rect.y,
+            state.rect.w,
+            Math.max(1, Math.round(16 * this.overlayScaleY)),
+            FONT_BOLD_12,
+            0xffffff,
+            0,
+            0,
+            true,
+            1,
+            undefined,
+            this.overlayScaleX,
+            this.overlayScaleY,
+        );
+        this.glRenderer.flush();
     }
 
     /** Draw over the chat history while preserving the underlying widget tree. */
