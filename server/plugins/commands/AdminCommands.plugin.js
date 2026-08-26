@@ -319,22 +319,12 @@ function queueNpcSpawn(player, id, amount = 1) {
   return spawned;
 }
 
-function fallbackSaveFilePathForUsername(username) {
-  const raw = String(username ?? "").trim().toLowerCase();
-  const safe = raw
-    .replace(/[^a-z0-9]/gi, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  const normalized = safe.length > 0 ? safe : "player";
-  return path.join(process.cwd(), "data", "saves", "characters", `${normalized}.json`);
-}
-
 function resolveSaveFilePathForUsername(username) {
   const persistence = GameConstants.PLAYER_PERSISTENCE;
   if (persistence && typeof persistence.resolveFilePath === "function") {
     return persistence.resolveFilePath(username);
   }
-  return fallbackSaveFilePathForUsername(username);
+  return null;
 }
 
 class UpdateTask extends Task {
@@ -990,6 +980,12 @@ module.exports = {
 
       const corruptTargetSave = (overrideJson = null) => {
         const filePath = resolveSaveFilePathForUsername(targetName);
+        if (!filePath) {
+          player
+            .getPacketSender()
+            .sendMessage("This command is only available with the legacy file-based save provider.");
+          return;
+        }
         if (!fs.existsSync(filePath)) {
           player
             .getPacketSender()

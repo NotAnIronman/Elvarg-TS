@@ -1,7 +1,6 @@
 const fs = require("fs");
-const fsp = fs.promises;
 const path = require("path");
-const { promisify } = require("util");
+const { DatabaseSync } = require("node:sqlite");
 const { PrayerData } = require("../../src/main/typescript/elvarg/game/content/PrayerHandler");
 const { FightType } = require("../../src/main/typescript/elvarg/game/content/combat/FightType");
 const { Skills } = require("../../src/main/typescript/elvarg/game/content/skill/SkillManager");
@@ -20,107 +19,66 @@ const {
   PlayerFlagAttributes,
 } = require("../../src/main/typescript/elvarg/game/entity/flags/PlayerFlags");
 
-const openAsync = promisify(fs.open);
-const writeFileAsync = promisify(fs.writeFile);
-const fsyncAsync = promisify(fs.fsync);
-const closeAsync = promisify(fs.close);
-
-function isIgnorableFsyncError(error) {
-  const code = error?.code;
-  if (code === "ENOSYS" || code === "ENOTSUP" || code === "ERR_NOT_IMPLEMENTED") {
-    return true;
-  }
-  const message = String(error?.message ?? "");
-  return message.includes("Method not implemented");
+function legacyJsonImportEnabled() {
+  const value = String(process.env.PLAYER_SAVE_IMPORT_LEGACY_JSON ?? "1")
+    .trim()
+    .toLowerCase();
+  return value !== "0" && value !== "false" && value !== "off" && value !== "no";
 }
 
-async function fsyncDirectorySafeAsync(directoryPath) {
-  let dirFd = null;
-  try {
-    dirFd = await openAsync(directoryPath, "r");
-    await fsyncAsync(dirFd);
-  } catch (error) {
-    if (!isIgnorableFsyncError(error)) {
-      // Directory fsync is best-effort and can be unsupported on some platforms/filesystems.
-    }
-  } finally {
-    if (dirFd !== null) {
-      try {
-        await closeAsync(dirFd);
-      } catch (_error) {
-        // no-op
-      }
-    }
-  }
-}
-
-async function fsyncFileSafeAsync(fd) {
-  try {
-    await fsyncAsync(fd);
-  } catch (error) {
-    if (!isIgnorableFsyncError(error)) {
-      throw error;
-    }
-  }
-}
-
-async function writeFileAtomicallyAsync(filePath, content) {
-  const directory = path.dirname(filePath);
-  const tempFilePath = path.join(
-    directory,
-    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${Math.floor(Math.random() * 1_000_000)}.tmp`
-  );
-  let tempFd = null;
-  try {
-    tempFd = await openAsync(tempFilePath, "w");
-    await writeFileAsync(tempFd, content, "utf8");
-    await fsyncFileSafeAsync(tempFd);
-  } finally {
-    if (tempFd !== null) {
-      try {
-        await closeAsync(tempFd);
-      } catch (_error) {
-        // no-op
-      }
-    }
-  }
-
-  await fsp.rename(tempFilePath, filePath);
-  await fsyncDirectorySafeAsync(directory);
-}
-
-class JsonPlayerPersistence extends PlayerPersistence {
-  static SAVE_DIRECTORY = path.join(
-    process.cwd(),
-    "data",
-    "saves",
-    "characters"
-  );
+class SqlitePlayerPersistence extends PlayerPersistence {
+  static LEGACY_SAVE_DIRECTORY = process.env.LEGACY_PLAYER_SAVE_DIRECTORY
+    ? path.resolve(process.env.LEGACY_PLAYER_SAVE_DIRECTORY)
+    : path.join(process.cwd(), "data", "saves", "characters");
+  static DATABASE_PATH = process.env.PLAYER_SAVE_DATABASE_PATH
+    ? path.resolve(process.env.PLAYER_SAVE_DATABASE_PATH)
+    : path.join(process.cwd(), "data", "saves", "players.sqlite");
+  static IMPORT_LEGACY_JSON = legacyJsonImportEnabled();
 
   constructor() {
     super();
     this.prayerByConfig = new Map();
-    this.pendingSerializedSaves = new Map();
-    this.failedWrites = new Map();
-    this.pendingWriteChain = Promise.resolve();
-    this.nextWriteSequence = 0;
     for (const prayer of PrayerData.values()) {
       this.prayerByConfig.set(prayer.configId, prayer);
+    }
+
+    fs.mkdirSync(path.dirname(SqlitePlayerPersistence.DATABASE_PATH), { recursive: true });
+    this.database = new DatabaseSync(SqlitePlayerPersistence.DATABASE_PATH);
+    this.database.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA foreign_keys = ON;
+      PRAGMA busy_timeout = 5000;
+      PRAGMA synchronous = NORMAL;
+
+      CREATE TABLE IF NOT EXISTS player_saves (
+        username TEXT PRIMARY KEY,
+        save_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    this.findSave = this.database.prepare(
+      "SELECT save_json AS saveJson FROM player_saves WHERE username = ?"
+    );
+    this.savePlayer = this.database.prepare(`
+      INSERT INTO player_saves (username, save_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(username) DO UPDATE SET
+        save_json = excluded.save_json,
+        updated_at = excluded.updated_at
+    `);
+    if (SqlitePlayerPersistence.IMPORT_LEGACY_JSON) {
+      this.importLegacySaves();
+    } else {
+      console.info("[persistence] legacy JSON import is disabled");
     }
   }
 
   load(username) {
-    const filePath = this.resolveFilePath(username);
-    const pendingWrite = this.pendingSerializedSaves.get(filePath);
-    if (pendingWrite) {
-      const parsed = JSON.parse(pendingWrite.serialized, this.reviver.bind(this));
-      return this.hydratePlayerSave(parsed);
-    }
-    if (!fs.existsSync(filePath)) {
+    const row = this.findSave.get(this.normalizeUsername(username));
+    if (!row || typeof row.saveJson !== "string") {
       return null;
     }
-    const rawJson = fs.readFileSync(filePath, "utf8");
-    const parsed = JSON.parse(rawJson, this.reviver.bind(this));
+    const parsed = JSON.parse(row.saveJson, this.reviver.bind(this));
     return this.hydratePlayerSave(parsed);
   }
 
@@ -157,25 +115,15 @@ class JsonPlayerPersistence extends PlayerPersistence {
 
     const serialized = JSON.stringify(save, this.replacer.bind(this), 2);
     this.validateSerializedSave(serialized, player.getUsername());
-    const filePath = this.resolveFilePath(player.getUsername());
-    this.enqueueSerializedWrite(filePath, serialized, player.getUsername());
+    this.savePlayer.run(
+      this.normalizeUsername(player.getUsername()),
+      serialized,
+      new Date().toISOString()
+    );
   }
 
   exists(username) {
-    const filePath = this.resolveFilePath(username);
-    return this.pendingSerializedSaves.has(filePath) || fs.existsSync(filePath);
-  }
-
-  async flush() {
-    await this.pendingWriteChain.catch(() => undefined);
-    if (this.failedWrites.size > 0) {
-      throw this.failedWrites.values().next().value;
-    }
-  }
-
-  resolveFilePath(username) {
-    const normalized = this.normalizeUsername(username);
-    return path.join(JsonPlayerPersistence.SAVE_DIRECTORY, `${normalized}.json`);
+    return this.findSave.get(this.normalizeUsername(username)) !== undefined;
   }
 
   normalizeUsername(username) {
@@ -187,25 +135,73 @@ class JsonPlayerPersistence extends PlayerPersistence {
     return safe.length > 0 ? safe.toLowerCase() : "player";
   }
 
-  enqueueSerializedWrite(filePath, serialized, username) {
-    const sequence = ++this.nextWriteSequence;
-    this.pendingSerializedSaves.set(filePath, { sequence, serialized });
-    this.pendingWriteChain = this.pendingWriteChain
-      .catch(() => undefined)
-      .then(async () => {
+  /**
+   * Copies every legacy character file into SQLite without ever overwriting an
+   * existing row. The original JSON files remain in place as a rollback backup.
+   */
+  importLegacySaves() {
+    const directory = SqlitePlayerPersistence.LEGACY_SAVE_DIRECTORY;
+    if (!fs.existsSync(directory)) {
+      return;
+    }
+
+    const insertLegacySave = this.database.prepare(`
+      INSERT INTO player_saves (username, save_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(username) DO NOTHING
+    `);
+    const files = fs
+      .readdirSync(directory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === ".json")
+      .map((entry) => entry.name)
+      .sort();
+    let imported = 0;
+    let skipped = 0;
+    let invalid = 0;
+
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const updatedAt = new Date().toISOString();
+      for (const fileName of files) {
+        const username = this.normalizeUsername(path.basename(fileName, ".json"));
+        const filePath = path.join(directory, fileName);
+        let serialized;
         try {
-          await fsp.mkdir(path.dirname(filePath), { recursive: true });
-          await writeFileAtomicallyAsync(filePath, serialized);
-          const pendingWrite = this.pendingSerializedSaves.get(filePath);
-          if (pendingWrite && pendingWrite.sequence === sequence) {
-            this.pendingSerializedSaves.delete(filePath);
+          serialized = fs.readFileSync(filePath, "utf8");
+          const parsed = JSON.parse(serialized, this.reviver.bind(this));
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            throw new Error("root must be an object");
           }
-          this.failedWrites.delete(filePath);
         } catch (error) {
-          this.failedWrites.set(filePath, error);
-          console.error(`[persistence] async save failed for ${username}`, error);
+          invalid++;
+          console.warn(
+            `[persistence] skipped invalid legacy save ${fileName}: ${error?.message ?? error}`
+          );
+          continue;
         }
-      });
+
+        const result = insertLegacySave.run(username, serialized, updatedAt);
+        if (result.changes === 1) {
+          imported++;
+        } else {
+          skipped++;
+        }
+      }
+      this.database.exec("COMMIT");
+    } catch (error) {
+      try {
+        this.database.exec("ROLLBACK");
+      } catch (_rollbackError) {
+        // The import error is more useful than a rollback error.
+      }
+      throw error;
+    }
+
+    if (files.length > 0) {
+      console.info(
+        `[persistence] SQLite imported ${imported} legacy save(s); existing=${skipped}, invalid=${invalid}`
+      );
+    }
   }
 
   resolvePresetBaselineSave(player) {
@@ -752,12 +748,18 @@ class JsonPlayerPersistence extends PlayerPersistence {
 let SkillManager;
 
 module.exports = {
-  name: "JsonPlayerPersistence",
+  name: "SqlitePlayerPersistence",
   register(api) {
     SkillManager = api.getSkillManager();
-    api.setPlayerPersistence(new JsonPlayerPersistence());
+    const persistence = new SqlitePlayerPersistence();
+    api.setPlayerPersistence(persistence);
     api.log("registered", {
-      saveDirectory: path.join("data", "saves", "characters"),
+      databasePath: path.relative(process.cwd(), SqlitePlayerPersistence.DATABASE_PATH),
+      legacySaveDirectory: path.relative(
+        process.cwd(),
+        SqlitePlayerPersistence.LEGACY_SAVE_DIRECTORY
+      ),
+      legacyJsonImportEnabled: SqlitePlayerPersistence.IMPORT_LEGACY_JSON,
     });
   },
 };

@@ -8,9 +8,19 @@
  
  ```yarn install```
  
- Then, run
+Then, run
  
- ```yarn dev```
+```yarn dev```
+
+## Player persistence
+
+Player saves are stored in `data/saves/players.sqlite`. On startup, JSON character
+files from `data/saves/characters` are imported by default without modifying the
+source files. Set `PLAYER_SAVE_IMPORT_LEGACY_JSON=0` (also accepts `false`, `off`,
+or `no`) to skip that import; restart the server after changing the setting.
+
+`PLAYER_SAVE_DATABASE_PATH` and `LEGACY_PLAYER_SAVE_DIRECTORY` optionally override
+the database and legacy-save locations.
 
 ## Development data API
 

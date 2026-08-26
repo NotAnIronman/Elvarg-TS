@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "dependencies": {
     "@angular/core": "^15.2.3",
     "@awboost/ddb-table-client": "^0.1.0",

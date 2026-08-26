@@ -7,6 +7,7 @@ dist
 
 # Runtime/server state
 data/saves/characters
+data/saves/*.sqlite*
 logs/
 caches/
 Function
