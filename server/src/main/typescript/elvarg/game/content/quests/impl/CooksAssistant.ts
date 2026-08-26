@@ -3,6 +3,7 @@ import { QuestHandler, Quests } from '../QuestHandler';
 import { NPC } from '../../../entity/impl/npc/NPC';
 import { Player } from '../../../entity/impl/player/Player';
 import { Skill } from '../../../model/Skill';
+import { Item } from '../../../model/Item';
 import { DialogueExpression } from '../../../model/dialogues/DialogueExpression';
 import { DialogueChainBuilder } from '../../../model/dialogues/builders/DialogueChainBuilder';
 import { NpcIdentifiers } from '../../../../util/NpcIdentifiers';
@@ -122,102 +123,102 @@ export class CooksAssistant implements Quest {
         this.dialogueBuilder = new DialogueChainBuilder();
         this.dialogueBuilder.add(
             new NpcDialogue(0, CooksAssistant.NPC_COOK, "What am I to do?", DialogueExpression.SAD),
-            new OptionDialogue(1, new CooksDialogueAction((option, player) => {
-                if (!player) return;
-                switch (option) {
-                    case DialogueOption.FIRST_OPTION:
-                    case DialogueOption.THIRD_OPTION:
-                        player.getDialogueManager().startDialog(this.dialogueBuilder, 2);
-                        break;
-                    case DialogueOption.SECOND_OPTION:
-                        player.getDialogueManager().startDialog(this.dialogueBuilder, 14);
-                        break;
-                    case DialogueOption.FOURTH_OPTION:
-                        player.getDialogueManager().startDialog(this.dialogueBuilder, 17);
-                        break;
-                }
-            }), "What's wrong?", "Can you cook me a cake?", "You don't look very happy.", "Nice hat."),
-            new PlayerDialogue(2, "What's wrong?"),
-            new NpcDialogue(3, CooksAssistant.NPC_COOK,
-                "Oh dear, oh dear, oh dear, I'm in a terrible terrible" +
-                "mess! It's the Duke's birthday today, and I should be" +
-                "making him a lovely big birthday cake!", DialogueExpression.SAD),
-            new NpcDialogue(4,CooksAssistant. NPC_COOK,
-                "I've forgotten to buy the ingredients. I'll never get" +
-                "them in time now. He'll sack me! What will I do? I have" +
-                "four children and a goat to look after. Would you help" +
-                "me? Please?", DialogueExpression.SAD),
-            new OptionDialogue(5, new CooksDialogueAction((option, player) => {
-                if (!player) return;
-                switch (option) {
-                    case DialogueOption.FIRST_OPTION:
-                        Quests.COOKS_ASSISTANT.setProgress(player, 1);
-                        player.getDialogueManager().startDialog(this.dialogueBuilder, 6);
-                        break;
-                    case DialogueOption.SECOND_OPTION:
-                        player.getDialogueManager().startDialog(this.dialogueBuilder, 11);
-                        break;
-                }
-            }), "I'm always happy to help a cook in distress.", "I can't right now, Maybe later."),
+                                 new OptionDialogue(1, new CooksDialogueAction((option, player) => {
+                                     if (!player) return;
+                                     switch (option) {
+                                         case DialogueOption.FIRST_OPTION:
+                                         case DialogueOption.THIRD_OPTION:
+                                             player.getDialogueManager().startDialog(this.dialogueBuilder, 2);
+                                             break;
+                                         case DialogueOption.SECOND_OPTION:
+                                             player.getDialogueManager().startDialog(this.dialogueBuilder, 14);
+                                             break;
+                                         case DialogueOption.FOURTH_OPTION:
+                                             player.getDialogueManager().startDialog(this.dialogueBuilder, 17);
+                                             break;
+                                     }
+                                 }), "What's wrong?", "Can you cook me a cake?", "You don't look very happy.", "Nice hat."),
+                                 new PlayerDialogue(2, "What's wrong?"),
+                                 new NpcDialogue(3, CooksAssistant.NPC_COOK,
+                                                 "Oh dear, oh dear, oh dear, I'm in a terrible terrible" +
+                                                 "mess! It's the Duke's birthday today, and I should be" +
+                                                 "making him a lovely big birthday cake!", DialogueExpression.SAD),
+                                 new NpcDialogue(4,CooksAssistant. NPC_COOK,
+                                                 "I've forgotten to buy the ingredients. I'll never get" +
+                                                 "them in time now. He'll sack me! What will I do? I have" +
+                                                 "four children and a goat to look after. Would you help" +
+                                                 "me? Please?", DialogueExpression.SAD),
+                                 new OptionDialogue(5, new CooksDialogueAction((option, player) => {
+                                     if (!player) return;
+                                     switch (option) {
+                                         case DialogueOption.FIRST_OPTION:
+                                             Quests.COOKS_ASSISTANT.setProgress(player, 1);
+                                             player.getDialogueManager().startDialog(this.dialogueBuilder, 6);
+                                             break;
+                                         case DialogueOption.SECOND_OPTION:
+                                             player.getDialogueManager().startDialog(this.dialogueBuilder, 11);
+                                             break;
+                                     }
+                                 }), "I'm always happy to help a cook in distress.", "I can't right now, Maybe later."),
 
-            new PlayerDialogue(6, "Yes, I'll help you.", DialogueExpression.HAPPY),
-            new NpcDialogue(7, CooksAssistant.NPC_COOK, "Oh thank you, thank you. I need milk, an egg, and " +
-                "flour. I'd be very grateful if you can get them for me.", DialogueExpression.HAPPY),
-            new PlayerDialogue(8, "So where do I find these ingredients then?", DialogueExpression.DISTRESSED),
-            new NpcDialogue(9, CooksAssistant.NPC_COOK, "You can find flour in any of the shops here." +
-                "You can find eggs by killing chickens." +
-                "You can find milk by using a bucket on a cow"),
-            new EndDialogue(10),
+                                 new PlayerDialogue(6, "Yes, I'll help you.", DialogueExpression.HAPPY),
+                                 new NpcDialogue(7, CooksAssistant.NPC_COOK, "Oh thank you, thank you. I need milk, an egg, and " +
+                                 "flour. I'd be very grateful if you can get them for me.", DialogueExpression.HAPPY),
+                                 new PlayerDialogue(8, "So where do I find these ingredients then?", DialogueExpression.DISTRESSED),
+                                 new NpcDialogue(9, CooksAssistant.NPC_COOK, "You can find flour in any of the shops here." +
+                                 "You can find eggs by killing chickens." +
+                                 "You can find milk by using a bucket on a cow"),
+                                 new EndDialogue(10),
 
-            new PlayerDialogue(11, "I can't right now, Maybe later.", DialogueExpression.SAD),
-            new NpcDialogue(12, CooksAssistant.NPC_COOK, "Oh please! Hurry then!", DialogueExpression.DISTRESSED),
-            new EndDialogue(13),
+                                 new PlayerDialogue(11, "I can't right now, Maybe later.", DialogueExpression.SAD),
+                                 new NpcDialogue(12, CooksAssistant.NPC_COOK, "Oh please! Hurry then!", DialogueExpression.DISTRESSED),
+                                 new EndDialogue(13),
 
-            new PlayerDialogue(14, "Can you bake me a cake?", DialogueExpression.EVIL_LAUGH_SHORT),
-            new NpcDialogue(15, CooksAssistant.NPC_COOK, "Does it look like I have the time?", DialogueExpression.ANGRY_1),
-            new EndDialogue(16),
+                                 new PlayerDialogue(14, "Can you bake me a cake?", DialogueExpression.EVIL_LAUGH_SHORT),
+                                 new NpcDialogue(15, CooksAssistant.NPC_COOK, "Does it look like I have the time?", DialogueExpression.ANGRY_1),
+                                 new EndDialogue(16),
 
-            new PlayerDialogue(17, "Nice hat!", DialogueExpression.EVIL_LAUGH_SHORT),
-            new NpcDialogue(18, CooksAssistant.NPC_COOK, "I don't have time for your jibber-jabber!", DialogueExpression.ANGRY_1),
-            new EndDialogue(19),
+                                 new PlayerDialogue(17, "Nice hat!", DialogueExpression.EVIL_LAUGH_SHORT),
+                                 new NpcDialogue(18, CooksAssistant.NPC_COOK, "I don't have time for your jibber-jabber!", DialogueExpression.ANGRY_1),
+                                 new EndDialogue(19),
 
-            new NpcDialogue(20, CooksAssistant.NPC_COOK, "How are you getting on with finding the ingredients?", DialogueExpression.DISTRESSED, new CooksAction((player) => {
-                if (player.getInventory().contains(CooksAssistant.EGG) && player.getInventory().contains(CooksAssistant.MILK)
-                    && player.getInventory().contains(CooksAssistant.FLOUR)) {
-                    player.getDialogueManager().start(this.dialogueBuilder, 21);
-                } else {
-                    player.getDialogueManager().start(this.dialogueBuilder, 28);
-                }
-            })),
+                                 new NpcDialogue(20, CooksAssistant.NPC_COOK, "How are you getting on with finding the ingredients?", DialogueExpression.DISTRESSED, new CooksAction((player) => {
+                                     if (player.getInventory().contains(CooksAssistant.EGG) && player.getInventory().contains(CooksAssistant.MILK)
+                                         && player.getInventory().contains(CooksAssistant.FLOUR)) {
+                                         player.getDialogueManager().startDialog(this.dialogueBuilder, 21);
+                                         } else {
+                                             player.getDialogueManager().startDialog(this.dialogueBuilder, 28);
+                                         }
+                                 })),
 
-            new PlayerDialogue(21, "Here's all the ingredients!"),
-            new NpcDialogue(22, CooksAssistant.NPC_COOK, "You brought me everything I need! I'm saved!", DialogueExpression.HAPPY, new CooksAction((player) => {
-                player.getInventory().delete(CooksAssistant.EGG, 1);
-                player.getInventory().delete(CooksAssistant.MILK, 1);
-                player.getInventory().delete(CooksAssistant.FLOUR, 1);
+                                 new PlayerDialogue(21, "Here's all the ingredients!"),
+                                 new NpcDialogue(22, CooksAssistant.NPC_COOK, "You brought me everything I need! I'm saved!", DialogueExpression.HAPPY, new CooksAction((player) => {
+                                     player.getInventory().delete(CooksAssistant.EGG, 1);
+                                     player.getInventory().delete(CooksAssistant.MILK, 1);
+                                     player.getInventory().delete(CooksAssistant.FLOUR, 1);
 
-                Quests.COOKS_ASSISTANT.setProgress(player, 2);
-            })),
-            new PlayerDialogue(24, "So do I get to go to the Duke's Party?"),
-            new NpcDialogue(25, CooksAssistant.NPC_COOK, "I'm afraid not, only the big cheeses get to dine with the"
-                + "Duke.", DialogueExpression.SLIGHTLY_SAD),
-            new PlayerDialogue(26, "Well, maybe one day I'll be important enough to sit on" +
-                "the Duke's table"),
-            new NpcDialogue(27, CooksAssistant.NPC_COOK, "Maybe, but I won't be holding my breath.",DialogueExpression.LAUGHING, new CooksAction((player) => {
-                Quests.COOKS_ASSISTANT.setProgress(player, 3);
-                Quests.COOKS_ASSISTANT.showRewardInterface(player, ["1 Quest Point", "500 Coins", "300 Cooking XP"], 326);
-                player.getInventory().add(995, 500);
-                player.getSkillManager().addExperience(Skill.COOKING, 300);
-                player.getPacketSender().sendMessage("You completed " + Quests.COOKS_ASSISTANT.getName() + "!");
-                //client.getActionSender().sendQuickSong(93, 0);
-            })),
+                                     Quests.COOKS_ASSISTANT.setProgress(player, 2);
+                                 })),
+                                 new PlayerDialogue(24, "So do I get to go to the Duke's Party?"),
+                                 new NpcDialogue(25, CooksAssistant.NPC_COOK, "I'm afraid not, only the big cheeses get to dine with the"
+                                 + "Duke.", DialogueExpression.SLIGHTLY_SAD),
+                                 new PlayerDialogue(26, "Well, maybe one day I'll be important enough to sit on" +
+                                 "the Duke's table"),
+                                 new NpcDialogue(27, CooksAssistant.NPC_COOK, "Maybe, but I won't be holding my breath.",DialogueExpression.LAUGHING, new CooksAction((player) => {
+                                     Quests.COOKS_ASSISTANT.setProgress(player, 3);
+                                     Quests.COOKS_ASSISTANT.showRewardInterface(player, ["1 Quest Point", "500 Coins", "300 Cooking XP"], 326);
+                                     player.getInventory().add(new Item(995, 500), true);
+                                     player.getSkillManager().addExperiences(Skill.COOKING, 300);
+                                     player.getPacketSender().sendMessage("You completed " + Quests.COOKS_ASSISTANT.getName() + "!");
+                                     //client.getActionSender().sendQuickSong(93, 0);
+                                 })),
 
-            // Keep the incomplete-items response on its own branch. Index 24
-            // is the post-turn-in conversation used when the quest is ready
-            // to be completed; reusing it made the dialogue map overwrite the
-            // reward branch and let players complete the quest without items.
-            new PlayerDialogue(28, "I don't have all the ingredients yet!", DialogueExpression.SAD),
-            new EndDialogue(29)
+                                 // Keep the incomplete-items response on its own branch. Index 24
+                                 // is the post-turn-in conversation used when the quest is ready
+                                 // to be completed; reusing it made the dialogue map overwrite the
+                                 // reward branch and let players complete the quest without items.
+                                 new PlayerDialogue(28, "I don't have all the ingredients yet!", DialogueExpression.SAD),
+                                 new EndDialogue(29)
         );
     }
 }
@@ -240,5 +241,5 @@ class CooksAction implements DialogueAction{
     execute(player: Player): void {
         this.execFunc(player);
     }
-    
+
 }
