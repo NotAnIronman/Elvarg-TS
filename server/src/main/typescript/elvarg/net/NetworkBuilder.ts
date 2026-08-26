@@ -99,6 +99,11 @@ type PendingLogin = {
   save: any | null;
 };
 
+export function isConfiguredDeveloperUsername(username: string): boolean {
+  const developerUsername = process.env.DEV_USERNAME?.trim();
+  return !!developerUsername && developerUsername.toLowerCase() === username.toLowerCase();
+}
+
 export class NetworkBuilder {
   public initialize(port: number): WebSocketServer {
     const http = createServer((request, response) => {
@@ -698,6 +703,7 @@ class ClientConnection {
     player.setLongUsername(Misc.stringToLongBigInt(pending.username));
     player.setHostAddress(this.channel.remoteAddress);
     if (pending.save) pending.save.applyToPlayer(player);
+    if (isConfiguredDeveloperUsername(player.getUsername())) player.setRights(PlayerRights.DEVELOPER);
     player.setPasswordHashWithSalt(pending.passwordHash);
     player.setLastKnownRegion(player.getLocation().clone());
     player.getUpdateFlag().flag(Flag.APPEARANCE);
